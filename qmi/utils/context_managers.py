@@ -1,0 +1,71 @@
+"""Context managers for QMI RPC protocol contexts."""
+from contextlib import contextmanager
+from typing import Iterator, Protocol, TypeVar
+
+
+class StartStoppable(Protocol):
+    """Protocol for start_stop context class"""
+    def start(self, *args, **kwargs) -> None: ...
+    def stop(self) -> None: ...
+
+
+class StartStopJoinable(StartStoppable, Protocol):
+    """Protocol for start_stop context class, but has join as well."""
+    def start(self, *args, **kwargs) -> None: ...
+    def stop(self) -> None: ...
+    def join(self) -> None: ...
+
+
+class OpenClosable(Protocol):
+    """Protocol for open_close context class. None of the `open` implementations take arguments."""
+    def open(self) -> None: ...
+    def close(self) -> None: ...
+
+
+class LockUnlockable(Protocol):
+    """Protocol for lock_unlock context class. None of the `lock` implementations take arguments."""
+    def lock(self, *args, **kwargs) -> None: ...
+    def unlock(self, *args, **kwargs) -> None: ...
+
+
+_SS = TypeVar("_SS", bound=StartStoppable)
+_SSJ = TypeVar("_SSJ", bound=StartStopJoinable)
+_OC = TypeVar("_OC", bound=OpenClosable)
+_LU = TypeVar("_LU", bound=LockUnlockable)
+
+
+@contextmanager
+def start_stop(thing: _SS, *args, **kwargs) -> Iterator[_SS]:
+    thing.start(*args, **kwargs)
+    try:
+        yield thing
+    finally:
+        thing.stop()
+
+
+@contextmanager
+def start_stop_join(thing: _SSJ, *args, **kwargs) -> Iterator[_SSJ]:
+    thing.start(*args, **kwargs)
+    try:
+        yield thing
+    finally:
+        thing.stop()
+        thing.join()
+
+
+@contextmanager
+def open_close(thing: _OC) -> Iterator[_OC]:
+    thing.open()
+    try:
+        yield thing
+    finally:
+        thing.close()
+
+
+@contextmanager
+def lock_unlock(thing: _LU, *args, **kwargs) -> Iterator[_LU]:
+    thing.lock(*args, **kwargs)
+    try:
+        yield thing
+    finally:
+        thing.unlock()

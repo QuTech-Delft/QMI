@@ -1,0 +1,80 @@
+digraph {
+
+    // Classes without a superclass.
+    cls_qmi_context [shape=record label="{ QMI_Context | <rpc_objects> _rpc_object_map | <signal_manager> _signal_manager | <message_router> _message_router }"];
+
+    cls_message_router [shape=record label="{ MessageRouter\n(qmi.core.messaging) | <thread> _thread | <socket_manager> _socket_manager }" ];
+
+    cls_socket_manager [shape=record label="{ _SocketManager\n(qmi.core.messaging) | <socket_wrappers> _socket_wrappers }" ];
+
+    // _SocketWrapper class and its specializations
+
+    cls_socket_wrapper       [shape=record label="{ _SocketWrapper\n(qmi.core.messaging) }" ];
+    cls_udp_responder        [shape=record label="{ _UdpResponder\n(qmi.core.messaging) }" ];
+    cls_peer_tcp_connection  [shape=record label="{ _PeerTcpConnection\n(qmi.core.messaging) }" ];
+    cls_tcp_server           [shape=record label="{ _TcpServer\n(qmi.core.messaging) }" ];
+
+    // QMI_MessageHandler class and its specializations
+
+    cls_qmi_message_handler [shape=record label="{ QMI_MessageHandler\n(qmi.core.messaging) }" ];
+    cls_rpc_object_manager  [shape=record label="{ RpcObjectManager\n(qmi.core.rpc) | <rpc_thread> _rpc_thread }" ];
+    cls_rpc_future          [shape=record label="{ RpcFuture\n(qmi.core.rpc) }" ];
+    cls_signal_manager      [shape=record label="{ SignalManager\n(qmi.core.pubsub) }" ];
+
+    // QMI_RpcObject class and its specializations
+
+    cls_rpc_object          [shape=record label="{ QMI_RpcObject\n(qmi.core.rpc) }"        ];
+    cls_context_rpc_object  [shape=record label="{ _ContextRpcObject\n(qmi.core.context) }"];
+    cls_qmi_instrument      [shape=record label="{ QMI_Instrument\n(qmi.core.instrument) }"];
+    cls_qmi_task_runner     [shape=record label="{ QMI_TaskRunner\n(qmi.core.task) | <thread> _thread }" ];
+
+    // QMI Thread class and derivatives 
+
+    cls_python_thread       [shape=record label="{ threading.Thread\n(Python) }"];
+    cls_qmi_thread          [shape=record label="{ QMI_Thread\n(qmi.core.thread) }"];
+    cls_rpc_thread          [shape=record label="{ _RpcThread\n(qmi.core.rpc) | <rpc_object> _rpc_object}" color=red ];
+    cls_event_driven_thread [shape=record label="{ _EventDrivenThread\n(qmi.core.messaging) }" color=red ];
+    cls_task_thread         [shape=record label="{ _TaskThread\n(qmi.core.task) | <task> task }" color=red ];
+
+    // QMI_Task stuff
+    
+    cls_qmi_task            [shape=record label="{ QMI_Task\n(qmi.core.task) }"];
+
+    // QMI Signal stuff (other than the Messages)
+
+    
+    // Specializations
+
+    cls_qmi_message_handler -> cls_rpc_object_manager  [dir="back" arrowtail="onormal" color="green"];
+    cls_qmi_message_handler -> cls_rpc_future          [dir="back" arrowtail="onormal" color="green"];
+    cls_qmi_message_handler -> cls_signal_manager      [dir="back" arrowtail="onormal" color="green"];
+
+    cls_python_thread -> cls_qmi_thread            [dir="back" arrowtail="onormal" color="green"];
+    cls_qmi_thread    -> cls_rpc_thread            [dir="back" arrowtail="onormal" color="green"];
+    cls_qmi_thread    -> cls_event_driven_thread   [dir="back" arrowtail="onormal" color="green"];
+    cls_qmi_thread    -> cls_task_thread           [dir="back" arrowtail="onormal" color="green"];
+
+    cls_rpc_object -> cls_context_rpc_object  [dir="back" arrowtail="onormal" color="green"];
+    cls_rpc_object -> cls_qmi_instrument      [dir="back" arrowtail="onormal" color="green"];
+    cls_rpc_object -> cls_qmi_task_runner     [dir="back" arrowtail="onormal" color="green"];
+    
+    cls_socket_wrapper    -> cls_udp_responder        [dir="back" arrowtail="onormal" color="green"];
+    cls_socket_wrapper    -> cls_peer_tcp_connection  [dir="back" arrowtail="onormal" color="green"];
+    cls_socket_wrapper    -> cls_tcp_server           [dir="back" arrowtail="onormal" color="green"];
+
+    // Ownership
+
+    cls_qmi_context:rpc_objects:w       -> cls_rpc_object_manager [color="blue", label="(zero or more)"];
+    cls_rpc_thread:rpc_object:e         -> cls_rpc_object         [color="blue", label="(one)"];
+    cls_rpc_object_manager:rpc_thread:e -> cls_rpc_thread         [color="blue", label="(one)"];
+
+    cls_qmi_task_runner:thread:w -> cls_task_thread [color="blue", label="(one)"];
+    cls_task_thread:task:e -> cls_qmi_task [color="blue", label="(one)"];
+
+    cls_message_router:thread:e -> cls_event_driven_thread [color="blue", label="(one)"];
+    cls_message_router:socket_manager:w -> cls_socket_manager [color="blue", label="(one)"];
+    cls_socket_manager:socket_wrappers:w -> cls_socket_wrapper [color="blue", label="(zero or more)"];
+
+    cls_qmi_context:signal_manager:e -> cls_signal_manager [color="blue", label="(one)"];
+    cls_qmi_context:message_router:w -> cls_message_router [color="blue", label="(one)"];
+}
