@@ -1,0 +1,44 @@
+Answered Questions
+==================
+
+  * Is it possible to render stuff that is in the same RST file, on different pages?
+
+    No. See:
+
+    https://stackoverflow.com/questions/44777009/can-i-split-a-single-restructuredtext-file-into-multiple-html-pages-by-section
+
+  * Can we add a hook to autodoc (eg for @rpc_method decorators)?
+
+    Yes, using events, inside a self-written Sphinx extension (or inside "conf.py").
+
+  * How do we document class member variables?
+
+    --> Use the "Attributes" section in Google Docs style.
+
+Unanswered questions
+====================
+
+  * Is it possible to suppress stuff (make it invisible for autodoc)?
+
+    Check the
+         :exclude-members: option!
+
+  * How do we extend the toc-tree inside the code tree?
+
+  * Is 'autosummary' worth it?
+
+  * How do I widen the page?
+
+    This is theme-specific.
+
+
+Issues
+======
+
+(1) WARNING: more than one target found for cross-reference
+
+    We accept them, for now.
+
+(2) We use autodoc but not autosummary, for now.
+
+(3) We get a warning from the sphinx_rtd_theme while building the documentation.

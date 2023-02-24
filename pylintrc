@@ -1,0 +1,44 @@
+
+[MESSAGES CONTROL]
+
+disable=unsubscriptable-object,     # Otherwise complains about Optional[<type>] = None and Union[<type1>, <type2>]
+        no-else-return,             # Rarely a helpful warning.
+        too-many-public-methods,    # Disable unhelpful warnings.
+        too-few-public-methods,
+        too-many-arguments,
+        too-many-instance-attributes,
+        too-many-statements,
+        abstract-method
+
+
+[BASIC]
+
+# Allow underscores in class names.
+class-rgx=_?[A-Z][A-Za-z0-9]*(_[A-Za-z0-9]+)*
+
+good-names=i,
+           j,
+           k,
+           ex,
+           Run,
+           _,
+           _logger,     # Allow "_logger" as global variable.
+           d,           # Allow some single-letter variables for convenience.
+           n,
+           s,
+           t
+
+
+[FORMAT]
+
+# Allow 119 characters on a line (QMI coding style).
+max-line-length=119
+
+
+[TYPECHECK]
+
+# List of members which are set dynamically and missed by pylint inference
+# system, and so shouldn't trigger E1101 when accessed. Python regular
+# expressions are accepted.
+generated-members=
+

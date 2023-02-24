@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+
+import sys
+import qmi.tools.proc
+sys.exit(qmi.tools.proc.main())

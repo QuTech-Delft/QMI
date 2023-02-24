@@ -1,0 +1,43 @@
+#! /usr/bin/env python3
+
+import sys
+import argparse
+import time
+
+from qmi.core.context import QMI_Context
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Start some QMI_Contexts, waits, then stops the contexts.")
+
+    parser.add_argument("--numcontexts", action='store', default=1, type=int, help="The number of contexts to make.")
+    parser.add_argument("--sleep", action='store', default=60.0, type=float, help="Time keep the context alive (seconds).")
+
+    args = parser.parse_args()
+
+    num_contexts = args.numcontexts
+    sleeptime = args.sleep
+
+    contexts = []
+
+    print("Instantiating {} contexts ...".format(num_contexts))
+    for i in range(num_contexts):
+        context_name = "context_{}".format(i + 1)
+        context = QMI_Context(context_name)
+        contexts.append(context)
+
+    print("Starting contexts ...")
+    for (i, context) in enumerate(contexts):
+        context.start()
+
+    try:
+        print("waiting for {:.3f} seconds ...".format(sleeptime))
+        time.sleep(sleeptime)
+    finally:
+        print("Stopping contexts ...")
+        for context in contexts:
+            context.stop()
+
+
+if __name__ == '__main__':
+    sys.exit(main())
