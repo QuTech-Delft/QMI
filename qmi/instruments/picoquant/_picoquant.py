@@ -41,10 +41,10 @@ EventDataType = np.dtype([
 
 
 class RealTimeHistogram(NamedTuple):
-    """Real-time histogram from MultiHarp T2 event data.
+    """Real-time histogram from T2 event data.
 
     Attributes:
-        start_timestamp: MultiHarp timestamp of first SYNC event of the histogram.
+        start_timestamp: timestamp of first SYNC event of the histogram.
         bin_resolution: Histogram bin resolution as multiple of the instrument base resolution.
         num_sync:       Number of SYNC periods included in this histogram.
         channels:       List of channel numbers included in the histogram.
@@ -58,10 +58,10 @@ class RealTimeHistogram(NamedTuple):
 
 
 class RealTimeCountRate(NamedTuple):
-    """Real-time count rate from MultiHarp T2 event data.
+    """Real-time count rate from T2 event data.
 
     Attributes:
-        start_timestamp: MultiHarp timestamp of the SYNC event that started the counters.
+        start_timestamp: timestamp of the SYNC event that started the counters.
         num_sync:       Number of SYNC periods included in the counter values.
         counts:         1D array of counter value for each input channel.
     """
@@ -77,7 +77,7 @@ class EventFilterMode(IntEnum):
 
 
 class _FetchEventsThread(QMI_Thread):
-    """This thread continuously fetches event data from the MultiHarp via USB."""
+    """This thread continuously fetches event data from the via USB."""
 
     _LOOP_SLEEP_DURATION = 0.01
 
@@ -159,7 +159,7 @@ class _FetchEventsThread(QMI_Thread):
         with self._condition:
             while not self._shutdown_requested:
                 if self._active:
-                    # Read data from MultiHarp, if any.
+                    # Read data from HydraHarp, if any.
                     fifo_data = self._read_fifo_func()
                     fifo_data_timestamp = time.time()
                     if len(fifo_data) > 0:
@@ -179,7 +179,7 @@ class _FetchEventsThread(QMI_Thread):
         It activates continuous event fetching in the background thread.
 
         This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_MultiHarp150`, `PicoQuant_HydraHarp400` instance.
+        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
         """
         with self._condition:
             if self._active:
@@ -211,7 +211,7 @@ class _FetchEventsThread(QMI_Thread):
         short time after stopping a measurement.
 
         This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_MultiHarp150`, `PicoQuant_HydraHarp400` instance.
+        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
         """
         with self._condition:
             self._active = False
@@ -221,7 +221,7 @@ class _FetchEventsThread(QMI_Thread):
         """Enable or disable blocking of events.
 
         This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_MultiHarp150`, `PicoQuant_HydraHarp400` instance.
+        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
         """
         with self._condition:
             self._block_events = blocked
@@ -233,7 +233,7 @@ class _FetchEventsThread(QMI_Thread):
         """Update event filter parameters.
 
         This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_MultiHarp150`, `PicoQuant_HydraHarp400` instance.
+        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
         """
         with self._condition:
             self._event_filter_channels = channel_filter
@@ -245,7 +245,7 @@ class _FetchEventsThread(QMI_Thread):
         """Configure real-time histograms.
 
         This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_MultiHarp150`, `PicoQuant_HydraHarp400` instance.
+        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
         """
         with self._condition:
             self._histogram_channels = channels
@@ -259,7 +259,7 @@ class _FetchEventsThread(QMI_Thread):
         """Configure real-time count rate reporting.
 
         This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_MultiHarp150`, `PicoQuant_HydraHarp400` instance.
+        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
         """
         with self._condition:
             self._countrate_aperture = sync_aperture
@@ -281,7 +281,7 @@ class _FetchEventsThread(QMI_Thread):
             Tuple (timestamp, event_data).
 
         This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_MultiHarp150`, `PicoQuant_HydraHarp400` instance.
+        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
         """
 
         # Accept at most `max_events` pending event records.
@@ -584,7 +584,7 @@ class _EventFilter:
                 self._aperture_filter_enabled = True
 
     def process_events(self, event_records: np.ndarray) -> np.ndarray:
-        """Filter MultiHarp event records.
+        """Filter event records.
 
         This function filters a sequence of event records and returns only
         the events that are considered to be interesting according to the
@@ -681,13 +681,13 @@ class _EventFilter:
 
 
 class _T2EventDecoder:
-    """Decode the MultiHarp, HydraHarp TTTR data stream in T2 mode."""
+    """Decode the TTTR data stream in T2 mode."""
 
     def __init__(self) -> None:
         self._overflow_counter = 0
 
     def process_data(self, fifo_data: np.ndarray) -> np.ndarray:
-        """Decode event records from the MultiHarp T2 data stream.
+        """Decode event records from the T2 data stream.
 
         This function decodes raw 32-bit TTTR event records and returns
         an array of structured event records.
@@ -708,12 +708,12 @@ class _T2EventDecoder:
         """
 
         #
-        # MultiHarp T2 TTTR event record format:
+        # T2 TTTR event record format:
         #   bit  31    = special_flag
         #   bits 30:25 = channel
         #   bits 24:0  = timetag
         #
-        # The "timetag" value is a multiple of the instrument base resolution (80 ps for MultiHarp).
+        # The "timetag" value is a multiple of the instrument base resolution.
         # Overflow of the 25-bit counter is marked via special overflow records.
         #
         # If special_flag == 0, the record represents a normal event on the specified channel.
@@ -896,9 +896,9 @@ class TttrHistogram:
 
 @enum.unique
 class _MODE(enum.Enum):
-    """Symbolic constants for the :func:`~MultiHarpDevice.initialize` method's `mode` argument.
+    """Symbolic constants for the :func:`~HydraHarpDevice.initialize` method's `mode` argument.
 
-    These are defined as preprocessor symbols in the ``mhdefin.h`` C header file.
+    These are defined as preprocessor symbols in the ``hhdefin.h`` C header file.
     """
     HIST = 0
     """Histogram mode."""
@@ -914,11 +914,11 @@ class _MODE(enum.Enum):
 class _EDGE(enum.Enum):
     """Symbolic constants for routines that take an `edge` argument:
 
-    * Function :func:`~MultiHarpDevice.setMeasurementControl`, `startedge` and `stopedge` arguments;
-    * Function :func:`~MultiHarpDevice.setSyncEdgeTrigger`, `edge` argument;
-    * Function :func:`~MultiHarpDevice.setInputEdgeTrigger`, `edge` argument.
+    * Function :func:`~HydraHarpDevice.setMeasurementControl`, `startedge` and `stopedge` arguments;
+    * Function :func:`~HydraHarpDevice.setSyncEdgeTrigger`, `edge` argument;
+    * Function :func:`~HydraHarpDevice.setInputEdgeTrigger`, `edge` argument.
 
-    These are defined as preprocessor symbols in the ``mhdefin.h`` C header file.
+    These are defined as preprocessor symbols in the ``hhdefin.h`` C header file.
     """
     RISING = 1
     """Rising edge."""
@@ -928,11 +928,11 @@ class _EDGE(enum.Enum):
 
 @enum.unique
 class _FEATURE(enum.IntFlag):
-    """Bitfield constants for the return value of the :func:`~MultiHarpDevice.getFeatures` function.
+    """Bitfield constants for the return value of the :func:`~HydraHarpDevice.getFeatures` function.
 
-    These are defined as preprocessor symbols in the ``mhdefin.h`` C header file.
+    These are defined as preprocessor symbols in the ``hhdefin.h`` C header file.
 
-    Unfortunately, their meanings are not fully documented in the MultiHarp documentation.
+    Unfortunately, their meanings are not fully documented in the documentation.
     """
     DLL = 0x0001
     """DLL License available."""
@@ -1062,11 +1062,8 @@ class _PicoquantHarp(QMI_Instrument):
                     decoded_serial = serial.value.decode()
                     if not decoded_serial:
                         try:
-                            if self._model in ["MH", "HH"]:
-                                self._lib.Initialize(devidx, 0, 0)  # HydraHarp and MultiHarp
-
-                            elif self._model in ["PH", "TH260"]:
-                                self._lib.Initialize(devidx, 0)  # PicoHarp and TimeHarp
+                            if self._model in ["HH"]:
+                                self._lib.Initialize(devidx, 0, 0)  # HydraHarp
 
                             else:
                                 raise NotImplementedError(f"Model {self._model} is not implemented!")
