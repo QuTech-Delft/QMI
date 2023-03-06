@@ -25,7 +25,7 @@ setup(
         read('CHANGELOG.md')),
     author='QuTech',
     author_email='',
-    url='https://gitlab.tudelft.nl/qmi/qmi',
+    url='https://github.com/QuTech-Delft/QMI',
     packages=find_packages(include=["qmi*"]),
     package_data={"qmi": ["py.typed"], "qmi.instruments.zurich_instruments": ["hdawg_command_table.schema"]},
     include_package_data=True,
@@ -47,8 +47,8 @@ setup(
         'Topic:: Scientific / Engineering:: Physics',
     ],
     project_urls={
-        'Changelog': 'https://gitlab.tudelft.nl/qmi/qmi/-/blob/v0.36.0-beta.0/CHANGELOG.md',
-        'Issue Tracker': 'https://gitlab.tudelft.nl/qmi/qmi/issues',
+        'Changelog': 'https://github.com/QuTech-Delft/QMI/CHANGELOG.md',
+        'Issue Tracker': 'https://github.com/QuTech-Delft/QMI/issues',
     },
     keywords=[
         # eg: 'keyword1', 'keyword2', 'keyword3',
