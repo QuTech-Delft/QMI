@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## \[x.y.z] - Unreleased
 
 ### Added
+- ACKNOWLEDGEMENTS.md
+- Copyright waiver in README.md
 
 ### Changed
+- LICENSE.md with a small change on first sentence
 
 ### Removed
 

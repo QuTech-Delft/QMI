@@ -7,6 +7,9 @@ QMI is developed by [QuTech](https://qutech.nl) to support advanced physics expe
 However, other than its name and original purpose, there is nothing specifically *quantum* about QMI — it is potentially
 useful in any environment where monitoring and control of measurement equipment is needed.
 
+## Copyright waiver
+Technische Universiteit Delft hereby disclaims all copyright interest in the program QMI (Quantum Measurement Infrastructure), a lab instrument remote procedure call control framework written by the QuTech.
+Professor Lieven Vandersypen, Director of Research QuTech
 ## Installation
 
 You can install QMI using pip. 
