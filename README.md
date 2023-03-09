@@ -10,6 +10,7 @@ useful in any environment where monitoring and control of measurement equipment 
 ## Copyright waiver
 Technische Universiteit Delft hereby disclaims all copyright interest in the program QMI (Quantum Measurement Infrastructure), a lab instrument remote procedure call control framework written by the QuTech.
 Professor Lieven Vandersypen, Director of Research QuTech
+
 ## Installation
 
 You can install QMI using pip. 
