@@ -41,7 +41,7 @@ jobs:
       - name: pylint
         run: |
           pip install pylint
-          pwd
+          chmod a+x scripts/run_analysis_pylint.sh 
           SCORE=$( scripts/run_analysis_pylint.sh )
           echo $SCORE $PYLINT_MIN_SCORE
           echo $SCORE > pylint_score
@@ -68,6 +68,7 @@ jobs:
       - name: radon-cc
         run: |
           pip install radon
+          chmod a+x scripts/run_analysis_cc.sh
           MAX_SCORE=$( scripts/run_analysis_cc.sh $SOURCE_DIRS )
           echo $MAX_SCORE $COMPLEXITY_MAX_SCORE
           echo $MAX_SCORE > cc_max_score
@@ -83,6 +84,7 @@ jobs:
       - name: radon-mi
         run: |
           pip install radon
+          chmod a+x scripts/run_analysis_mi.sh
           MIN_INDEX=$( scripts/run_analysis_mi.sh $SOURCE_DIRS )
           echo $MIN_INDEX $MAINTAINABILITY_MIN_INDEX
           echo $MIN_INDEX > mi_min_index
@@ -97,6 +99,7 @@ jobs:
       - name: coverage
         run: |
           pip install coverage
+          chmod a+x scripts/run_unit_tests_with_coverage.sh
           scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
           # coverage: '/^TOTAL.+?(\d+\%)$/'
