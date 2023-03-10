@@ -41,7 +41,8 @@ jobs:
       - name: pylint
         run: |
           pip install pylint
-          SCORE=$( sudo ./scripts/run_analysis_pylint.sh )
+          pwd
+          SCORE=$( scripts/run_analysis_pylint.sh )
           echo $SCORE $PYLINT_MIN_SCORE
           echo $SCORE > pylint_score
           # bc evaluates to `1` if relation is true
@@ -67,7 +68,7 @@ jobs:
       - name: radon-cc
         run: |
           pip install radon
-          MAX_SCORE=$( sudo ./scripts/run_analysis_cc.sh $SOURCE_DIRS )
+          MAX_SCORE=$( scripts/run_analysis_cc.sh $SOURCE_DIRS )
           echo $MAX_SCORE $COMPLEXITY_MAX_SCORE
           echo $MAX_SCORE > cc_max_score
           # bc evaluates to `1` if relation is true
@@ -82,7 +83,7 @@ jobs:
       - name: radon-mi
         run: |
           pip install radon
-          MIN_INDEX=$( sudo ./scripts/run_analysis_mi.sh $SOURCE_DIRS )
+          MIN_INDEX=$( scripts/run_analysis_mi.sh $SOURCE_DIRS )
           echo $MIN_INDEX $MAINTAINABILITY_MIN_INDEX
           echo $MIN_INDEX > mi_min_index
           exit $( echo "$MIN_INDEX < $MAINTAINABILITY_MIN_INDEX" | bc )  # bc evaluates to `1` if relation is true
@@ -96,7 +97,7 @@ jobs:
       - name: coverage
         run: |
           pip install coverage
-          sudo sudo ./scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
+          scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
           # coverage: '/^TOTAL.+?(\d+\%)$/'
       - name: upload coverage results
