@@ -34,10 +34,10 @@ jobs:
           apt-get update -qy
           apt-get install -y bc
           python3 --version
-          python3 -m venv .venv
-          . ./.venv/bin/activate
+#          python3 -m venv .venv
+#          . ./.venv/bin/activate
           pip install --upgrade pip
-          pip install -r requirements-ci.txt
+          pip install .
       - name: pylint
         run: |
           pip install pylint
