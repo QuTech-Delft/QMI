@@ -1,0 +1,20 @@
+# For generating an installable package and deploying
+setuptools
+wheel
+twine
+# For scientific data processing and visualisation
+numpy
+scipy
+h5py>=3.7.0
+matplotlib
+# For hardware interfacing
+pyserial
+pyusb
+python-vxi11
+# For miscellaneous functionality
+pytz
+psutil
+colorama
+jsonschema
+# Instrument AD2
+pydwf
