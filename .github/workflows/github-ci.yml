@@ -37,7 +37,7 @@ jobs:
           python3 -m venv .venv
           . ./.venv/bin/activate
           pip install --upgrade pip
-          python setup.py install
+          pip install -r requirements-ci.txt
       - name: pylint
         run: |
           pip install pylint
