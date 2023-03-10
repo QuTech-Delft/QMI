@@ -1,3 +1,8 @@
+![pylint](https://github.com/QuTech-Delft/QMI/tree/main/pylint.svg)
+ ![mypy](https://github.com/QuTech-Delft/QMI/tree/main/mypy.svg)
+ ![radon-cc](https://github.com/QuTech-Delft/QMI/tree/main/radon-cc.svg)
+ ![radon-mi](https://github.com/QuTech-Delft/QMI/tree/main/radon-mi.svg)
+
 # Quantum Measurement Infrastructure
 
 QMI is a Python 3 framework for controlling laboratory equipment. It is suitable for anything ranging from one-off
@@ -32,8 +37,6 @@ See [here](https://pip.pypa.io/en/stable/user_guide/#configuration) for where to
 systems and virtual environments.
 
 ## Documentation
-
-Download the latest documentation from
 
 `<TBD>`
 
