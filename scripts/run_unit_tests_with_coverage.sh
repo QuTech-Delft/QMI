@@ -8,4 +8,4 @@
 
 sdirs=$(IFS=, ; echo "$*")  # join arguments to comma-separated list
 
-coverage run --branch --source=$sdirs -m unittest discover --start-directory=tests --pattern="test_*.py"
+sudo coverage run --branch --source=$sdirs -m unittest discover --start-directory=tests --pattern="test_*.py"

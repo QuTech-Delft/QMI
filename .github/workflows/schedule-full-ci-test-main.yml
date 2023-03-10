@@ -43,7 +43,7 @@ jobs:
       - name: pylint
         run: |
           pip install pylint
-          SCORE=$( scripts/run_analysis_pylint.sh )
+          SCORE=$( sudo ./scripts/run_analysis_pylint.sh )
           echo $SCORE $PYLINT_MIN_SCORE
           echo $SCORE > pylint_score
           # bc evaluates to `1` if relation is true
@@ -55,9 +55,13 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: pylint-results
-          path:
-            - pylint.log
-            - pylint.svg
+          path: pylint.log
+        if: ${{ always() }}
+      - name: upload pylint test badge
+        uses: actions/upload-artifact@v3
+        with:
+          name: pylint-badge
+          path: pylint.svg
         if: ${{ always() }}
       - name: mypy
         run: |
@@ -70,14 +74,18 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: mypy-results
-          path:
-            - mypy.log
-            - mypy.svg
+          path: mypy.log
+        if: ${{ always() }}
+      - name: upload mypy test badge
+        uses: actions/upload-artifact@v3
+        with:
+          name: mypy-badge
+          path: mypy.svg
         if: ${{ always() }}
       - name: radon-cc
         run: |
           pip install radon
-          MAX_SCORE=$( scripts/run_analysis_cc.sh $SOURCE_DIRS )
+          MAX_SCORE=$( sudo ./scripts/run_analysis_cc.sh $SOURCE_DIRS )
           echo $MAX_SCORE $COMPLEXITY_MAX_SCORE
           echo $MAX_SCORE > cc_max_score
           # bc evaluates to `1` if relation is true
@@ -89,14 +97,18 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: radon-cc-results
-          path:
-            - radon-cc.log
-            - radon-cc.svg
+          path: radon-cc.log
+        if: ${{ always() }}
+      - name: upload radon-cc badge
+        uses: actions/upload-artifact@v3
+        with:
+          name: radon-cc-badge
+          path: radon-cc.svg
         if: ${{ always() }}
       - name: radon-mi
         run: |
           pip install radon
-          MIN_INDEX=$( scripts/run_analysis_mi.sh $SOURCE_DIRS )
+          MIN_INDEX=$( sudo ./scripts/run_analysis_mi.sh $SOURCE_DIRS )
           echo $MIN_INDEX $MAINTAINABILITY_MIN_INDEX
           echo $MIN_INDEX > mi_min_index
           exit $( echo "$MIN_INDEX < $MAINTAINABILITY_MIN_INDEX" | bc )  # bc evaluates to `1` if relation is true
@@ -107,14 +119,18 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: radon-mi-results
-          path:
-            - radon-mi.log
-            - radon-mi.svg
+          path: radon-mi.log
+        if: ${{ always() }}
+      - name: upload radon-mi badge
+        uses: actions/upload-artifact@v3
+        with:
+          name: radon-mi-badge
+          path: radon-mi.svg
         if: ${{ always() }}
       - name: coverage
         run: |
           pip install coverage
-          sudo scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
+          sudo sudo ./scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
           # coverage: '/^TOTAL.+?(\d+\%)$/'
       - name: upload coverage results
