@@ -96,7 +96,7 @@ jobs:
       - name: coverage
         run: |
           pip install coverage
-          ./scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
+          sudo ./scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
           # coverage: '/^TOTAL.+?(\d+\%)$/'
       - name: upload coverage results

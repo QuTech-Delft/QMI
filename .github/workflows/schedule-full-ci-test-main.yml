@@ -32,8 +32,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-#          apt-get update -qy
-#          apt-get install -y bc
+          sudo apt-get update -qy
+          sudo apt-get install -y bc
           python3 --version
           python3 -m venv .venv
           . ./.venv/bin/activate
@@ -114,7 +114,7 @@ jobs:
       - name: coverage
         run: |
           pip install coverage
-          ./scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
+          sudo ./scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
           # coverage: '/^TOTAL.+?(\d+\%)$/'
       - name: upload coverage results
