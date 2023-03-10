@@ -1,9 +1,7 @@
 import unittest.mock
 
 from qmi.instruments.picoquant._library_wrapper import _LibWrapper
-from qmi.instruments.picoquant import (
-    _mhlib_function_signatures, _hhlib_function_signatures, _phlib_function_signatures, _th260lib_function_signatures
-)
+from qmi.instruments.picoquant import _hhlib_function_signatures
 
 
 class LibraryWrapperTestCase(unittest.TestCase):
