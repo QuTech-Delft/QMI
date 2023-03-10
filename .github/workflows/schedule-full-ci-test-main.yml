@@ -46,7 +46,7 @@ jobs:
           SCORE=$( ./scripts/run_analysis_pylint.sh )
           echo $SCORE $PYLINT_MIN_SCORE
           echo $SCORE > pylint_score
-        # bc evaluates to `1` if relation is true
+          # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
           SCORE=$( cat pylint_score )
           anybadge -l pylint -v $SCORE -f pylint.svg 2=red 4=orange 8=yellow 10=green
@@ -80,7 +80,7 @@ jobs:
           MAX_SCORE=$( ./scripts/run_analysis_cc.sh $SOURCE_DIRS )
           echo $MAX_SCORE $COMPLEXITY_MAX_SCORE
           echo $MAX_SCORE > cc_max_score
-        # bc evaluates to `1` if relation is true
+          # bc evaluates to `1` if relation is true
           exit $( echo "$MAX_SCORE > $COMPLEXITY_MAX_SCORE" | bc )
           MAX_SCORE=$( cat cc_max_score )
           anybadge -l radon-cc -v $MAX_SCORE -f radon-cc.svg 11=green 21=yellow 31=orange 100=red
@@ -116,7 +116,7 @@ jobs:
           pip install coverage
           ./scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
-#        coverage: '/^TOTAL.+?(\d+\%)$/'
+          # coverage: '/^TOTAL.+?(\d+\%)$/'
       - name: upload coverage results
         uses: actions/upload-artifact@v3
         with:
