@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - ACKNOWLEDGEMENTS.md
 - Copyright waiver in README.md
+- CI workflows for regular push, pull request and for publishing.
+- Scheduled CI workflow for main branch
 
 ### Changed
 - LICENSE.md with a small change on first sentence
