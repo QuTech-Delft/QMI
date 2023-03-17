@@ -1,3 +1,9 @@
+"""
+Library wrapper module that utilizes a Python wrapper around the PicoQuant library header files
+for implemented models. The wrapper uses the manufacturer provided software libraries. The library files and
+the respective licence terms can be found in the dedicated instrument software packages at PicoQuant website:
+https://www.picoquant.com/products/category/tcspc-and-time-tagging-modules.
+"""
 import ctypes
 import sys
 from typing import Any
