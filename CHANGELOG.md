@@ -7,13 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## \[x.y.z] - Unreleased
 
 ### Added
-- ACKNOWLEDGEMENTS.md
-- Copyright waiver in README.md
+- ACKNOWLEDGEMENTS.md.
+- Copyright waiver in README.md.
 - CI workflows for regular push, pull request and for publishing.
-- Scheduled CI workflow for main branch
+- Scheduled CI workflow for main branch.
+- Added licence references for files.
 
 ### Changed
-- LICENSE.md with a small change on first sentence
+- LICENSE.md with a small change on first sentence.
 
 ### Removed
 

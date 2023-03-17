@@ -1,8 +1,8 @@
-name: QMI Python CI runner
+name: QMI Python CI runner on push to branch
 
+# This runner runs on regular push to a branch. For pull requests see "pull_request.yml"
 on:
   push:
-    branches: [ "main" ]
 
 env:
   # minimum pylint code quality score (max. 10)
@@ -54,6 +54,8 @@ jobs:
         run: |
           pip install mypy
           mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
+          if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passed"; else RESULT="failed"; fi
+          echo $RESULT
         continue-on-error: true
       - name: upload mypy test results
         uses: actions/upload-artifact@v3
@@ -115,3 +117,4 @@ jobs:
           name: unit-test-results
           path: testresults.xml
         if: ${{ always() }}
+

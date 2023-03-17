@@ -99,7 +99,7 @@ class _LibWrapper:
         return wrap_fun
 
     def annotate_function_signatures(self, sigs) -> None:
-        """Annotate functions present in the HydraHarp shared library according to their function signatures."""
+        """Annotate functions present in the MultiHarp shared library according to their function signatures."""
         function_signatures = sigs
 
         for (name, restype, argtypes) in function_signatures:
