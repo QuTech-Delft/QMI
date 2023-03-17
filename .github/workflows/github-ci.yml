@@ -14,6 +14,7 @@ env:
   # minimum maintainability index (goal: >=20; max. 100)
   MAINTAINABILITY_MIN_INDEX: "10.62"
   SOURCE_DIRS: "qmi/"
+  WORKFLOW_DIR: ".github/workflows"
 
 jobs:
   on_push:
@@ -34,6 +35,11 @@ jobs:
           python3 --version
           pip install --upgrade pip
           pip install -e '.[dev]'
+          pip install anybadge
+      - name: setup git config
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.mail "<>"
       - name: pylint
         run: |
           pip install pylint
@@ -43,6 +49,7 @@ jobs:
           echo $SCORE > pylint_score
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
+          anybadge -l pylint -v $SCORE -f $WORKFLOW_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
         continue-on-error: true
       - name: upload pylint test results
         uses: actions/upload-artifact@v3
@@ -50,6 +57,11 @@ jobs:
           name: pylint-results
           path: pylint.log
         if: ${{ always() }}
+      - name: commit pylint test badge
+        run: |
+          git add $WORKFLOW_DIR/pylint.svg
+          git commit -m "testing commit pylint badge to main"
+          git push origin main
       - name: mypy
         run: |
           pip install mypy

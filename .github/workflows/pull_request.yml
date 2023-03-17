@@ -36,7 +36,6 @@ jobs:
           python3 --version
           pip install --upgrade pip
           pip install -e '.[dev]'
-          pip install anybadge
       - name: pylint
         run: |
           pip install pylint
@@ -47,19 +46,12 @@ jobs:
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
           SCORE=$( cat pylint_score )
-          anybadge -l pylint -v $SCORE -f pylint.svg 2=red 4=orange 8=yellow 10=green
         continue-on-error: true
       - name: upload pylint test results
         uses: actions/upload-artifact@v3
         with:
           name: pylint-results
           path: pylint.log
-        if: ${{ always() }}
-      - name: upload pylint test badge
-        uses: actions/upload-artifact@v3
-        with:
-          name: pylint-badge
-          path: pylint.svg
         if: ${{ always() }}
       - name: mypy
         run: |
