@@ -14,6 +14,7 @@ env:
   # minimum maintainability index (goal: >=20; max. 100)
   MAINTAINABILITY_MIN_INDEX: "10.62"
   SOURCE_DIRS: "qmi/"
+  BADGES_DIR: ".github/badges"
 
 jobs:
   build:
@@ -25,7 +26,7 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Python-latest
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -37,6 +38,11 @@ jobs:
           pip install --upgrade pip
           pip install -e '.[dev]'
           pip install anybadge
+      - name: setup git config
+        run: |
+          git config user.name "Badge Bot"
+          git config user.mail "<>"
+          chmod u+w $BADGES_DIR
       - name: pylint
         run: |
           pip install pylint

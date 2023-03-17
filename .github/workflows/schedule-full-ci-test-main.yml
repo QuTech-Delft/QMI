@@ -2,8 +2,8 @@ name: QMI Python CI full test runner
 
 on:
   schedule:
-    # Schedule for every day at 7am
-    - cron: "0 7 * * *"
+    # Schedule for every Monday at 7am
+    - cron: "0 7 * * 1"
 
 env:
   # minimum pylint code quality score (max. 10)

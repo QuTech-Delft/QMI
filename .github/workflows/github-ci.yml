@@ -14,7 +14,6 @@ env:
   # minimum maintainability index (goal: >=20; max. 100)
   MAINTAINABILITY_MIN_INDEX: "10.62"
   SOURCE_DIRS: "qmi/"
-  BADGES_DIR: ".github/badges"
 
 jobs:
   on_push:
@@ -35,11 +34,6 @@ jobs:
           python3 --version
           pip install --upgrade pip
           pip install -e '.[dev]'
-      - name: setup git config
-        run: |
-          git config user.name "GitHub Actions Bot"
-          git config user.mail "<>"
-          chmod u+w $BADGES_DIR
       - name: pylint
         run: |
           pip install pylint
