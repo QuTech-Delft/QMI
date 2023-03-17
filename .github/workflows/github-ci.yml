@@ -48,9 +48,11 @@ jobs:
           echo $SCORE $PYLINT_MIN_SCORE
           echo $SCORE > pylint_score
           anybadge -o -l pylint -v $SCORE -f $WORKFLOW_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
+          git config -l | grep user
+          git config -l | grep branch
           git add $WORKFLOW_DIR/pylint.svg
           git commit -m "testing commit pylint badge to main"
-          git push origin main
+          git push --all
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
         continue-on-error: true
