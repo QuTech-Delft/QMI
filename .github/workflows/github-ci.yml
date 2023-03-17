@@ -58,8 +58,8 @@ jobs:
         if: ${{ always() }}
       - name: commit pylint test badge
         run: |
-          anybadge -h
-          anybadge -l pylint -v $SCORE -o -f $WORKFLOW_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
+          echo $SCORE
+          anybadge -o -l pylint -v $SCORE -f $WORKFLOW_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
           ls $WORKFLOW_DIR
           git add $WORKFLOW_DIR/pylint.svg
           git commit -m "testing commit pylint badge to main"
