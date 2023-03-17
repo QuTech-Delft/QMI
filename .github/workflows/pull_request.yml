@@ -35,6 +35,7 @@ jobs:
           sudo apt-get update -qy
           sudo apt-get install -y bc
           VERSION=$( python3 -c "import platform; major, minor, _ = platform.python_version_tuple(); print(f'{major}.{minor}')" )
+          echo $VERSION
           pip install --upgrade pip
           pip install -e '.[dev]'
           pip install anybadge
@@ -50,6 +51,8 @@ jobs:
           SCORE=$( scripts/run_analysis_pylint.sh )
           echo $SCORE > pylint_score
           anybadge -o -l pylint -v $SCORE -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
+          echo $VERSION
+          if [ "$VERSION" = "3.8" ]; then git echo "We have 3.8"; fi
           if [ "$VERSION" = "3.11" ]; then git add $BADGES_DIR/pylint.svg; fi
           if [ "$VERSION" = "3.11" ]; then git commit -m "commit pylint badge"; fi
           # bc evaluates to `1` if relation is true
