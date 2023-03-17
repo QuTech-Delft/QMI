@@ -1,4 +1,10 @@
-""" QMI instrument driver for the PicoQuant HydraHarp 400 instrument."""
+""" QMI instrument driver for the PicoQuant HydraHarp 400 instrument.
+
+The instrument driver makes use of the manufacturer provided software libraries, "hhlib.so" for Linux OS,
+or "hhlib.dll" or "hhlib64.dll" for 32-bit and 64-bit Windows OS, respectively.
+Please find the licence terms for these files in the dedicated software package for the HydraHarp instrument at
+https://www.picoquant.com/dl_software/HydraHarp400/HydraHarp400_SW_and_DLL_v3_0_0_4.zip
+"""
 import ctypes
 import enum
 import logging
@@ -6,8 +12,9 @@ from typing import List, Tuple
 
 from qmi.core.exceptions import QMI_InvalidOperationException
 from qmi.core.rpc import rpc_method
-from qmi.instruments.picoquant._library_wrapper import _LibWrapper
-from qmi.instruments.picoquant._picoquant import _str_to_enum, _PicoquantHarp, _MODE, _EDGE
+from qmi.instruments.picoquant.support._library_wrapper import _LibWrapper
+from qmi.instruments.picoquant._picoquant import _str_to_enum, _PicoquantHarp, _EDGE
+from qmi.instruments.picoquant.support._events import _MODE
 
 _logger = logging.getLogger(__name__)
 
@@ -124,7 +131,7 @@ class PicoQuant_HydraHarp400(_PicoquantHarp):
 
     @property
     def _lib(self) -> _LibWrapper:
-        if self._lazy_lib is None:
+        if self._lazy_lib is None:  # type: ignore
             self._lazy_lib = _LibWrapper('HH')
         return self._lazy_lib
 

@@ -3,7 +3,9 @@ import sys
 from typing import Any
 
 from qmi.core.exceptions import QMI_InstrumentException
-from qmi.instruments.picoquant._hhlib_function_signatures import _hhlib_function_signatures
+from qmi.instruments.picoquant.support._hhlib_function_signatures import _hhlib_function_signatures
+from qmi.instruments.picoquant.support._mhlib_function_signatures import _mhlib_function_signatures
+from qmi.instruments.picoquant.support._phlib_function_signatures import _phlib_function_signatures
 
 
 class _LibWrapper:
@@ -24,6 +26,14 @@ class _LibWrapper:
                 self._lib = ctypes.cdll.LoadLibrary("libhh400.so")
                 self.annotate_function_signatures(_hhlib_function_signatures)
 
+            elif model == "MH":
+                self._lib = ctypes.cdll.LoadLibrary("libmh150.so")
+                self.annotate_function_signatures(_mhlib_function_signatures)
+
+            elif model == "PH":
+                self._lib = ctypes.cdll.LoadLibrary("libph300.so")
+                self.annotate_function_signatures(_phlib_function_signatures)
+
             else:
                 raise FileNotFoundError("Unknown library: {lib}.".format(lib=model))
 
@@ -35,6 +45,22 @@ class _LibWrapper:
                     self._lib = ctypes.WinDLL("hhlib.dll")  # 32-bit version
 
                 self.annotate_function_signatures(_hhlib_function_signatures)
+
+            elif model == "MH":
+                try:
+                    self._lib = ctypes.WinDLL("mhlib64.dll")  # 64-bit version
+                except:
+                    self._lib = ctypes.WinDLL("mhlib.dll")  # 32-bit version
+
+                self.annotate_function_signatures(_mhlib_function_signatures)
+
+            elif model == "PH":
+                try:
+                    self._lib = ctypes.WinDLL("phlib64.dll")  # 64-bit version
+                except:
+                    self._lib = ctypes.WinDLL("phlib.dll")  # 32-bit version
+
+                self.annotate_function_signatures(_phlib_function_signatures)
 
             else:
                 raise FileNotFoundError("Unknown library: {lib}.".format(lib=model))
@@ -54,7 +80,7 @@ class _LibWrapper:
         return wrap_fun
 
     def annotate_function_signatures(self, sigs) -> None:
-        """Annotate functions present in the HydraHarp shared library according to their function signatures."""
+        """Annotate functions present in the MultiHarp shared library according to their function signatures."""
         function_signatures = sigs
 
         for (name, restype, argtypes) in function_signatures:

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException
-from qmi.instruments.picoquant._hhlib_function_signatures import _hhlib_function_signatures
+from qmi.instruments.picoquant.support._hhlib_function_signatures import _hhlib_function_signatures
 from qmi.instruments.picoquant.hydraharp import PicoQuant_HydraHarp400
 
 

@@ -4,7 +4,7 @@ from unittest.mock import patch
 import numpy as np
 
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException
-from qmi.instruments.picoquant._picoquant import TttrHistogram
+from qmi.instruments.picoquant import TttrHistogram
 
 
 class PicoQuantSomeHarpOpenTestCase(unittest.TestCase):

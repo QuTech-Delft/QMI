@@ -1,808 +1,30 @@
-""" This module contains the base class for QMI instrument driver for the Picoquant 'Harp instruments.
-Further, it has some utility functions on how to extract real-time histograms and count rates from T2 event data
-and how to filter these T2 event records.
-"""
+""" This module contains the base class for QMI instrument driver for the Picoquant 'Harp instruments."""
 
 import ctypes
 import enum
 import logging
 import time
-from enum import IntEnum, Enum
-from threading import Condition, Lock
-from typing import Callable, Optional, Dict, List, Tuple, NamedTuple, TypeVar, Type
+from enum import Enum
+from threading import Lock
+from typing import Optional, Dict, List, Tuple, TypeVar, Type
 
 import numpy as np
-from numpy.typing import ArrayLike
 
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_InvalidOperationException, QMI_RuntimeException, QMI_InstrumentException
+from qmi.core.exceptions import QMI_InvalidOperationException, QMI_InstrumentException
 from qmi.core.instrument import QMI_Instrument
+from qmi.core.messaging import _PeerTcpConnection
 from qmi.core.pubsub import QMI_Signal
 from qmi.core.rpc import rpc_method
-from qmi.core.thread import QMI_Thread
-from qmi.instruments.picoquant._library_wrapper import _LibWrapper
+from qmi.instruments.picoquant import EventFilterMode, SYNC_TYPE
+from qmi.instruments.picoquant.support._realtime import RealTimeHistogram, RealTimeCountRate, NUM_CHANNELS
+from qmi.instruments.picoquant.support._events import _FetchEventsThread, _MODE
+from qmi.instruments.picoquant.support._library_wrapper import _LibWrapper
 
 _logger = logging.getLogger(__name__)
 
-NUM_CHANNELS = 8
-
-# Event type of SYNC events.
-SYNC_TYPE = 64
-
-
-# Numpy record type used to represent event records.
-# Event types 0 to 7 represent a normal event.
-# Event type 64 represents a SYNC event.
-# Event types 65 to 79 represent marker events.
-EventDataType = np.dtype([
-    ("type", np.uint8),
-    ("timestamp", np.uint64)
-])
-
-
-class RealTimeHistogram(NamedTuple):
-    """Real-time histogram from T2 event data.
-
-    Attributes:
-        start_timestamp: timestamp of first SYNC event of the histogram.
-        bin_resolution: Histogram bin resolution as multiple of the instrument base resolution.
-        num_sync:       Number of SYNC periods included in this histogram.
-        channels:       List of channel numbers included in the histogram.
-        histogram_data: 2D array of shape (num_channels, num_bins) containing counts for each bin.
-    """
-    start_timestamp: int
-    bin_resolution: int
-    num_sync: int
-    channels: List[int]
-    histogram_data: np.ndarray
-
-
-class RealTimeCountRate(NamedTuple):
-    """Real-time count rate from T2 event data.
-
-    Attributes:
-        start_timestamp: timestamp of the SYNC event that started the counters.
-        num_sync:       Number of SYNC periods included in the counter values.
-        counts:         1D array of counter value for each input channel.
-    """
-    start_timestamp: int
-    num_sync: int
-    counts: np.ndarray
-
-
-class EventFilterMode(IntEnum):
-    NO_EVENTS = 0
-    ALL_EVENTS = 1
-    APERTURE = 2
-
-
-class _FetchEventsThread(QMI_Thread):
-    """This thread continuously fetches event data from the via USB."""
-
-    _LOOP_SLEEP_DURATION = 0.01
-
-    def __init__(self,
-                 read_fifo_func: Callable[[], np.ndarray],
-                 publish_histogram_func: Callable,
-                 publish_countrate_func: Callable,
-                 max_pending_events: int = 10**8
-                 ) -> None:
-        """Initialize background event fetching thread.
-
-        Args:
-            read_fifo_func: Callable that can be used to obtain the fifo ndarray.
-            publish_histogram_func: Callable used to publish histogram data.
-            publish_countrate_func: callable used to countrate histogram data.
-            max_pending_events: The purpose of this limit is to avoid consuming an excessive amount of memory.
-                By default allow at most 10**8 events in the queue (~ 900 MByte). It is not expected that this limit
-                will be exceeded in a properly working setup.
-
-        """
-        super().__init__()
-        self._read_fifo_func = read_fifo_func
-        self._publish_histogram_func = publish_histogram_func
-        self._publish_countrate_func = publish_countrate_func
-        self._condition = Condition(Lock())
-        self._t2_decoder: Optional[_T2EventDecoder] = None
-        self._event_filter: Optional[_EventFilter] = None
-        self._histogram_processor: Optional[_RealTimeHistogramProcessor] = None
-        self._event_filter_channels: Dict[int, EventFilterMode] = {}
-        self._event_filter_aperture = (0, 0)
-        self._histogram_channels: List[int] = []
-        self._histogram_resolution = 1
-        self._histogram_num_bins = 0
-        self._histogram_num_sync = 0
-        self._countrate_aperture = (0, 0)
-        self._countrate_num_sync = 0
-        self._active = False
-        self._count_read_fifo = 0
-        self._block_events = False
-        self._data: List[np.ndarray] = []
-        self._data_timestamp = 0.0
-        self._num_pending_events = 0
-        self._pending_events_overflow = False
-        self._max_pending_events = max_pending_events
-
-    def _process_fifo_data(self, fifo_data: np.ndarray, fifo_data_timestamp: float) -> None:
-        """Process new received raw event records from the multiharp, hydraharp.
-
-        This function will be called in the background thread while holding the "self._condition" lock.
-        """
-        assert self._t2_decoder is not None
-        assert self._histogram_processor is not None
-        assert self._event_filter is not None
-
-        # Decode event records.
-        event_records = self._t2_decoder.process_data(fifo_data)
-
-        # Process real-time histograms and counters.
-        self._histogram_processor.process_events(event_records)
-
-        if not self._block_events:
-
-            # Filter events.
-            event_records = self._event_filter.process_events(event_records)
-
-            # Store filtered events.
-            num_events = len(event_records)
-            if num_events > 0:
-                if self._num_pending_events + num_events > self._max_pending_events:
-                    # Too many pending events.
-                    self._pending_events_overflow = True
-                else:
-                    self._data.append(event_records)
-                    self._num_pending_events += num_events
-                    self._data_timestamp = fifo_data_timestamp
-
-    def run(self) -> None:
-        """Main function running in the background thread."""
-        with self._condition:
-            while not self._shutdown_requested:
-                if self._active:
-                    # Read data from HydraHarp, if any.
-                    fifo_data = self._read_fifo_func()
-                    fifo_data_timestamp = time.time()
-                    if len(fifo_data) > 0:
-                        # Process received event records.
-                        self._process_fifo_data(fifo_data, fifo_data_timestamp)
-                    self._count_read_fifo += 1
-                    # Sleep and wake up again in 10ms.
-                    self._condition.wait(self._LOOP_SLEEP_DURATION)
-                else:
-                    # Wait until we are activated.
-                    self._condition.wait()
-
-    def activate(self) -> None:
-        """Activate background event fetching.
-
-        This method is called immediately after starting a measurement in TTTR mode.
-        It activates continuous event fetching in the background thread.
-
-        This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
-        """
-        with self._condition:
-            if self._active:
-                raise QMI_InvalidOperationException("Already active")
-            self._t2_decoder = _T2EventDecoder()
-            self._event_filter = _EventFilter()
-            self._event_filter.set_event_filter_config(self._event_filter_channels,
-                                                       self._event_filter_aperture)
-            self._histogram_processor = _RealTimeHistogramProcessor(self._publish_histogram_func,
-                                                                    self._publish_countrate_func)
-            self._histogram_processor.set_histogram_config(self._histogram_channels,
-                                                           self._histogram_resolution,
-                                                           self._histogram_num_bins,
-                                                           self._histogram_num_sync)
-            self._histogram_processor.set_countrate_config(self._countrate_aperture,
-                                                           self._countrate_num_sync)
-            self._count_read_fifo = 0
-            self._active = True
-            self._data = []
-            self._num_pending_events = 0
-            self._pending_events_overflow = False
-            self._condition.notify_all()
-
-    def deactivate(self) -> None:
-        """Deactivate background event fetching.
-
-        This method is called after stopping a measurement in TTTR mode.
-        Note that the instrument typically continues to produce events for a
-        short time after stopping a measurement.
-
-        This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
-        """
-        with self._condition:
-            self._active = False
-            self._condition.notify_all()
-
-    def set_block_events(self, blocked: bool) -> None:
-        """Enable or disable blocking of events.
-
-        This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
-        """
-        with self._condition:
-            self._block_events = blocked
-
-    def set_event_filter_config(self,
-                                channel_filter: Dict[int, EventFilterMode],
-                                sync_aperture: Tuple[int, int]
-                                ) -> None:
-        """Update event filter parameters.
-
-        This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
-        """
-        with self._condition:
-            self._event_filter_channels = channel_filter
-            self._event_filter_aperture = sync_aperture
-            if self._event_filter is not None:
-                self._event_filter.set_event_filter_config(channel_filter, sync_aperture)
-
-    def set_histogram_config(self, channels: List[int], bin_resolution: int, num_bins: int, num_sync: int) -> None:
-        """Configure real-time histograms.
-
-        This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
-        """
-        with self._condition:
-            self._histogram_channels = channels
-            self._histogram_resolution = bin_resolution
-            self._histogram_num_bins = num_bins
-            self._histogram_num_sync = num_sync
-            if self._histogram_processor is not None:
-                self._histogram_processor.set_histogram_config(channels, bin_resolution, num_bins, num_sync)
-
-    def set_countrate_config(self, sync_aperture: Tuple[int, int], num_sync: int) -> None:
-        """Configure real-time count rate reporting.
-
-        This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
-        """
-        with self._condition:
-            self._countrate_aperture = sync_aperture
-            self._countrate_num_sync = num_sync
-            if self._histogram_processor:
-                self._histogram_processor.set_countrate_config(sync_aperture, num_sync)
-
-    def _request_shutdown(self) -> None:
-        with self._condition:
-            self._condition.notify_all()
-
-    def get_events(self, max_events: int) -> Tuple[float, np.ndarray]:
-        """Return events fetched by the background thread.
-
-        Parameters:
-            max_events: Maximum number of events to return.
-
-        Returns:
-            Tuple (timestamp, event_data).
-
-        This method is thread-safe.
-        It will be called in the thread that owns the `PicoQuant_HydraHarp400` instance.
-        """
-
-        # Accept at most `max_events` pending event records.
-        # This must be done under the condition variable lock.
-        with self._condition:
-
-            data_timestamp = self._data_timestamp
-
-            if self._pending_events_overflow:
-                # Events got dropped because there were too many pending events.
-                # Discard all pending events and clear the overflow flag, then raise an exception.
-                self._data = []
-                self._num_pending_events = 0
-                self._pending_events_overflow = False
-                raise QMI_RuntimeException("Too many pending events from time tagger, pending events discarded.")
-
-            if self._num_pending_events <= max_events:
-                # Accept all pending events.
-                data = self._data
-                self._data = []
-                self._num_pending_events = 0
-
-            else:
-                # Split the set of pending events.
-                room_left = max_events
-                split_pos = 0
-                while True:
-                    num_events = len(self._data[split_pos])
-                    if num_events > room_left:
-                        break
-                    room_left -= num_events
-                    split_pos += 1
-                data = self._data[:split_pos]
-                self._data = self._data[split_pos:]
-                if room_left > 0:
-                    data.append(self._data[0][:room_left])
-                    self._data[0] = self._data[0][room_left:]
-                self._num_pending_events -= max_events
-
-        # Concatenate the event arrays to be returned.
-        if len(data) == 0:
-            event_data = np.empty(0, dtype=EventDataType)
-        else:
-            event_data = np.concatenate(data)
-
-        return data_timestamp, event_data
-
-
-class _RealTimeHistogramProcessor:
-    """Extract real-time histograms and count rates from T2 event data."""
-
-    def __init__(self, publish_histogram_func: Callable, publish_countrate_func: Callable) -> None:
-        """Initialize histogram processing."""
-        self._publish_histogram_func = publish_histogram_func
-        self._publish_countrate_func = publish_countrate_func
-        self._previous_sync_timestamp = -1
-
-        self._histogram_channels: List[int] = []
-        self._histogram_resolution = 1
-        self._histogram_num_bins = 0
-        self._histogram_num_sync = 0
-        self._histogram_data = np.zeros((0, 0), dtype=np.uint32)
-        self._histogram_sync_counter = -1
-        self._histogram_start_timestamp = 0
-
-        self._countrate_aperture = (0, 0)
-        self._countrate_num_sync = 0
-        self._countrate_data = np.zeros(NUM_CHANNELS, dtype=np.uint64)
-        self._countrate_sync_counter = -1
-        self._countrate_start_timestamp = 0
-
-    def set_histogram_config(self, channels: List[int], bin_resolution: int, num_bins: int, num_sync: int) -> None:
-        """Configure real-time histograms."""
-
-        assert bin_resolution > 0
-        self._histogram_channels = channels
-        self._histogram_resolution = bin_resolution
-        self._histogram_num_bins = num_bins
-        self._histogram_num_sync = num_sync
-
-        # Clear data.
-        self._histogram_data = np.zeros((len(channels), num_bins), dtype=np.uint32)
-        self._histogram_sync_counter = -1
-
-    def set_countrate_config(self, sync_aperture: Tuple[int, int], num_sync: int) -> None:
-        """Configure real-time count rate reporting."""
-        self._countrate_aperture = sync_aperture
-        self._countrate_num_sync = num_sync
-
-        # Clear data.
-        self._countrate_data = np.zeros(NUM_CHANNELS, dtype=np.uint64)
-        self._countrate_sync_counter = -1
-
-    def process_events(self, event_records: np.ndarray) -> None:
-        """Process T2 event records and update histogram and count rates."""
-
-        # Do nothing if histogram and count rate features are both disabled.
-        if (self._histogram_num_sync == 0) and (self._countrate_num_sync == 0):
-            return
-
-        # Prepend the previous SYNC event, if there is any.
-        # This simplifies calculation of time deltas since last SYNC.
-        previous_sync_inserted = False
-        if self._previous_sync_timestamp >= 0:
-            event_records = np.insert(event_records, 0, (SYNC_TYPE, self._previous_sync_timestamp))
-            previous_sync_inserted = True
-
-        # Find the indexes of SYNC events.
-        (sync_events_idx,) = np.where(event_records["type"] == SYNC_TYPE)
-
-        # Do nothing before we get the first SYNC event.
-        if len(sync_events_idx) == 0:
-            return
-
-        # Update the timestamp of the last SYNC event.
-        self._previous_sync_timestamp = event_records[sync_events_idx[-1]]["timestamp"]
-
-        # For each event, determine time delta since the last SYNC event.
-        # The result is only valid for event past the first SYNC.
-        first_sync_idx = sync_events_idx[0]
-        sync_deltas = _get_sync_deltas(event_records, sync_events_idx)
-
-        # Discard all events before the first SYNC.
-        # Also discard the previous SYNC, if we prepended it to the current dataset.
-        if previous_sync_inserted:
-            first_sync_idx += 1
-            sync_events_idx = sync_events_idx[1:]
-        event_records = event_records[first_sync_idx:]
-        sync_deltas = sync_deltas[first_sync_idx:]
-        sync_events_idx -= first_sync_idx
-
-        # Update real-time histograms.
-        if self._histogram_num_sync > 0:
-            self._update_histogram(event_records, sync_events_idx, sync_deltas)
-
-        # Update real-time count rates.
-        if self._countrate_num_sync > 0:
-            self._update_countrate(event_records, sync_events_idx, sync_deltas)
-
-    def _update_histogram(self,
-                          event_records: np.ndarray,
-                          sync_events_idx: np.ndarray,
-                          sync_deltas: np.ndarray
-                          ) -> None:
-        """Update real-time histograms."""
-
-        channels = self._histogram_channels
-        num_bins = self._histogram_num_bins
-        num_sync = self._histogram_num_sync
-
-        # Do nothing if histogram processing is disabled.
-        if (num_sync < 1) or (num_bins < 1) or (len(channels) < 1):
-            return
-
-        # Convert delta time to histogram bin index.
-        # Clip to maximum bin index.
-        event_bins = sync_deltas // self._histogram_resolution
-        event_bins = np.minimum(event_bins, num_bins - 1)
-
-        # Skip events before the first SYNC.
-        next_idx = 0
-        if self._histogram_sync_counter < 0:
-            if len(sync_events_idx) == 0:
-                return
-            next_idx = sync_events_idx[0]
-            self._histogram_start_timestamp = event_records[next_idx]["timestamp"]
-
-        # Visit each SYNC record which ends a histogram integration interval.
-        event_types = event_records["type"]
-        for sync_idx in sync_events_idx[num_sync-self._histogram_sync_counter-1::num_sync]:
-
-            # Update histogram up to the end of the current integration interval.
-            # Process each channel separately.
-            for (chan_pos, chan) in enumerate(channels):
-                chan_bool = (event_types[next_idx:sync_idx] == chan)
-                chan_bins = event_bins[next_idx:sync_idx][chan_bool]
-                # Note: input to bincount MUST be dtype int64
-                #       output from bincount will be dtype int64
-                self._histogram_data[chan_pos] += np.bincount(chan_bins.astype(np.int64),
-                                                              minlength=num_bins
-                                                              ).astype(np.uint32)
-
-            # Publish completed histogram.
-            self._publish_histogram_func(RealTimeHistogram(
-                start_timestamp=self._histogram_start_timestamp,
-                bin_resolution=self._histogram_resolution,
-                num_sync=num_sync,
-                channels=channels,
-                histogram_data=self._histogram_data))
-
-            # Reset histogram for new integration interval.
-            self._histogram_data = np.zeros((len(channels), num_bins), dtype=np.uint32)
-            self._histogram_start_timestamp = event_records[sync_idx]["timestamp"]
-            next_idx = sync_idx
-
-        # Update the SYNC counter.
-        self._histogram_sync_counter = (self._histogram_sync_counter + len(sync_events_idx)) % num_sync
-
-        # Update histogram for remaining events.
-        # Process each channel separately.
-        for (chan_pos, chan) in enumerate(channels):
-            chan_bool = (event_types[next_idx:] == chan)
-            chan_bins = event_bins[next_idx:][chan_bool]
-            self._histogram_data[chan_pos] += np.bincount(chan_bins.astype(np.int64),
-                                                          minlength=num_bins
-                                                          ).astype(np.uint32)
-
-    def _update_countrate(self,
-                          event_records: np.ndarray,
-                          sync_events_idx: np.ndarray,
-                          sync_deltas: np.ndarray
-                          ) -> None:
-        """Update real-time count rates."""
-
-        # Do nothing if count rate processing is disabled.
-        num_sync = self._countrate_num_sync
-        if num_sync < 1:
-            return
-
-        # Select events that pass the aperture filter.
-        (delta_min, delta_max) = self._countrate_aperture
-        events_selected_bool = ((sync_deltas >= delta_min) & (sync_deltas <= delta_max))
-
-        # Narrow down to events on the normal input channels.
-        event_types = event_records["type"]
-        events_selected_bool &= (event_types < NUM_CHANNELS)
-
-        # Skip events before the first SYNC.
-        next_idx = 0
-        if self._countrate_sync_counter < 0:
-            if len(sync_events_idx) == 0:
-                return
-            next_idx = sync_events_idx[0]
-            self._countrate_start_timestamp = event_records[next_idx]["timestamp"]
-
-        # Visit each SYNC record which ends an integration interval.
-        for sync_idx in sync_events_idx[num_sync-self._countrate_sync_counter-1::num_sync]:
-
-            # Update counters up to the end of the current integration interval.
-            event_chan = event_types[next_idx:sync_idx][events_selected_bool[next_idx:sync_idx]]
-            # Note: input to bincount MUST be dtype int64
-            #       output from bincount will be dtype int64
-            self._countrate_data += np.bincount(event_chan.astype(np.int64),
-                                                minlength=NUM_CHANNELS
-                                                ).astype(np.uint64)
-
-            # Publish integrated counter values.
-            self._publish_countrate_func(RealTimeCountRate(
-                start_timestamp=self._countrate_start_timestamp,
-                num_sync=num_sync,
-                counts=self._countrate_data))
-
-            # Reset counters for new integration interval.
-            self._countrate_data = np.zeros(NUM_CHANNELS, dtype=np.uint64)
-            self._countrate_start_timestamp = event_records[sync_idx]["timestamp"]
-            next_idx = sync_idx
-
-        # Update the SYNC counter.
-        self._countrate_sync_counter = (self._countrate_sync_counter + len(sync_events_idx)) % num_sync
-
-        # Update counters for the remaining events.
-        event_chan = event_types[next_idx:][events_selected_bool[next_idx:]]
-        self._countrate_data += np.bincount(event_chan.astype(np.int64),
-                                            minlength=NUM_CHANNELS
-                                            ).astype(np.uint64)
-
-
-class _EventFilter:
-    """Filter T2 event records."""
-
-    def __init__(self) -> None:
-        """Initialize the event filter."""
-        self._previous_sync_timestamp = -1
-        self._previous_sync_reported = False
-        self._sync_aperture = (0, 0)
-        self._channel_filter_map = np.zeros(128, dtype=np.uint8)
-        self._aperture_filter_enabled = False
-
-    def set_event_filter_config(self,
-                                channel_filter: Dict[int, EventFilterMode],
-                                sync_aperture: Tuple[int, int]
-                                ) -> None:
-        """Set event filter parameters.
-
-        Parameters:
-            channel_filter: Mapping from event type (input channel) to the event filter mode for that event type.
-            sync_aperture:  Tuple (delta_min, delta_max) in multiples of the instrument base resolution,
-                            defining a time window following each SYNC event.
-                            For event types that use `EventFilterMode.APERTURE`, only events that fall inside
-                            this time window will pass the filter.
-        """
-        self._sync_aperture = sync_aperture
-        self._channel_filter_map[:] = 0
-        self._aperture_filter_enabled = False
-
-        # Construct a map from event type code to channel filter mode.
-        for (event_type, filter_mode) in channel_filter.items():
-            self._channel_filter_map[event_type] = int(filter_mode)
-            if filter_mode == EventFilterMode.APERTURE:
-                self._aperture_filter_enabled = True
-
-    def process_events(self, event_records: np.ndarray) -> np.ndarray:
-        """Filter event records.
-
-        This function filters a sequence of event records and returns only
-        the events that are considered to be interesting according to the
-        configured filter rules.
-
-        The `_EventFilter` instance keeps track of the most recent SYNC event.
-        The sequence of calls to this method must therefore correspond to
-        a single TTTR event stream, processed in order, without missing events.
-
-        Parameters:
-            event_records: Numpy array of EventDataType records.
-
-        Returns:
-            Numpy array of event records that pass the filter.
-        """
-
-        # Do not waste time processing an empty array.
-        if len(event_records) == 0:
-            return event_records
-
-        # Prepend the previous SYNC event, if there is any.
-        # This simplifies processing of the aperture filter.
-        previous_sync_inserted = False
-        if self._aperture_filter_enabled and (self._previous_sync_timestamp >= 0):
-            event_records = np.insert(event_records, 0, (SYNC_TYPE, self._previous_sync_timestamp))
-            previous_sync_inserted = True
-
-        # Map event type of each record to the corresponding filter mode.
-        record_filter_modes = self._channel_filter_map[event_records["type"]]
-
-        # Select events on channels that are unconditionally enabled.
-        events_selected_bool = (record_filter_modes == EventFilterMode.ALL_EVENTS)
-
-        # Find the indexes of SYNC events.
-        (sync_events_idx,) = np.where(event_records["type"] == SYNC_TYPE)
-
-        # Handle aperture filter, if necessary.
-        if self._aperture_filter_enabled and (len(sync_events_idx) > 0):
-
-            # For each event, determine time delta since the last SYNC event.
-            # The result is only valid for event past the first SYNC.
-            first_sync_idx = sync_events_idx[0]
-            sync_deltas = _get_sync_deltas(event_records, sync_events_idx)
-
-            # Mark all events on channels that are configured to use aperture filtering.
-            events_aperture_bool = (record_filter_modes == EventFilterMode.APERTURE)
-
-            # Reject events that do not pass the SYNC aperture.
-            (delta_min, delta_max) = self._sync_aperture
-            events_aperture_bool[:first_sync_idx] = False
-            events_aperture_bool &= (sync_deltas >= delta_min)
-            events_aperture_bool &= (sync_deltas <= delta_max)
-
-            # Select events that pass the aperture filter.
-            events_selected_bool |= events_aperture_bool
-
-            # If aperture filtering is enabled on the SYNC channel, temporarily select all SYNC events.
-            if self._channel_filter_map[SYNC_TYPE] == EventFilterMode.APERTURE:
-                events_selected_bool[sync_events_idx] = True
-
-        # If we prepended a previous, already reported SYNC event,
-        # drop that event now to avoid reporting it a second time.
-        if previous_sync_inserted and self._previous_sync_reported:
-            events_selected_bool[0] = False
-
-        # Update the timestamp of the last SYNC event.
-        if len(sync_events_idx) > 0:
-            self._previous_sync_timestamp = event_records[sync_events_idx[-1]]["timestamp"]
-            self._previous_sync_reported = True
-
-        # Discard rejected events.
-        event_records = event_records[events_selected_bool]
-
-        # If aperture filtering is enabled on the SYNC channel,
-        # reject SYNC events unless they are followed by a non-SYNC event.
-        if self._channel_filter_map[SYNC_TYPE] == EventFilterMode.APERTURE:
-
-            # Select non-SYNC events.
-            events_selected_bool = (event_records["type"] != SYNC_TYPE)
-
-            # Also select all events that are followed by a non-SYNC event.
-            events_selected_bool[np.where(events_selected_bool[1:])] = True
-
-            # Remember whether the last SYNC event is dropped, so it can
-            # be reported later if it becomes relevant again.
-            if (len(event_records) > 0) and (event_records[-1]["type"] == SYNC_TYPE):
-                self._previous_sync_reported = False
-
-            # Discard rejected events.
-            event_records = event_records[events_selected_bool]
-
-        # Return the events that pass the filter.
-        return event_records
-
-
-class _T2EventDecoder:
-    """Decode the TTTR data stream in T2 mode."""
-
-    def __init__(self) -> None:
-        self._overflow_counter = 0
-
-    def process_data(self, fifo_data: np.ndarray) -> np.ndarray:
-        """Decode event records from the T2 data stream.
-
-        This function decodes raw 32-bit TTTR event records and returns
-        an array of structured event records.
-
-        Overflow records in the TTTR stream are used to assign an unwrapped
-        64-bit timestamp value to each event. The overflow records are removed
-        from the event array returned by this function.
-
-        The `_T2EventDecoder` instance keeps track of the running overflow counter.
-        The sequence of calls to this method must therefore correspond to
-        a single TTTR data stream, processed in order, without gaps or data loss.
-
-        Parameters:
-            fifo_data: Numpy array of 32-bit raw event records in TTTR T2 format.
-
-        Returns:
-            Numpy array of `EventDataType` records.
-        """
-
-        #
-        # T2 TTTR event record format:
-        #   bit  31    = special_flag
-        #   bits 30:25 = channel
-        #   bits 24:0  = timetag
-        #
-        # The "timetag" value is a multiple of the instrument base resolution.
-        # Overflow of the 25-bit counter is marked via special overflow records.
-        #
-        # If special_flag == 0, the record represents a normal event on the specified channel.
-        # If special_flag == 1 And channel == 63, the record represents overflow of the 25-bit time value.
-        # If special_flag == 1 And channel == 0, the record represents a SYNC event.
-        # If special_flag == 1 And 1 <= channel <= 15, the record represents a marker event.
-        #
-
-        # Type code for overflow events.
-        # Note that overflow channel is 63, but here also special flag is added, so 0x7f.
-        overflow_type = 0x7f
-
-        # Overflow period is the full range of the 25 bits time tag.
-        overflow_period = (1 << 25)
-
-        # Extract the 7-bit "type" field of each record.
-        # The "type" field consists of the 1-bit "special" flag together with the 6-bit "channel" field.
-        record_types = (fifo_data >> 25).astype(np.uint8)
-
-        # Extract the 25-bit "timetag" field.
-        # For overflow records, this is the overflow increment;
-        # for event records, this is the time-tag (offset since last overflow).
-        record_tags = (fifo_data & 0x01ffffff)
-
-        # Make a bool array marking the overflow records.
-        overflow_records_bool = (record_types == overflow_type)
-
-        # Make a bool array marking the normal (non-overflow) records.
-        event_records_bool = ~overflow_records_bool
-
-        # Prepare a running count of the number of overflows
-        overflow_counts = np.cumsum(overflow_records_bool * record_tags, dtype=np.uint64)
-        overflow_counts += self._overflow_counter
-
-        # Update the overflow counter to take this batch of events into account.
-        if len(overflow_counts) > 0:
-            self._overflow_counter = int(overflow_counts[-1])
-
-        # Select the event types of the non-overflow records.
-        event_types = record_types[event_records_bool]
-
-        # Calculate the event timestamps of the non-overflow records.
-        event_timestamps = overflow_counts[event_records_bool] * overflow_period + record_tags[event_records_bool]
-
-        # Copy the non-overflow records to a result array.
-        events = np.empty(len(event_types), dtype=EventDataType)
-        events["type"] = event_types
-        events["timestamp"] = event_timestamps
-
-        return events
-
-
-def _get_sync_deltas(event_records: np.ndarray, sync_events_idx: np.ndarray) -> np.ndarray:
-    """For each event record, determine the time delta since the last SYNC event.
-
-    Parameters:
-        event_records: Array of structured event records with "type" and "timestamp" fields.
-        sync_events_idx: Array of indexes into `event_records` corresponding to SYNC events.
-
-    Returns:
-        Array of time deltas since SYNC event for each event record.
-        This array has the same length as `event_records`.
-        The returned values for records occurring before the first SYNC record will be invalid.
-    """
-
-    # Extract timestamps of SYNC events.
-    event_timestamps = event_records["timestamp"]
-    sync_timestamps = event_timestamps[sync_events_idx]
-
-    # If there is no SYNC record, return dummy invalid data.
-    if len(sync_events_idx) == 0:
-        return np.zeros_like(event_timestamps)
-
-    # Find index of the first SYNC event.
-    first_sync_idx = sync_events_idx[0]
-
-    # Prepare an array holding, for each event record, the timestamp of the most recent SYNC event.
-    most_recent_sync_timestamp = np.zeros_like(event_timestamps)
-    most_recent_sync_timestamp[first_sync_idx] = sync_timestamps[0]
-    most_recent_sync_timestamp[sync_events_idx[1:]] = np.diff(sync_timestamps)
-    most_recent_sync_timestamp = np.cumsum(most_recent_sync_timestamp)
-
-    # Prepare an array holding, for each event record, the elapsed time since the most recent SYNC event.
-    sync_deltas = event_timestamps - most_recent_sync_timestamp
-
-    return sync_deltas
-
-
 _ENUM_T = TypeVar('_ENUM_T', bound=Enum)
+MAX_MESSAGE_SIZE = _PeerTcpConnection.MAX_MESSAGE_SIZE
 
 
 def _str_to_enum(enum_type: Type[_ENUM_T], str_value: str) -> _ENUM_T:
@@ -814,111 +36,15 @@ def _str_to_enum(enum_type: Type[_ENUM_T], str_value: str) -> _ENUM_T:
         raise ValueError("Bad value {!r}, expected one of {!r}".format(str_value, allowed_values))
 
 
-class TttrHistogram:
-    """Class to make histograms from Time Tagged Time Resolved (TTTR) T2-mode data."""
-
-    def __init__(self, channel: int, numbins: int):
-
-        self.channel = channel
-        self.bins = np.arange(numbins)
-        self.bin_edges = np.arange(numbins + 1)
-
-        self.counts = np.zeros(numbins, dtype=np.uint64)
-        self.deltas = None
-        self.previous = None  # No timestamp carried from previous events.
-
-    def reset(self) -> None:
-        """Reset counts, deltas and previous timestamp."""
-        self.counts.fill(0)
-        self.deltas = None
-        self.previous = None  # No timestamp carried from previous events.
-
-    def process(self, events: np.ndarray) -> None:
-        """Process events, and filter by aperture (if applicable)."""
-
-        sync_type = 64  # The type of SYNC events.
-
-        # If we have a previously recorded SYNC timestamp, we prepend it to the EVENTS array.
-        if self.previous is not None:
-            events = np.insert(events, 0, (sync_type, self.previous))
-
-        # Find the first SYNC event.
-        first_sync_index, = np.where(events["type"] == sync_type)
-        if len(first_sync_index) == 0:
-            # No sync event found. Discard these events.
-            return
-
-        # Discard all events before the first SYNC event.
-        first_sync_index = first_sync_index[0]
-        if first_sync_index != 0:
-            events = events[first_sync_index:]  # type: ignore
-
-        # At this point, the first event is guaranteed to be a SYNC,
-        #   which simplifies matters significantly.
-
-        assert events["type"][0] == sync_type
-
-        idx = np.where(events["type"] == sync_type)  # This includes the first event.
-        timestamps = events["timestamp"][idx]  # The timestamps of the SYNC events.
-
-        increments = np.insert(np.diff(timestamps), 0, events["timestamp"][0])
-
-        most_recent_synctime = np.zeros_like(events["timestamp"])
-        most_recent_synctime[idx] = increments
-        most_recent_synctime = np.cumsum(most_recent_synctime)
-
-        deltas = events["timestamp"] - most_recent_synctime
-
-        deltas = deltas[events["type"] == self.channel]
-        deltas = deltas[deltas < len(self.counts)]
-
-        self.deltas = deltas
-
-        hist, _ = np.histogram(deltas, self.bin_edges)
-
-        hist = hist.astype(np.uint64)
-
-        self.counts += hist
-
-        self.previous = most_recent_synctime[-1]
-
-    def get_plot_data(self, bin_resolution: float) -> Tuple[ArrayLike, ArrayLike, int]:
-        """Convenience function to return bin values and counts for plotting to the caller.
-
-        Parameters:
-            bin_resolution: bin resolution for the histogram. Unit is probably seconds
-
-        Returns:
-            Tuple of (bin values data, self.counts, number of bins in self.bins)
-        """
-        return self.bins * bin_resolution / 1e-9, self.counts, len(self.bins)
-
-
-@enum.unique
-class _MODE(enum.Enum):
-    """Symbolic constants for the :func:`~HydraHarpDevice.initialize` method's `mode` argument.
-
-    These are defined as preprocessor symbols in the ``hhdefin.h`` C header file.
-    """
-    HIST = 0
-    """Histogram mode."""
-    T2 = 2
-    """T2 mode."""
-    T3 = 3
-    """T3 mode."""
-    CONT = 8
-    """Continuous Mode"""
-
-
 @enum.unique
 class _EDGE(enum.Enum):
     """Symbolic constants for routines that take an `edge` argument:
 
-    * Function :func:`~HydraHarpDevice.setMeasurementControl`, `startedge` and `stopedge` arguments;
-    * Function :func:`~HydraHarpDevice.setSyncEdgeTrigger`, `edge` argument;
-    * Function :func:`~HydraHarpDevice.setInputEdgeTrigger`, `edge` argument.
+    * Function :func:`~MultiHarpDevice.setMeasurementControl`, `startedge` and `stopedge` arguments;
+    * Function :func:`~MultiHarpDevice.setSyncEdgeTrigger`, `edge` argument;
+    * Function :func:`~MultiHarpDevice.setInputEdgeTrigger`, `edge` argument.
 
-    These are defined as preprocessor symbols in the ``hhdefin.h`` C header file.
+    These are defined as preprocessor symbols in the ``mhdefin.h`` C header file.
     """
     RISING = 1
     """Rising edge."""
@@ -928,11 +54,11 @@ class _EDGE(enum.Enum):
 
 @enum.unique
 class _FEATURE(enum.IntFlag):
-    """Bitfield constants for the return value of the :func:`~HydraHarpDevice.getFeatures` function.
+    """Bitfield constants for the return value of the :func:`~MultiHarpDevice.getFeatures` function.
 
-    These are defined as preprocessor symbols in the ``hhdefin.h`` C header file.
+    These are defined as preprocessor symbols in the ``mhdefin.h`` C header file.
 
-    Unfortunately, their meanings are not fully documented in the documentation.
+    Unfortunately, their meanings are not fully documented in the MultiHarp documentation.
     """
     DLL = 0x0001
     """DLL License available."""
@@ -953,10 +79,9 @@ class _PicoquantHarp(QMI_Instrument):
     # Some functions have model-dependent variable/string differences. Use this to distinguish
     _MODEL: str = ""
 
-    # The QMI RPC mechanism can not handle messages larger than 10 MB.
-    # To avoid RPC errors, we limit the number of events returned per call
-    # to 10**6 such that the RPC message will be at most 9 MB plus some overhead.
-    MAX_EVENTS_PER_CALL = 10 ** 6
+    # The QMI RPC mechanism can not handle messages larger than what is set in qmi.core.messaging.
+    # To avoid RPC errors, we limit the number of events returned per call.
+    MAX_EVENTS_PER_CALL = MAX_MESSAGE_SIZE
 
     # Signal published to report real-time histograms based on T2 event data.
     sig_histogram = QMI_Signal([RealTimeHistogram])
@@ -967,7 +92,7 @@ class _PicoquantHarp(QMI_Instrument):
     def __init__(self, context: QMI_Context, name: str, serial_number: str, max_pending_events: int = 10 ** 8) -> None:
         """Instantiate the instrument driver. This is the base class for all *Harp instruments.
 
-        Arguments
+        Parameters:
             context: the QMI_Context that manages us
             name: the name of the instrument instance
             serial_number: the serial number of the instrument to be opened.
@@ -1062,8 +187,11 @@ class _PicoquantHarp(QMI_Instrument):
                     decoded_serial = serial.value.decode()
                     if not decoded_serial:
                         try:
-                            if self._model in ["HH"]:
-                                self._lib.Initialize(devidx, 0, 0)  # HydraHarp
+                            if self._model in ["MH", "HH"]:
+                                self._lib.Initialize(devidx, 0, 0)  # HydraHarp and MultiHarp
+
+                            elif self._model in ["PH", "TH260"]:
+                                self._lib.Initialize(devidx, 0)  # PicoHarp and TimeHarp
 
                             else:
                                 raise NotImplementedError(f"Model {self._model} is not implemented!")
@@ -1203,7 +331,7 @@ class _PicoquantHarp(QMI_Instrument):
 
         Returns:
             A tuple `(resolution, binsteps)` where resolution (float) is the base resolution in
-            picoseconds binsteps (int) is the number of allowed binning steps.
+            picoseconds; binsteps (int) is the number of allowed binning steps.
         """
         self._check_is_open()
         with self._device_lock:
@@ -1282,7 +410,7 @@ class _PicoquantHarp(QMI_Instrument):
         Change the active edge on which the external TTL signals connected to the marker inputs are triggering.
         Only meaningful in TTTR mode.
 
-        Arguments:
+        Parameters:
             me0_str (str): edge of marker signal 0.
             me1_str (str): edge of marker signal 1.
             me2_str (str): edge of marker signal 2.
@@ -1306,7 +434,7 @@ class _PicoquantHarp(QMI_Instrument):
         Used to enable or disable the external TTL marker inputs.
         Only meaningful in TTTR mode.
 
-        Arguments:
+        Parameters:
             en0: edge of marker signal 0.
             en1: edge of marker signal 1.
             en2: edge of marker signal 2.
@@ -1323,7 +451,7 @@ class _PicoquantHarp(QMI_Instrument):
     def set_marker_holdoff_time(self, holdofftime: int) -> None:
         """Set marker hold-off time.
 
-        Arguments:
+        Parameters:
             holdofftime: hold-off time in [ns]. Ranges from 0 ns 25500 ns.
 
         Raises:
@@ -1337,7 +465,7 @@ class _PicoquantHarp(QMI_Instrument):
     def start_measurement(self, tacq: int) -> None:
         """Start a measurement.
 
-        Arguments:
+        Parameters:
             tacq: acquisition time, in [ms], ranging from 1 to 360000000; corresponding to 100 hours)
 
         Raises:
@@ -1346,14 +474,27 @@ class _PicoquantHarp(QMI_Instrument):
         self._check_is_open()
         if self._measurement_running:
             raise QMI_InvalidOperationException("Measurement still active")
+
         assert self._fetch_events_thread is not None
         with self._device_lock:
             self._lib.StartMeas(self._devidx, tacq)
-            self._measurement_start_time = time.time()
+
+        self._measurement_start_time = time.time()
         self._measurement_running = True
         if self._mode == _MODE.T2:
             # Start collecting data in the background thread.
-            self._fetch_events_thread.activate()
+            self._fetch_events_thread.activate(_MODE.T2)
+
+        elif self._mode == _MODE.T3:
+            with self._device_lock:
+                # Get sync rate and resolution from the Harp first
+                sync_rate = ctypes.c_int()
+                self._lib.GetSyncRate(self._devidx, sync_rate)
+                resolution = ctypes.c_double()
+                self._lib.GetResolution(self._devidx, resolution)
+
+            # Start collecting data in the background thread.
+            self._fetch_events_thread.activate(_MODE.T3, sync_rate.value, int(resolution.value))
 
     @rpc_method
     def stop_measurement(self) -> None:
@@ -1372,7 +513,7 @@ class _PicoquantHarp(QMI_Instrument):
         assert self._fetch_events_thread is not None
         with self._device_lock:
             self._lib.StopMeas(self._devidx)
-        if self._mode == _MODE.T2:
+        if self._mode in [_MODE.T2, _MODE.T3]:
             # Stop collecting data in the background thread.
             self._fetch_events_thread.deactivate()
         self._measurement_running = False
@@ -1414,7 +555,7 @@ class _PicoquantHarp(QMI_Instrument):
 
     @rpc_method
     def get_events(self) -> np.ndarray:
-        """Return events recorded by the instrument in T2 mode.
+        """Return events recorded by the instrument in T2 or T3 mode.
 
         While a measurement is active, a background thread continuously reads
         event records from the instrument and stores the events in a buffer.
@@ -1425,7 +566,7 @@ class _PicoquantHarp(QMI_Instrument):
         | `type` (uint8): The channel index where the event was recorded, or 64 for a SYNC event.
         | `timestamp` (uint64): Event timestamp as a multiple of the instrument base resolution.
 
-        This method may only be used in T2 mode.
+        This method may only be used in T2 or T3 mode.
 
         Returns:
             Numpy array containing event records.
@@ -1437,7 +578,7 @@ class _PicoquantHarp(QMI_Instrument):
 
     @rpc_method
     def get_timestamped_events(self) -> Tuple[float, np.ndarray]:
-        """Return events recorded by the instrument in T2 mode.
+        """Return events recorded by the instrument in T2 or T3 mode.
 
         While a measurement is active, a background thread continuously reads
         event records from the instrument and stores the events in a buffer.
@@ -1448,7 +589,7 @@ class _PicoquantHarp(QMI_Instrument):
         | `type` (uint8): The channel index where the event was recorded, or 64 for a SYNC event.
         | `timestamp` (uint64): Event timestamp as a multiple of the instrument base resolution.
 
-        This method may only be used in T2 mode.
+        This method may only be used in T2 or T3 mode.
 
         Returns:
             Tuple `(timestamp, events)`
@@ -1501,7 +642,7 @@ class _PicoquantHarp(QMI_Instrument):
         Allow at least 100 ms after :func:`initialize` to get a stable rate meter reading.
         Similarly, wait at least 100 ms to get a new reading (100 ms is the gate time of the counter).
 
-        Arguments:
+        Parameters:
             channel: Channel index (range from 0 to `number_of_channels` - 1).
 
         Returns:
@@ -1679,7 +820,7 @@ class _PicoquantHarp(QMI_Instrument):
         Set the number of bins of the collected histograms. The histogram length is 65536 which is also the
         default after initialization if `set_histogram_length` is not called.
 
-        Arguments:
+        Parameters:
             lencode: The histogram length code requesting a histogram of (1024 * 2**`lencode`) bins.
                      Valid range is from 0 to 6.
 
@@ -1705,7 +846,7 @@ class _PicoquantHarp(QMI_Instrument):
         measurements through TTL signals at the control port or through White Rabbit. Note that this needs custom
         software.
 
-        Arguments:
+        Parameters:
             meascontrol_str: Measurement control code. Any of 'SINGLESHOT_CTC', 'C1_GATED', 'C1_START_CTC_STOP',
                 'C1_START_C2_STOP', 'WR_M2S', 'WR_S2M'.
             startedge_str : Start edge selection. Either 'RISING' or 'FALLING'.
@@ -1742,7 +883,7 @@ class _PicoquantHarp(QMI_Instrument):
         This is not the same as changing or compensating cable delays. If the latter is desired,
         use :func:`setSyncChannelOffset` and/or :func:`setInputChannelOffset`.
 
-        Arguments:
+        Parameters:
             offset: time offset in [ns], ranging from 0 ns to 100000000 ns.
 
         Raises:
@@ -1756,7 +897,7 @@ class _PicoquantHarp(QMI_Instrument):
     def set_binning(self, binning: int) -> None:
         """Set time binning.
 
-        Arguments:
+        Parameters:
             binning: the following values can be used:
 
                      | 0 = 1× base resolution,
@@ -1782,7 +923,7 @@ class _PicoquantHarp(QMI_Instrument):
 
         If `stop_ovfl` is False, the measurement will continue but counts above `STOPCNTMAX` in any bin will be clipped.
 
-        Arguments:
+        Parameters:
             stop_ovfl: If true, the measurement will stop once the limit is reached. If not, the measurement will
                 continue.
             stopcount: 1 to 4294967295.
@@ -1808,7 +949,7 @@ class _PicoquantHarp(QMI_Instrument):
         The readings obtained with :func:`get_count_rate` are internally corrected for the divider setting and
         deliver the external (undivided) rate. The sync divider should not be changed while a measurement is running.
 
-        Arguments:
+        Parameters:
             divider: value ranging from 1 to 16.
 
         Raises:
@@ -1849,7 +990,7 @@ class _PicoquantHarp(QMI_Instrument):
         This function can replace an adjustable cable delay. A positive offset corresponds to inserting a cable in
         the sync input.
 
-        Arguments:
+        Parameters:
             sync_offset: SYNC offset, in [ps]. A value ranging from -99999 ps to +99999 ps.
 
         Raises:
@@ -1864,7 +1005,7 @@ class _PicoquantHarp(QMI_Instrument):
         This is equivalent to changing the cable delay on the sync input. Actual resolution is the device's base
         resolution.
 
-        Arguments:
+        Parameters:
             value: SYNC channel offset, in [ps]. A value ranging from -99999 ps to +99999 ps.
 
         Raises:
@@ -1879,7 +1020,7 @@ class _PicoquantHarp(QMI_Instrument):
         This is equivalent to changing the cable delay on the chosen input. Actual resolution is the device's base
         resolution.
 
-        Arguments:
+        Parameters:
             channel: Channel index (range from 0 to `number_of_channels` - 1).
             value: channel offset, in [ps]. A value ranging from -99999 ps to +99999 ps.
 
@@ -1894,7 +1035,7 @@ class _PicoquantHarp(QMI_Instrument):
     def set_input_channel_enable(self, channel: int, enable: bool) -> None:
         """Enable or disable the input channel.
 
-        Arguments:
+        Parameters:
             channel: Channel index (range from 0 to `number_of_channels` - 1).
             enable: True to enable the channel, False to disable.
 
@@ -1926,7 +1067,7 @@ class _PicoquantHarp(QMI_Instrument):
         """Get histogram data array from a specific channel. Note that MH_GetHistogram cannot be used with the
         shortest two histogram lengths of 1024 and 2048 bins. You need to use MH_GetAllHistograms in this case.
 
-        Arguments:
+        Parameters:
             channel: Channel index (range from 0 to `number_of_channels` - 1).
             clear: Optional input for HydraHarp only: 0 = keep histogram in buffer, 1 = clear buffer
 
@@ -1979,7 +1120,7 @@ class _PicoquantHarp(QMI_Instrument):
     def get_warnings_text(self, warnings: int) -> str:
         """Translates warnings into human-readable text.
 
-        Arguments:
+        Parameters:
             warnings: integer bitfield obtained from MH_GetWarnings
 
         Returns:
@@ -2000,7 +1141,7 @@ class _PicoquantHarp(QMI_Instrument):
 
         Set the period of the programmable trigger output. The period 0 switches it off.
 
-        Arguments:
+        Parameters:
             period: Period in units of 100 ns range is 0 to 16777215.
 
         Raises:

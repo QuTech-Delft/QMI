@@ -1,8 +1,8 @@
 name: QMI Python CI runner
 
+# branches: [ "main" ]
 on:
   push:
-    branches: [ "main" ]
 
 env:
   # minimum pylint code quality score (max. 10)

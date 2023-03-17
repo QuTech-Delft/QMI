@@ -1,3 +1,4 @@
+"""TBA: header file licence text"""
 # This is generated code, do not edit by hand!
 import ctypes
 
