@@ -35,7 +35,6 @@ jobs:
           python3 --version
           pip install --upgrade pip
           pip install -e '.[dev]'
-          pip install anybadge
       - name: setup git config
         run: |
           git config user.name "GitHub Actions Bot"
@@ -48,12 +47,6 @@ jobs:
           SCORE=$( scripts/run_analysis_pylint.sh )
           echo $SCORE $PYLINT_MIN_SCORE
           echo $SCORE > pylint_score
-          anybadge -o -l pylint -v $SCORE -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
-          git config -l | grep user
-          git config -l | grep branch
-          git add $BADGES_DIR/pylint.svg
-          git commit -m "testing commit pylint badge to branch"
-          git push --all
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
         continue-on-error: true
@@ -67,6 +60,8 @@ jobs:
         run: |
           pip install mypy
           mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
+          if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passed"; else RESULT="failed"; fi
+          echo $RESULT
         continue-on-error: true
       - name: upload mypy test results
         uses: actions/upload-artifact@v3
@@ -128,3 +123,4 @@ jobs:
           name: unit-test-results
           path: testresults.xml
         if: ${{ always() }}
+

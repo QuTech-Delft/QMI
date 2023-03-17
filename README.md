@@ -1,7 +1,8 @@
 ![pylint](https://github.com/QuTech-Delft/QMI/tree/main/.github/badges/pylint.svg)
- ![mypy](https://github.com/QuTech-Delft/QMI/tree/main/mypy.svg)
- ![radon-cc](https://github.com/QuTech-Delft/QMI/tree/main/radon-cc.svg)
- ![radon-mi](https://github.com/QuTech-Delft/QMI/tree/main/radon-mi.svg)
+ ![mypy](https://github.com/QuTech-Delft/QMI/tree/main/.github/badges/mypy.svg)
+ ![radon-cc](https://github.com/QuTech-Delft/QMI/tree/main/.github/badges/radon-cc.svg)
+ ![radon-mi](https://github.com/QuTech-Delft/QMI/tree/main/.github/badges/radon-mi.svg)
+ ![coverage](https://github.com/QuTech-Delft/QMI/tree/main/.github/badges/coverage.svg)
 
 # Quantum Measurement Infrastructure
 
