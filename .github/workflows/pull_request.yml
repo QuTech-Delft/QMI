@@ -50,8 +50,8 @@ jobs:
           SCORE=$( scripts/run_analysis_pylint.sh )
           echo $SCORE > pylint_score
           anybadge -o -l pylint -v $SCORE -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
-          if [ $VERSION == "3.11" ]; then git add $BADGES_DIR/pylint.svg; fi
-          if [ $VERSION == "3.11" ]; then git commit -m "commit pylint badge"; fi
+          if [ $VERSION = "3.11" ]; then git add $BADGES_DIR/pylint.svg; fi
+          if [ $VERSION = "3.11" ]; then git commit -m "commit pylint badge"; fi
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
           SCORE=$( cat pylint_score )
@@ -68,8 +68,8 @@ jobs:
           mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
           if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passed"; else RESULT="failed"; fi
           anybadge -o -l mypy -v $RESULT -f $BADGES_DIR/mypy.svg failed=red passed=green
-          if [ $VERSION == "3.11" ]; then git add $BADGES_DIR/mypy.svg; fi
-          if [ $VERSION == "3.11" ]; then git commit -m "commit mypy badge"; fi
+          if [ $VERSION = "3.11" ]; then git add $BADGES_DIR/mypy.svg; fi
+          if [ $VERSION = "3.11" ]; then git commit -m "commit mypy badge"; fi
         continue-on-error: true
       - name: upload mypy test results
         uses: actions/upload-artifact@v3
@@ -84,8 +84,8 @@ jobs:
           MAX_SCORE=$( scripts/run_analysis_cc.sh $SOURCE_DIRS )
           echo $MAX_SCORE > cc_max_score
           anybadge -o -l radon-cc -v $MAX_SCORE -f $BADGES_DIR/radon-cc.svg 11=green 21=yellow 31=orange 100=red
-          if [ $VERSION == "3.11" ]; then git add $BADGES_DIR/radon-cc.svg; fi
-          if [ $VERSION == "3.11" ]; then git commit -m "commit radon-cc badge"; fi
+          if [ $VERSION = "3.11" ]; then git add $BADGES_DIR/radon-cc.svg; fi
+          if [ $VERSION = "3.11" ]; then git commit -m "commit radon-cc badge"; fi
           # bc evaluates to `1` if relation is true
           exit $( echo "$MAX_SCORE > $COMPLEXITY_MAX_SCORE" | bc )
           MAX_SCORE=$( cat cc_max_score )
@@ -103,8 +103,8 @@ jobs:
           MIN_INDEX=$( scripts/run_analysis_mi.sh $SOURCE_DIRS )
           echo $MIN_INDEX > mi_min_index
           anybadge -o -l radon-mi -v $MIN_INDEX -f $BADGES_DIR/radon-mi.svg 10=red 20=orange 100=green
-          if [ $VERSION == "3.11" ]; then git add $BADGES_DIR/radon-mi.svg; fi
-          if [ $VERSION == "3.11" ]; then git commit -m "commit radon-mi badge"; fi
+          if [ $VERSION = "3.11" ]; then git add $BADGES_DIR/radon-mi.svg; fi
+          if [ $VERSION = "3.11" ]; then git commit -m "commit radon-mi badge"; fi
           exit $( echo "$MIN_INDEX < $MAINTAINABILITY_MIN_INDEX" | bc )  # bc evaluates to `1` if relation is true
           MIN_INDEX=$( cat mi_min_index )
         continue-on-error: true
@@ -122,8 +122,8 @@ jobs:
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
           COVERAGE_PERC=$(tail -1 coverage.log | grep -o '....$')
           anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green
-          if [ $VERSION == "3.11" ]; then git add $BADGES_DIR/coverage.svg; fi
-          if [ $VERSION == "3.11" ]; then git commit -m "commit coverage badge"; fi
+          if [ $VERSION = "3.11" ]; then git add $BADGES_DIR/coverage.svg; fi
+          if [ $VERSION = "3.11" ]; then git commit -m "commit coverage badge"; fi
           # coverage: '/^TOTAL.+?(\d+\%)$/'
       - name: upload coverage results
         uses: actions/upload-artifact@v3
@@ -131,7 +131,7 @@ jobs:
           name: coverage-results
           path: coverage.log
         if: ${{ always() }}
-      - name: unit-tests latest
+      - name: unit-tests
         run: |
           pip install unittest-xml-reporting
           python -m xmlrunner --output-file testresults.xml discover --start-directory=tests --pattern="test_*.py"
@@ -143,4 +143,4 @@ jobs:
         if: ${{ always() }}
       - name: push all internal commits
         run: |
-          if [ $VERSION == "3.11" ]; then git push --all; fi
+          if [ $VERSION = "3.11" ]; then git push --all; fi
