@@ -1,4 +1,4 @@
-![pylint](https://github.com/QuTech-Delft/QMI/tree/main/.github/workflows/pylint.svg)
+![pylint](https://github.com/QuTech-Delft/QMI/tree/main/.github/badges/pylint.svg)
  ![mypy](https://github.com/QuTech-Delft/QMI/tree/main/mypy.svg)
  ![radon-cc](https://github.com/QuTech-Delft/QMI/tree/main/radon-cc.svg)
  ![radon-mi](https://github.com/QuTech-Delft/QMI/tree/main/radon-mi.svg)

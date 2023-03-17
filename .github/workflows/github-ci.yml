@@ -14,7 +14,7 @@ env:
   # minimum maintainability index (goal: >=20; max. 100)
   MAINTAINABILITY_MIN_INDEX: "10.62"
   SOURCE_DIRS: "qmi/"
-  WORKFLOW_DIR: ".github/workflows"
+  BADGES_DIR: ".github/badges"
 
 jobs:
   on_push:
@@ -40,6 +40,7 @@ jobs:
         run: |
           git config user.name "GitHub Actions Bot"
           git config user.mail "<>"
+          chmod u+w $BADGES_DIR
       - name: pylint
         run: |
           pip install pylint
@@ -47,11 +48,11 @@ jobs:
           SCORE=$( scripts/run_analysis_pylint.sh )
           echo $SCORE $PYLINT_MIN_SCORE
           echo $SCORE > pylint_score
-          anybadge -o -l pylint -v $SCORE -f $WORKFLOW_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
+          anybadge -o -l pylint -v $SCORE -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
           git config -l | grep user
           git config -l | grep branch
-          git add $WORKFLOW_DIR/pylint.svg
-          git commit -m "testing commit pylint badge to main"
+          git add $BADGES_DIR/pylint.svg
+          git commit -m "testing commit pylint badge to branch"
           git push --all
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
