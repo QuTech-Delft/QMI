@@ -48,7 +48,7 @@ jobs:
           chmod a+x scripts/run_analysis_pylint.sh
           SCORE=$( scripts/run_analysis_pylint.sh )
           echo $SCORE > pylint_score
-          anybadge -o -l pylint -v $SCORE -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
+          if [ "${{ matrix.python-version }}" = "3.11" ]; then anybadge -o -l pylint -v $SCORE -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green; fi
           if [ "${{ matrix.python-version }}" = "3.11" ]; then git add $BADGES_DIR/pylint.svg; fi
           if [ "${{ matrix.python-version }}" = "3.11" ]; then git commit -m "commit pylint badge"; fi
           # bc evaluates to `1` if relation is true
@@ -66,7 +66,7 @@ jobs:
           pip install mypy
           mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
           if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passed"; else RESULT="failed"; fi
-          anybadge -o -l mypy -v $RESULT -f $BADGES_DIR/mypy.svg failed=red passed=green
+          if [ "${{ matrix.python-version }}" = "3.11" ]; then anybadge -o -l mypy -v $RESULT -f $BADGES_DIR/mypy.svg failed=red passed=green; fi
           if [ "${{ matrix.python-version }}" = "3.11" ]; then git add $BADGES_DIR/mypy.svg; fi
           if [ "${{ matrix.python-version }}" = "3.11" ]; then git commit -m "commit mypy badge"; fi
         continue-on-error: true
@@ -82,7 +82,7 @@ jobs:
           chmod a+x scripts/run_analysis_cc.sh
           MAX_SCORE=$( scripts/run_analysis_cc.sh $SOURCE_DIRS )
           echo $MAX_SCORE > cc_max_score
-          anybadge -o -l radon-cc -v $MAX_SCORE -f $BADGES_DIR/radon-cc.svg 11=green 21=yellow 31=orange 100=red
+          if [ "${{ matrix.python-version }}" = "3.11" ]; then anybadge -o -l radon-cc -v $MAX_SCORE -f $BADGES_DIR/radon-cc.svg 11=green 21=yellow 31=orange 100=red; fi
           if [ "${{ matrix.python-version }}" = "3.11" ]; then git add $BADGES_DIR/radon-cc.svg; fi
           if [ "${{ matrix.python-version }}" = "3.11" ]; then git commit -m "commit radon-cc badge"; fi
           # bc evaluates to `1` if relation is true
@@ -101,7 +101,7 @@ jobs:
           chmod a+x scripts/run_analysis_mi.sh
           MIN_INDEX=$( scripts/run_analysis_mi.sh $SOURCE_DIRS )
           echo $MIN_INDEX > mi_min_index
-          anybadge -o -l radon-mi -v $MIN_INDEX -f $BADGES_DIR/radon-mi.svg 10=red 20=orange 100=green
+          if [ "${{ matrix.python-version }}" = "3.11" ]; then anybadge -o -l radon-mi -v $MIN_INDEX -f $BADGES_DIR/radon-mi.svg 10=red 20=orange 100=green; fi
           if [ "${{ matrix.python-version }}" = "3.11" ]; then git add $BADGES_DIR/radon-mi.svg; fi
           if [ "${{ matrix.python-version }}" = "3.11" ]; then git commit -m "commit radon-mi badge"; fi
           exit $( echo "$MIN_INDEX < $MAINTAINABILITY_MIN_INDEX" | bc )  # bc evaluates to `1` if relation is true
@@ -120,7 +120,7 @@ jobs:
           scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
           COVERAGE_PERC=$(tail -1 coverage.log | grep -o '....$')
-          anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green
+          if [ "${{ matrix.python-version }}" = "3.11" ]; then anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green; fi
           if [ "${{ matrix.python-version }}" = "3.11" ]; then git add $BADGES_DIR/coverage.svg; fi
           if [ "${{ matrix.python-version }}" = "3.11" ]; then git commit -m "commit coverage badge"; fi
           # coverage: '/^TOTAL.+?(\d+\%)$/'
