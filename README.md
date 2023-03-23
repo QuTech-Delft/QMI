@@ -1,4 +1,4 @@
-![pylint](.github/badges/pylint.svg?sanitize=true)
+![pylint](.github/badges/pylint.svg)
  ![mypy](.github/badges/mypy.svg)
  ![radon-cc](.github/badges/radon-cc.svg)
  ![radon-mi](.github/badges/radon-mi.svg)
