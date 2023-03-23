@@ -147,4 +147,4 @@ jobs:
         if: ${{ always() }}
       - name: push all internal commits
         run: |
-          if [ "${{ matrix.python-version }}" = "3.11" ]; then git push --all; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
