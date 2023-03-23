@@ -138,12 +138,11 @@ jobs:
           path: testresults.xml
         if: ${{ always() }}
       - name: push all internal commits
-        if: "${{ matrix.python-version }}" == "3.10"
         run: |
-          git add $BADGES_DIR/pylint.svg
-          git add $BADGES_DIR/mypy.svg
-          git add $BADGES_DIR/radon-cc.svg
-          git add $BADGES_DIR/radon-mi.svg
-          git add $BADGES_DIR/coverage.svg
-          git commit -m "commit badges"
-          git push
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/pylint.svg; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/mypy.svg; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/radon-cc.svg; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/radon-mi.svg; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/coverage.svg; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git commit -m "commit badges"; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git push; fi
