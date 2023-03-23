@@ -51,24 +51,21 @@ jobs:
           git config user.mail "<>"
           chmod u+w $BADGES_DIR
       - name: Extract branch name
-        - uses: mdecoleman/pr-branch-name2.0.0
-        id: vars
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-        - run: echo ${{ steps.vars.outputs.branch }}
+        id: branch-name
+        uses: tj-actions/branch-names@v6
       - name: pylint
         run: |
           pip install pylint
           chmod a+x scripts/run_analysis_pylint.sh
           SCORE=$( scripts/run_analysis_pylint.sh )
           echo $SCORE > pylint_score
-          echo `git branch`
+          echo "${{ steps.branch-name.outputs.is_default }}"
+          echo "${{ steps.branch-name.outputs.current_branch }}"
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l pylint -v $SCORE -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${GITHUB_REF#refs/}; fi
           # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/pylint.svg; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git commit -m "commit badges"; fi
-          echo `git status`
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
