@@ -26,8 +26,7 @@ env:
   BADGES_DIR: ".github/badges"
 
 jobs:
-  build:
-
+  on_push:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 3
