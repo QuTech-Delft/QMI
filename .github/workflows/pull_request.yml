@@ -26,7 +26,7 @@ env:
   BADGES_DIR: ".github/badges"
 
 jobs:
-  on_push:
+  on_pull_request:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 3
@@ -51,10 +51,11 @@ jobs:
           git config user.mail "<>"
           chmod u+w $BADGES_DIR
       - name: Extract branch name
-        shell: bash
-        run: echo "branch=$(echo ${GITHUB_REF#refs/})"
-        # >>$GITHUB_OUTPUT
-        id: extract_branch
+        - uses: mdecoleman/pr-branch-name2.0.0
+        id: vars
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+        - run: echo ${{ steps.vars.outputs.branch }}
       - name: pylint
         run: |
           pip install pylint
