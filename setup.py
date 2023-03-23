@@ -18,7 +18,7 @@ def read(*names, **kwargs):
 
 setup(
     name='qmi',
-    version='0.36.0-beta.0',
+    version='0.38.0-beta.0',
     description='The Quantum Measurement Infrastructure framework',
     long_description="{}\n{}".format(
         read('README.md'),
@@ -42,6 +42,7 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy',
         'Topic:: Scientific / Engineering:: Physics',
@@ -63,7 +64,6 @@ setup(
         'numpy',
         'scipy',
         'h5py>=3.7.0',
-        'matplotlib',
         # For hardware interfacing
         'pyserial',
         'pyusb',
