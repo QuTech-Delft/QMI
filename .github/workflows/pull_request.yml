@@ -26,7 +26,8 @@ env:
   BADGES_DIR: ".github/badges"
 
 jobs:
-  on_pull_request:
+  build:
+
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 3
@@ -34,6 +35,8 @@ jobs:
         python-version: ["3.8", "3.9", "3.10"]
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -50,9 +53,6 @@ jobs:
           git config user.name "Badge Bot"
           git config user.mail "<>"
           chmod u+w $BADGES_DIR
-      - name: Extract branch name
-        id: branch-name
-        uses: tj-actions/branch-names@v6
       - name: pylint
         run: |
           pip install pylint
@@ -60,11 +60,6 @@ jobs:
           SCORE=$( scripts/run_analysis_pylint.sh )
           echo $SCORE > pylint_score
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l pylint -v $SCORE -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout origin/${{ steps.branch-name.outputs.current_branch }}; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/pylint.svg; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git commit -m "commit badges"; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
           SCORE=$( cat pylint_score )
@@ -80,10 +75,6 @@ jobs:
           mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
           if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passed"; else RESULT="failed"; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l mypy -v $RESULT -f $BADGES_DIR/mypy.svg failed=red passed=green; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout origin/${{ steps.branch-name.outputs.current_branch }}; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/mypy.svg; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
       - name: upload mypy test results
         uses: actions/upload-artifact@v3
         with:
@@ -97,10 +88,6 @@ jobs:
           MAX_SCORE=$( scripts/run_analysis_cc.sh $SOURCE_DIRS )
           echo $MAX_SCORE > cc_max_score
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l radon-cc -v $MAX_SCORE -f $BADGES_DIR/radon-cc.svg 11=green 21=yellow 31=orange 100=red; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout origin/${{ steps.branch-name.outputs.current_branch }}; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/radon-cc.svg; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
           # bc evaluates to `1` if relation is true
           exit $( echo "$MAX_SCORE > $COMPLEXITY_MAX_SCORE" | bc )
           MAX_SCORE=$( cat cc_max_score )
@@ -117,10 +104,6 @@ jobs:
           MIN_INDEX=$( scripts/run_analysis_mi.sh $SOURCE_DIRS )
           echo $MIN_INDEX > mi_min_index
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l radon-mi -v $MIN_INDEX -f $BADGES_DIR/radon-mi.svg 10=red 20=orange 100=green; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout origin/${{ steps.branch-name.outputs.current_branch }}; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/radon-mi.svg; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
           exit $( echo "$MIN_INDEX < $MAINTAINABILITY_MIN_INDEX" | bc )  # bc evaluates to `1` if relation is true
           MIN_INDEX=$( cat mi_min_index )
       - name: upload radon-mi results
@@ -137,11 +120,6 @@ jobs:
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
           COVERAGE_PERC=$(tail -1 coverage.log | grep -o '....$')
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout origin/${{ steps.branch-name.outputs.current_branch }}; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/coverage.svg; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git commit -m "commit badges"; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
           # coverage: '/^TOTAL.+?(\d+\%)$/'
       - name: upload coverage results
         uses: actions/upload-artifact@v3
@@ -160,6 +138,12 @@ jobs:
           path: testresults.xml
         if: ${{ always() }}
       - name: push all internal commits
+        if: "${{ matrix.python-version }}" == "3.10"
         run: |
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout origin/${{ steps.branch-name.outputs.current_branch }}; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
+          git add $BADGES_DIR/pylint.svg
+          git add $BADGES_DIR/mypy.svg
+          git add $BADGES_DIR/radon-cc.svg
+          git add $BADGES_DIR/radon-mi.svg
+          git add $BADGES_DIR/coverage.svg
+          git commit -m "commit badges"
+          git push
