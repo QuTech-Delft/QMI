@@ -63,7 +63,6 @@ jobs:
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
           SCORE=$( cat pylint_score )
-        continue-on-error: true
       - name: upload pylint test results
         uses: actions/upload-artifact@v3
         with:
@@ -78,7 +77,6 @@ jobs:
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l mypy -v $RESULT -f $BADGES_DIR/mypy.svg failed=red passed=green; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/mypy.svg; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git commit -m "commit mypy badge"; fi
-        continue-on-error: true
       - name: upload mypy test results
         uses: actions/upload-artifact@v3
         with:
@@ -97,7 +95,6 @@ jobs:
           # bc evaluates to `1` if relation is true
           exit $( echo "$MAX_SCORE > $COMPLEXITY_MAX_SCORE" | bc )
           MAX_SCORE=$( cat cc_max_score )
-        continue-on-error: true
       - name: upload radon-cc results
         uses: actions/upload-artifact@v3
         with:
@@ -115,7 +112,6 @@ jobs:
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git commit -m "commit radon-mi badge"; fi
           exit $( echo "$MIN_INDEX < $MAINTAINABILITY_MIN_INDEX" | bc )  # bc evaluates to `1` if relation is true
           MIN_INDEX=$( cat mi_min_index )
-        continue-on-error: true
       - name: upload radon-mi results
         uses: actions/upload-artifact@v3
         with:
