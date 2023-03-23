@@ -1,8 +1,16 @@
-name: QMI Python CI runner on push to branch
+name: QMI Python CI runner
 
-# This runner runs on regular push to a branch. For pull requests see "pull_request.yml"
+# This runner runs on regular push to a branch.
 on:
   push:
+  paths-ignore:
+      - README.md
+      - CHANGELOG.md
+      - .gitignore
+      - ACKNOWLEDGEMENTS.md
+      - LICENSE.md
+      - CONTRIBUTING.md
+      - TESTING.md
 
 env:
   # minimum pylint code quality score (max. 10)
@@ -25,8 +33,7 @@ jobs:
       - name: Set up Python-latest
         uses: actions/setup-python@v4
         with:
-          # Take latest Python 3 version
-          python-version: "3.x"
+          python-version: "3.11"
       - name: Install dependencies
         run: |
           sudo apt-get update -qy
