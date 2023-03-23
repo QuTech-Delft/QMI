@@ -3,14 +3,14 @@ name: QMI Python CI full test runner on pull request
 on:
   pull_request:
     branches: [ "main" ]
-  paths-ignore:
-      - README.md
-      - CHANGELOG.md
-      - .gitignore
-      - ACKNOWLEDGEMENTS.md
-      - LICENSE.md
-      - CONTRIBUTING.md
-      - TESTING.md
+    paths-ignore:
+        - README.md
+        - CHANGELOG.md
+        - .gitignore
+        - ACKNOWLEDGEMENTS.md
+        - LICENSE.md
+        - CONTRIBUTING.md
+        - TESTING.md
 
 env:
   # minimum pylint code quality score (max. 10)
