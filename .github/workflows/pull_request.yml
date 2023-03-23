@@ -59,14 +59,12 @@ jobs:
           chmod a+x scripts/run_analysis_pylint.sh
           SCORE=$( scripts/run_analysis_pylint.sh )
           echo $SCORE > pylint_score
-          echo "${{ steps.branch-name.outputs.is_default }}"
-          echo "${{ steps.branch-name.outputs.current_branch }}"
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l pylint -v $SCORE -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${GITHUB_REF#refs/}; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${{ steps.branch-name.outputs.current_branch }}; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/pylint.svg; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git commit -m "commit badges"; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
+          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
           SCORE=$( cat pylint_score )
@@ -82,10 +80,10 @@ jobs:
           mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
           if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passed"; else RESULT="failed"; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l mypy -v $RESULT -f $BADGES_DIR/mypy.svg failed=red passed=green; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${GITHUB_REF#refs/}; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${{ steps.branch-name.outputs.current_branch }}; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/mypy.svg; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
+          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
       - name: upload mypy test results
         uses: actions/upload-artifact@v3
         with:
@@ -99,10 +97,10 @@ jobs:
           MAX_SCORE=$( scripts/run_analysis_cc.sh $SOURCE_DIRS )
           echo $MAX_SCORE > cc_max_score
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l radon-cc -v $MAX_SCORE -f $BADGES_DIR/radon-cc.svg 11=green 21=yellow 31=orange 100=red; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${GITHUB_REF#refs/}; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${{ steps.branch-name.outputs.current_branch }}; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/radon-cc.svg; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
+          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
           # bc evaluates to `1` if relation is true
           exit $( echo "$MAX_SCORE > $COMPLEXITY_MAX_SCORE" | bc )
           MAX_SCORE=$( cat cc_max_score )
@@ -119,10 +117,10 @@ jobs:
           MIN_INDEX=$( scripts/run_analysis_mi.sh $SOURCE_DIRS )
           echo $MIN_INDEX > mi_min_index
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l radon-mi -v $MIN_INDEX -f $BADGES_DIR/radon-mi.svg 10=red 20=orange 100=green; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${GITHUB_REF#refs/}; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${{ steps.branch-name.outputs.current_branch }}; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/radon-mi.svg; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
+          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
           exit $( echo "$MIN_INDEX < $MAINTAINABILITY_MIN_INDEX" | bc )  # bc evaluates to `1` if relation is true
           MIN_INDEX=$( cat mi_min_index )
       - name: upload radon-mi results
@@ -139,11 +137,11 @@ jobs:
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
           COVERAGE_PERC=$(tail -1 coverage.log | grep -o '....$')
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${GITHUB_REF#refs/}; fi
-          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${{ steps.branch-name.outputs.current_branch }}; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/coverage.svg; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git commit -m "commit badges"; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
+          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
           # coverage: '/^TOTAL.+?(\d+\%)$/'
       - name: upload coverage results
         uses: actions/upload-artifact@v3
@@ -161,3 +159,7 @@ jobs:
           name: unit-test-results
           path: testresults.xml
         if: ${{ always() }}
+      - name: push all internal commits
+        run: |
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${{ steps.branch-name.outputs.current_branch }}; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
