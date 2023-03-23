@@ -60,6 +60,8 @@ jobs:
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l pylint -v $SCORE -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green; fi
           raw=$(git branch -r --contains ${{ github.ref }})
           branch=${raw##*/}
+          echo git branch
+          echo branch
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout $branch; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/pylint.svg; fi
