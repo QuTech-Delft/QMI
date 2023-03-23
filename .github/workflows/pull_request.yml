@@ -1,5 +1,6 @@
-name: QMI Python CI full test runner on pull request
+name: QMI Python CI runner on pull request
 
+# This runner runs on a pull request to main.
 on:
   pull_request:
     branches: [ "main" ]

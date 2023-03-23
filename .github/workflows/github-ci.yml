@@ -1,4 +1,4 @@
-name: QMI Python CI runner
+name: QMI Python CI runner on push
 
 # This runner runs on regular push to a branch.
 on:
