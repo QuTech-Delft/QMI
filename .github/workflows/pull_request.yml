@@ -62,11 +62,13 @@ jobs:
           chmod a+x scripts/run_analysis_pylint.sh
           SCORE=$( scripts/run_analysis_pylint.sh )
           echo $SCORE > pylint_score
+          echo `git branch`
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l pylint -v $SCORE -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${GITHUB_REF#refs/}; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
+          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/pylint.svg; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git commit -m "commit badges"; fi
+          echo `git status`
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
@@ -84,7 +86,7 @@ jobs:
           if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passed"; else RESULT="failed"; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l mypy -v $RESULT -f $BADGES_DIR/mypy.svg failed=red passed=green; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${GITHUB_REF#refs/}; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
+          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/mypy.svg; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
       - name: upload mypy test results
@@ -101,7 +103,7 @@ jobs:
           echo $MAX_SCORE > cc_max_score
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l radon-cc -v $MAX_SCORE -f $BADGES_DIR/radon-cc.svg 11=green 21=yellow 31=orange 100=red; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${GITHUB_REF#refs/}; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
+          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/radon-cc.svg; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
           # bc evaluates to `1` if relation is true
@@ -121,7 +123,7 @@ jobs:
           echo $MIN_INDEX > mi_min_index
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l radon-mi -v $MIN_INDEX -f $BADGES_DIR/radon-mi.svg 10=red 20=orange 100=green; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${GITHUB_REF#refs/}; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
+          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/radon-mi.svg; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
           exit $( echo "$MIN_INDEX < $MAINTAINABILITY_MIN_INDEX" | bc )  # bc evaluates to `1` if relation is true
@@ -141,7 +143,7 @@ jobs:
           COVERAGE_PERC=$(tail -1 coverage.log | grep -o '....$')
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git checkout ${GITHUB_REF#refs/}; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
+          # if [ "${{ matrix.python-version }}" = "3.10" ]; then git pull; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/coverage.svg; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git commit -m "commit badges"; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git push --all; fi
