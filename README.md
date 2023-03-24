@@ -19,23 +19,7 @@ Professor Lieven Vandersypen, Director of Research QuTech
 
 ## Installation
 
-You can install QMI using pip. 
-
-```sh
-pip install qmi
-```
-
-```sh
-pip list
-```
-and checking that in the output you see line
-```sh
-qmi                     V.R.P
-```
-where V.R.P. are the Version-Revision-Patch numbers. These should match the numbers of the latest documentation link below.
-
-See [here](https://pip.pypa.io/en/stable/user_guide/#configuration) for where to put `pip.conf` for specific operating
-systems and virtual environments.
+Currently, no PIP installation is possible. Please clone and setup with `python setup.py install`.
 
 ## Documentation
 
