@@ -54,7 +54,7 @@ def configstruct(cls: Type[_T]) -> Type[_T]:
     def initfn(self: Any, **kwargs: Any) -> None:
 
         # Walk the list of field definitions.
-        for f in dataclasses.fields(cls):   # type: ignore
+        for f in dataclasses.fields(cls):  # type: ignore
             if f.init and f.name in kwargs:
                 # Value specified as argument to __init__().
                 value = kwargs.pop(f.name)
@@ -63,9 +63,9 @@ def configstruct(cls: Type[_T]) -> Type[_T]:
             elif f.default is not dataclasses.MISSING:
                 # No value specified; use default value of field.
                 setattr(self, f.name, f.default)
-            elif f.default_factory is not dataclasses.MISSING: # type: ignore
+            elif f.default_factory is not dataclasses.MISSING:
                 # No value specified; use default factory of field.
-                setattr(self, f.name, f.default_factory()) # type: ignore
+                setattr(self, f.name, f.default_factory())
             elif f.init:
                 # No value specified and no default.
                 raise TypeError("{}.__init__() missing required argument {!r}"

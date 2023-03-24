@@ -57,22 +57,20 @@ CI configuration
 Code quality analysis, maintainability analysis and unit tests are executed on all branches when changes are pushed
 to the repository.
 
-The pipeline is configured in `<TBD>` and consists of three stages:
+The pipelines are configured in `.github\workflows` and consists of four files:
 
-  1. Analysis
-  2. Test
-  3. Package
+  1. github-ci.yml
+  2. pull_request.yml
+  3. schedule-full-ci-test-main.yml
+  4. python_publish.yml
 
-During the analysis stage, the code quality and maintainability analyses are performed. Unit test coverage is also
-determined in the analysis phase, as this metric is considered a quality indicator for the code base (which includes
-tests). However, since this implies that unit tests are executed twice, it may be considered in the future to move
-this job to the test stage.
-
-Unit tests are performed during the test stage. On branches, unit tests are executing only with Python 3.9. When
-changes are pushed to the main branches, the tests are rerun with Python 3.8 and Python 3.10 (latest). A verbose
-unit test job is available that provides detailed output, but it is only run after manual trigger.
-
-The final stage packages the source code into a installable Python package.
+In the first three workflows, the following tests are performed:
+- The code quality and maintainability analyses and unit-test coverage are performed, as these metrics are considered as quality indicators for the code base (which includes
+tests).
+- Unit-tests are performed.
+  - However, since this implies that unit tests are executed twice (coverage AND unit-testing), we might consider dropping the latter step.
+- On push to a branch, tests are executing only with Python 3.11. When changes are pushed to a pull request, the tests are rerun parallel also with Python 3.8, 3.9 and 3.10. With the 3.10 version, the quality badges are created.
+- The fourth workflow packages the source code into an installable Python package.
 
 
 ### Acceptance criteria

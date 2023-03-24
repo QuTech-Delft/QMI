@@ -455,6 +455,7 @@ class PI_E873(QMI_Instrument):
         _logger.debug("[%s] set reference definition mode %d", self._name, force_reference)
         mode = "1" if force_reference else "0"
         self._write("RON {} {}".format(self.axis_id, mode))
+        self._check_error()
 
     @rpc_method
     def get_reference_definition_mode(self) -> bool:

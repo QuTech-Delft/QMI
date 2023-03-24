@@ -3,7 +3,8 @@
 The instrument driver makes use of the manufacturer provided software libraries, "phlib.so" for Linux OS,
 or "phlib.dll" or "phlib64.dll" for 32-bit and 64-bit Windows OS, respectively.
 Please find the licence terms for these files in the dedicated software package for the PicoHarp instrument at
-https://www.picoquant.com/dl_software/PicoHarp300/PicoHarp300_SW_and_DLL_v3_0_0_3.zip
+https://www.picoquant.com/products/category/tcspc-and-time-tagging-modules/picoharp-300-stand-alone-tcspc-module-with-usb-interface
+--> "Software" tab --> download link in "Current software and developer's library version".
 """
 import ctypes
 import enum
@@ -24,43 +25,51 @@ class _FLAG(enum.IntFlag):
     """Bitfield constants for the return value of the :func:`~PicoHarpDevice.getFlags` function.
 
     These are defined as preprocessor symbols in the ``phdefin.h`` C header file.
-
-    Unfortunately, their meanings are not fully documented in the PicoHarp documentation.
     """
     OVERFLOW = 0x0040
-    """Histogram mode only."""
+    """Histogram mode only. It indicates that a histogram measurement has reached the maximum count 
+    as specified via PH_SetStopOverflow."""
     FIFOFULL = 0x0003
-    """TTTR modes only."""
+    """TTTR mode only. It indicates that the data FiFo has run full. The measurement will then have
+    to be aborted as data integrity is no longer maintained."""
     SYSERROR = 0x0100
-    """Hardware error, must contact support."""
+    """Indicates an error of the hardware or internal software. The user should in this case
+    call the library routine PH_GetHardwareDebugInfo and provide the result to PicoQuant support."""
 
 
 @enum.unique
 class _WARNING(enum.IntFlag):
     """Bitfield constants for the return value of the :func:`~PicoHarpDevice.getWarnings` function.
 
-    These are defined as preprocessor symbols in the ``phdefin.h`` C header file.
-
-    Unfortunately, their meanings are not fully documented in the PicoHarp documentation.
+    These are defined as preprocessor symbols in the ``phdefin.h`` C header file. For full descriptions
+    see the chapter '11. Warnings' from the PicoHarp PHLib Manual.
     """
     INP0_RATE_ZERO = 0x0001
-    """Input 0 rate zero."""
+    """No counts are detected at input channel 0."""
     INP0_RATE_TOO_LOW = 0x0002
-    """Input 0 rate low."""
+    """The count rate at input channel 0 is below 1 kHz and the sync divider is >1."""
     INP0_RATE_TOO_HIGH = 0x0004
-    """Input 0 rate high."""
+    """You have selected T2 mode and the count rate at input channel 0 is higher than 5 MHz.
+    The measurement will inevitably lead to a FiFo overrun."""
     INP1_RATE_ZERO = 0x0010
-    """Input 1 rate zero."""
+    """No counts are detected at input channel 1."""
     INP1_RATE_TOO_HIGH = 0x0040
-    """Input 1 rate high."""
+    """If you have selected T2 mode then this warning means the count rate at input channel 1 is higher than 5 MHz. 
+    The measurement will inevitably lead to a FiFo overrun.
+    In histogramming and T3 mode this warning is issued when the input rate is >10 MHz. This will probably lead to 
+    deadtime artefacts."""
     INP_RATE_RATIO = 0x0100
-    """Input rate ratio."""
+    """This warning is issued in histogramming and T3 mode when the rate at input 1 is over 5% of the rate
+    at input 0."""
     DIVIDER_GREATER_ONE = 0x0200
-    """Divider greater than one."""
+    """You have selected T2 mode and the sync divider is set larger than 1. This is probably not intended."""
     TIME_SPAN_TOO_SMALL = 0x0400
-    """Time span too small."""
+    """This warning is issued in histogramming and T3 mode when the sync period (1/Rate[ch0]) is longer than 
+    the start to stop time span that can be covered by the histogram or by the T3 mode records."""
     OFFSET_UNNECESSARY = 0x0800
-    """Offset unneccesary."""
+    """This warning is issued in histogramming and T3 mode when an offset >0 is set even though the sync period
+    (1/Rate0) can be covered by the measurement time span without using an offset. The offset may lead to events
+    getting discarded."""
 
 
 class PicoQuant_PicoHarp300(_PicoquantHarp):

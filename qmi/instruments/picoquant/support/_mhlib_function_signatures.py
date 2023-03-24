@@ -1,4 +1,7 @@
-"""TBA: header file licence text"""
+"""A Python wrapper module to wrap around manufacturer provided library header file 'mhdefin.h'. The header file used
+is from software version 3.1.0.
+Please find the header file in the dedicated software package for the MultiHarp instrument at
+https://www.picoquant.com/dl_software/MultiHarp150/MultiHarp150_160_V3_1.zip"""
 # This is generated code, do not edit by hand!
 import ctypes
 
