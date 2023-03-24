@@ -112,31 +112,31 @@ jobs:
           name: radon-mi-results
           path: radon-mi.log
         if: ${{ always() }}
-      #      - name: coverage
-      #        run: |
-      #          pip install coverage
-      #          chmod a+x scripts/run_unit_tests_with_coverage.sh
-      #          scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
-      #          coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
-      #          COVERAGE_PERC=$(tail -1 coverage.log | grep -o '....$')
-      #          if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green; fi
-      #          # coverage: '/^TOTAL.+?(\d+\%)$/'
-      #      - name: upload coverage results
-      #        uses: actions/upload-artifact@v3
-      #        with:
-      #          name: coverage-results
-      #          path: coverage.log
-      #        if: ${{ always() }}
-      #      - name: unit-tests
-      #        run: |
-      #          pip install unittest-xml-reporting
-      #          python -m xmlrunner --output-file testresults.xml discover --start-directory=tests --pattern="test_*.py"
-      #      - name: upload unit-tests results
-      #        uses: actions/upload-artifact@v3
-      #        with:
-      #          name: unit-test-results
-      #          path: testresults.xml
-      #        if: ${{ always() }}
+      - name: coverage
+        run: |
+          pip install coverage
+          chmod a+x scripts/run_unit_tests_with_coverage.sh
+          scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
+          coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
+          COVERAGE_PERC=$(tail -1 coverage.log | grep -o '....$')
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green; fi
+          # coverage: '/^TOTAL.+?(\d+\%)$/'
+      - name: upload coverage results
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-results
+          path: coverage.log
+        if: ${{ always() }}
+      - name: unit-tests
+        run: |
+          pip install unittest-xml-reporting
+          python -m xmlrunner --output-file testresults.xml discover --start-directory=tests --pattern="test_*.py"
+      - name: upload unit-tests results
+        uses: actions/upload-artifact@v3
+        with:
+          name: unit-test-results
+          path: testresults.xml
+        if: ${{ always() }}
       - name: push all internal commits
         run: |
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/pylint.svg; fi
