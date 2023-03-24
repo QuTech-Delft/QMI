@@ -54,7 +54,7 @@ def configstruct(cls: Type[_T]) -> Type[_T]:
     def initfn(self: Any, **kwargs: Any) -> None:
 
         # Walk the list of field definitions.
-        for f in dataclasses.fields(cls):
+        for f in dataclasses.fields(cls):   # type: ignore
             if f.init and f.name in kwargs:
                 # Value specified as argument to __init__().
                 value = kwargs.pop(f.name)
