@@ -144,5 +144,4 @@ jobs:
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/radon-cc.svg; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/radon-mi.svg; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/coverage.svg; fi
-          if [ "$(git diff --quiet" ]; then if [ "${{ matrix.python-version }}" = "3.10" ]; then git commit -m "commit badges"; fi; fi
-          if [ "$(git diff --quiet" ]; then if [ "${{ matrix.python-version }}" = "3.10" ]; then git push; fi; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then git commit -m "commit badges"; if [ $? = 0 ]; then git push; fi; fi
