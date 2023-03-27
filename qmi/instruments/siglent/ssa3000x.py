@@ -25,7 +25,7 @@ class SSA3000X(QMI_Instrument):
     _FLOAT = "REAL"
     _TRACE_FORMATS = [_ASCii, _FLOAT]
 
-    _RESP_TERMINATOR = "\n\r>>"  # Responses have this unconvential terminator
+    _RESP_TERMINATOR = "\n"  # Responses have this unconventional terminator
     _TIMEOUT = 2.0  # Can't find value in datasheet. This is best guess.
 
     _CHANNEL_COUNT = 4
@@ -39,12 +39,16 @@ class SSA3000X(QMI_Instrument):
                                   response_terminator=self._RESP_TERMINATOR,
                                   default_timeout=self._TIMEOUT)
 
+    def _ask(self, *args, **kwargs) -> str:
+        """Helper method to cleanup up the data from the SSA3000X"""
+        return self._scpi.ask(*args, **kwargs).replace('\0', '')
+
     @rpc_method
     def open(self) -> None:
         _logger.info("Opening connection to instrument")
         self._transport.open()
 
-        time.sleep(0.1)  # determined based on testing
+        time.sleep(2.0)  # determined based on testing
         self._transport.discard_read()  # discard welcome message
 
         super().open()
@@ -62,7 +66,7 @@ class SSA3000X(QMI_Instrument):
         Returns:
             Device identification string.
         """
-        return self._scpi.ask("*IDN?", discard=True)
+        return self._ask("*IDN?", discard=True)
 
     @rpc_method
     def get_freq_span(self) -> float:
@@ -71,7 +75,7 @@ class SSA3000X(QMI_Instrument):
         Returns:
             Frequency span in Hz.
         """
-        resp = self._scpi.ask(":FREQ:SPAN?", discard=True)
+        resp = self._ask(":FREQ:SPAN?", discard=True)
         try:
             return float(resp)
         except ValueError as err:
@@ -99,7 +103,7 @@ class SSA3000X(QMI_Instrument):
         Returns:
             Center frequency in Hz.
         """
-        resp = self._scpi.ask(":FREQ:CENT?", discard=True)
+        resp = self._ask(":FREQ:CENT?", discard=True)
         try:
             return float(resp)
         except ValueError as err:
@@ -130,7 +134,7 @@ class SSA3000X(QMI_Instrument):
         Returns:
             Start frequency in Hz.
         """
-        resp = self._scpi.ask(":FREQ:STAR?", discard=True)
+        resp = self._ask(":FREQ:STAR?", discard=True)
         try:
             return float(resp)
         except ValueError as err:
@@ -143,7 +147,7 @@ class SSA3000X(QMI_Instrument):
         Returns:
             Stop frequency in Hz.
         """
-        resp = self._scpi.ask(":FREQ:STOP?", discard=True)
+        resp = self._ask(":FREQ:STOP?", discard=True)
         try:
             return float(resp)
         except ValueError as err:
@@ -157,7 +161,7 @@ class SSA3000X(QMI_Instrument):
             "REAL": single precision floating point values
             "ASCii": ASCii string representation of values
         """
-        resp = self._scpi.ask(":FORM?", discard=True)
+        resp = self._ask(":FORM?", discard=True)
         if resp not in self._TRACE_FORMATS:
             raise QMI_InstrumentException(f"{resp!r} is not a acceptable format {self._TRACE_FORMATS}.")
         return resp
@@ -178,7 +182,7 @@ class SSA3000X(QMI_Instrument):
         if fmt != self._ASCii:
             raise QMI_InstrumentException(f"Trace format should be {self._ASCii!r}, not {fmt!r}")
         # Read trace data
-        resp = self._scpi.ask(f":TRAC:DATA? {channel}")
+        resp = self._ask(f":TRAC:DATA? {channel}", discard=True)
         try:
             values_str = resp.split(',')[:-1]  # strip the trailing ','
             return [float(val) for val in values_str]

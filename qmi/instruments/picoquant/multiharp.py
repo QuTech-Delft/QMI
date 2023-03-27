@@ -3,7 +3,8 @@
 The instrument driver makes use of the manufacturer provided software libraries, "mhlib.so" for Linux OS,
 or "mhlib.dll" or "mhlib64.dll" for 32-bit and 64-bit Windows OS, respectively.
 Please find the licence terms for these files in the dedicated software package for the MultiHarp instrument at
-https://www.picoquant.com/dl_software/MultiHarp150/MultiHarp150_160_V3_1.zip
+https://www.picoquant.com/products/category/tcspc-and-time-tagging-modules/multiharp-150-high-throughput-multichannel-event-timer-tcspc-unit
+--> "Software" tab --> download link in "Current software and developer's library version".
 """
 import ctypes
 import enum

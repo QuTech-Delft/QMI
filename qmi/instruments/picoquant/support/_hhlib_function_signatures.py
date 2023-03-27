@@ -1,4 +1,7 @@
-"""TBA: header file licence text"""
+"""A Python wrapper module to wrap around manufacturer provided library header file 'hhdefin.h'. The header file used
+is from software version 3.0.0.4.
+Please find the header file in the dedicated software package for the HydraHarp instrument at
+https://www.picoquant.com/dl_software/HydraHarp400/HydraHarp400_SW_and_DLL_v3_0_0_4.zip"""
 # This is generated code, do not edit by hand!
 import ctypes
 

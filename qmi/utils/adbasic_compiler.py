@@ -116,6 +116,9 @@ def _parse_stderr_lines(stderr_lines: List[str]) -> Tuple[List[AdbasicError], Li
     error_warning_count_line_pattern_string = r"([0-9]+) error.s., ([0-9]+) warning.s."
     error_warning_count_line_pattern = re.compile(error_warning_count_line_pattern_string)
 
+    fixme_line_pattern_string = r"([0-9a-fA-F]+):fixme:([:a-zA-Z]+) .+"
+    fixme_warning_count_line_pattern = re.compile(fixme_line_pattern_string)
+
     errors: List[AdbasicError] = []
     warnings: List[AdbasicError] = []
 
@@ -124,7 +127,7 @@ def _parse_stderr_lines(stderr_lines: List[str]) -> Tuple[List[AdbasicError], Li
         # Parse stderr line(s).
         while len(line) != 0:
             match = error_line_v1_pattern.match(line)
-            if match is not None:
+            if match:
                 (error_number, error_description, error_line, filename, line_number) = match.groups()
                 error_number_int = int(error_number)
                 line_number_int = int(line_number)
@@ -134,7 +137,7 @@ def _parse_stderr_lines(stderr_lines: List[str]) -> Tuple[List[AdbasicError], Li
                 continue
 
             match = error_line_v2_pattern.match(line)
-            if match is not None:
+            if match:
                 (error_number, error_description, filename) = match.groups()
                 error_number_int = int(error_number)
                 error = AdbasicError(error_number_int, error_description, "", filename, 0)
@@ -143,7 +146,7 @@ def _parse_stderr_lines(stderr_lines: List[str]) -> Tuple[List[AdbasicError], Li
                 continue
 
             match = error_invalid_option_pattern.match(line)
-            if match is not None:
+            if match:
                 (invalid_option, ) = match.groups()
                 error = AdbasicError(0, "Invalid command line option: {}".format(invalid_option), "", "", 0)
                 errors.append(error)
@@ -151,7 +154,7 @@ def _parse_stderr_lines(stderr_lines: List[str]) -> Tuple[List[AdbasicError], Li
                 continue
 
             match = compilation_aborted_line_pattern.match(line)
-            if match is not None:
+            if match:
                 error_description = match.group(0)
                 error = AdbasicError(0, error_description, "", "", 0)
                 errors.append(error)
@@ -159,10 +162,19 @@ def _parse_stderr_lines(stderr_lines: List[str]) -> Tuple[List[AdbasicError], Li
                 continue
 
             match = error_warning_count_line_pattern.match(line)
-            if match is not None:
+            if match:
                 error_count = int(match.group(1))
                 warning_count = int(match.group(2))
                 if (error_count > 0) or (warning_count > 0):
+                    error = AdbasicError(0, match.group(0), "", "", 0)
+                    warnings.append(error)
+                line = line[match.end():]
+                continue
+
+            match = fixme_warning_count_line_pattern.match(line)
+            if match:
+                warning_count = int("0x" + match.group(1), 16)
+                if warning_count > 0:
                     error = AdbasicError(0, match.group(0), "", "", 0)
                     warnings.append(error)
                 line = line[match.end():]

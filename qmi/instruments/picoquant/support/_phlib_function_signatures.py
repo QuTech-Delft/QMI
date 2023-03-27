@@ -1,4 +1,7 @@
-"""TBA: header file licence text"""
+"""A Python wrapper module to wrap around manufacturer provided library header file 'phdefin.h'. The header file used
+is from software version 3.0.0.3.
+Please find the header file in the dedicated software package for the PicoHarp instrument at
+https://www.picoquant.com/dl_software/PicoHarp300/PicoHarp300_SW_and_DLL_v3_0_0_3.zip"""
 # This is generated code, do not edit by hand!
 import ctypes
 

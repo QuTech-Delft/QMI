@@ -98,7 +98,8 @@ class TestRunAdBasicCompiler(unittest.TestCase):
         error3 = "Invalid Option: {}".format(inv_opt)
         error4 = "Compilation aborted !"
         warning1 = r"{} error.s., {} warning.s.".format(4, 0)
-        stderr_string = "\r\n".join([error1, error2, error3, error4, warning1]).encode()
+        warning2 = r"002b:fixme:ver:SomeCommandToFix (0x33f1d0 (nil)): stub\n"
+        stderr_string = "\r\n".join([error1, error2, error3, error4, warning1, warning2]).encode()
         # run_adbasic_compiler arguments
         adbasic_arguments = ["ls", "-l", "/dev/null"]
         working_dir = None
@@ -162,35 +163,38 @@ class TestRunAdBasicCompiler(unittest.TestCase):
         """Test that adbasic compiler works raises AdbasicCompilerException on errative stderr lines"""
         # Arrange
         expected_returncode = 99
-        error1 = "Liirum laarum pimpeli pompeli"
-        warning1 = r"{} error.s., {} warning.s.".format(4, 0)
-        stderr_string = "\r\n".join([error1, warning1]).encode()
-        # run_adbasic_compiler arguments
-        adbasic_arguments = ["ls", "-l", "/dev/null"]
-        working_dir = None
-        parse_stderr = True
-        remove_c_directory = False
-        pretty_print = False
+        error1 = "Liirum laarum pimpeli pompeli"  # nonsense
+        warning1 = r"{} warning.s., {} error.s.".format(4, 0)  # wrong order
+        warning2 = r"002b:todo:ver:SomeCommandToFix (0x33f1d0 (nil)): stub\n"  # 'todo' instead of 'fixme'
+        tests = [error1, warning1, warning2]
+        for test_string in tests:
+            stderr_string = f"{test_string}\r\n".encode()
+            # run_adbasic_compiler arguments
+            adbasic_arguments = ["ls", "-l", "/dev/null"]
+            working_dir = None
+            parse_stderr = True
+            remove_c_directory = False
+            pretty_print = False
 
-        run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=expected_returncode,
-                         stdout=b"some stdout line\n", stderr=bytes(stderr_string))
+            run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=expected_returncode,
+                             stdout=b"some stdout line\n", stderr=bytes(stderr_string))
 
-        # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
-            # Assert
-            with self.assertRaises(AdbasicCompilerException):
-                run_adbasic_compiler(
-                    self.adwin_dir[sys.platform], "T11", adbasic_arguments, working_dir, parse_stderr,
-                    remove_c_directory, pretty_print
-                    )
+            # Act
+            with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
+                # Assert
+                with self.assertRaises(AdbasicCompilerException):
+                    run_adbasic_compiler(
+                        self.adwin_dir[sys.platform], "T11", adbasic_arguments, working_dir, parse_stderr,
+                        remove_c_directory, pretty_print
+                        )
 
-        with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
-            # Assert
-            with self.assertRaises(AdbasicCompilerException):
-                run_adbasic_compiler(
-                    self.adwin_dir[sys.platform], "T11", adbasic_arguments, working_dir, parse_stderr,
-                    remove_c_directory, pretty_print
-                    )
+            with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
+                # Assert
+                with self.assertRaises(AdbasicCompilerException):
+                    run_adbasic_compiler(
+                        self.adwin_dir[sys.platform], "T11", adbasic_arguments, working_dir, parse_stderr,
+                        remove_c_directory, pretty_print
+                        )
 
     def test_print_adbasic_compiler_help_T11(self):
         """Test that print_adbasic_compiler_help() works on linux and windows"""

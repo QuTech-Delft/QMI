@@ -57,8 +57,6 @@ class _FEATURE(enum.IntFlag):
     """Bitfield constants for the return value of the :func:`~MultiHarpDevice.getFeatures` function.
 
     These are defined as preprocessor symbols in the ``mhdefin.h`` C header file.
-
-    Unfortunately, their meanings are not fully documented in the MultiHarp documentation.
     """
     DLL = 0x0001
     """DLL License available."""

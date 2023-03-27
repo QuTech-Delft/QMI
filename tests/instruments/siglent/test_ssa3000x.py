@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import call, patch
+from unittest.mock import call, patch, ANY
 from typing import cast
 import numpy as np
 
@@ -40,6 +40,17 @@ class TestSSA3000X(unittest.TestCase):
         # arrange
         expected_id_string = "test_string"
         self._scpi_mock.ask.return_value = expected_id_string
+        # act
+        actual_val = self.instr.get_id()
+        # assert
+        self._scpi_mock.ask.assert_called_once_with("*IDN?", discard=True)
+        self.assertEqual(actual_val, expected_id_string)
+
+    def test_nullbyte(self):
+        """ Test case for discarding null byte. """
+        # arrange
+        expected_id_string = "test_string"
+        self._scpi_mock.ask.return_value = "\0" + expected_id_string
         # act
         actual_val = self.instr.get_id()
         # assert
@@ -163,7 +174,7 @@ class TestSSA3000X(unittest.TestCase):
         # act
         actual = self.instr.get_trace(1)
         # assert
-        self._scpi_mock.ask.assert_has_calls([call(":TRAC:DATA? 1")])
+        self._scpi_mock.ask.assert_has_calls([call(":TRAC:DATA? 1", discard=True)])
         self.assertListEqual(actual, expected)
 
     def test_get_trace_wrong_format(self):

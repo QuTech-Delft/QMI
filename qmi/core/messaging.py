@@ -1344,7 +1344,7 @@ class MessageRouter:
         #       We default to SO_REUSEADDR.
         #
         if sys.platform in ['darwin']:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)  # type: ignore
         elif sys.platform in ['linux', 'win32']:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         else:
