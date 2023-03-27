@@ -70,7 +70,8 @@ tests).
 - Unit-tests are performed.
   - However, since this implies that unit tests are executed twice (coverage AND unit-testing), we might consider dropping the latter step.
 - On push to a branch, tests are executing only with Python 3.11. When changes are pushed to a pull request, the tests are rerun parallel also with Python 3.8, 3.9 and 3.10. With the 3.10 version, the quality badges are created.
-- The fourth workflow packages the source code into an installable Python package.
+
+The fourth workflow packages the source code into an installable Python package.
 
 
 ### Acceptance criteria
