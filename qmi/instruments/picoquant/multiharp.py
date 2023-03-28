@@ -56,8 +56,6 @@ class _MEASCTL(enum.Enum):
     """Symbolic constants for the :func:`~MultiHarpDevice.setMeasurementControl` `control` argument.
 
     These are defined as preprocessor symbols in the ``mhdefin.h`` C header file.
-
-    Unfortunately, their meanings are not fully documented in the MultiHarp documentation.
     """
     SINGLESHOT_CTC = 0
     """Default value."""
@@ -78,8 +76,6 @@ class _FLAG(enum.Enum):
     """Bitfield constants for the return value of the :func:`~MultiHarpDevice.getFlags` function.
 
     These are defined as preprocessor symbols in the ``mhdefin.h`` C header file.
-
-    Unfortunately, their meanings are not fully documented in the MultiHarp documentation.
     """
     OVERFLOW = 0x0001
     """Histogram mode only."""
@@ -102,8 +98,6 @@ class _WARNING(enum.Enum):
     """Bitfield constants for the return value of the :func:`~MultiHarpDevice.getWarnings` function.
 
     These are defined as preprocessor symbols in the ``mhdefin.h`` C header file.
-
-    Unfortunately, their meanings are not fully documented in the MultiHarp documentation.
     """
     SYNC_RATE_ZERO = 0x0001
     """Sync rate zero."""
