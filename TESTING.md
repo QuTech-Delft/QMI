@@ -48,7 +48,10 @@ locally, use the scripts provided in `scripts/`:
     $ run_unit_tests.sh
     $ run_unit_tests_with_coverage.sh
 
-When unit tests are run locally, the Python version you have installed will be used.
+When unit tests are run locally, the Python version you have installed will be used. The coverage can also be run using
+```zsh
+coverage run --branch -m unittest discover --start-directory=tests --pattern="test_*.py";
+```
 
 
 CI configuration
@@ -67,8 +70,7 @@ The pipelines are configured in `.github\workflows` and consists of four files:
 In the first three workflows, the following tests are performed:
 - The code quality and maintainability analyses and unit-test coverage are performed, as these metrics are considered as quality indicators for the code base (which includes
 tests).
-- Unit-tests are performed.
-  - However, since this implies that unit tests are executed twice (coverage AND unit-testing), we might consider dropping the latter step.
+- Unit-tests are performed and the coverage is calculated.
 - On push to a branch, tests are executing only with Python 3.11. When changes are pushed to a pull request, the tests are rerun parallel also with Python 3.8, 3.9 and 3.10. With the 3.10 version, the quality badges are created.
 
 The fourth workflow packages the source code into an installable Python package.
