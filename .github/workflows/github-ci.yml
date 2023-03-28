@@ -60,7 +60,7 @@ jobs:
         run: |
           pip install mypy
           mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
-          if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passed"; else RESULT="failed"; fi
+          if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passing"; else RESULT="faling"; fi
           echo $RESULT
       - name: upload mypy test results
         uses: actions/upload-artifact@v3
@@ -109,15 +109,5 @@ jobs:
         with:
           name: coverage-results
           path: coverage.log
-        if: ${{ always() }}
-      - name: unit-tests latest
-        run: |
-          pip install unittest-xml-reporting
-          python -m xmlrunner --output-file testresults.xml discover --start-directory=tests --pattern="test_*.py"
-      - name: upload unit-tests results
-        uses: actions/upload-artifact@v3
-        with:
-          name: unit-test-results
-          path: testresults.xml
         if: ${{ always() }}
 
