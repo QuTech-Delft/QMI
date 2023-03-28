@@ -21,6 +21,7 @@ env:
   COMPLEXITY_MAX_SCORE: "38"
   # minimum maintainability index (goal: >=20; max. 100)
   MAINTAINABILITY_MIN_INDEX: "10.62"
+  # this should be a comma separated list of new line separated list
   SOURCE_DIRS: "qmi/"
 
 jobs:
@@ -100,8 +101,7 @@ jobs:
       - name: coverage
         run: |
           pip install coverage
-          chmod a+x scripts/run_unit_tests_with_coverage.sh
-          scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
+          coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
           # coverage: '/^TOTAL.+?(\d+\%)$/'
       - name: upload coverage results
