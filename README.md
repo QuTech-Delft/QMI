@@ -3,6 +3,7 @@
  ![radon-cc](.github/badges/radon-cc.svg)
  ![radon-mi](.github/badges/radon-mi.svg)
  ![coverage](.github/badges/coverage.svg)
+ ![tests](.github/badges/tests.svg)
 
 # Quantum Measurement Infrastructure
 
