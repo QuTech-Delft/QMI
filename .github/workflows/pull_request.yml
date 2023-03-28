@@ -73,8 +73,8 @@ jobs:
         run: |
           pip install mypy
           mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
-          if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passing"; else RESULT="failing"; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l mypy -v $RESULT -f $BADGES_DIR/mypy.svg failing=red passing=green; fi
+          if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="pass"; else RESULT="fail"; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l mypy -v $RESULT -f $BADGES_DIR/mypy.svg fail=red pass=green; fi
       - name: upload mypy test results
         uses: actions/upload-artifact@v3
         with:
