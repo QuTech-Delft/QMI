@@ -60,7 +60,7 @@ jobs:
         run: |
           pip install mypy
           mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
-          if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passing"; else RESULT="faling"; fi
+          if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="pass"; else RESULT="fail"; fi
           echo $RESULT
       - name: upload mypy test results
         uses: actions/upload-artifact@v3

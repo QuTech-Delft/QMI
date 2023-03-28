@@ -115,11 +115,11 @@ jobs:
       - name: coverage
         run: |
           pip install coverage
-          if coverage run --branch -m unittest discover --start-directory=tests --pattern="test_*.py"; then RESULT="passing"; else RESULT="failing"; fi
+          if coverage run --branch -m unittest discover --start-directory=tests --pattern="test_*.py"; then RESULT="pass"; else RESULT="fail"; fi
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
           COVERAGE_PERC=$(tail -1 coverage.log | grep -o '....$')
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l tests -v $RESULT -f $BADGES_DIR/tests.svg failing=red passing=green; fi
+          if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l tests -v $RESULT -f $BADGES_DIR/tests.svg fail=red pass=green; fi
           # coverage: '/^TOTAL.+?(\d+\%)$/'
       - name: upload coverage results
         uses: actions/upload-artifact@v3
