@@ -1,9 +1,10 @@
 ![pylint](.github/badges/pylint.svg)
- ![mypy](.github/badges/mypy.svg)
- ![radon-cc](.github/badges/radon-cc.svg)
- ![radon-mi](.github/badges/radon-mi.svg)
- ![coverage](.github/badges/coverage.svg)
- ![tests](.github/badges/tests.svg)
+![mypy](.github/badges/mypy.svg)
+[![Documentation Status](https://readthedocs.org/projects/qmi/badge/?version=latest)](https://qmi.readthedocs.io/en/latest/?badge=latest)
+![radon-cc](.github/badges/radon-cc.svg)
+![radon-mi](.github/badges/radon-mi.svg)
+![coverage](.github/badges/coverage.svg)
+![tests](.github/badges/tests.svg)
 
 # Quantum Measurement Infrastructure
 
@@ -24,21 +25,26 @@ Currently, no PIP installation is possible. Please clone and setup with `python 
 
 ## Documentation
 
+### Latest version
+
+The latest version of the documentation can be found [here](https://qmi.readthedocs.io/en/latest/).
+
+### Installing for generating documentation
+
 To install the necessary packages to perform documentation activities for QMI do:
 
 ```
 pip install -e .[rtd]
 ```
 
-To build the 'readthedocs' documentation do:
+To build the 'readthedocs' locally documentation do:
 
 ```
 cd documentation/sphinx
 ./make-docs
 ```
 
-The documentation is then build in 'documentation/sphinx/build/html' and can be
-viewed [here](documentation/sphinx/build/html/index.html).
+The documentation can then be found in the `build/html` directory.
 
 ## Contribute
 
