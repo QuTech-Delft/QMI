@@ -132,9 +132,9 @@ Often class member variables are initialized at init time, and read-only after t
 make a private member variable, and provide a property to read it.  However, throughout QMI, we will simply make a
 variable name public, and explicitly document that the member is to be treated as read-only in the class documentation.
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ Coding Conventions for ``__init__.py`` files
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 In case of the top-level ``qmi`` package we do want to do a few things:
 
 * Define QMI version and check the Python version running QMI.
@@ -150,9 +150,9 @@ of imports can have an effect on this.
 
 Otherwise, you can keep __init__.py files empty or write a short docstring describing the package.
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ Coding Convention for assert statements
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Asserting is fine in cases where you need to assert something is really the case even if you are (nearly) 100% that it
 is so. For example in more complex data analysis scripts, or you want to assert system state before moving on.
@@ -163,9 +163,9 @@ to be used later on in the code. But, try to avoid this and think if you can ini
 It should **not** be used to check input parameters or user-given parameters, where rather a check should be employed
 (with possibly raising an exception on wrong input).
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ Coding Convention for logger naming policy
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For modules that are not run as ``__main__``, we should always initialize the logger with
 ``logging.getLogger(__name__)``.
@@ -178,16 +178,16 @@ or if it is set in the configuration file, the possible options are "INFO", "WAR
 "FATAL", "ERROR", "WARN", "NOTSET". "DEBUG" should not be used directly, but rather via the ``QMI_DEBUG``
 environment variable.
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ Coding Convention for logging argument strings
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 We support the "old" way of string formatting with logging, using the `%` sign. See the
 `Python documentation <https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting>`_ for details.
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ Coding Convention to document exceptions
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 If a function itself can raise an exception (like checking an input value), it should be described in the docstring
 which error can be raised and under which condition. Do not describe exceptions raised by any other calls of the
@@ -200,9 +200,9 @@ Semantic guidelines
 This section provides guidelines that are concerned with the functionality of the software, as opposed to the formatting
 and presentation of the code.
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ The use of ``__init()__`` methods
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For __init__ function a few conventions can be made:
   - When in instrument class, do not try to open the instrument in __init__, as we have the ``open`` function for it.
@@ -210,9 +210,9 @@ For __init__ function a few conventions can be made:
     and ``None`` is avoided as much as possible so that we do not need to do any assert ``self.xxx is not None``
     later on.
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ The use of ``__del__()`` methods
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``__del__()`` methods (also called finalizers) should be avoided in QMI code. A deviation to this is that if we use
 an external module, like the ``usbtmc.py``, and there is already a ``__del__`` method, we do not try to "fix" this to
