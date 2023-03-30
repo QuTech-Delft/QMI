@@ -58,18 +58,45 @@ class _MEASCTL(enum.Enum):
     These are defined as preprocessor symbols in the ``mhdefin.h`` C header file.
     """
     SINGLESHOT_CTC = 0
-    """Default value."""
+    """Default value.
+       Acquisition starts by software command and runs until CTC expires. 
+       The duration is set by the ``tacq`` parameter passed to ``MH_StartMeas``.
+    """
     C1_GATED = 1
-    """(Undocumented)"""
+    """Data is collected for the period where C1 is active. 
+       This can be the logical high or low period dependent
+       on the value supplied to the parameter ``startedge``.
+    """
     C1_START_CTC_STOP = 2
-    """(Undocumented)"""
+    """Data collection is started by a transition on C1 and
+       stopped by expiration of the internal CTC. 
+       Which transition actually triggers the start is given
+       by the value supplied to the parameter ``startedge``. 
+       Theduration is set by the ``tacq``parameter passed to MH_StartMeas.
+    """
     C1_START_C2_STOP = 3
-    """(Undocumented)"""
+    """Data collection is started by a transition on C1 and stopped
+       by a transition on C2. Which transitions actually trigger
+       start and stop is given by the values supplied to the parameters startedge and ``stopedge```
+    """
     WR_M2S = 4
-    """(Undocumented)"""
+    """Sets measurement conrol for a pair of devices such that the master device
+       not only starts its own measurement but also that of the slave.
+       This setting must be applied identivcally for both devices and it requires
+       that the two devices have established a white rabbit connection.
+    """
     WR_S2M = 5
-    """(Undocumented)"""
-
+    """Sets measurement conrol for a pair of devices such that the master device
+       not only starts its own measurement but also that of the slave.
+       This setting must be applied identivcally for both devices and it requires
+       that the two devices have established a white rabbit connection. 
+    """
+    SW_START_SW_STOP = 6 # new since v3.1
+    """Sets measurement control such that the duration of a measurement is purely under software control,
+       i.e. started by te call of ``MH_StartMeas`` and stopped by the call of ``MH_StartMeas``. 
+       This overcomes the time limits of the hardware CTC and allows virtually unlimited measurement times.
+       The resulting shortcoming is that the resulting duration is then less precise.
+    """
 
 @enum.unique
 class _FLAG(enum.Enum):
