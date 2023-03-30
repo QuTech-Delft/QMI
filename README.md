@@ -37,7 +37,7 @@ To install the necessary packages to perform documentation activities for QMI do
 pip install -e .[rtd]
 ```
 
-To build the 'readthedocs' locally documentation do:
+To build the 'readthedocs' documentation locally do:
 
 ```
 cd documentation/sphinx
