@@ -1,0 +1,18 @@
+version: 2
+
+build:
+  image: latest
+
+# Build documentation in the documentation/sphinx/ directory with Sphinx
+sphinx:
+  configuration: documentation/sphinx/source/conf.py
+
+python:
+  version: "3.8"
+  install:
+    - requirements: documentation/sphinx/requirements.txt
+    - method: pip
+      path: .
+
+# Don't build any extra formats
+formats: []

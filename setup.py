@@ -88,11 +88,12 @@ setup(
             'pylint',
             'mypy',
             "radon",
-            # For generating documentation
-            'sphinx',
-            'sphinx_rtd_theme',
             # version bump
             'bump2version'
+        ],
+        'rtd': [
+            # For generating documentation
+            'sphinx', 'sphinx_rtd_theme'
         ]
     },
     entry_points={

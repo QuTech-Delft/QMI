@@ -24,7 +24,21 @@ Currently, no PIP installation is possible. Please clone and setup with `python 
 
 ## Documentation
 
-`<TBD>`
+To install the necessary packages to perform documentation activities for QMI do:
+
+```
+pip install -e .[rtd]
+```
+
+To build the 'readthedocs' documentation do:
+
+```
+cd documentation/sphinx
+./make-docs
+```
+
+The documentation is then build in 'documentation/sphinx/build/html' and can be
+viewed [here](documentation/sphinx/build/html/index.html).
 
 ## Contribute
 
