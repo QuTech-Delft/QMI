@@ -30,10 +30,9 @@ The QMI framework consists of the following packages:
 | :mod:`qmi.utils`       | Miscellaneous functionality that doesn't fit elsewhere.                    |
 +------------------------+----------------------------------------------------------------------------+
 
-.. rubric:: Full list of QMI packages and modules [Test 5]:
+.. rubric:: Full list of QMI packages and modules [Test 6]:
 
-.. autosummary::
-   :toctree:
+.. toctree::
    :template: module-template.rst
    :recursive:
 
