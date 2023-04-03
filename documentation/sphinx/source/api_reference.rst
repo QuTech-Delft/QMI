@@ -34,7 +34,12 @@ The QMI framework consists of the following packages:
 
 .. autosummary::
    :toctree: ./generated/
-   :template: custom-module.rst
    :recursive:
 
    qmi
+   qmi.analysis
+   qmi.core
+   qmi.data
+   qmi.instruments
+   qmi.tools
+   qmi.utils.
