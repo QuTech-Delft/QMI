@@ -32,8 +32,7 @@ The QMI framework consists of the following packages:
 
 .. rubric:: Full list of QMI packages and modules [Test 11]:
 
-.. autosummary::
-   :toctree: build
+.. toctree::
    :template: custom-module.rst
    :recursive:
 
