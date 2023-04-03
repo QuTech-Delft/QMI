@@ -25,7 +25,7 @@ Indices and tables
 * :ref:`search`
 
 .. autosummary::
-   :toctree:
+   :toctree: _autosummary
    :template: custom-module.rst
    :recursive:
 
