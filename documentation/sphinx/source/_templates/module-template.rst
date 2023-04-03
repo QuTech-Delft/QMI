@@ -2,6 +2,7 @@
 
 .. automodule:: {{ fullname }}
    :members:
+   :recursive:
 
    {% block attributes %}
    {% if attributes %}
