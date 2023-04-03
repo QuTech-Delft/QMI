@@ -37,4 +37,4 @@ The QMI framework consists of the following packages:
    :template: custom-module.rst
    :recursive:
 
-   qmi/instruments
+   instruments
