@@ -42,7 +42,7 @@ master_doc = 'index'
 extensions = [ 'sphinx.ext.autodoc', 'sphinx.ext.autosummary', 'sphinx.ext.napoleon', 'sphinx.ext.todo' ]
 # extensions = [ 'sphinx.ext.autodoc', 'qmi_sphinx', 'sphinx.ext.napoleon', 'sphinx.ext.todo' ]
 
-autosummary_generate = True
+# autosummary_generate = True
 
 autodoc_default_options = {
 #    'members'           : True,
