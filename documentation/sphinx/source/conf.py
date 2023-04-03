@@ -39,11 +39,9 @@ master_doc = 'index'
 # Order is important... qmi_sphinx should go before sphinx.ext.napoleon.
 #
 
-# extensions = [ 'sphinx.ext.autodoc', 'sphinx.ext.autosummary', 'sphinx.ext.napoleon', 'sphinx.ext.todo' ]
-extensions = [ 'sphinx.ext.autodoc', 'qmi_sphinx', 'sphinx.ext.napoleon', 'sphinx.ext.todo' ]
-
-# autosummary_generate = True
-
+extensions = [ 'sphinx.ext.autodoc', 'sphinx.ext.autosummary', 'sphinx.ext.napoleon', 'sphinx.ext.todo' ]
+# extensions = [ 'sphinx.ext.autodoc', 'qmi_sphinx', 'sphinx.ext.napoleon', 'sphinx.ext.todo' ]
+#
 # autodoc_member_order = 'bysource'
 # autodoc_default_flags = ['members']
 autodoc_default_options = {
@@ -58,6 +56,8 @@ autodoc_default_options = {
    #  'imported-members'  : False
    # 'exclude-members'   : ''
 }
+
+autosummary_generate = True
 
 todo_include_todos = True
 
