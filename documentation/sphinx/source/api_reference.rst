@@ -33,7 +33,7 @@ The QMI framework consists of the following packages:
 .. rubric:: Full list of QMI packages and modules [Test 5]:
 
 .. autosummary::
-   :toctree: qmi
+   :toctree:
    :template: module-template.rst
    :recursive:
 
