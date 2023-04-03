@@ -1,11 +1,13 @@
 """ This is a Sphinx extension that takes care of some peculiarities of the QMI code base.
 """
 
+
 def autodoc_process_docstring_func(app, what, name, obj, options, lines):
     if hasattr(obj, "_rpc_method"):
         lines.append('')
         lines.append('Note:')
         lines.append('    This is an rpc-callable method.')
+
 
 def autodoc_skip_member_func(app, what, name, obj, skip, options):
     if name == "Proxy":

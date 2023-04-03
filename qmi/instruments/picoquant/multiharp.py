@@ -105,19 +105,27 @@ class _FLAG(enum.Enum):
     These are defined as preprocessor symbols in the ``mhdefin.h`` C header file.
     """
     OVERFLOW = 0x0001
-    """Histogram mode only."""
+    """Histogram mode only. It indicates that a histogram measurement has reached the maximum count 
+    as specified via MH_SetStopOverflow."""
     FIFOFULL = 0x0002
-    """TTTR mode only."""
+    """TTTR mode only. It indicates that the data FiFo has run full. The measurement will then have
+    to be aborted as data integrity is no longer maintained."""
     SYNC_LOST = 0x0004
-    """Synchronization lost."""
+    """This flag may occur in T3 mode and in histo mode. It indicates that the sync signal has been lost
+    which in this case is critical as the function of T3 mode and histo mode relies on an uninterrupted
+    sync signal."""
     REF_LOST = 0x0008
-    """Reference lost."""
+    """This flag will occur when the MultiHarp is programmed to use an external reference clock and this
+    reference clock is lost."""
     SYSERROR = 0x0010
-    """Hardware error, must contact support."""
+    """Indicates an error of the hardware or internal software. The user should in this case
+    call the library routine MH_GetDebugInfo and provide the result to PicoQuant support."""
     ACTIVE = 0x0020
     """Measurement is running."""
     CNTS_DROPPED = 0x0040
-    """Counts were dropped."""
+    """Indicates that counts were dropped at the first level FiFo directly following the TDC of an input channel.
+    This occurs typically only at extremely high count rates. Dependent on the application scenario this may or
+    may not be considered critical."""
 
 
 @enum.unique
