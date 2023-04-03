@@ -44,9 +44,11 @@ extensions = [ 'sphinx.ext.autodoc', 'sphinx.ext.autosummary', 'sphinx.ext.napol
 
 autosummary_generate = True
 
-autodoc_default_options = {
+autodoc_member_order = 'bysource'
+autodoc_members = True
+# autodoc_default_options = {
 #    'members'           : True,
-     'member-order'      : 'bysource',
+#      'member-order'      : 'bysource',
 #    'undoc_members'     : True,
 #    'private-members'   : False,
 #    'special-members'   : '',
@@ -55,7 +57,7 @@ autodoc_default_options = {
 #    'ignore-module-all' : False,
 #     'imported-members'  : False
 #    'exclude-members'   : ''
-}
+# }
 
 todo_include_todos = True
 
