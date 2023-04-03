@@ -23,8 +23,6 @@ The QMI framework consists of the following packages:
 +------------------------+----------------------------------------------------------------------------+
 | :mod:`qmi.data`        | Functionality for data handling.                                           |
 +------------------------+----------------------------------------------------------------------------+
-| :mod:`qmi.analysis`    | Functionality for data analysis.                                           |
-+------------------------+----------------------------------------------------------------------------+
 | :mod:`qmi.tools`       | Functionality on which the QMI command line tools are based.               |
 +------------------------+----------------------------------------------------------------------------+
 | :mod:`qmi.utils`       | Miscellaneous functionality that doesn't fit elsewhere.                    |
@@ -33,13 +31,12 @@ The QMI framework consists of the following packages:
 .. rubric:: Full list of QMI packages and modules [Test 14]:
 
 .. autosummary::
-   :toctree: ./generated/
+   :toctree: build
    :recursive:
 
    qmi
-   qmi.analysis
    qmi.core
    qmi.data
    qmi.instruments
    qmi.tools
-   qmi.utils.
+   qmi.utils
