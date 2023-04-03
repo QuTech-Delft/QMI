@@ -58,7 +58,7 @@ autodoc_default_options = {
 }
 
 autosummary_generate = True
-
+autosummary_imported_members = True
 todo_include_todos = True
 
 # Add any paths that contain templates here, relative to this directory.
