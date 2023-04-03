@@ -34,5 +34,7 @@ The QMI framework consists of the following packages:
 
 .. autosummary::
    :toctree: _autosummary
-   :template: _templates/autosummary/module.rst
+   :template: module.rst
    :recursive:
+
+   .
