@@ -23,3 +23,10 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+.. autosummary::
+   :toctree:
+   :template: custom-module.rst
+   :recursive:
+
+   qmi
