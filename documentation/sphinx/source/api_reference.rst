@@ -37,4 +37,4 @@ The QMI framework consists of the following packages:
    :template: module.rst
    :recursive:
 
-   .
+   qmi
