@@ -37,9 +37,4 @@ The QMI framework consists of the following packages:
    :template: module-template.rst
    :recursive:
 
-   qmi/analysis
-   qmi/core
-   qmi/data
-   qmi/instruments
-   qmi/tools
-   qmi/utils
+   qmi
