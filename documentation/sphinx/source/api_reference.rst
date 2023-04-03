@@ -15,24 +15,7 @@ The QMI framework consists of the following packages:
 +------------------------+----------------------------------------------------------------------------+
 | package                | description                                                                |
 +========================+============================================================================+
-| :mod:`qmi`             | Toplevel entry-point to access QMI functionality.                          |
-+------------------------+----------------------------------------------------------------------------+
-| :mod:`qmi.core`        | Core functionality of QMI, such as `contexts`, `instruments`, and `tasks`. |
-+------------------------+----------------------------------------------------------------------------+
-| :mod:`qmi.instruments` | QMI instrument drivers for specific types of instruments.                  |
-+------------------------+----------------------------------------------------------------------------+
-| :mod:`qmi.data`        | Functionality for data handling.                                           |
-+------------------------+----------------------------------------------------------------------------+
-| :mod:`qmi.tools`       | Functionality on which the QMI command line tools are based.               |
-+------------------------+----------------------------------------------------------------------------+
-| :mod:`qmi.utils`       | Miscellaneous functionality that doesn't fit elsewhere.                    |
-+------------------------+----------------------------------------------------------------------------+
 
-.. rubric:: Full list of QMI packages and modules [Test 15]:
-
-+------------------------+----------------------------------------------------------------------------+
-| package                | description                                                                |
-+========================+============================================================================+
 .. autosummary::
    :toctree: build
    :template: custom-module.rst
@@ -44,3 +27,5 @@ The QMI framework consists of the following packages:
    qmi.instruments
    qmi.tools
    qmi.utils
+
+https://qmi.readthedocs.io/en/22-the-api-reference-in-the-readthedocs-documentation-lacks-all-modules/qmi.html
