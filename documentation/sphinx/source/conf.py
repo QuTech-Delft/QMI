@@ -16,6 +16,7 @@ import sys
 # We add the correct directory, enabling Sphinx to find our 'qmi_sphinx' extension.
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../../..'))
+doctest_path = [os.path.abspath('../../../qmi')]
 
 # -- Project information -----------------------------------------------------
 
@@ -57,6 +58,7 @@ autodoc_default_options = {
 #    'exclude-members'   : ''
 }
 
+keep_warnings = True  # For testing.
 todo_include_todos = True
 
 # Add any paths that contain templates here, relative to this directory.
