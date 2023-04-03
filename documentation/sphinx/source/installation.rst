@@ -7,7 +7,7 @@ While it is possible to install QMI by checking out the repository, for normal u
 
 .. code-block:: shell
 
-    pip install git+https://github.com/QuTech-Delft/QMI.git@v0.28.0-beta.0#egg=qmi
+    pip install git+https://github.com/QuTech-Delft/QMI.git@v0.38.0-beta.0#egg=qmi
 
 Read the ``README.md`` of the project for more detailed installation procedure.
 
@@ -17,7 +17,7 @@ Dependencies
 
 .. rubric:: Python version
 
-QMI depends on Python 3.9 or newer.
+QMI depends on Python 3.8 or newer.
 
 .. rubric:: Python packages
 
