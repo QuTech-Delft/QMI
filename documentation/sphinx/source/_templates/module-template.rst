@@ -45,7 +45,7 @@
    .. rubric:: {{ _('Exceptions') }}
 
    .. autosummary::
-      :toctree:                                          <-- add this line
+      :toctree:
    {% for item in exceptions %}
       {{ item }}
    {%- endfor %}
@@ -58,7 +58,7 @@
 
 .. autosummary::
    :toctree:
-   :template: custom-module-template.rst                 <-- add this line
+   :template: custom-module-template.rst
    :recursive:
 {% for item in modules %}
    {{ item }}
