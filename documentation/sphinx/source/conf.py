@@ -15,7 +15,7 @@ import sys
 
 # We add the correct directory, enabling Sphinx to find our 'qmi_sphinx' extension.
 sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('../../../qmi'))
+sys.path.insert(0, os.path.abspath('../../..'))
 
 # -- Project information -----------------------------------------------------
 
