@@ -38,3 +38,9 @@ The QMI framework consists of the following packages:
    :recursive:
 
    qmi
+   qmi.analysis
+   qmi.core
+   qmi.data
+   qmi.instruments
+   qmi.tools
+   qmi.utils
