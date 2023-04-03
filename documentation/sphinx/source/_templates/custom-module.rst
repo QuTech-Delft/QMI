@@ -50,3 +50,17 @@
    {%- endfor %}
    {% endif %}
    {% endblock %}
+
+{% block modules %}
+{% if modules %}
+.. rubric:: Full list of QMI packages and modules [Test 14]:
+
+.. autosummary::
+   :toctree:
+   :template: custom-module.rst
+   :recursive:
+   {% for item in modules %}
+      {{ item }}
+   {%- endfor %}
+{% endif %}
+{% endblock %}
