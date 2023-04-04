@@ -35,8 +35,7 @@ master_doc = 'index'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 #
-# We don't use 'sphinx.ext.autosummary' now. It is taken care of by `qmi_sphinx.py`
-# Order is important... qmi_sphinx should go before sphinx.ext.napoleon.
+# Order is important... autosummary should go before sphinx.ext.napoleon.
 #
 
 extensions = [ 'sphinx.ext.autodoc', 'sphinx.ext.autosummary', 'sphinx.ext.napoleon', 'sphinx.ext.todo' ]
