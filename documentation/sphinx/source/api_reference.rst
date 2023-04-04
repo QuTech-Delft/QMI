@@ -19,7 +19,7 @@ The QMI main package:
 
 
 The QMI framework consists of the following sub-packages:
-   :package:
+   :sub-package:
       :description:
 .. autosummary::
    :toctree: build
