@@ -2,6 +2,7 @@
 
 .. automodule:: {{ fullname }}
    :members:
+   :no-imported-members:
 
    {% block attributes %}
    {% if attributes %}

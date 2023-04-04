@@ -1,6 +1,8 @@
 {{ fullname | escape | underline}}
 
 .. currentmodule:: {{ module }}
+   :members:
+   :no-imported-members:
 
 .. autoclass:: {{ objname }}
    :members:

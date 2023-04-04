@@ -52,7 +52,7 @@ autodoc_default_options = {
    # 'inherited-members' : False,
    # 'show-inheritance'  : False,
    # 'ignore-module-all' : False,
-   #  'imported-members'  : False
+   'imported-members'  : True
    # 'exclude-members'   : ''
 }
 
