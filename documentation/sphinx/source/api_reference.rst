@@ -14,9 +14,7 @@ The QMI main package:
 
 .. autosummary::
    :toctree: build
-   :members:
-   :private-members:
-   :inherited-members:
+   :template: custom-package.rst
 
    qmi
 
