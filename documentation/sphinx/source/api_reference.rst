@@ -12,15 +12,16 @@ The QMI framework consists of several Python 3 packages and modules.
 
 The QMI main package:
 
-.. automodule::
+.. automodule:: qmi
    :members:
-   :special-members: __version, __contains__
+   :special-members: __version__, __contains__
    :inherited-members:
-
-   qmi
 
 
 The QMI framework consists of the following sub-packages:
+
+   :package
+      :description
 
 .. autosummary::
    :toctree: build
@@ -33,4 +34,4 @@ The QMI framework consists of the following sub-packages:
    qmi.tools
    qmi.utils
 
-Click on the module name to see more details.
+Click on the package name to see more details.
