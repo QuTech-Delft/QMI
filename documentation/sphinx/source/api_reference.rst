@@ -10,28 +10,26 @@ The QMI framework consists of several Python 3 packages and modules.
 
 .. rubric:: QMI package overview
 
-The QMI framework consists of the following packages:
+The QMI main package:
 
-+------------------------+----------------------------------------------------------------------------+
-| package                | description                                                                |
-+========================+============================================================================+
-| :mod:`qmi`             | Toplevel entry-point to access QMI functionality.                          |
-+------------------------+----------------------------------------------------------------------------+
-| :mod:`qmi.core`        | Core functionality of QMI, such as `contexts`, `instruments`, and `tasks`. |
-+------------------------+----------------------------------------------------------------------------+
-| :mod:`qmi.instruments` | QMI instrument drivers for specific types of instruments.                  |
-+------------------------+----------------------------------------------------------------------------+
-| :mod:`qmi.data`        | Functionality for data handling.                                           |
-+------------------------+----------------------------------------------------------------------------+
-| :mod:`qmi.analysis`    | Functionality for data analysis.                                           |
-+------------------------+----------------------------------------------------------------------------+
-| :mod:`qmi.tools`       | Functionality on which the QMI command line tools are based.               |
-+------------------------+----------------------------------------------------------------------------+
-| :mod:`qmi.utils`       | Miscellaneous functionality that doesn't fit elsewhere.                    |
-+------------------------+----------------------------------------------------------------------------+
+.. autosummary::
+   :toctree: build
+   :template: custom-package.rst
 
-.. rubric:: Full list of QMI packages and modules:
+   qmi
 
-.. toctree::
 
-   generated/qmi
+The QMI framework consists of the following sub-packages:
+
+.. autosummary::
+   :toctree: build
+   :template: custom-module.rst
+   :recursive:
+
+   qmi.core
+   qmi.data
+   qmi.instruments
+   qmi.tools
+   qmi.utils
+
+Click on the package name to see more details.

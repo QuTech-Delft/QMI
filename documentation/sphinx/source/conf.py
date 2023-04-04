@@ -35,25 +35,24 @@ master_doc = 'index'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 #
-# We don't use 'sphinx.ext.autosummary' now.
-# Order is important... qmi_sphinx should go before sphinx.ext.napoleon.
+# Order is important... autosummary should go before sphinx.ext.napoleon.
 #
 
-extensions = [ 'sphinx.ext.autodoc', 'qmi_sphinx', 'sphinx.ext.napoleon', 'sphinx.ext.todo' ]
+extensions = [ 'sphinx.ext.autodoc', 'sphinx.ext.autosummary', 'sphinx.ext.napoleon', 'sphinx.ext.todo' ]
 
-#autosummary_generate = True
+autosummary_generate = True
 
 autodoc_default_options = {
-#    'members'           : True,
-     'member-order'      : 'bysource',
-#    'undoc_members'     : True,
-#    'private-members'   : False,
-#    'special-members'   : '',
-#    'inherited-members' : False,
-#    'show-inheritance'  : False,
-#    'ignore-module-all' : False,
-#     'imported-members'  : False
-#    'exclude-members'   : ''
+   # 'members'           : True,
+   'member-order'      : 'bysource',
+   # 'undoc_members'     : True,
+   # 'private-members'   : False,
+   # 'special-members'   : '',
+   # 'inherited-members' : False,
+   # 'show-inheritance'  : False,
+   # 'ignore-module-all' : False,
+   'imported-members'  : True
+   # 'exclude-members'   : ''
 }
 
 todo_include_todos = True
