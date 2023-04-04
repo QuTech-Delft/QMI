@@ -16,8 +16,6 @@ The QMI main package:
    :toctree: build
    :template: custom-package.rst
 
-   qmi
-
 
 The QMI framework consists of the following sub-packages:
 
