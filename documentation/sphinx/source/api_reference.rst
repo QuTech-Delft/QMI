@@ -12,7 +12,7 @@ The QMI framework consists of several Python 3 packages and modules.
 
 The QMI framework consists of the following packages:
 
-+------------------------+----------------------------------------------------------------------------+
++========================+============================================================================+
 | package                | description                                                                |
 +========================+============================================================================+
 
@@ -28,4 +28,4 @@ The QMI framework consists of the following packages:
    qmi.tools
    qmi.utils
 
-https://qmi.readthedocs.io/en/22-the-api-reference-in-the-readthedocs-documentation-lacks-all-modules/qmi.html
+Click on the module to see more details.

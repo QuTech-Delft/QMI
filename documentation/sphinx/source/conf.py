@@ -40,13 +40,9 @@ master_doc = 'index'
 #
 
 extensions = [ 'sphinx.ext.autodoc', 'sphinx.ext.autosummary', 'sphinx.ext.napoleon', 'sphinx.ext.todo' ]
-# extensions = [ 'sphinx.ext.autodoc', 'qmi_sphinx', 'sphinx.ext.napoleon', 'sphinx.ext.todo' ]
 
 autosummary_generate = True
-autosummary_imported_members = True
 
-# autodoc_member_order = 'bysource'
-# autodoc_default_flags = ['members']
 autodoc_default_options = {
    # 'members'           : True,
    'member-order'      : 'bysource',
