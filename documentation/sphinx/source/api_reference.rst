@@ -10,6 +10,10 @@ The QMI framework consists of several Python 3 packages and modules.
 
 .. rubric:: QMI package overview
 
+.. toctree::
+
+   build/qmi
+
 The QMI framework consists of the following packages:
 
 .. autosummary::
@@ -17,7 +21,6 @@ The QMI framework consists of the following packages:
    :template: custom-module.rst
    :recursive:
 
-   qmi
    qmi.core
    qmi.data
    qmi.instruments
