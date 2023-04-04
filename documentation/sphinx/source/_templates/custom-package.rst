@@ -2,7 +2,7 @@
 
 .. automodule:: qmi
    :members:
-   :special-members: __version__, __contains__
+   :special-members: __version__
    :inherited-members:
 
    {% block attributes %}
@@ -12,18 +12,6 @@
    .. autosummary::
       :toctree:
    {% for item in attributes %}
-      {{ item }}
-   {%- endfor %}
-   {% endif %}
-   {% endblock %}
-
-   {% block functions %}
-   {% if functions %}
-   .. rubric:: {{ _('Functions') }}
-
-   .. autosummary::
-      :toctree:
-   {% for item in functions %}
       {{ item }}
    {%- endfor %}
    {% endif %}
@@ -44,5 +32,3 @@
 .. autosummary::
    :toctree:
    :template: custom-package.rst
-
-   qmi
