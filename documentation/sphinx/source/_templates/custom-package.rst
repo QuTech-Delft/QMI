@@ -1,3 +1,5 @@
 .. automodule:: qmi
    :members:
-   :imported-members:
+   :undoc-members:
+   :special-members: __contains__
+   :show-inheritance:
