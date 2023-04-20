@@ -91,7 +91,7 @@ class _MEASCTL(enum.Enum):
        This setting must be applied identivcally for both devices and it requires
        that the two devices have established a white rabbit connection. 
     """
-    SW_START_SW_STOP = 6 # new since v3.1
+    SW_START_SW_STOP = 6  # new since v3.1
     """Sets measurement control such that the duration of a measurement is purely under software control,
        i.e. started by te call of ``MH_StartMeas`` and stopped by the call of ``MH_StartMeas``. 
        This overcomes the time limits of the hardware CTC and allows virtually unlimited measurement times.
@@ -132,30 +132,41 @@ class _FLAG(enum.Enum):
 class _WARNING(enum.Enum):
     """Bitfield constants for the return value of the :func:`~MultiHarpDevice.getWarnings` function.
 
-    These are defined as preprocessor symbols in the ``mhdefin.h`` C header file.
+    These are defined as preprocessor symbols in the ``mhdefin.h`` C header file. For full descriptions
+    see the chapter '8.1. Warnings' from the MultiHarp MHLib Manual.
     """
     SYNC_RATE_ZERO = 0x0001
-    """Sync rate zero."""
+    """No pulses are detected at the sync input. In histogramming and T3 mode this is crucial and the
+    measurement will not work without this signal."""
     SYNC_RATE_VERY_LOW = 0x0002
-    """Sync rate very low."""
+    """The detected pulse rate at the sync input is below 100 Hz and cannot be determined accurately.
+    Other warnings may not be reliable under this condition."""
     SYNC_RATE_TOO_HIGH = 0x0004
-    """Sync rate too high."""
+    """The pulse rate at the sync input (after the divider) is higher than 75 MHz. This is close to 
+    the TDC limit. Sync events will be lost above 78 MHz."""
     INPT_RATE_ZERO = 0x0010
-    """Input rate zero."""
+    """No counts are detected at any of the input channels."""
     INPT_RATE_TOO_HIGH = 0x0040
-    """Input rate high."""
+    """The overall pulse rate at the input channels is higher than 80 MHz (USB 3.0 connection) or higher
+    than 9 MHz (USB 2.0 connection). The measurement will likely lead to a FIFO overrun."""
     INPT_RATE_RATIO = 0x0100
-    """Input rate ratio."""
+    """This warning is issued in histogramming and T3 mode when the rate at any input channel is higher
+    than 5% of the sync rate."""
     DIVIDER_GREATER_ONE = 0x0200
-    """Divider greater than one."""
+    """In T2 mode: The sync divider is set larger than 1. This is probably not intended.
+    In histogramming and T3 mode: If the pulse rate at the sync input is below 75 MHz then a divider
+    >1 is not needed."""
     TIME_SPAN_TOO_SMALL = 0x0400
-    """Time span too small."""
+    """This warning is issued in histogramming and T3 mode when the sync period (1/SyncRate) is longer
+    than the start to stop time span that can be covered by the histogram or by the T3 mode records."""
     OFFSET_UNNECESSARY = 0x0800
-    """Offset unneccesary."""
+    """This warning is issued in histogramming and T3 mode when an offset >0 is set even though the sync
+    period (1/SyncRate) can be covered by the measurement time span without using an offset."""
     DIVIDER_TOO_SMALL = 0x1000
-    """Divider too small."""
+    """The pulse rate at the sync input (after the divider) is higher than 75 MHz."""
     COUNTS_DROPPED = 0x2000
-    """Counts dropped."""
+    """This warning is issued when the front end of the data processing pipeline was not able to process
+    all events that came in."""
 
 
 class _WR_STATUS(enum.Enum):

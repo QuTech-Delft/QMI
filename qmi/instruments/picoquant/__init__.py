@@ -1,6 +1,6 @@
 """The qmi.instruments.picoquant package provides support for devices manufactured by PicoQuant.
 
-Currently, four instruments are supported: MultiHarp 150, HydraHarp 400 and PicoHarp 300.
+Currently, three instruments are supported: MultiHarp 150, HydraHarp 400 and PicoHarp 300.
 """
 from qmi.instruments.picoquant.support._decoders import EventDataType, EventFilterMode, SYNC_TYPE
 from qmi.instruments.picoquant.support._realtime import RealTimeHistogram, RealTimeCountRate, TttrHistogram
