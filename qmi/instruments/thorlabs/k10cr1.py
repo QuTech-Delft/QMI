@@ -471,6 +471,9 @@ class Thorlabs_K10CR1(QMI_Instrument):
             _logger.debug("[%s] Ignoring message %s (message_id=0x%04x)",
                           self._name, type(msg).__name__, msg.message_id)
 
+            if time.monotonic() > end_time:
+                raise QMI_TimeoutException(f"Expected message type {message_type} not received.")
+
     def _send_message(self, msg: _AptMessage) -> None:
         """Encode and send a binary message to the instrument."""
 
@@ -478,14 +481,9 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # a potential old message from the instrument.
         # This prevents a buildup of unhandled notification messages from
         # the instrument after several move_XXX() commands.
-        try:
-            pending_msg = self._read_message(timeout=0.0)
-            _logger.debug("[%s] Ignoring message %s (message_id=0x%04x)",
-                          self._name, type(pending_msg).__name__, pending_msg.message_id)
-        except QMI_TimeoutException:
-            # This timeout is the normal, expected situation when there
-            # is no unhandled message from the instrument.
-            pass
+        pending_msg = self._read_message(timeout=0.0)
+        _logger.debug("[%s] Pending message %s (message_id=0x%04x)",
+                      self._name, type(pending_msg).__name__, pending_msg.message_id)
 
         # Now send the new command.
         self._transport.write(bytes(msg))
@@ -545,7 +543,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
         _logger.info("[%s] Closing connection to instrument", self._name)
         super().close()
         self._transport.close()
-
 
     @rpc_method
     def get_idn(self) -> QMI_InstrumentIdentification:
@@ -674,7 +671,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
     @rpc_method
     def set_velocity_params(self, max_velocity: float, acceleration: float) -> None:
-        """Set the maximum velocity and accleration.
+        """Set the maximum velocity and acceleration.
 
         These settings will be applied for subsequent absolute and relative moves.
 

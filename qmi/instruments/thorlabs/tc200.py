@@ -426,7 +426,7 @@ class Thorlabs_TC200(QMI_Instrument):
         The offset is stored in persistent memory and loaded automatically on device startup.
         """
         if not self.is_enabled():
-            raise QMI_UsageException("Heater output must be enable for tuning")
+            raise QMI_UsageException("Heater output must be enabled for tuning")
 
         if self.is_tuned():
             raise QMI_UsageException("Device is already tuned")

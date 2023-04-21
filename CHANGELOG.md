@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Copyright waiver in README.md.
 - CI workflows for regular push, pull request and for publishing.
 - Scheduled CI workflow for main branch.
+- Workflow for creating documentation into readthedocs.io.
 - Added licence references for files.
 
 ### Changed
