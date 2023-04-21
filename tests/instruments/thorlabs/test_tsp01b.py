@@ -4,26 +4,11 @@ import unittest, unittest.mock
 import struct
 import binascii
 
-
-# mock the later on imported usb.core and usb.util
-_usb_core_mock = unittest.mock.Mock()
-_usb_util_mock = unittest.mock.Mock()
-_usb_core_find_mock = unittest.mock.Mock()
-sys.modules['usb.core'] = _usb_core_mock
-sys.modules["usb.core.find"] = _usb_core_find_mock
-sys.modules['usb.util'] = _usb_util_mock
-sys.modules['usb.util.claim_interface'] = unittest.mock.Mock()
-
-from qmi.instruments.thorlabs.tsp01b import Thorlabs_TSP01B
-import qmi.core.exceptions
-from qmi.utils.context_managers import open_close
-
-ENDPOINT_TYPE_INTR: int = 0x03
-ENDPOINT_IN: int = 0x80
-ENDPOINT_OUT: int = 0x00
+# Check for earlier possible mocking of the usb.core and usb.util modules and delete those
+if "usb.core" in sys.modules.keys():
+    del sys.modules['usb.core'], sys.modules['usb.core.find'], sys.modules['usb.util']
 
 
-# Mock classes for usb.core and usb.util
 class EndpointMock:
     """Mock values from usb.util module. See inline comments for attribute name."""
     bmAttributes: int = 0x03  # ENDPOINT_TYPE_INTR
@@ -98,6 +83,24 @@ class DevMock:
         raise _usb_core_mock.USBError
 
 
+# mock the later on imported usb.core and usb.util
+_usb_core_find_mock = unittest.mock.Mock(return_value=DevMock())
+_usb_core_mock = unittest.mock.Mock()
+_usb_util_mock = unittest.mock.Mock()
+sys.modules['usb.core'] = _usb_core_mock
+sys.modules['usb.core.find'] = _usb_core_find_mock
+sys.modules['usb.util'] = _usb_util_mock
+sys.modules['usb.util.claim_interface'] = unittest.mock.Mock()
+
+from qmi.instruments.thorlabs.tsp01b import Thorlabs_TSP01B
+import qmi.core.exceptions
+from qmi.utils.context_managers import open_close
+
+ENDPOINT_TYPE_INTR: int = 0x03
+ENDPOINT_IN: int = 0x80
+ENDPOINT_OUT: int = 0x00
+
+
 # Mock functions
 def endpoint_type(attribute):
     """Mock usb.util.endpoint_type call"""
@@ -138,48 +141,53 @@ class TestThorlabsTsp01b(unittest.TestCase):
         self.patch_claim.stop()
         self.patch_error.stop()
 
-    def test_open_close(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_open_close(self, usbmock, patch_find):
         """Test opening and closing the instrument"""
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            self.instr.open()
-            self.instr.close()
+        self.instr.open()
+        self.instr.close()
 
-        patch.assert_called_with(
+        patch_find.assert_called_with(
             find_all=False, idVendor=0x1313, idProduct=0x80fa, serial_number=self._serial)
 
-    def test_open_close_except_with_no_serial_number(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=None)
+    def test_open_close_except_with_no_serial_number(self, usbmock, patch_find):
         """Test opening the instrument with no serial number excepts"""
         expected = f"Instrument with serial number {self._serial} not found (check device permission)"
-        with unittest.mock.patch("usb.core.find", return_value=None):
-            with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
-                self.instr.open()
+        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+            self.instr.open()
 
         self.assertEqual(str(exc.exception), expected)
 
-    def test_open_close_except_with_no_HID_interface(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock(True))
+    def test_open_close_except_with_no_HID_interface(self, usbmock, patch_find):
         """Test opening the instrument with no active config excepts"""
         expected = "Instrument does not have a HID interface"
-        with unittest.mock.patch("usb.core.find", return_value=DevMock(True)):  # "True" sets no active config
-            with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
-                self.instr.open()
+        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+            self.instr.open()
 
         self.assertEqual(str(exc.exception), expected)
 
-    def test_open_close_except_with_no_IN_endpoint(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock(False, False, True))
+    def test_open_close_except_with_no_IN_endpoint(self, usbmock, patch_find):
         """Test opening the instrument excepts if IN endpoint is not correctly defined."""
         expected = "Instrument does not have Interrupt IN endpoint"
-        with unittest.mock.patch("usb.core.find", return_value=DevMock(False, False, True)):
-            with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
-                self.instr.open()
+        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+            self.instr.open()
 
         self.assertEqual(str(exc.exception), expected)
 
-    def test_open_close_except_with_no_OUT_endpoint(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock(False, True, False))
+    def test_open_close_except_with_no_OUT_endpoint(self, usbmock, patch_find):
         """Test opening the instrument excepts if OUT endpoint is not correctly defined."""
         expected = "Instrument does not have Interrupt OUT endpoint"
-        with unittest.mock.patch("usb.core.find", return_value=DevMock(False, True, False)):
-            with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
-                self.instr.open()
+        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+            self.instr.open()
 
         self.assertEqual(str(exc.exception), expected)
 
@@ -250,32 +258,36 @@ class TestThorlabsTsp01bMethods(unittest.TestCase):
         self.patch_error.stop()
         qmi.stop()
 
-    def test_reset(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_reset(self, patch_find):
         """Test the reset method."""
         command_string = self._create_byte_string(0x01, bytes([0x00]), bytes([189]))
         reply_string = self._create_byte_string(0x04, bytes([0x00]))
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException, reply_string]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr):
-                self.instr.reset()
+        with open_close(self.instr):
+            self.instr.reset()
 
         DevMock.write.assert_called_with(0, command_string, 2000)
 
-    def test_unexpected_reply_to_reset(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_unexpected_reply_to_reset(self, patch_find):
         """Test the reset method raises exception."""
         expected = "Unexpected reply to reset command (01, 00)"
         # Now we return wrong reply parameter
         reply_string = self._create_byte_string(0x01, bytes([0x00]))
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException, reply_string]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
-                self.instr.reset()
+        with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+            self.instr.reset()
 
         self.assertEqual(str(exc.exception), expected)
 
-    def test_get_idn(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_get_idn(self, patch_find):
         """Test the get_idn method."""
         expected_idn = []
         command_strings, reply_strings = [], []
@@ -289,9 +301,8 @@ class TestThorlabsTsp01bMethods(unittest.TestCase):
             )
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException] + reply_strings
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr):
-                idn = self.instr.get_idn()
+        with open_close(self.instr):
+            idn = self.instr.get_idn()
 
         for i in range(4):
             DevMock.write.assert_called_with(0, command_strings[i], 2000)
@@ -301,20 +312,23 @@ class TestThorlabsTsp01bMethods(unittest.TestCase):
         self.assertEqual(ord(idn.serial), expected_idn[2])
         self.assertEqual(ord(idn.version), expected_idn[3])
 
-    def test_unexpected_reply_to_device_info_query(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_unexpected_reply_to_device_info_query(self, patch_find):
         """Test the get_idn raises an exception."""
         expected = "Unexpected reply to device info query (01, 00)"
         # Now we return wrong reply parameter
         reply_string = self._create_byte_string(0x01, bytes([0x00]))
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException, reply_string]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
-                self.instr.get_idn()
+        with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+            self.instr.get_idn()
 
         self.assertEqual(str(exc.exception), expected)
 
-    def test_get_internal_temperature(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_get_internal_temperature(self, patch_find):
         """Test get_internal_temperature method returns temperature value."""
         expected_t = -273.0  # Quite cold!
         command_string = self._create_byte_string(0x01, bytes([0x00]), bytes([189]))
@@ -322,40 +336,43 @@ class TestThorlabsTsp01bMethods(unittest.TestCase):
         reply_string = self._create_byte_string(0x07, b"\x00\x00\x80\x88\xc3")
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException, reply_string]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr):
-                temp_int = self.instr.get_internal_temperature()
+        with open_close(self.instr):
+            temp_int = self.instr.get_internal_temperature()
 
         DevMock.write.assert_called_with(0, command_string, 2000)
         self.assertEqual(temp_int, expected_t)
 
-    def test_sensor_not_connected(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_sensor_not_connected(self, patch_find):
         """Test get_internal_temperature method raises exception."""
         expected = "Sensor not connected"
         # Reply parameter 0x13 indicates sensor is not connected, with specific byte string
         reply_string = self._create_byte_string(0x13, b"\x03\x02\x24\x00")
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException, reply_string]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
-                self.instr.get_internal_temperature()
+        with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+            self.instr.get_internal_temperature()
 
         self.assertEqual(str(exc.exception), expected)
 
-    def test_unexpected_reply_to_measurement_query(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_unexpected_reply_to_measurement_query(self, patch_find):
         """Test get_internal_temperature method raises exception."""
         expected = "Unexpected reply to measurement query (07, 00 00 00 00)"
         # Reply data misses one byte, the channel number
         reply_string = self._create_byte_string(0x07, b"\x00\x00\x00\x00")
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException, reply_string]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
-                self.instr.get_internal_temperature()
+        with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+            self.instr.get_internal_temperature()
 
         self.assertEqual(str(exc.exception), expected)
 
-    def test_get_external_temperature(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_get_external_temperature(self, patch_find):
         """Test get_internal_temperature method returns temperature value."""
         expected_t = 273.0  # Quite warm!
         channels = [1, 2]
@@ -364,23 +381,25 @@ class TestThorlabsTsp01bMethods(unittest.TestCase):
         reply_string = self._create_byte_string(0x07, b"\x02\x00\x80\x88\x43")
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException, reply_string, reply_string]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr):
-                for channel in channels:
-                    temp_int = self.instr.get_external_temperature(channel)
-                    self.assertEqual(temp_int, expected_t)
+        with open_close(self.instr):
+            for channel in channels:
+                temp_int = self.instr.get_external_temperature(channel)
+                self.assertEqual(temp_int, expected_t)
 
         DevMock.write.assert_called_with(0, command_string, 2000)
 
-    def test_get_external_temperature_wrong_channel_number(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_get_external_temperature_wrong_channel_number(self, patch_find):
         """See that the call excepts on wrong channel number"""
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr), self.assertRaises(ValueError):
-                self.instr.get_external_temperature(0)
+        with open_close(self.instr), self.assertRaises(ValueError):
+            self.instr.get_external_temperature(0)
 
-    def test_get_humidity(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_get_humidity(self, patch_find):
         """Test get_internal_temperature method returns temperature value."""
         expected_h2o = 0.0  # Dry
         command_string = self._create_byte_string(0x01, bytes([0x00]), bytes([189]))
@@ -388,58 +407,61 @@ class TestThorlabsTsp01bMethods(unittest.TestCase):
         reply_string = self._create_byte_string(0x07, b"\x01\x00\x00\x00\x00")
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException, reply_string]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr):
-                humidity = self.instr.get_humidity()
+        with open_close(self.instr):
+            humidity = self.instr.get_humidity()
 
         DevMock.write.assert_called_with(0, command_string, 2000)
         self.assertEqual(humidity, expected_h2o)
 
-    def test_packet_too_short_exception(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_packet_too_short_exception(self, patch_find):
         """See that an exception is raised if the packet is too short."""
         expected = "Received short packet from instrument"
         reply_string = self._create_byte_string(0x00, bytes([0x00]), bytes([189]))
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException, reply_string[:10]]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
-                self.instr.reset()
+        with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+            self.instr.reset()
 
         self.assertEqual(str(exc.exception)[:len(expected)], expected)
 
-    def test_packet_has_wrong_fixed_values(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_packet_has_wrong_fixed_values(self, patch_find):
         """See that an exception is raised if the packet has a wrong fixed value."""
         expected = "Received invalid packet from instrument"
         reply_string = self._create_byte_string(0x00, bytes([0x00]), bytes([189]))
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException, reply_string[1:]]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
-                self.instr.reset()
+        with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+            self.instr.reset()
 
         self.assertEqual(str(exc.exception)[:len(expected)], expected)
 
-    def test_packet_except_on_bad_crc_check_value(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_packet_except_on_bad_crc_check_value(self, patch_find):
         """See that an exception is raised if the CRC8 check value does not match."""
         expected = "Received bad header CRC from instrument"
         reply_string = self._create_byte_string(0x00, bytes([0x00]), bytes([189]))
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException, reply_string]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
-                self.instr.reset()
+        with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+            self.instr.reset()
 
         self.assertEqual(str(exc.exception)[:len(expected)], expected)
 
-    def test_inconsistent_data_length_raises_exception(self):
+    @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
+    @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
+    def test_inconsistent_data_length_raises_exception(self, patch_find):
         """See that an exception is raised if data length is inconsistent with the packet length."""
         expected = "Received invalid packet from instrument"
         reply_string = self._create_byte_string(0x04, bytes([0x00]))
         DevMock.read = unittest.mock.Mock()
         DevMock.read.side_effect = [BaseException, reply_string[:11]]
-        with unittest.mock.patch("usb.core.find", return_value=DevMock()) as patch:
-            with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
-                self.instr.reset()
+        with open_close(self.instr), self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+            self.instr.reset()
 
         self.assertEqual(str(exc.exception)[:len(expected)], expected)
 
