@@ -54,7 +54,6 @@ class MyRpcSubClass(MyRpcTestClass):
         return math.log(x)
 
 
-
 class TestRPC(unittest.TestCase):
 
     def setUp(self):

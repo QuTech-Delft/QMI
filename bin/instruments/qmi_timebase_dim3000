@@ -103,7 +103,7 @@ def parse_instrument_source(args) -> AbstractContextManager:
             qmi.make_instrument(
                 instrument_name="DIM3000",
                 instrument_class=TimeBase_DIM3000,
-                transport=f"serial:/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_{args.serial}-if00-port0")
+                transport=f"serial:{args.serial}")
         )
 
     # get the instrument

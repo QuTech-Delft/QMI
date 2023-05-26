@@ -27,6 +27,15 @@ from qmi.core.exceptions import (
 from qmi.core.util import format_address_and_port, is_valid_object_name
 
 
+def _path_eq(p1, p2):
+    return p1 == p2 or os.path.normcase(p1) == os.path.normcase(p2)
+
+
+# Am I running in a windows virtual environment?
+# sys.executable and sys._base_executable are not equal within a Windows python virtual environment.
+# Within a linux python virtual environment they are equal.
+WINENV = not _path_eq(sys.executable, sys._base_executable)  # type: ignore
+
 # Time in seconds to wait until a context shuts down after a request.
 CONTEXT_SHUTDOWN_TIMEOUT = 8
 
@@ -56,7 +65,6 @@ class ProcessException(Exception):
 
 class ProcessManagementClient:
     """Client side of a remote process management server."""
-
 
     def __init__(self, host: str, context_name: str) -> None:
         """Connect to a remote computer via SSH and start a remote process management server.
@@ -200,7 +208,7 @@ class ProcessManagementClient:
                 success = int(decoded_resp[3:].strip())
             except ValueError:
                 raise ProcessException("Remote process management protocol error")
-            return (success != 0)
+            return success != 0
         elif decoded_resp.startswith("ERR "):
             # Got error from process server.
             msg = decoded_resp[4:].strip()
@@ -214,7 +222,7 @@ def is_local_host(host: str) -> bool:
 
     # Resolve host.
     try:
-        addrs = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM) # type: ignore
+        addrs = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)  # type: ignore
     except OSError:
         _logger.debug("Invalid host name '%s'", host)
         return False
@@ -235,7 +243,7 @@ def is_local_host(host: str) -> bool:
     # Return True if a local IP address matches the specified host.
     for addrs in if_addrs.values():
         for addr in addrs:
-            if addr.address in host_ips: # type: ignore
+            if addr.address in host_ips:  # type: ignore
                 return True
 
     # Specified host does not refer to the local computer.
@@ -298,7 +306,8 @@ def start_local_process(context_name: str) -> int:
     try:
         output_file = open(output_file_name, "a")
     except OSError as exc:
-        raise ProcessException("Can not create output log file '{}'".format(output_file_name))
+        raise ProcessException("Can not create output log file '{}' ({})".format(
+            output_file_name, str(exc)))
 
     # Start a new Python process to run the specified program.
     # Close standard input.
@@ -332,8 +341,14 @@ def start_local_process(context_name: str) -> int:
     # See https://bugs.python.org/issue26741 which introduces this limitation.
     proc.returncode = 0
 
+    pid = proc.pid
+    if WINENV:
+        parent = psutil.Process(pid)
+        # always the only child, due to the nature in which this process is spawned.
+        pid = parent.children()[0].pid
+
     # Return PID of managed process.
-    return proc.pid
+    return pid
 
 
 def stop_local_process(context_name: str, pid: int) -> bool:
@@ -457,7 +472,7 @@ def get_context_status(context_name: str) -> Tuple[int, str]:
 
     :param context_name: Name of the context to be tested.
     :return: A tuple containing the process ID of the Python program containing the context, or -1 if the context is
-        not responding via TCP. Also the QMI version number of the newly created context.
+        not responding via TCP. And the QMI version number of the newly created context.
     :raises ProcessException: If an error occurs.
     """
 
@@ -475,11 +490,13 @@ def get_context_status(context_name: str) -> Tuple[int, str]:
     try:
         qmi.context().suppress_version_mismatch_warnings = True
         qmi.context().connect_to_peer(context_name, peer_addr)
+
     except OSError as exc:
         # Can not connect to context; mark it as not responding.
         _logger.debug("Can not connect to context %r (%s: %s)",
                       context_name, type(exc).__name__, str(exc))
-        return (-1, "")
+        return -1, ""
+
     except QMI_Exception as exc:
         # Unexpected error while connecting to context (bad handshake, etc.).
         _logger.debug("Protocol error from context %r (%s: %s)", context_name, type(exc).__name__, str(exc))
@@ -508,7 +525,7 @@ def get_context_status(context_name: str) -> Tuple[int, str]:
         pass  # apparently already disconnected
 
     # Mark context as responding.
-    return (pid, ver)
+    return pid, ver
 
 
 def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> ShutdownResult:
@@ -790,7 +807,7 @@ def proc_start(context_name: Optional[str]) -> int:
             # Check if the peer context responds via TCP.
             pid, ver = get_context_status(context_name)
             if pid >= 0:
-                print("already running (PID={}, QMI={})".format(pid,ver))
+                print("already running (PID={}, QMI={})".format(pid, ver))
 
             else:
                 # Context not responding via TCP.
@@ -903,7 +920,7 @@ def proc_status(context_name: Optional[str]) -> int:
 
     # Select applicable contexts.
     context_names = select_contexts(context_name)
-    max_len_context_name = len(max(context_names,key=len))
+    max_len_context_name = len(max(context_names, key=len))
 
     print("QMI process status:")
 
@@ -917,7 +934,7 @@ def proc_status(context_name: Optional[str]) -> int:
             pid, ver = get_context_status(context_name)
             # Print process status
             if pid >= 0:
-                print(running_str, "responding via TCP (PID={}, QMI={})".format(pid,ver))
+                print(running_str, "responding via TCP (PID={}, QMI={})".format(pid, ver))
             else:
                 print(offline_str, "not responding via TCP")
         except ProcessException as exc:

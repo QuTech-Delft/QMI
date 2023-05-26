@@ -89,6 +89,9 @@ class AdbasicCompilerException(QMI_RuntimeException):
             error_message += "\n  " + str(error)
         return error_message
 
+    def __reduce__(self):
+        return (AdbasicCompilerException, (self.message, self.adbasic_errors))
+
 
 def _extract_lines(lines_bin: bytes) -> List[str]:
     """Extract lines from compiler output stream."""
@@ -117,7 +120,7 @@ def _parse_stderr_lines(stderr_lines: List[str]) -> Tuple[List[AdbasicError], Li
     error_warning_count_line_pattern = re.compile(error_warning_count_line_pattern_string)
 
     fixme_line_pattern_string = r"([0-9a-fA-F]+):fixme:([:a-zA-Z]+) .+"
-    fixme_warning_count_line_pattern = re.compile(fixme_line_pattern_string)
+    fixme_warning_count_line_pattern = re.compile(fixme_line_pattern_string, re.DOTALL)
 
     errors: List[AdbasicError] = []
     warnings: List[AdbasicError] = []
@@ -265,11 +268,6 @@ def run_adbasic_compiler(adwin_dir: str,
     stdout_lines = _extract_lines(completed_process.stdout)
     stderr_lines = _extract_lines(completed_process.stderr)
 
-    # The returncode may be 0 even if compilation failed, especially under Linux.
-    # We therefore assume the compiler was successful only if returncode is 0
-    # and there are no messages on the stderr stream.
-    success = (completed_process.returncode == 0) and (not stderr_lines)
-
     for line in stdout_lines:
         if pretty_print:
             print(colorama.Fore.GREEN + "(stdout)" + colorama.Style.RESET_ALL, line)
@@ -303,6 +301,11 @@ def run_adbasic_compiler(adwin_dir: str,
                 print(colorama.Fore.RED + "(stderr)" + colorama.Style.RESET_ALL, line)
             else:
                 _logger.error("ADbasic stderr: %s", line)
+
+    # The returncode may be 0 even if compilation failed, especially under Linux.
+    # We therefore assume the compiler was successful only if returncode is 0
+    # and there are no messages on the stderr stream.
+    success = (completed_process.returncode == 0) and (not errors)
 
     return AdbasicResult(command_line, duration, completed_process.returncode, success, errors, warnings)
 
