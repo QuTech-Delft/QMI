@@ -68,7 +68,7 @@ class TestDim3000(unittest.TestCase):
         init_data = self.instr.get_init_data()
         self._transport_mock.write.assert_called_with(b'Ginit\n')
         self.assertDictEqual(
-            dict(amoffsmin=-225, amoffsmax=25, amoffsnom=0, init=True),
+            dict(amoffsmin=-225, amoffsmax=25, amoffsnom=0, init=True, adcoffs=None, btstat=None),
             asdict(init_data)
         )
 
@@ -77,7 +77,16 @@ class TestDim3000(unittest.TestCase):
         init_data = self.instr.get_init_data()
         self._transport_mock.write.assert_called_with(b'Ginit\n')
         self.assertDictEqual(
-            dict(amoffsmin=-225, amoffsmax=25, amoffsnom=0, init=True),
+            dict(amoffsmin=-225, amoffsmax=25, amoffsnom=0, btstat=False, adcoffs=None, init=True),
+            asdict(init_data)
+        )
+
+    def test_get_init_data_adcoffs(self):
+        self._transport_mock.read_until.return_value = b'Ramoffsmin:-225|Ramoffsmax:25|Ramoffsnom:0|Radcoffs:-24|Rinit:1\n'
+        init_data = self.instr.get_init_data()
+        self._transport_mock.write.assert_called_with(b'Ginit\n')
+        self.assertDictEqual(
+            dict(amoffsmin=-225, amoffsmax=25, amoffsnom=0, btstat=None, adcoffs=-24, init=True),
             asdict(init_data)
         )
 

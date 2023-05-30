@@ -97,9 +97,9 @@ class TestRunAdBasicCompiler(unittest.TestCase):
         error2 = "Error: No: {} {} file: {} ".format(1, exp_descriptions[1], f)
         error3 = "Invalid Option: {}".format(inv_opt)
         error4 = "Compilation aborted !"
-        warning1 = r"{} error.s., {} warning.s.".format(4, 0)
-        warning2 = r"002b:fixme:ver:SomeCommandToFix (0x33f1d0 (nil)): stub\n"
-        stderr_string = "\r\n".join([error1, error2, error3, error4, warning1, warning2]).encode()
+        warning1 = "{} error.s., {} warning.s.".format(4, 0)
+        warning2 = "002b:fixme:ver:SomeCommandToFix (0x33f1d0 (nil)): stub\n"
+        stderr_string = "\r\n".join([error1, error2, error3, error4, warning1, warning2])
         # run_adbasic_compiler arguments
         adbasic_arguments = ["ls", "-l", "/dev/null"]
         working_dir = None
@@ -108,7 +108,7 @@ class TestRunAdBasicCompiler(unittest.TestCase):
         pretty_print = False
 
         run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=expected_returncode,
-                         stdout=b"some stdout line\n", stderr=bytes(stderr_string))
+                         stdout=b"some stdout line\n", stderr=bytes(stderr_string, encoding="ASCII"))
 
         # Act
         with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
@@ -138,6 +138,86 @@ class TestRunAdBasicCompiler(unittest.TestCase):
             self.assertEqual(error.filename, exp_filenames[e])
             self.assertEqual(error.line_number, exp_line_numbers[e])
 
+    def test_run_adbasic_compiler_returns_success_on_warnings(self):
+        """Test that adbasic compiler returns errors and warnings correctly"""
+        # Suppress logging.
+        logging.getLogger("qmi.utils.adbasic_compiler").setLevel(logging.CRITICAL)
+
+        # Arrange
+        expected_returncode = 0
+        warning1 = "{} error.s., {} warning.s.".format(4, 0)
+        warning2 = "002b:fixme:ver:SomeCommandToFix (0x33f1d0 (nil)): stub\n"
+        stderr_string = "\r\n".join([warning1, warning2])
+        # run_adbasic_compiler arguments
+        adbasic_arguments = ["ls", "-l", "/dev/null"]
+        working_dir = None
+        parse_stderr = True
+        remove_c_directory = False
+        pretty_print = False
+
+        run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=expected_returncode,
+                         stdout=b"some stdout line\n", stderr=bytes(stderr_string, encoding="ASCII"))
+
+        # Act
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
+            adbasic_result_linux = run_adbasic_compiler(
+                self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
+                pretty_print
+                )
+
+        with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
+            adbasic_result_win = run_adbasic_compiler(
+                self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
+                pretty_print
+                )
+
+        # Assert
+        self.assertTrue(adbasic_result_linux.success)
+        self.assertTrue(adbasic_result_win.success)
+
+    def test_run_adbasic_compiler_returns_failure_on_errors(self):
+        """Test that adbasic compiler returns errors and warnings correctly"""
+        # Suppress logging.
+        logging.getLogger("qmi.utils.adbasic_compiler").setLevel(logging.CRITICAL)
+
+        # Arrange
+        expected_returncode = 0
+        f = "bad_input.bas"
+        inv_opt = "-explode"
+        exp_descriptions = ["Small error", "Another error", "Invalid command line option: {}".format(inv_opt),
+                            "Compilation aborted !"]
+        error1 = "Error: No: {} {} line: {} file: {} line no.: {} ".format(1, exp_descriptions[0], 2, f, 3)
+        error2 = "Error: No: {} {} file: {} ".format(1, exp_descriptions[1], f)
+        error3 = "Invalid Option: {}".format(inv_opt)
+        error4 = "Compilation aborted !"
+        stderr_string = "\r\n".join([error1, error2, error3, error4])
+        # run_adbasic_compiler arguments
+        adbasic_arguments = ["ls", "-l", "/dev/null"]
+        working_dir = None
+        parse_stderr = True
+        remove_c_directory = False
+        pretty_print = False
+
+        run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=expected_returncode,
+                         stdout=b"some stdout line\n", stderr=bytes(stderr_string, encoding="ASCII"))
+
+        # Act
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
+            adbasic_result_linux = run_adbasic_compiler(
+                self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
+                pretty_print
+                )
+
+        with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
+            adbasic_result_win = run_adbasic_compiler(
+                self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
+                pretty_print
+                )
+
+        # Assert
+        self.assertFalse(adbasic_result_linux.success)
+        self.assertFalse(adbasic_result_win.success)
+
     def test_run_adbasic_compiler_does_not_raise_FileNotFoundError(self):
         """Test that adbasic compiler works passes FileNotFoundError on fictive C directory removal"""
         # Arrange
@@ -164,11 +244,11 @@ class TestRunAdBasicCompiler(unittest.TestCase):
         # Arrange
         expected_returncode = 99
         error1 = "Liirum laarum pimpeli pompeli"  # nonsense
-        warning1 = r"{} warning.s., {} error.s.".format(4, 0)  # wrong order
-        warning2 = r"002b:todo:ver:SomeCommandToFix (0x33f1d0 (nil)): stub\n"  # 'todo' instead of 'fixme'
+        warning1 = "{} warning.s., {} error.s.".format(4, 0)  # wrong order
+        warning2 = "002b:todo:ver:SomeCommandToFix (0x33f1d0 (nil)): stub\n"  # 'todo' instead of 'fixme'
         tests = [error1, warning1, warning2]
         for test_string in tests:
-            stderr_string = f"{test_string}\r\n".encode()
+            stderr_string = f"{test_string}\r\n".encode("ASCII")
             # run_adbasic_compiler arguments
             adbasic_arguments = ["ls", "-l", "/dev/null"]
             working_dir = None

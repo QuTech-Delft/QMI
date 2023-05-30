@@ -18,7 +18,7 @@ def read(*names, **kwargs):
 
 setup(
     name='qmi',
-    version='0.39.0-beta.0',
+    version='0.40.0-beta.0',
     description='The Quantum Measurement Infrastructure framework',
     long_description="{}\n{}".format(
         read('README.md'),
@@ -109,6 +109,7 @@ setup(
         'bin/qmi_hdf5_to_mat',
         'bin/instruments/qmi_anapico_apsin',
         'bin/instruments/qmi_mcc_usb1808x',
+        'bin/instruments/qmi_newport_ag_uc8',
         'bin/instruments/qmi_quantum_composer_9530',
         'bin/instruments/qmi_siglent_ssa3000x',
         'bin/instruments/qmi_srs_dc205',

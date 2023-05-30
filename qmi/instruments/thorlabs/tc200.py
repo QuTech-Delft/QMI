@@ -150,7 +150,7 @@ class Thorlabs_TC200(QMI_Instrument):
             transport:  Transport specification string.
         """
         super().__init__(context, name)
-        self._transport = create_transport(transport)
+        self._transport = create_transport(transport, default_attributes={"baudrate": 115200})
 
     def _send_command(self, command: _Command, argument: Any = None) -> str:
         self._check_is_open()

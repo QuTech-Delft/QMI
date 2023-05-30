@@ -17,7 +17,7 @@ class TestThorlabsTc200(unittest.TestCase):
         qmi_context.name = "mockytemp"
         self.ser_address = "COM298"
         self.baudrate = 115200
-        transport_id = "serial:{}:baudrate={}".format(self.ser_address, self.baudrate)
+        transport_id = "serial:{}".format(self.ser_address)
         self.thorlabs = Thorlabs_TC200(qmi_context, "heet", transport_id)
 
     def test_open_close(self):

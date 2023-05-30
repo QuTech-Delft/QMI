@@ -3,7 +3,7 @@ from dataclasses import dataclass, fields
 from enum import IntEnum
 import logging
 import time
-from typing import Tuple, Type, TypeVar, Union, ClassVar
+from typing import Optional, Tuple, Type, TypeVar, Union, ClassVar, get_origin, get_args
 import re
 
 from qmi.core.context import QMI_Context
@@ -59,24 +59,34 @@ class DIM3000Base:
     @classmethod
     def from_string(cls: Type[T], string: str) -> T:
         """Factory function for making a dataclass from a string received from device."""
+
         if (match := re.match(cls.PATTERN, string)) is None:
             raise QMI_InstrumentException(f"Unexpected string returned from device: {string}")
 
-        kwargs: dict[str, Union[int, float, bool, str]] = {}
+        kwargs: dict[str, Union[int, float, bool, str, None]] = {}
 
-        for group_idx, field in enumerate(fields(cls), start=1):  # start at 1, because match.group(0) is full match
-            if field.type is int:
-                kwargs[field.name] = int(match[group_idx])
-            elif field.type is float:
-                kwargs[field.name] = float(match[group_idx])
-            elif field.type is bool:
-                kwargs[field.name] = bool(int(match[group_idx]))
-            elif field.type is str:
-                kwargs[field.name] = match[group_idx]
-            elif issubclass(field.type, IntEnum):
-                kwargs[field.name] = field.type(int(match[group_idx]))
+        for field in fields(cls):
+            # remap optional field type
+            if get_origin(field.type) is Union:
+                field_type = get_args(field.type)[0]
             else:
-                raise RuntimeError(f"Unexpected type {field.type} for {cls}!")
+                field_type = field.type
+
+            # optional fields might not have match, so set to None
+            if match[field.name] is None:
+                kwargs[field.name] = None
+            elif field_type is int:
+                kwargs[field.name] = int(match[field.name])
+            elif field_type is float:
+                kwargs[field.name] = float(match[field.name])
+            elif field_type is bool:
+                kwargs[field.name] = bool(int(match[field.name]))
+            elif field_type is str:
+                kwargs[field.name] = match[field.name]
+            elif issubclass(field_type, IntEnum):
+                kwargs[field.name] = field_type(int(match[field.name]))
+            else:
+                raise RuntimeError(f"Unexpected type {field_type} for {cls}!")
 
         return cls(**kwargs)
 
@@ -84,7 +94,11 @@ class DIM3000Base:
 @dataclass(frozen=True)
 class DIM3000DevInfo(DIM3000Base):
     """Dataclass containing device information."""
-    PATTERN = r"^Rdev:(\w*)\|Rhv:(\w*)\|Rfv:(\w*)\|Rfb:(\w*)\|Rsn:(\w*)"
+    PATTERN = (r"^Rdev:(?P<dev>\w*)\|"
+               r"Rhv:(?P<hv>\w*)\|"
+               r"Rfv:(?P<fv>\w*)\|"
+               r"Rfb:(?P<fb>\w*)\|"
+               r"Rsn:(?P<sn>\w*)")
     dev: str
     hv: str
     fv: str
@@ -95,20 +109,47 @@ class DIM3000DevInfo(DIM3000Base):
 @dataclass(frozen=True)
 class DIM3000InitData(DIM3000Base):
     """Dataclass containing initial data."""
-    PATTERN = r"^Ramoffsmin:(-?\d*)\|Ramoffsmax:(-?\d*)\|Ramoffsnom:(-?\d*)\|(?:Rbtstat:\d\|)?Rinit:(\d)"
+    PATTERN = (r"^Ramoffsmin:(?P<amoffsmin>-?\d*)\|"
+               r"Ramoffsmax:(?P<amoffsmax>-?\d*)\|"
+               r"Ramoffsnom:(?P<amoffsnom>-?\d*)\|"
+               r"(Rbtstat:(?P<btstat>\d)\|)?"
+               r"(Radcoffs:(?P<adcoffs>-?\d*)\|)?"
+               r"Rinit:(?P<init>\d)")
     amoffsmin: int
     amoffsmax: int
     amoffsnom: int
+    btstat: Optional[bool]
+    adcoffs: Optional[int]
     init: bool
 
 
 @dataclass(frozen=True)
 class DIM3000Parameters(DIM3000Base):
-    """Dataclass containing paramter data."""
-    PATTERN = (r"^Rfreq:(\d*)\|Rampl:(\d*)\|Rout:(\d*)\|Rpmon:\d*\|Rpmfr:\d*\|Rpmd:\d*\|Rpmphc:\d*\|"
-               r"Rswpm:(\d*)\|Rswps:(\d*)\|Rswpp:(\d*)\|Rswpf:(\d*)\|Rswpt:(\d*)\|Rfmon:(\d*)\|Rfmdev:(\d*)\|"
-               r"Rplson:(\d*)\|Rplsfr:(\d*)\|Rplsdt:(\d*)\|Rffreq:(\d*)\|Rfampl:(\d*)\|Ramoffs:(-?\d*)\|"
-               r"Rpcbtemp:(\d*)\|Rrefstat:(\d*)\|Rreflev:(-?\d*)\|Rvcclev:(\d*)")
+    """Dataclass containing parameter data."""
+    PATTERN = (r"^Rfreq:(?P<freq>\d*)\|"
+               r"Rampl:(?P<ampl>\d*)\|"
+               r"Rout:(?P<out>\d*)\|"
+               r"Rpmon:\d*\|"
+               r"Rpmfr:\d*\|"
+               r"Rpmd:\d*\|"
+               r"Rpmphc:\d*\|"
+               r"Rswpm:(?P<swpm>\d*)\|"
+               r"Rswps:(?P<swps>\d*)\|"
+               r"Rswpp:(?P<swpp>\d*)\|"
+               r"Rswpf:(?P<swpf>\d*)\|"
+               r"Rswpt:(?P<swpt>\d*)\|"
+               r"Rfmon:(?P<fmon>\d*)\|"
+               r"Rfmdev:(?P<fmdev>\d*)\|"
+               r"Rplson:(?P<plson>\d*)\|"
+               r"Rplsfr:(?P<plsfr>\d*)\|"
+               r"Rplsdt:(?P<plsdt>\d*)\|"
+               r"Rffreq:(?P<ffreq>\d*)\|"
+               r"Rfampl:(?P<fampl>\d*)\|"
+               r"Ramoffs:(?P<amoffs>-?\d*)\|"
+               r"Rpcbtemp:(?P<pcbtemp>\d*)\|"
+               r"Rrefstat:(?P<refstat>\d*)\|"
+               r"Rreflev:(?P<reflev>-?\d*)\|"
+               r"Rvcclev:(?P<vcclev>\d*)")
     freq: int
     ampl: float
     out: bool
@@ -132,6 +173,8 @@ class DIM3000Parameters(DIM3000Base):
 
     def __post_init__(self):
         # Correct some scaling of parameters
+        # Using __setattr__ because this is what is recommended by python when working with frozen classes
+        # See https://docs.python.org/3/library/dataclasses.html#frozen-instances
         object.__setattr__(self, 'ampl', self.ampl/10.)
         object.__setattr__(self, 'fampl', self.fampl/10.)
         object.__setattr__(self, 'pcbtemp', self.pcbtemp/100.)
