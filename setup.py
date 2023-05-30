@@ -109,6 +109,7 @@ setup(
         'bin/qmi_hdf5_to_mat',
         'bin/instruments/qmi_anapico_apsin',
         'bin/instruments/qmi_mcc_usb1808x',
+        'bin/instruments/qmi_newport_ag_uc8',
         'bin/instruments/qmi_quantum_composer_9530',
         'bin/instruments/qmi_siglent_ssa3000x',
         'bin/instruments/qmi_srs_dc205',
