@@ -7,7 +7,7 @@ While it is possible to install QMI by checking out the repository, for normal u
 
 .. code-block:: shell
 
-    pip install git+https://github.com/QuTech-Delft/QMI.git@v0.38.0-beta.0#egg=qmi
+    pip install git+https://github.com/QuTech-Delft/QMI.git@v0.40.0-beta.0#egg=qmi
 
 Read the ``README.md`` of the project for more detailed installation procedure.
 
