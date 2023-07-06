@@ -1,7 +1,7 @@
 import unittest.mock
 
 from qmi.instruments.picoquant.support._library_wrapper import _LibWrapper
-from qmi.instruments.picoquant.support import _phlib_function_signatures, _th260lib_function_signatures, \
+from qmi.instruments.picoquant.support import _phlib_function_signatures, \
     _mhlib_function_signatures, _hhlib_function_signatures
 
 
@@ -57,15 +57,6 @@ class LibraryWrapperTestCase(unittest.TestCase):
             for a in attr_list:
                 self.assertIn(a, annotations)
 
-    @unittest.mock.patch("sys.platform", "linux")
-    def test_timeharp_wrapper_annotations_lin(self):
-        attr_list = [fs[0] for fs in _th260lib_function_signatures._th260lib_function_signatures]
-        with unittest.mock.patch("ctypes.cdll"):
-            lib_wrapper = _LibWrapper("TH260")
-            annotations = dir(lib_wrapper._lib)
-            for a in attr_list:
-                self.assertIn(a, annotations)
-
     @unittest.mock.patch("sys.platform", "win32")
     def test_multiharp_wrapper_annotations_win(self):
         attr_list = [fs[0] for fs in _mhlib_function_signatures._mhlib_function_signatures]
@@ -89,15 +80,6 @@ class LibraryWrapperTestCase(unittest.TestCase):
         attr_list = [fs[0] for fs in _phlib_function_signatures._phlib_function_signatures]
         with unittest.mock.patch("ctypes.WinDLL", create=True):
             lib_wrapper = _LibWrapper("PH")
-            annotations = dir(lib_wrapper._lib)
-            for a in attr_list:
-                self.assertIn(a, annotations)
-
-    @unittest.mock.patch("sys.platform", "win32")
-    def test_timeharp_wrapper_annotations_win(self):
-        attr_list = [fs[0] for fs in _th260lib_function_signatures._th260lib_function_signatures]
-        with unittest.mock.patch("ctypes.WinDLL", create=True):
-            lib_wrapper = _LibWrapper("TH260")
             annotations = dir(lib_wrapper._lib)
             for a in attr_list:
                 self.assertIn(a, annotations)
@@ -128,14 +110,6 @@ class LibraryWrapperTestCase(unittest.TestCase):
 
         ptc.assert_any_call("phlib64.dll")
         ptc.assert_called_with("phlib.dll")
-
-        with unittest.mock.patch("ctypes.WinDLL", create=True, side_effect=[BaseException("No lib"), None]) \
-                as ptc:
-
-            _LibWrapper("TH260")
-
-        ptc.assert_any_call("th260lib64.dll")
-        ptc.assert_called_with("th260lib.dll")
 
 
 if __name__ == "__main__":
