@@ -22,7 +22,7 @@ EXECUTION_ERRORS = {
     2: "Wrong token",
     3: "Invalid bit",
     4: "Queue full",
-    5: "Not compatible"
+    5: "Not compatible",
 }
 
 # Command error codes returned by the DC205.
@@ -41,7 +41,7 @@ COMMAND_ERRORS = {
     11: "Bad integer token",
     12: "Bad token value",
     13: "Bad hex block",
-    14: "Unknown token"
+    14: "Unknown token",
 }
 
 
@@ -58,11 +58,7 @@ class SRS_DC205(QMI_Instrument):
     # Response timeout for reset command.
     RESET_RESPONSE_TIMEOUT = 5.0
 
-    def __init__(self,
-                 context: QMI_Context,
-                 name: str,
-                 transport: str
-                 ) -> None:
+    def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize the instrument driver.
 
         Arguments:
@@ -73,11 +69,15 @@ class SRS_DC205(QMI_Instrument):
                             "serial:/dev/ttyUSB0:baudrate=115200".
         """
         super().__init__(context, name)
-        self._transport = create_transport(transport, default_attributes={"baudrate": 115200})
-        self._scpi_protocol = ScpiProtocol(self._transport,
-                                           command_terminator="\n",
-                                           response_terminator="\n",
-                                           default_timeout=self.COMMAND_RESPONSE_TIMEOUT)
+        self._transport = create_transport(
+            transport, default_attributes={"baudrate": 115200}
+        )
+        self._scpi_protocol = ScpiProtocol(
+            self._transport,
+            command_terminator="\n",
+            response_terminator="\n",
+            default_timeout=self.COMMAND_RESPONSE_TIMEOUT,
+        )
 
     @rpc_method
     def open(self) -> None:
@@ -103,17 +103,21 @@ class SRS_DC205(QMI_Instrument):
         resp = self._scpi_protocol.ask("LEXE?; LCME?")
         words = resp.split(";")
         if len(words) != 2:
-            raise QMI_InstrumentException("Unexpected response to LEXE?;LCME?, got {!r}".format(resp))
+            raise QMI_InstrumentException(
+                f"Unexpected response to LEXE?;LCME?, got {resp!r}"
+            )
         execution_error = int(words[0].strip())
         command_error = int(words[1].strip())
         if execution_error != 0:
             error_str = EXECUTION_ERRORS.get(execution_error, "unknown")
-            raise QMI_InstrumentException("Instrument returned execution error after {!r}: {} ({})"
-                                          .format(cmd, execution_error, error_str))
+            raise QMI_InstrumentException(
+                f"Instrument returned execution error after {cmd!r}: {execution_error} ({error_str})"
+            )
         if command_error != 0:
             error_str = COMMAND_ERRORS.get(execution_error, "unknown")
-            raise QMI_InstrumentException("Instrument returned command error after {!r}: {} ({})"
-                                          .format(cmd, command_error, error_str))
+            raise QMI_InstrumentException(
+                f"Instrument returned command error after {cmd!r}: {command_error} ({error_str})"
+            )
 
     def _set_command(self, cmd: str) -> None:
         self._check_is_open()
@@ -126,8 +130,10 @@ class SRS_DC205(QMI_Instrument):
         resp = self._scpi_protocol.ask(cmd)
         try:
             return float(resp)
-        except ValueError:
-            raise QMI_InstrumentException("Unexpected response to command {!r}: {!r}".format(cmd, resp))
+        except ValueError as exc:
+            raise QMI_InstrumentException(
+                f"Unexpected response to command {cmd!r}: {resp!r}"
+            ) from exc
 
     def _ask_token(self, cmd: str, tokens: List[str]) -> int:
         """Read a token response from the instrument.
@@ -143,10 +149,14 @@ class SRS_DC205(QMI_Instrument):
             return tokens.index(resp)
         try:
             tok = int(resp)
-        except ValueError:
-            raise QMI_InstrumentException("Unexpected response to command {!r}: {!r}".format(cmd, resp))
+        except ValueError as exc:
+            raise QMI_InstrumentException(
+                f"Unexpected response to command {cmd!r}: {resp!r}"
+            ) from exc
         if tok >= len(tokens):
-            raise QMI_InstrumentException("Unexpected response to command {!r}: {!r}".format(cmd, resp))
+            raise QMI_InstrumentException(
+                f"Unexpected response to command {cmd!r}: {resp!r}"
+            )
         return tok
 
     @rpc_method
@@ -174,11 +184,13 @@ class SRS_DC205(QMI_Instrument):
         resp = self._scpi_protocol.ask("*IDN?")
         words = resp.rstrip().split(",")
         if len(words) != 4:
-            raise QMI_InstrumentException("Unexpected response to *IDN?, got {!r}".format(resp))
-        return QMI_InstrumentIdentification(vendor=words[0].strip(),
-                                            model=words[1].strip(),
-                                            serial=words[2].strip(),
-                                            version=words[3].strip())
+            raise QMI_InstrumentException(f"Unexpected response to *IDN?, got {resp!r}")
+        return QMI_InstrumentIdentification(
+            vendor=words[0].strip(),
+            model=words[1].strip(),
+            serial=words[2].strip(),
+            version=words[3].strip(),
+        )
 
     @rpc_method
     def get_range(self) -> int:
@@ -204,7 +216,7 @@ class SRS_DC205(QMI_Instrument):
         """
         if volt_range not in (1, 10, 100):
             raise ValueError("Invalid voltage range")
-        self._set_command("RNGE RANGE{}".format(int(volt_range)))
+        self._set_command(f"RNGE RANGE{int(volt_range)}")
 
     @rpc_method
     def get_output_enabled(self) -> bool:
@@ -215,7 +227,7 @@ class SRS_DC205(QMI_Instrument):
     @rpc_method
     def set_output_enabled(self, enable: bool) -> None:
         """Enable or disable the output."""
-        self._set_command("SOUT {}".format(int(enable)))
+        self._set_command(f"SOUT {int(enable)}")
 
     @rpc_method
     def get_voltage(self) -> float:
@@ -229,7 +241,7 @@ class SRS_DC205(QMI_Instrument):
     @rpc_method
     def set_voltage(self, voltage: float) -> None:
         """Set the DC voltage setting in Volt."""
-        self._set_command("VOLT {:.6f}".format(voltage))
+        self._set_command(f"VOLT {voltage:.6f}")
 
     @rpc_method
     def get_output_floating(self) -> bool:
@@ -240,7 +252,7 @@ class SRS_DC205(QMI_Instrument):
     @rpc_method
     def set_output_floating(self, enable: bool) -> None:
         """Enable or disable floating output."""
-        self._set_command("ISOL {}".format(int(enable)))
+        self._set_command(f"ISOL {int(enable)}")
 
     @rpc_method
     def get_sensing_enabled(self) -> bool:
@@ -255,7 +267,7 @@ class SRS_DC205(QMI_Instrument):
     @rpc_method
     def set_sensing_enabled(self, enable: bool) -> None:
         """Enable or disable remote sensing mode."""
-        self._set_command("SENS {}".format(int(enable)))
+        self._set_command(f"SENS {int(enable)}")
 
     @rpc_method
     def get_interlock_status(self) -> bool:

@@ -7,20 +7,19 @@ from unittest.mock import MagicMock, call, patch
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.transport import QMI_SerialTransport
-from qmi.instruments.wieserlabs.flexdds import (
-    OutputChannel, DdsRegister, DcpRegister, PllStatus, Wieserlabs_FlexDDS_NG_Dual)
+from qmi.instruments.wieserlabs import OutputChannel, DdsRegister, DcpRegister, Wieserlabs_FlexDdsNg
 
 
 class TestFlexDDS(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("TestContext")
+        qmi.start("Test_flex_dds")
         self._transport_mock = MagicMock(spec=QMI_SerialTransport)
         with patch(
                 'qmi.instruments.wieserlabs.flexdds.create_transport',
                 return_value=self._transport_mock):
-            self.instr: Wieserlabs_FlexDDS_NG_Dual = qmi.make_instrument("instr", Wieserlabs_FlexDDS_NG_Dual, "transp")
-            self.instr = cast(Wieserlabs_FlexDDS_NG_Dual, self.instr)
+            self.instr: Wieserlabs_FlexDdsNg = qmi.make_instrument("instr", Wieserlabs_FlexDdsNg, "transp")
+            self.instr = cast(QMI_SerialTransport, self.instr)
 
     def tearDown(self):
         qmi.stop()
@@ -39,7 +38,7 @@ class TestFlexDDS(unittest.TestCase):
         ])
         self._transport_mock.write.reset_mock()
         self._transport_mock.read_until.assert_called_once_with(
-            b"Interactive off\r\n", timeout=Wieserlabs_FlexDDS_NG_Dual.COMMAND_RESPONSE_TIMEOUT)
+            b"Interactive off\r\n", timeout=Wieserlabs_FlexDdsNg.COMMAND_RESPONSE_TIMEOUT)
         self._transport_mock.read_until.reset_mock()
 
     def test_open_close(self):

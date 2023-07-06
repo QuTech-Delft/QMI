@@ -64,11 +64,13 @@ class Tektronix_FCA3000(QMI_Instrument):
         resp = self._scpi_transport.ask("*IDN?")
         words = resp.rstrip().split(",")
         if len(words) != 4:
-            raise QMI_InstrumentException("Unexpected response to *IDN?, got {!r}".format(resp))
-        return QMI_InstrumentIdentification(vendor=words[0].strip(),
-                                            model=words[1].strip(),
-                                            serial=words[2].strip(),
-                                            version=words[3].strip())
+            raise QMI_InstrumentException(f"Unexpected response to *IDN?, got {resp!r}")
+        return QMI_InstrumentIdentification(
+            vendor=words[0].strip(),
+            model=words[1].strip(),
+            serial=words[2].strip(),
+            version=words[3].strip(),
+        )
 
     @rpc_method
     def get_errors(self) -> List[str]:
@@ -98,17 +100,18 @@ class Tektronix_FCA3000(QMI_Instrument):
 
         :param channel: Input channel to use (1 = channel A, 2 = channel B).
         """
-        resp = self._scpi_transport.ask("MEAS:FREQ? (@{})".format(channel))
+        resp = self._scpi_transport.ask(f"MEAS:FREQ? (@{channel})")
         freq = float(resp.rstrip())
         return freq
 
     @rpc_method
-    def configure_frequency(self,
-                            channel: int = 1,
-                            aperture: Optional[float] = None,
-                            trigger_level: Optional[float] = None,
-                            timestamp: bool = False,
-                            ) -> None:
+    def configure_frequency(
+        self,
+        channel: int = 1,
+        aperture: Optional[float] = None,
+        trigger_level: Optional[float] = None,
+        timestamp: bool = False,
+    ) -> None:
         """Configure the instrument for frequency measurements.
 
         After this function returns, you can perform a series of measurements
@@ -121,13 +124,13 @@ class Tektronix_FCA3000(QMI_Instrument):
             Setting a fixed trigger level makes the measurement faster.
         :param timestamp: True to enable timestamping of measurement values.
         """
-        self._scpi_transport.write("CONF:FREQ (@{})".format(channel))
+        self._scpi_transport.write(f"CONF:FREQ (@{channel})")
         if aperture is not None:
-            self._scpi_transport.write("ACQ:APER {:.6g}".format(aperture))
+            self._scpi_transport.write(f"ACQ:APER {aperture:.6g}")
         if trigger_level is not None:
-            self._scpi_transport.write("INP{}:LEV:AUTO 0".format(channel))
-            self._scpi_transport.write("INP{}:LEV {:.6g}".format(channel, trigger_level))
-        self._scpi_transport.write("FORM:TINF {}".format(int(timestamp)))
+            self._scpi_transport.write(f"INP{channel}:LEV:AUTO 0")
+            self._scpi_transport.write(f"INP{channel}:LEV {trigger_level:.6g}")
+        self._scpi_transport.write(f"FORM:TINF {int(timestamp)}")
 
     @rpc_method
     def read_value(self) -> float:
@@ -152,7 +155,9 @@ class Tektronix_FCA3000(QMI_Instrument):
         response = self._scpi_transport.ask("READ?")
         words = response.split(",")
         if len(words) < 2:
-            raise QMI_InstrumentException("Expecting timestamped value but got {!r}".format(response))
+            raise QMI_InstrumentException(
+                f"Expecting timestamped value but got {response!r}"
+            )
         val = float(words[0])
         timestamp = float(words[1])
         return timestamp, val
@@ -235,7 +240,7 @@ class Tektronix_FCA3000(QMI_Instrument):
         :param channel: Input channel (1 = channel A, 2 = channel B).
         :return: Trigger level in Volt.
         """
-        response = self._scpi_transport.ask("INP{}:LEV?".format(channel))
+        response = self._scpi_transport.ask(f"INP{channel}:LEV?")
         return float(response)
 
     @rpc_method
@@ -246,7 +251,7 @@ class Tektronix_FCA3000(QMI_Instrument):
 
         :param enable: True to enable the display, False to disable it.
         """
-        self._scpi_transport.write("DISP:ENAB {}".format(int(enable)))
+        self._scpi_transport.write(f"DISP:ENAB {int(enable)}")
 
     @rpc_method
     def set_initiate_continuous(self, enable: bool) -> None:
@@ -262,4 +267,4 @@ class Tektronix_FCA3000(QMI_Instrument):
 
         :param enable: True to enable continous measurements.
         """
-        self._scpi_transport.write("INIT:CONT {}".format(int(enable)))
+        self._scpi_transport.write(f"INIT:CONT {int(enable)}")

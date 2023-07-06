@@ -5,7 +5,8 @@ sys.modules["usb.core.find"] = unittest.mock.Mock()
 from typing import NamedTuple
 import time
 
-from qmi.instruments.thorlabs.pm100d import Thorlabs_PM10x, SensorInfo
+from qmi.instruments.thorlabs import SensorInfo
+from qmi.instruments.thorlabs.pm100d import Thorlabs_PM10x
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.context import QMI_Context
 

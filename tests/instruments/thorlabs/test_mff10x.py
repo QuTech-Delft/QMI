@@ -1,7 +1,7 @@
 import struct
 import unittest, unittest.mock
 
-from qmi.instruments.thorlabs.mff10x import Thorlabs_MFF10X
+from qmi.instruments.thorlabs import Thorlabs_Mff10X
 
 import qmi.core.exceptions
 from qmi.core.context import QMI_Context
@@ -149,7 +149,7 @@ class TestThorlabsMFF10x(unittest.TestCase):
         self.ser_address = "COM100"
         self.baudrate = 115200
         transport_id = "serial:{}:baudrate={}".format(self.ser_address, self.baudrate)
-        self.thorlabs = Thorlabs_MFF10X(qmi_context, "flippy", transport_id)
+        self.thorlabs = Thorlabs_Mff10X(qmi_context, "flippy", transport_id)
 
     def test_open_close(self):
         with unittest.mock.patch("serial.Serial") as ser:

@@ -4,9 +4,9 @@ import binascii
 from typing import cast
 
 from qmi.core.transport import QMI_SerialTransport
-from qmi.instruments.thorlabs.k10cr1 import Thorlabs_K10CR1, _AptMsgHwGetInfo
+from qmi.instruments.thorlabs import Thorlabs_K10Cr1
+from qmi.instruments.thorlabs.k10cr1 import _AptMsgHwGetInfo
 import qmi.core.exceptions
-from qmi.utils.context_managers import open_close
 
 # Number of microsteps per degree of rotation.
 MICROSTEPS_PER_DEGREE = 409600.0 / 3.0
@@ -18,13 +18,13 @@ ACCELERATION_FACTOR = 1502.0
 
 class TestThorlabsK10cr1(unittest.TestCase):
     def setUp(self):
-        qmi.start("TestK10cr1Context")
+        qmi.start("TestK10cr1OpenClose")
         self._transport_mock = unittest.mock.MagicMock(spec=QMI_SerialTransport)
         with unittest.mock.patch(
                 'qmi.instruments.thorlabs.k10cr1.create_transport',
                 return_value=self._transport_mock):
-            self.instr: Thorlabs_K10CR1 = qmi.make_instrument("instr", Thorlabs_K10CR1, "transport_descriptor")
-            self.instr = cast(Thorlabs_K10CR1, self.instr)
+            self.instr: Thorlabs_K10Cr1 = qmi.make_instrument("instr", Thorlabs_K10Cr1, "transport_descriptor")
+            self.instr = cast(Thorlabs_K10Cr1, self.instr)
 
     def tearDown(self):
         self._transport_mock.reset_mock()
@@ -106,8 +106,8 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         with unittest.mock.patch(
                 'qmi.instruments.thorlabs.k10cr1.create_transport',
                 return_value=self._transport_mock):
-            self.instr: Thorlabs_K10CR1 = qmi.make_instrument("instr", Thorlabs_K10CR1, "transport_descriptor")
-            self.instr = cast(Thorlabs_K10CR1, self.instr)
+            self.instr: Thorlabs_K10Cr1 = qmi.make_instrument("instr", Thorlabs_K10Cr1, "transport_descriptor")
+            self.instr = cast(Thorlabs_K10Cr1, self.instr)
 
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo) to 'open'
         expected_read = struct.pack("<l", 0x0006)

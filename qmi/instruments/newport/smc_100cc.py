@@ -8,7 +8,7 @@ from qmi.instruments.newport.single_axis_motion_controller import Newport_Single
 
 
 class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
-    """Instrument driver for the Newport CONEX-CC DC servo motion controller."""
+    """Instrument driver for the Newport SMC100CC servo motion controller."""
 
     def __init__(self,
                  context: QMI_Context,

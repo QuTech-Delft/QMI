@@ -15,7 +15,7 @@ from qmi.core.exceptions import QMI_RuntimeException
 from qmi.core.pubsub import QMI_SignalReceiver
 from qmi.instruments.picoquant.support._mhlib_function_signatures import _mhlib_function_signatures
 from qmi.instruments.picoquant import EventDataType, EventFilterMode
-from qmi.instruments.picoquant.multiharp import PicoQuant_MultiHarp150
+from qmi.instruments.picoquant import PicoQuant_MultiHarp150
 
 
 class TestMultiHarpEventFilter(unittest.TestCase):

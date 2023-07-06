@@ -1,9 +1,7 @@
 import unittest
-from unittest.mock import patch
 
 import numpy as np
 
-from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException
 from qmi.instruments.picoquant import TttrHistogram
 
 

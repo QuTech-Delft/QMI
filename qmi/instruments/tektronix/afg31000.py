@@ -6,7 +6,7 @@ import enum
 import logging
 import math
 import re
-from typing import List, Tuple, Type, TypeVar, Union
+from typing import Tuple, Type, TypeVar, Union
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException

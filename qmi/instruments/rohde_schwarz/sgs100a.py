@@ -4,8 +4,6 @@ Instrument driver for the Rohde&Schwarz SGS100A RF Signal Generator
 
 import logging
 
-from qmi.core.exceptions import QMI_InstrumentException
-from qmi.core.instrument import QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.instruments.rohde_schwarz.rs_base_signal_gen import RohdeSchwarz_Base
 
@@ -29,7 +27,7 @@ class RohdeSchwarz_SGS100A(RohdeSchwarz_Base):
         """Configure the external reference input frequency.
 
         Parameters:
-            frequency: desired frequency (accepted values: "10MHZ", "100MHZ", "1000MHZ"); see also
+            frequency: Desired frequency (accepted values: "10MHZ", "100MHZ", "1000MHZ"); see also
                        get_external_reference_frequency().
         """
         freq_options = ["10MHZ", "100MHZ", "1000MHZ"]
@@ -51,14 +49,14 @@ class RohdeSchwarz_SGS100A(RohdeSchwarz_Base):
         """Set the external reference synchronization bandwidth.
 
         Parameters:
-            bandwidth:  desired bandwith (accepted values: "NARR", "WIDE"); see also
+            bandwidth:  desired bandwidth (accepted values: "NARR", "WIDE"); see also
                         get_external_reference_bandwidth().
         """
-        bandwidth = bandwidth.upper()
-        if bandwidth not in ("NARR", "WIDE"):
-            raise ValueError("Unknown value {}".format(bandwidth))
+        options = ["NARR", "WIDE"]
+        bandwidth = self._is_valid_param(bandwidth, options)
+
         self._check_calibrating()
-        self._scpi_protocol.write(":ROSC:EXT:SBAN {}".format(bandwidth))
+        self._scpi_protocol.write(f":ROSC:EXT:SBAN {bandwidth}")
         self._check_error()
 
     @rpc_method
@@ -79,66 +77,17 @@ class RohdeSchwarz_SGS100A(RohdeSchwarz_Base):
         Parameters:
             impedance:  desired input impedance (accepted values: "G50", "G10K"); see also get_trigger_impedance().
         """
-        impedance = impedance.upper()
-        if impedance not in ("G50", "G10K"):
-            raise ValueError("Unknown value {}".format(impedance))
+        options = ["G50", "G10K"]
+        impedance = self._is_valid_param(impedance, options)
+
         self._check_calibrating()
-        self._scpi_protocol.write(":PULM:TRIG:EXT:IMP {}".format(impedance))
+        self._scpi_protocol.write(f":PULM:TRIG:EXT:IMP {impedance}")
         self._check_error()
 
     @rpc_method
     def start_calibration(self) -> None:
-        """Start internal adjustments.
-
-        This function returns immediately after starting the calibration.
-
-        Calibration can take up to 10 minutes. Call poll_calibration() to see
-        whether calibration is complete. No other commands can be processed
-        while the instrument is calibrating.
-
-        The instrument must be at stable temperature (30 minutes to warm up)
-        before starting internal adjustments.
-        """
-        self._check_calibrating()
-        if self._calibration_result is not None:
-            raise QMI_InstrumentException("Result of previous calibration is still pending")
-        _logger.info("Starting internal adjustments")
+        super().start_calibration()
         self._scpi_protocol.write(":CAL:ALL?")
-        self._calibrating = True
-
-    @rpc_method
-    def get_iq_wideband(self) -> bool:
-        """Return True if wideband IQ modulation is enabled, False if disabled."""
-        self._check_calibrating()
-        return self._ask_bool(":IQ:WBST?")
-
-    @rpc_method
-    def set_iq_wideband(self, enable: bool) -> None:
-        """Enable or disable wideband IQ modulation.
-
-        Parameters:
-            enable: target enabled state.
-        """
-        self._check_calibrating()
-        self._scpi_protocol.write(":IQ:WBST {}".format(1 if enable else 0))
-        self._check_error()
-
-    @rpc_method
-    def get_iq_crest_factor(self) -> float:
-        """Return the current IQ crest factor compensation in dB."""
-        self._check_calibrating()
-        return self._ask_float(":IQ:CRES?")
-
-    @rpc_method
-    def set_iq_crest_factor(self, factor: float) -> None:
-        """Set the IQ crest factor compensation in dB.
-
-        Parameters:
-            factor: crest factor in dB.
-        """
-        self._check_calibrating()
-        self._scpi_protocol.write(":IQ:CRES {}".format(factor))
-        self._check_error()
 
     @rpc_method
     def get_iq_correction_enabled(self) -> bool:
@@ -154,81 +103,5 @@ class RohdeSchwarz_SGS100A(RohdeSchwarz_Base):
             enable: target enabled state.
         """
         self._check_calibrating()
-        self._scpi_protocol.write(":IQ:IMP:STAT {}".format(1 if enable else 0))
-        self._check_error()
-
-    @rpc_method
-    def get_iq_quadrature_offset(self) -> float:
-        """Return the current IQ quadrature offset."""
-        self._check_calibrating()
-        return self._ask_float(":IQ:IMP:QUAD?")
-
-    @rpc_method
-    def set_iq_quadrature_offset(self, phase: float) -> None:
-        """Set the IQ quadrature offset between -8 and 8 degrees in increments of 0.01.
-
-        Parameters:
-            phase:  desired phase offset in degrees.
-        """
-        if not -8.0 <= phase <= 8.0:
-            raise ValueError("Phase offset should be in [-8, 8].")
-        self._check_calibrating()
-        self._scpi_protocol.write(":IQ:IMP:QUAD {:.2f}".format(phase))
-        self._check_error()
-
-    @rpc_method
-    def get_iq_leakage_i(self) -> float:
-        """Return the current I leakage amplitude (percent)."""
-        self._check_calibrating()
-        return self._ask_float(":IQ:IMP:LEAK:I?")
-
-    @rpc_method
-    def set_iq_leakage_i(self, leakage: float) -> None:
-        """Set the I leakage amplitude between -5 and 5 (percent), in increments of 0.01.
-
-        Parameters:
-            leakage:    leakage amplitude in percent.
-        """
-        if not -5.0 <= leakage <= 5.0:
-            raise ValueError("Leakage offset should be in [-5, 5].")
-        self._check_calibrating()
-        self._scpi_protocol.write(":IQ:IMP:LEAK:I {:.2f}".format(leakage))
-        self._check_error()
-
-    @rpc_method
-    def get_iq_leakage_q(self) -> float:
-        """Return the current Q leakage amplitude (percent)."""
-        self._check_calibrating()
-        return self._ask_float(":IQ:IMP:LEAK:Q?")
-
-    @rpc_method
-    def set_iq_leakage_q(self, leakage: float) -> None:
-        """Set the Q leakage amplitude between -5 and 5 (percent), in increments of 0.01.
-
-        Parameters:
-            leakage:    leakage amplitude in percent.
-        """
-        if not -5.0 <= leakage <= 5.0:
-            raise ValueError("Leakage offset should be in [-5, 5].")
-        self._check_calibrating()
-        self._scpi_protocol.write(":IQ:IMP:LEAK:Q {:.2f}".format(leakage))
-        self._check_error()
-
-    @rpc_method
-    def get_iq_gain_imbalance(self) -> float:
-        """Return the current IQ gain imbalance (dB)."""
-        self._check_calibrating()
-        return self._ask_float(":IQ:IMP:IQR:MAGN?")
-
-    @rpc_method
-    def set_iq_gain_imbalance(self, gain: float) -> None:
-        """Set the IQ gain imbalance in dB in range -1 to 1, increments of 0.001.
-
-        Parameters:
-            gain:   desired gain in dB.
-        """
-        if not -1.0 <= gain <= 1.0:
-            raise ValueError("Gain imabalance should be in [-1, 1].")
-        self._check_calibrating()
-        self._scpi_protocol.write(":IQ:IMP:IQR:MAGN {:.3f}".format(gain))
+        self._scpi_protocol.write(f":IQ:IMP:STAT {1 if enable else 0}")
         self._check_error()

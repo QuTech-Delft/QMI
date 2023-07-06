@@ -75,9 +75,9 @@ Example of starting and stopping a task::
 Custom Task Runner
 ##################
 
-It's possibe to define a custom task runner and have qmi use _it_ instead of a
+It's possible to define a custom task runner and have qmi use _it_ instead of a
 default `QMI_TaskRunner` instance. This will allow custom RPC methods and state
-to be added to the runner, which can be usefull in some cases.
+to be added to the runner, which can be useful in some cases.
 
 Example of a custom task runner::
 

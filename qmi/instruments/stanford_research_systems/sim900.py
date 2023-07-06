@@ -9,6 +9,7 @@ from qmi.core.scpi_protocol import ScpiProtocol
 from qmi.core.transport import create_transport
 from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
 
+
 class Sim900(QMI_Instrument):
     """Instrument driver for the stanford research system sim900 module."""
 
@@ -91,7 +92,7 @@ class Sim900(QMI_Instrument):
         self._scpi.write(f"SNDT {port},\"{message}\"")
 
     @rpc_method
-    def ask_module(self, port: int, message: str, delay: float=0.500) -> str:
+    def ask_module(self, port: int, message: str, delay: float = 0.500) -> str:
         """Ask module for data.
 
         This is a helper function that simulates the SCPI _ask_ functionality. It is important that this function is

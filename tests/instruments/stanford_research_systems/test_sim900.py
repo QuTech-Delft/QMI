@@ -6,21 +6,20 @@ from unittest.mock import patch, call
 import qmi
 from qmi.core.exceptions import QMI_InvalidOperationException, QMI_UsageException
 from qmi.core.transport import QMI_Transport
-from qmi.instruments.stanford_research_systems.sim900 import Sim900
+from qmi.instruments.stanford_research_systems import Srs_Sim900
 
 
 class TestSim900(unittest.TestCase):
     """Testcase of Stanford Research Systems Sim900 instrument"""
 
     def setUp(self):
-        # config_file = os.path.join(os.path.dirname(__file__), 'qmi.conf')
-        qmi.start("TestContext")
+        qmi.start("test_sim_900")
         # Add patches
-        patcher = patch('qmi.instruments.stanford_research_systems.sim900.create_transport',spec=QMI_Transport)
+        patcher = patch('qmi.instruments.stanford_research_systems.sim900.create_transport', spec=QMI_Transport)
         self.transport_mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
         # Make DUT
-        self.sim900 = qmi.make_instrument('Sim900', Sim900, "")
+        self.sim900 = qmi.make_instrument('Sim900', Srs_Sim900, "")
         self.sim900.open()
 
     def tearDown(self):

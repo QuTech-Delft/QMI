@@ -9,7 +9,7 @@ from typing import cast
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
-from qmi.instruments.rigol.dg4102 import Rigol_Dg4102
+from qmi.instruments.rigol import Rigol_Dg4102
 from qmi.utils.context_managers import open_close
 
 

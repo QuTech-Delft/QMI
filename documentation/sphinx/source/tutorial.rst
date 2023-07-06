@@ -157,7 +157,7 @@ Traceback (most recent call last):
     raise QMI_RuntimeException("The object is locked by another proxy")
 qmi.core.exceptions.QMI_RuntimeException: The object is locked by another proxy
 
-The first proxy first need to unlock the instrument!
+The first proxy first needs to unlock the instrument!
 
 >>> nsg1.unlock()
 True
@@ -512,6 +512,202 @@ in response to the call ``task.stop()``.
 The warning looks rather impressive since it also dumps a stack trace,
 but it is quite harmless.
 
+Using the QMI_LoopTask to make a task
+-------------------------------------
+
+In the above example we could instead of "regular" task, create a **QMI_LoopTask** instance::
+
+    from qmi.core.task import QMI_LoopTask
+    ...
+
+    class DemoLoopTask(QMI_LoopTask):
+        def loop_prepare(self):
+            # get the instrument
+            self.nsg = qmi.get_instrument("task_demo.nsg")
+
+        def loop_iteration(self):
+            # Define the period actions
+            sample = self.nsg.get_sample()
+            amplitude = self.nsg.get_amplitude()
+            if abs(sample) > 10:
+                amplitude *= 0.9
+            else:
+                amplitude *= 1.1
+            self.nsg.set_amplitude(amplitude)
+
+The **QMI_LoopTask subclass** ``__init__()`` takes additional parameters `loop_period` and `policy`. These additional parameters
+can be passed to `context.make_task()`. In the ``task_demo.py`` edit the ``make_task`` call to be::
+
+    from qmi.core.task import QMI_LoopTaskMissedLoopPolicy
+    from demo_task import DemoLoopTask
+    ...
+                task = qmi.make_task("task", DemoLoopTask, loop_period=1E-6, policy=QMI_LoopTaskMissedLoopPolicy.SKIP)
+                task.start()
+                print("the task has been started")
+                time.sleep(1E-5)
+                for i in range(5):
+                    print("amplitude =", nsg.get_amplitude())
+                    time.sleep(1E-5)
+                task.stop()
+                task.join()
+                print("the task has been stopped")
+
+Now, the task runs at loop period of 1 us, and if executing the ``loop_iteration`` function takes longer than the ``loop_period``,
+it just skips to the next scheduled period, instead of trying to do the following period a.s.a.p. (``IMMEDIATE`` policy, which is default).
+This is probably useful in cases where we can get data at specific moments of time ONLY, but due to the high frequency of the loop period we cannot
+always do this. The third option is ``TERMINATE`` which stops the loop if a period gets overdue.
+
+Tasks and RPC methods
+---------------------
+
+Tasks cannot have RPC methods in them by design choice. But, nevertheless in some special cases the user might like to monitor and control
+a value or values at some unknown moment while the task is running. For example, we would like to retrieve and control the ``amplitude`` value
+of our ``DemoTask``. To do this, first we need to make an attribute for the object by introducing it in ``__init__``::
+
+   def __init__(self, task_runner, name, amplitude_factor=1.0):
+        super().__init__(task_runner, name)
+        self.amplitude_factor = amplitude_factor
+        ...
+        # and we can modify in the while-loop 'amplitude' with 'self.amplitude_factor'
+        ...
+                nsg.set_amplitude(amplitude * self.amplitude_factor)
+
+Now, the amplitude value is accessible on the thread, but we still need to customize the task runner to control it.
+Try making the following class::
+
+    class CustomTaskRunner(QMI_TaskRunner):
+        @rpc_method
+        def set_amplitude_factor(self, amplitude: float):
+            if hasattr(self._thread.task, "amplitude_factor"):
+                self._thread.task.amplitude_factor = amplitude
+
+            else:
+                raise qmi.core.exceptions.QMI_TaskRunException("No such attribute in task: 'amplitude_factor'")
+
+And give it as the ``task_runner`` input when making the task, it is possible to change the value from outside the task.
+We now also switch to use the ``start_stop_join`` context manager for tasks::
+
+    ...
+                task = qmi.make_task("task", DemoTask, task_runner=CustomTaskRunner)
+                with start_stop_join(task):
+                    print("the task has been started")
+                    time.sleep(1)
+                    task.set_amplitude_factor(1.0)
+                    for i in range(5):
+                        print("amplitude =", nsg.get_amplitude())
+                        time.sleep(1)
+                        # modify amplitude with factor
+
+                   print("the task has been stopped")
+
+With factor 1.0 we get our expected output:
+
+>>> amplitude = 47.35139310000002
+>>> amplitude = 24.663698713618015
+>>> amplitude = 14.27385047108156
+>>> amplitude = 12.340263428871816
+>>> amplitude = 15.93705494741007
+
+But by changing the factor to e.g. 0.9 we drift quickly to lower values:
+
+>>> amplitude = 47.351393100000024
+>>> amplitude = 27.404109681797806
+>>> amplitude = 9.178708335524494
+>>> amplitude = 8.384908374123494
+>>> amplitude = 6.204404318848784
+
+Or setting it to 1.1 we bounce back to large values:
+
+>>> amplitude = 47.35139310000001
+>>> amplitude = 30.14452064997758
+>>> amplitude = 41.13632448440297
+>>> amplitude = 56.13614532919599
+>>> amplitude = 62.677189624461896
+
+Let's build up the task and control in another way, making use of another custom task runner. In this example, we build the control
+of the task in the script instead of inside the task. We now rewrite the script ``task_demo.py`` to be::
+
+    #!/usr/bin/env python3
+
+    import time
+    import qmi
+    from qmi.utils.context_managers import start_stop, open_close
+    from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
+    from demo_task import DemoTask
+
+    class CustomRpcControlTaskRunner(QMI_TaskRunner):
+        @rpc_method
+        def set_amplitude(self, amplitude: float):
+            settings = self.get_settings()
+            settings.amplitude = amplitude
+            self.set_settings(settings)
+
+    def main_2():
+        with start_stop(qmi, "task_demo"):
+            nsg = qmi.make_instrument("nsg", NoisySineGenerator)
+            with open_close(nsg):
+                task = qmi.make_task("task", DemoRpcControlTask, task_runner=CustomRpcControlTaskRunner)
+                with start_stop_join(task):
+                    print("the task has been started")
+                    for i in range(5):
+                        sample = nsg.get_sample()
+                        amplitude = nsg.get_amplitude()
+                        print("sample =", sample, "amplitude =", amplitude)
+                        if abs(sample) > 10:
+                            task.set_amplitude(amplitude * 0.9)
+                        else:
+                            task.set_amplitude(amplitude * 1.1)
+                        time.sleep(1)
+
+                print("the task has been stopped")
+
+
+    if __name__ == "__main__":
+        main_2()
+
+You can see now that the control of the amplitude is now done in this script instead of the task. For that we use the ``get_settings`` and ``set_settings``
+methods of the **QMI_TaskRunner** class. We rewrite the file ``demo_task.py`` to make use of the ``self.settings`` attribute and ``update_settings`` method of **QMI_Task** class::
+
+    from dataclasses import dataclass
+    import qmi
+    from qmi.core.task import QMI_Task
+    from qmi.core.task import QMI_LoopTask
+
+
+    @dataclass
+    class DemoLoopTaskSettings:
+        sample: float
+        amplitude: float
+
+
+    class DemoRpcControlTask(QMI_Task):
+
+        def __init__(self, task_runner, name):
+            super().__init__(task_runner, name)
+            self.settings = DemoLoopTaskSettings(amplitude=100.0, sample=None)
+
+        def run(self):
+            print("starting the background task")
+            nsg = qmi.get_instrument("task_demo.nsg")
+            while not self.stop_requested():
+                self.update_settings()
+                nsg.set_amplitude(self.settings.amplitude)
+                self.sleep(1.0)
+
+Here, the initialization of the ``self.settings`` is done in the ``__init__`` of the task. The ``amplitude`` requires now
+a valid value for start, ``sample`` can be initialized as ``None`` as it is calculated from ``amplitude`` in the instrument.
+The task now checks the latest settings and uses the ``amplitude`` value of the settings to set new amplitude in the instrument.
+The manipulation of the ``amplitude`` goes through the ``self.settings``, where the settings is manipulated by the custom task runner
+class' ``CustomRpcControlTaskRunner.set_amplitude`` RPC method.
+
+An example output is:
+
+>>> sample = 8.592947545820666 amplitude = 100.0
+>>> sample = 24.585371581587616 amplitude = 110.00000000000001
+>>> sample = 28.763647335054355 amplitude = 99.00000000000001
+>>> sample = 33.873943823248275 amplitude = 89.10000000000001
+>>> sample = 39.12230323820781 amplitude = 80.19000000000001
+
 Managing background processes
 -----------------------------
 
@@ -529,6 +725,9 @@ programs are running? That is where ``qmi_proc`` comes to the rescue.
 ``qmi_proc`` is a command-line tool to start and stop QMI processes
 (by process, we simply mean a running program).
 It can even manage programs on different computers via SSH.
+
+``qmi_proc`` demo
+=================
 
 To demonstrate the use of ``qmi_proc``, let's create a QMI program
 that keeps running, doing some thing, until explicitly told to stop.
@@ -615,3 +814,34 @@ The program will remain running in the background, with its output messages
 redirected to a file ``proc_demo_<date>_<time>.out`` in the home directory.
 Run ``qmi_proc status`` again to check that the program is still running.
 After a while, run ``qmi_proc stop proc_demo`` to stop the background process.
+
+Further options
+===============
+
+The ``qmi_proc`` provides also other options to facilitate starting and stopping processes. Beyond "start" and "stop" there are:
+  - The "restart" option that simply calls first "stop" and then "start".
+  - Together with "start", "stop" or "restart" you can also add arguments:
+
+    * "--all" to (re)start/stop all configured contexts in the QMI configuration file.
+    * "--locals" to (re)start/stop all configured LOCAL contexts.
+    * "--config <path_to_config_file>" to specify the configuration file to be used.
+
+Note that the "--all" and "--locals" options will work only for context in the configuration file that have
+  - ``"enabled": true`` and
+  - ``"program_module": "your.program.module"`` defined.
+
+Also, you cannot start or stop processes that are not configured in the configuration file.
+It is also possible to run the ``qmi_proc`` interactively in a "server" mode. Start it with::
+
+  qmi_proc server <--config path/to/your.conf>
+
+Then in the interactive mode type e.g.::
+
+  START proc_demo
+
+and then after it should be stopped::
+
+  STOP proc_demo
+
+At the moment no further commands are enabled and any other command exits the server.
+This functionality might get deprecated in the future.

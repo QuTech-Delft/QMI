@@ -6,8 +6,46 @@ from unittest.mock import Mock, call, patch
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
+from qmi.utils.context_managers import start_stop
+from qmi.instruments.newport import Newport_Smc100Cc, Newport_ConexCc
 from qmi.instruments.newport.actuators import TRA12CC, TRB6CC, CMA25CCL
 from qmi.instruments.newport.single_axis_motion_controller import Newport_Single_Axis_Motion_Controller
+
+
+class TestDerivingClassCase(unittest.TestCase):
+    """Test that the creation of child classes of Newport_Single_Axis_Motion_Controller work as expected."""
+    def setUp(self):
+        # Add patches
+        patcher = patch(
+            'qmi.instruments.newport.single_axis_motion_controller.create_transport', spec=QMI_TcpTransport)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = patch(
+            'qmi.instruments.newport.single_axis_motion_controller.ScpiProtocol', autospec=True)
+        self._scpi_mock: Mock = patcher.start().return_value
+        self.addCleanup(patcher.stop)
+
+    def test_smc100cc(self):
+        expected_rpc_class = "qmi.instruments.newport.smc_100cc.Newport_SMC100CC"
+        with start_stop(qmi, "TestSMC100CC", console_loglevel="CRITICAL"):
+            # Make DUT
+            self.instr: Newport_Smc100Cc = qmi.make_instrument(
+                "sam_controller", Newport_Smc100Cc, "Beverly_Hills", "FT5TMFGL",
+                {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL}, 90210
+            )
+            # Test __init__ is of correct module
+            self.assertIn(expected_rpc_class, str(self.instr.__init__))
+
+    def test_conex_cc(self):
+        expected_rpc_class = "qmi.instruments.newport.conex_cc.Newport_ConexCC"
+        with start_stop(qmi, "TestConexCC", console_loglevel="CRITICAL"):
+            # Make DUT
+            self.instr: Newport_ConexCc = qmi.make_instrument(
+                "sam_controller", Newport_ConexCc, "Beverly_Hills", "FT5TMFGL",
+                {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL}, 90210
+            )
+            # Test __init__ is of correct module
+            self.assertIn(expected_rpc_class, str(self.instr.__init__))
 
 
 class TestSingleAxisMotionController(unittest.TestCase):

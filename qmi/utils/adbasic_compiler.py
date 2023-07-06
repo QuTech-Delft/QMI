@@ -88,7 +88,7 @@ class AdbasicCompilerException(QMI_RuntimeException):
         for error in self.adbasic_errors:
             error_message += "\n  " + str(error)
         return error_message
-
+    
     def __reduce__(self):
         return (AdbasicCompilerException, (self.message, self.adbasic_errors))
 

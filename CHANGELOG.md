@@ -1,10 +1,86 @@
 # Changelog
-All notable changes to the Quantum Technology Toolbox will be documented in this file.
+All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[x.y.z] - Unreleased
+
+# [0.40.0] - 2023-07-06
+
+### Added
+- qmi/tools/proc.py: Added a new option `--locals` in the command line call. This can be used to start/stop/restart local contexts only.
+- New documentation. Now more details for RPC methods, messaging, signalling and logging in QMI. Also, more examples about how to use tasks.
+- Unittest for Tektronix_FCA3000.
+- Unittest for SRS_DC205.
+- Unittest for MCC_USB1808X.
+
+### Changed
+- qmi/tools/proc.py: changed the WINENV validater method. Previous method was not compatible with python3.11. Included in unit test.
+- Moved several functions from `RohdeSchwarz_SGS100A` to the base class, and removed and renamed some (double) methods in `RohdeSchwarz_SMBV100A`.
+- Pololu Maestro default values are the hardware limits. `set_max`, `set_min`, `get_target_value`, `get_value`, `move_up` and `move_down` are deprecated in the Pololu Maestro driver. They have either been replaced by other methods or have been removed altogether.
+- All the instrument packages now have module class imports in the package level (in __init__.py). The unit-tests were modified such that these imports are used when possible.
+- The `get_system_state` and `get_system_goal` methods for the Montana S50 returns enums instead of strings.
+
+## [0.39.0] - 2023-05-26
+
+### Added
+
+- Base class for Newport single axis motion controllers `Newport_Single_Axis_Motion_Controller`.
+- Newport SMC100CC controller driver `Newport_SMC100CC`.
+- Newport CMA25CCL linear actuator.
+
+### Changed
+
+- Added optional `btstat` and `adcoffs` parameters for DIM3000 driver. Now works with ADRV5.
+- Newport CONEX-CC controller inherits from `Newport_Single_Axis_Motion_Controller`.
+- Added default baudrate of 115200 to Thorlabs TC200 driver.
+
+### Fixed
+
+- ADBasic compiler now correctly doesn't fail compilation on warnings only. 
+- ADBasic compiler now correctly parses `fixme` warning.
+- qmi/tools/proc.py: get child pid when in WINENV. This fixes the incorrect error message on starting of a service, when using Windows virtual environment.
+
+## [0.38.0] - 2023-04-21
+
+### Added
+
+- Added client for Newport AG-UC8. `qmi_newport_ag_uc8`.
+- A new warning pattern "fixme" matching added to `qmi/tools/adbasic_compiler.py` function `_parse_stderr_lines`. It now also recognizes patterns starting with "<hex_code>:fixme"
+- Added unit-tests for Thorlabs instruments TC200, TSP01, TSP01B and K10CR1.
+- For K10CR1, one way to raise QMI_TimeoutException was added to _wait_message, so that the function description is valid.
+- Meanwhile the same exception was removed from _send_message as it will be handled in _read_message already.
+- Made `AdbasicCompilerException` RPC compatible by adding a custom `__reduce__` method to pack the arguments in a tuple.
+- Unittests for qmi/tools/proc.py.
+
+### Removed
+
+- The 'toolage' folder has been removed and contents moved to qid-utilities.
+- removed matplotlib from install_requires in setup.py, and added classifier for Python v3.11.
+- `qmi/gui` reference in `run_docs_sphinx.sh`
+
+### Fixed
+
+- Some additional PicoQuant license text fixes and other typo fixes.
+
+## [0.37.0] - 2023-03-17
+
+### Added
+
+- Included full coverage unit-tests for the PtGrey BlackFly cameras.
+- Included full coverage unit-tests for the PhysikInstrument E-873 Servo Controller.
+- Adding acknowledgements, licensing and copyright (waiver) to the QMI.
+- Added Parallax USB Propeller QMI driver.
+- Adding the licence referrals into PicoQuant modules.
+- Added two new functions, `get_phase` and `set_phase` to Rigol DG4102 QMI driver.
+- Added unit-tests for this instrument.
+
+### Removed
+
+- Removed installing `libhdf5-dev` linux package, and `ldconfig` steps in the CI YAML script as the latest Python 3.11 release now has applicable python-hdf5 package wheel that works without pre-installed libraries
+
+## [x.y.z] creation of repository
 
 ### Added
 - ACKNOWLEDGEMENTS.md.

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, call, patch
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
-from qmi.instruments.tektronix.afg31000 import Waveform, BurstMode, TriggerEdge, Tektronix_AFG31000
+from qmi.instruments.tektronix import Waveform, BurstMode, TriggerEdge, Tektronix_Afg31000
 
 
 class TestAFG31000(unittest.TestCase):
@@ -19,8 +19,8 @@ class TestAFG31000(unittest.TestCase):
         with patch(
                 'qmi.instruments.tektronix.afg31000.create_transport',
                 return_value=self._transport_mock):
-            self.instr: Tektronix_AFG31000 = qmi.make_instrument("instr", Tektronix_AFG31000, "transport_descriptor")
-            self.instr = cast(Tektronix_AFG31000, self.instr)
+            self.instr: Tektronix_Afg31000 = qmi.make_instrument("instr", Tektronix_Afg31000, "transport_descriptor")
+            self.instr = cast(Tektronix_Afg31000, self.instr)
 
     def tearDown(self):
         qmi.stop()

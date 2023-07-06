@@ -220,7 +220,7 @@ def _parse_attribute_value(s: str) -> Union[int, float, str]:
             "r": "\r",
             "t": "\t",
             "v": "\v"
-            }
+        }
         t = m.group(1)
         if t in replace_table:
             return replace_table[t]
@@ -458,7 +458,7 @@ def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
 
     # Reshape data to 2D format.
     if ndim > 2:
-        nrow = np.product(dataset.data.shape[:-1])
+        nrow = np.prod(dataset.data.shape[:-1])
         rawdata = dataset.data.reshape((nrow, ncol))
 
     else:
@@ -469,8 +469,8 @@ def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
     if ndim > 2:
         for axis in range(ndim - 1):
             n = dataset.data.shape[axis]
-            outer_rows = int(np.product(dataset.data.shape[:axis], dtype=np.int32))
-            inner_rows = int(np.product(dataset.data.shape[axis+1:-1], dtype=np.int32))
+            outer_rows = int(np.prod(dataset.data.shape[:axis], dtype=np.int32))
+            inner_rows = int(np.prod(dataset.data.shape[axis+1:-1], dtype=np.int32))
             extra_columns.append(np.tile(np.repeat(np.arange(n), inner_rows), outer_rows))
 
     # Insert axis scale columns.
@@ -478,8 +478,8 @@ def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
         dataset_axis_scale = dataset.axis_scale[axis]
         if dataset_axis_scale is not None:
             assert dataset_axis_scale.shape == (dataset.data.shape[axis],)
-            outer_rows = int(np.product(dataset.data.shape[:axis], dtype=np.int32))
-            inner_rows = int(np.product(dataset.data.shape[axis+1:-1], dtype=np.int32))
+            outer_rows = int(np.prod(dataset.data.shape[:axis], dtype=np.int32))
+            inner_rows = int(np.prod(dataset.data.shape[axis+1:-1], dtype=np.int32))
             extra_columns.append(np.tile(np.repeat(dataset_axis_scale, inner_rows), outer_rows))
 
     if extra_columns:
@@ -561,7 +561,7 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
     shape = tuple(shape_list)
 
     # Verify number of rows.
-    expect_rows = np.product(shape[:-1])
+    expect_rows = np.prod(shape[:-1])
     if nrow != expect_rows:
         raise ValueError("Expecting {} rows but got {} rows".format(expect_rows, nrow))
 
@@ -598,8 +598,8 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
             # Verify index column.
             axis = int(label[4:-6])
             n = dataset.data.shape[axis]
-            outer_rows = int(np.product(dataset.data.shape[:axis], dtype=np.int32))
-            inner_rows = int(np.product(dataset.data.shape[axis+1:-1], dtype=np.int32))
+            outer_rows = int(np.prod(dataset.data.shape[:axis], dtype=np.int32))
+            inner_rows = int(np.prod(dataset.data.shape[axis+1:-1], dtype=np.int32))
             idx = np.tile(np.repeat(np.arange(n), inner_rows), outer_rows)
             if not np.all(rawdata[:, col].astype(np.int64) == idx):
                 raise ValueError("Inconsistent index data for axis {}".format(axis))
@@ -608,8 +608,8 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
             # Set axis scale.
             axis = int(label[4:-6])
             n = dataset.data.shape[axis]
-            outer_rows = int(np.product(dataset.data.shape[:axis], dtype=np.int32))
-            inner_rows = int(np.product(dataset.data.shape[axis+1:-1], dtype=np.int32))
+            outer_rows = int(np.prod(dataset.data.shape[:axis], dtype=np.int32))
+            inner_rows = int(np.prod(dataset.data.shape[axis+1:-1], dtype=np.int32))
             scale = rawdata[0:n*inner_rows:inner_rows, col]
             scale_raw = np.tile(np.repeat(scale, inner_rows), outer_rows)
             if not np.all(rawdata[:, col] == scale_raw):

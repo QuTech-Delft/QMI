@@ -1,9 +1,10 @@
 import unittest
-from unittest.mock import patch, call
+from unittest.mock import Mock, patch, call
 import logging
 
 import qmi
-from qmi.instruments.pololu.maestro import Pololu_Maestro
+from qmi.core.transport import QMI_TcpTransport
+from qmi.instruments.pololu import Pololu_Maestro
 from qmi.core.exceptions import QMI_InstrumentException
 
 
@@ -12,7 +13,7 @@ class PololuMaestroOpenCloseTestCase(unittest.TestCase):
     def setUp(self) -> None:
         qmi.start("pololu_unit_test")
         transport = "serial:COM1"
-        self.pololu = qmi.make_instrument("Pololu", Pololu_Maestro, transport)
+        self.instr = qmi.make_instrument("Pololu", Pololu_Maestro, transport)
 
     def tearDown(self) -> None:
         qmi.stop()
@@ -20,10 +21,10 @@ class PololuMaestroOpenCloseTestCase(unittest.TestCase):
     def test_open_close(self):
         """Test opening and closing the instrument"""
         with patch("serial.Serial") as ser:
-            self.pololu.open()
-            self.assertTrue(self.pololu.is_open())
-            self.pololu.close()
-            self.assertFalse(self.pololu.is_open())
+            self.instr.open()
+            self.assertTrue(self.instr.is_open())
+            self.instr.close()
+            self.assertFalse(self.instr.is_open())
             ser.assert_called_once_with(
                 "COM1",
                 baudrate=9600,  # The rest are defaults
@@ -32,42 +33,168 @@ class PololuMaestroOpenCloseTestCase(unittest.TestCase):
                 rtscts=False,
                 stopbits=1.0,
                 timeout=0.04
-                )
+            )
+
+
+class PololuMaestroMinMaxTargetsConfigTestCase(unittest.TestCase):
+
+    TRANSPORT_STR = "serial:/dev/ttyS1"
+    CHANNEL1_MIN = 9000
+    CHANNEL1_MAX = 9300
+    CHANNEL3_MIN = 8000
+    CHANNEL3_MAX = 9100
+
+    def setUp(self) -> None:
+        # suppress logging
+        logging.getLogger("qmi.instruments.pololu.maestro").setLevel(
+            logging.CRITICAL)
+        self._cmd_lead = chr(0xAA) + chr(0x0C)
+        self._error_check_cmd = bytes(self._cmd_lead + chr(0x21), "latin-1")
+        qmi.start("pololu_unit_test")
+        patcher = patch(
+            'qmi.instruments.pololu.maestro.create_transport', spec=QMI_TcpTransport)
+        self._transport_mock: Mock = patcher.start().return_value
+        self.addCleanup(patcher.stop)
+        self.instr: Pololu_Maestro = qmi.make_instrument(
+            "Pololu", Pololu_Maestro, self.TRANSPORT_STR,
+            channels_min_max_targets={1: (self.CHANNEL1_MIN, self.CHANNEL1_MAX),
+                                      3: (self.CHANNEL3_MIN, self.CHANNEL3_MAX)})
+        self.instr.open()
+
+    def tearDown(self) -> None:
+        self.instr.close()
+        qmi.stop()
+
+    def test_setting_channel_min_and_max_targets(self):
+        """Test setting the min and max targets of channels."""
+        # Arrange
+        channel = 1
+
+        # Act
+        actual_min = self.instr.get_min_target(channel)
+        actual_max = self.instr.get_max_target(channel)
+
+        # Assert
+        self.assertEqual(actual_min, self.CHANNEL1_MIN)
+        self.assertEqual(actual_max, self.CHANNEL1_MAX)
+
+        # Arrange
+        channel = 3
+
+        # Act
+        actual_min = self.instr.get_min_target(channel)
+        actual_max = self.instr.get_max_target(channel)
+
+        # Assert
+        self.assertEqual(actual_min, self.CHANNEL3_MIN)
+        self.assertEqual(actual_max, self.CHANNEL3_MAX)
+
+
+class PololuMaestroMinMaxSpeedsConfigTestCase(unittest.TestCase):
+
+    TRANSPORT_STR = "serial:/dev/ttyS1"
+    CHANNEL1_MIN = 88
+    CHANNEL1_MAX = 99
+
+    def setUp(self) -> None:
+        # suppress logging
+        logging.getLogger("qmi.instruments.pololu.maestro").setLevel(
+            logging.CRITICAL)
+        self._cmd_lead = chr(0xAA) + chr(0x0C)
+        self._error_check_cmd = bytes(self._cmd_lead + chr(0x21), "latin-1")
+        qmi.start("pololu_unit_test")
+        patcher = patch(
+            'qmi.instruments.pololu.maestro.create_transport', spec=QMI_TcpTransport)
+        self._transport_mock: Mock = patcher.start().return_value
+        self.addCleanup(patcher.stop)
+        self.instr: Pololu_Maestro = qmi.make_instrument(
+            "Pololu", Pololu_Maestro, self.TRANSPORT_STR,
+            channels_min_max_speeds={1: (self.CHANNEL1_MIN, self.CHANNEL1_MAX)})
+        self.instr.open()
+
+    def tearDown(self) -> None:
+        self.instr.close()
+        qmi.stop()
+
+    def test_setting_channel_min_and_max_speed(self):
+        """Test setting the min and max speeds of channels."""
+        # Arrange
+        channel = 1
+
+        # Act and Assert
+        with self.assertRaises(ValueError):
+            self.instr.set_speed(channel, 9000)
+
+
+class PololuMaestroMinMaxAccelerationsConfigTestCase(unittest.TestCase):
+
+    TRANSPORT_STR = "serial:/dev/ttyS1"
+    CHANNEL1_MIN = 88
+    CHANNEL1_MAX = 99
+
+    def setUp(self) -> None:
+        # suppress logging
+        logging.getLogger("qmi.instruments.pololu.maestro").setLevel(
+            logging.CRITICAL)
+        self._cmd_lead = chr(0xAA) + chr(0x0C)
+        self._error_check_cmd = bytes(self._cmd_lead + chr(0x21), "latin-1")
+        qmi.start("pololu_unit_test")
+        patcher = patch(
+            'qmi.instruments.pololu.maestro.create_transport', spec=QMI_TcpTransport)
+        self._transport_mock: Mock = patcher.start().return_value
+        self.addCleanup(patcher.stop)
+        self.instr: Pololu_Maestro = qmi.make_instrument(
+            "Pololu", Pololu_Maestro, self.TRANSPORT_STR,
+            channels_min_max_accelerations={1: (self.CHANNEL1_MIN, self.CHANNEL1_MAX)})
+        self.instr.open()
+
+    def tearDown(self) -> None:
+        self.instr.close()
+        qmi.stop()
+
+    def test_setting_channel_min_and_max_acceleration(self):
+        """Test setting the min and max accelerations of channels."""
+        # Arrange
+        channel = 1
+
+        # Act and Assert
+        with self.assertRaises(ValueError):
+            self.instr.set_acceleration(channel, 9000)
 
 
 class PololuMaestroCommandsTestCase(unittest.TestCase):
 
+    TRANSPORT_STR = "serial:/dev/ttyS1"
+
     def setUp(self) -> None:
         # suppress logging
-        logging.getLogger("qmi.instruments.pololu.maestro").setLevel(logging.CRITICAL)
+        logging.getLogger("qmi.instruments.pololu.maestro").setLevel(
+            logging.CRITICAL)
         self._cmd_lead = chr(0xAA) + chr(0x0C)
         self._error_check_cmd = bytes(self._cmd_lead + chr(0x21), "latin-1")
         qmi.start("pololu_unit_test")
-        transport = "serial:/dev/ttyS1"
-        self.patcher_open = patch("qmi.core.transport.QMI_Transport.open")
-        self.patcher_discard = patch("qmi.core.transport.QMI_SerialTransport.discard_read")
-        self.patcher_open.start()
-        self.patcher_discard.start()
-        self.pololu = qmi.make_instrument("Pololu", Pololu_Maestro, transport)
-        self.pololu.open()
+        patcher = patch(
+            'qmi.instruments.pololu.maestro.create_transport', spec=QMI_TcpTransport)
+        self._transport_mock: Mock = patcher.start().return_value
+        self.addCleanup(patcher.stop)
+        self.instr: Pololu_Maestro = qmi.make_instrument(
+            "Pololu", Pololu_Maestro, self.TRANSPORT_STR)
+        self.instr.open()
 
     def tearDown(self) -> None:
-        self.patcher_open.stop()
-        self.patcher_discard.stop()
-        patcher_close = patch("qmi.core.transport.QMI_Transport.close")
-        patcher_close.start()
-        self.pololu.close()
+        self.instr.close()
         qmi.stop()
-        patcher_close.stop()
-        # restore logging
-        logging.getLogger("qmi.instruments.pololu.maestro").setLevel(logging.NOTSET)
 
     def test_get_idn(self):
         """Test getting the QMI instrument ID."""
+        # Arrange
         expected_vendor = "Pololu"
         expected_model = "Maestro Micro Servo Controller"
-        idn = self.pololu.get_idn()
 
+        # Act
+        idn = self.instr.get_idn()
+
+        # Assert
         self.assertEqual(expected_vendor, idn.vendor)
         self.assertEqual(expected_model, idn.model)
         self.assertIsNone(idn.serial)
@@ -75,283 +202,236 @@ class PololuMaestroCommandsTestCase(unittest.TestCase):
 
     def test_set_target_value(self):
         """Test setting the target value."""
+        # Arrange
         target, channel = 5000, 1
         lsb = target & 0x7F  # 7 bits for least significant byte
         msb = (target >> 7) & 0x7F  # shift 7 and take next 7 bits for msb
         cmd = chr(0x04) + chr(channel) + chr(lsb) + chr(msb)
         expected_command = bytes(self._cmd_lead + cmd, "latin-1")
+        self._transport_mock.read.return_value = b'\x00\x00'
+        expected_calls = [
+            call(expected_command),
+            call(self._error_check_cmd)
+        ]
 
-        with patch("qmi.core.transport.QMI_SerialTransport.write") as write:
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0),)
-                self.pololu.set_target_value(channel, target)
+        # Act
+        self.instr.set_target(channel, target)
 
-            write.assert_called_with(self._error_check_cmd)
-            write.assert_any_call(expected_command)
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_calls)
 
-    def test_set_target_value_enforces_limits(self):
-        """Test setting the target value."""
-        expected_pos = [Pololu_Maestro.DEFAULT_MIN, Pololu_Maestro.DEFAULT_MAX]
-        # 1. Test minimum value
-        target_min, channel = 3000, 1
-        lsb = expected_pos[0] & 0x7F  # 7 bits for least significant byte
-        msb = (expected_pos[0] >> 7) & 0x7F  # shift 7 and take next 7 bits for msb
+    def test_set_target_enforces_min_values(self):
+        """Test setting the target value below the minimum allowed value.
+        The set value will be ignored and the target will be set to the minimum."""
+        # Arrange
+        target, channel = -20, 1
+        cmd = chr(0x04) + chr(channel) + chr(0x00) + chr(0x00)
+        expected_command = bytes(self._cmd_lead + cmd, "latin-1")
+        self._transport_mock.read.return_value = b'\x00\x00'
+        expected_calls = [
+            call(expected_command),
+            call(self._error_check_cmd)
+        ]
+
+        # Act
+        self.instr.set_target(channel, target)
+
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_calls)
+
+    def test_set_target_enforces_max_values(self):
+        """Test setting the target value above the maximum allowed value.
+        The set value will be ignored and the target will be set to the maximum."""
+        # Arrange
+        target, channel = 10000000, 1
+        lsb = Pololu_Maestro.DEFAULT_MAX_VALUE & 0x7F
+        msb = (Pololu_Maestro.DEFAULT_MAX_VALUE >> 7) & 0x7F
         cmd = chr(0x04) + chr(channel) + chr(lsb) + chr(msb)
         expected_command = bytes(self._cmd_lead + cmd, "latin-1")
+        self._transport_mock.read.return_value = b'\x00\x00'
+        expected_calls = [
+            call(expected_command),
+            call(self._error_check_cmd)
+        ]
 
-        with patch("qmi.core.transport.QMI_SerialTransport.write") as write:
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0),)
-                self.pololu.set_target_value(channel, target_min)
+        # Act
+        self.instr.set_target(channel, target)
 
-            write.assert_called_with(self._error_check_cmd)
-            write.assert_any_call(expected_command)
-
-        # 2. Test maximum value
-        target_max, channel = 6000, 1
-        lsb = expected_pos[1] & 0x7F  # 7 bits for least significant byte
-        msb = (expected_pos[1] >> 7) & 0x7F  # shift 7 and take next 7 bits for msb
-        cmd = chr(0x04) + chr(channel) + chr(lsb) + chr(msb)
-        expected_command = bytes(self._cmd_lead + cmd, "latin-1")
-
-        with patch("qmi.core.transport.QMI_SerialTransport.write") as write:
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0),)
-                self.pololu.set_target_value(channel, target_max)
-
-            write.assert_called_with(self._error_check_cmd)
-            write.assert_any_call(expected_command)
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_calls)
 
     def test_get_target_values(self):
         """Test get target values return expected values."""
-        target = 5000
-        expected_initial = [0] * Pololu_Maestro.AVAILABLE_CHANNELS
-        expected_after = [target + n for n in range(Pololu_Maestro.AVAILABLE_CHANNELS)]
+        # Arrange
+        expected_initial = [0] * Pololu_Maestro.DEFAULT_NUM_CHANNELS
 
-        initial = self.pololu.get_target_values()
+        # Act
+        initial = self.instr.get_targets()
+
         # Assert
         self.assertListEqual(expected_initial, initial)
 
-        # Then set all target values
-        with patch("qmi.core.transport.QMI_SerialTransport.write"):
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.return_value = (0, 0)
-                for channel in range(Pololu_Maestro.AVAILABLE_CHANNELS):
-                    self.pololu.set_target_value(channel, target + channel)
-
-    def test_get_value(self):
-        """Test get target value returns expected value."""
+    def test_get_position(self):
+        """Test get position returns expected value."""
+        # Arrange
         expected, channel = 5000, 0
         cmd = chr(0x10) + chr(channel)
         expected_command = bytes(self._cmd_lead + cmd, "latin-1")
         low_bit, high_bit = expected - (expected // 256 * 256), expected // 256
-        # Then set all target values
-        with patch("qmi.core.transport.QMI_SerialTransport.write") as write:
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0), chr(low_bit), chr(high_bit), (0, 0))
-                result = self.pololu.get_value(channel)
+        self._transport_mock.read.side_effect = [chr(low_bit),
+                                                 chr(high_bit), b'\x00\x00']
+        expected_calls = [
+            call(expected_command),
+            call(self._error_check_cmd)
+        ]
 
-            write.assert_called_with(self._error_check_cmd)
-            write.assert_any_call(expected_command)
+        # Act
+        result = self.instr.get_position(channel)
 
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_calls)
         self.assertEqual(result, expected)
 
     def test_set_speed(self):
         """Test setting a new speed for a channel."""
+        # Arrange
         speed, channel = 500, 1
         lsb = speed & 0x7F  # 7 bits for least significant byte
         msb = (speed >> 7) & 0x7F  # shift 7 and take next 7 bits for msb
         cmd = chr(0x07) + chr(channel) + chr(lsb) + chr(msb)
         expected_command = bytes(self._cmd_lead + cmd, "latin-1")
+        self._transport_mock.read.return_value = b'\x00\x00'
+        expected_calls = [
+            call(expected_command),
+            call(self._error_check_cmd)
+        ]
 
-        with patch("qmi.core.transport.QMI_SerialTransport.write") as write:
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0),)
-                self.pololu.set_speed(channel, speed)
+        # Act
+        self.instr.set_speed(channel, speed)
 
-            write.assert_called_with(self._error_check_cmd)
-            write.assert_any_call(expected_command)
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_calls)
 
     def test_set_speed_raises_exception(self):
         """Test setting an invalid speed for a channel raises an exception."""
-        speed, channel = 5000, 1
+        # Arrange
+        speed, channel = 10000000, 1
+
+        # Act and assert
         with self.assertRaises(ValueError):
-            self.pololu.set_speed(channel, speed)
+            self.instr.set_speed(channel, speed)
 
     def test_set_acceleration(self):
         """Test setting a new acceleration for a channel."""
+        # Arrange
         acceleration, channel = 50, 1
         lsb = acceleration & 0x7F  # 7 bits for least significant byte
-        msb = (acceleration >> 7) & 0x7F  # shift 7 and take next 7 bits for msb
+        # shift 7 and take next 7 bits for msb
+        msb = (acceleration >> 7) & 0x7F
         cmd = chr(0x09) + chr(channel) + chr(lsb) + chr(msb)
         expected_command = bytes(self._cmd_lead + cmd, "latin-1")
+        self._transport_mock.read.return_value = b'\x00\x00'
+        expected_calls = [
+            call(expected_command),
+            call(self._error_check_cmd)
+        ]
 
-        with patch("qmi.core.transport.QMI_SerialTransport.write") as write:
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0),)
-                self.pololu.set_acceleration(channel, acceleration)
+        # Act
+        self.instr.set_acceleration(channel, acceleration)
 
-            write.assert_any_call(expected_command)
-            write.assert_called_with(self._error_check_cmd)
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_calls)
 
     def test_set_acceleration_raises_exception(self):
         """Test setting an invalid acceleration for a channel raises an exception."""
         acceleration, channel = 500, 1
         with self.assertRaises(ValueError):
-            self.pololu.set_acceleration(channel, acceleration)
+            self.instr.set_acceleration(channel, acceleration)
 
     def test_go_home(self):
-        """Test go_home function."""
+        """Test homing."""
+        # Arrange
         expected_command = bytes(self._cmd_lead + chr(0x22), "latin-1")
-        with patch("qmi.core.transport.QMI_SerialTransport.write") as write:
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0),)
-                self.pololu.go_home()
+        self._transport_mock.read.return_value = b'\x00\x00'
+        expected_calls = [
+            call(expected_command),
+            call(self._error_check_cmd)
+        ]
 
-            write.assert_any_call(expected_command)
-            write.assert_called_with(self._error_check_cmd)
+        # Act
+        self.instr.go_home()
 
-    def test_move_up_moves_to_max(self):
-        """Test that the move_up sets the target value to maximum."""
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_calls)
+
+    def test_get_set_max_target(self):
+        """Test setting new maximum value on a channel."""
+        # Arrange
+        expected = 6100
         channel = 2
-        expected_targets = [0] * Pololu_Maestro.AVAILABLE_CHANNELS
-        expected_targets[channel] = Pololu_Maestro.DEFAULT_MAX
-        with patch("qmi.core.transport.QMI_SerialTransport.write"):
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0),)
-                self.pololu.move_up(channel)
-                # Get the target values
-                targets = self.pololu.get_target_values()
 
-        self.assertListEqual(expected_targets, targets)
+        # Act
+        self.instr.set_max_target(channel, expected)
 
-    def test_move_down_moves_to_min(self):
-        """Test that the move_down sets the target value to minimum."""
-        channel = 3
-        expected_targets = [0] * Pololu_Maestro.AVAILABLE_CHANNELS
-        expected_targets[channel] = Pololu_Maestro.DEFAULT_MIN
-        with patch("qmi.core.transport.QMI_SerialTransport.write"):
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0),)
-                self.pololu.move_down(channel)
-                # Get the target values
-                targets = self.pololu.get_target_values()
+        # Assert
+        actual = self.instr.get_max_target(channel)
+        self.assertEqual(expected, actual)
 
-        self.assertListEqual(expected_targets, targets)
-
-    def test_is_moving(self):
-        """Test that is_moving returns the correct value."""
-        # 1. Not moving, i.o.w. "servo reached target"
-        channel = 0
-        cmd = chr(0x10) + chr(channel)
-        expected_command = bytes(self._cmd_lead + cmd, "latin-1")
-        with patch("qmi.core.transport.QMI_SerialTransport.write") as write:
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0), chr(0x0), chr(0x0), (0, 0))
-                moving = self.pololu.is_moving(channel)
-
-            write.assert_any_call(expected_command)
-            write.assert_called_with(self._error_check_cmd)
-
-        self.assertFalse(moving)
-
-        # 2. Not moving, i.o.w. "servo blocked/stuck"
-        channel = 0
-        cmd = chr(0x10) + chr(channel)
-        expected_command = bytes(self._cmd_lead + cmd, "latin-1")
-        with patch("qmi.core.transport.QMI_SerialTransport.write") as write:
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0), chr(0x01), chr(0x01), (0, 0), (0, 0), chr(0x01), chr(0x01), (0, 0))
-                moving = self.pololu.is_moving(channel)
-
-            self.assertEqual(write.mock_calls.count(call(expected_command)), 2)
-            self.assertEqual(write.mock_calls.count(call(self._error_check_cmd)), 4)
-
-        self.assertFalse(moving)
-
-        # 3. Moving
-        with patch("qmi.core.transport.QMI_SerialTransport.write") as write:
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0), chr(0x01), chr(0x00), (0, 0), (0, 0), chr(0x01), chr(0x01), (0, 0))
-                moving = self.pololu.is_moving(channel)
-
-            self.assertEqual(write.mock_calls.count(call(expected_command)), 2)
-            self.assertEqual(write.mock_calls.count(call(self._error_check_cmd)), 4)
-
-        self.assertTrue(moving)
-
-    def test_set_max(self):
-        """Test that setting new maximum value on a channels works."""
-        new_max = 6100
-        channel = 2
-        expected_targets = [0] * Pololu_Maestro.AVAILABLE_CHANNELS
-        expected_targets[channel] = new_max
-
-        self.pololu.set_max(channel, new_max)
-        with patch("qmi.core.transport.QMI_SerialTransport.write"):
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0),)
-                self.pololu.move_up(channel)
-                # Get the target values
-                targets = self.pololu.get_target_values()
-
-        self.assertListEqual(expected_targets, targets)
-
-    def test_set_max_excepts(self):
+    def test_set_max_target_excepts(self):
         """Test that setting new maximum value outside valid range excepts."""
-        invalid_maxes = [3999, 8001]
+        invalid_maxes = [1100020394, -999]
         channel = 4
 
-        for new_max in invalid_maxes:
+        for m in invalid_maxes:
             with self.assertRaises(ValueError):
-                self.pololu.set_max(channel, new_max)
+                self.instr.set_max_target(channel, m)
 
-    def test_set_min(self):
-        """Test that setting new minimum value on a channels works."""
-        new_min = 2912
-        channel = 3
-        expected_targets = [0] * Pololu_Maestro.AVAILABLE_CHANNELS
-        expected_targets[channel] = new_min
+    def test_get_set_min_target(self):
+        """Test setting new minimum value on a channel."""
+        # Arrange
+        expected = 7
+        channel = 2
 
-        self.pololu.set_min(channel, new_min)
-        with patch("qmi.core.transport.QMI_SerialTransport.write"):
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((0, 0),)
-                self.pololu.move_down(channel)
-                # Get the target values
-                targets = self.pololu.get_target_values()
+        # Act
+        self.instr.set_min_target(channel, expected)
 
-        self.assertListEqual(expected_targets, targets)
+        # Assert
+        actual = self.instr.get_min_target(channel)
+        self.assertEqual(expected, actual)
 
-    def test_set_min_excepts(self):
+    def test_set_min_target_excepts(self):
         """Test that setting new minimum value outside valid range excepts."""
-        invalid_mins = [-1, 5500]
-        channel = 5
+        invalid_maxes = [1100020394, -999]
+        channel = 4
 
-        for new_min in invalid_mins:
+        for m in invalid_maxes:
             with self.assertRaises(ValueError):
-                self.pololu.set_min(channel, new_min)
+                self.instr.set_min_target(channel, m)
 
     def test_command_error_check_excepts(self):
         """Make a command's error check to except"""
+        # Arrange
         cmd = chr(0x22)
         expected_command = bytes(self._cmd_lead + cmd, "latin-1")
+        self._transport_mock.read.return_value = b'\x00\xF0'
+        expected_calls = [
+            call(expected_command),
+            call(self._error_check_cmd)
+        ]
 
-        with patch("qmi.core.transport.QMI_SerialTransport.write") as write:
-            with patch("qmi.core.transport.QMI_SerialTransport.read") as read:
-                read.side_effect = ((16, 1),)
-                with self.assertRaises(QMI_InstrumentException):
-                    self.pololu.go_home()
+        # Act
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.go_home()
 
-            write.assert_called_with(self._error_check_cmd)
-            write.assert_any_call(expected_command)
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_calls)
 
     def test_set_wrong_channel_excepts(self):
         """Test a set command with wrong channel numbers and see that it excepts"""
-        wrong_channels = (-1, Pololu_Maestro.AVAILABLE_CHANNELS)
+        wrong_channels = (-1, Pololu_Maestro.DEFAULT_NUM_CHANNELS)
         for ch in wrong_channels:
             with self.assertRaises(ValueError):
-                self.pololu.set_target_value(ch, 0)
+                self.instr.set_target(ch, 0)
 
 
 if __name__ == '__main__':

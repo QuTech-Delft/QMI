@@ -2,6 +2,7 @@ import unittest, unittest.mock
 from unittest.mock import call
 from collections.abc import Sequence
 
+from qmi.instruments.thorlabs import Thorlabs_Tc200
 from qmi.instruments.thorlabs.tc200 import *
 from qmi.instruments.thorlabs.tc200 import _Query, _Command
 
@@ -18,7 +19,7 @@ class TestThorlabsTc200(unittest.TestCase):
         self.ser_address = "COM298"
         self.baudrate = 115200
         transport_id = "serial:{}".format(self.ser_address)
-        self.thorlabs = Thorlabs_TC200(qmi_context, "heet", transport_id)
+        self.thorlabs = Thorlabs_Tc200(qmi_context, "heet", transport_id)
 
     def test_open_close(self):
         with unittest.mock.patch("serial.Serial") as ser:

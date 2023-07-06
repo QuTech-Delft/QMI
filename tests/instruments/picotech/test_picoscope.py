@@ -2,7 +2,7 @@ import typing
 import unittest
 from unittest.mock import Mock
 
-from qmi.instruments.picotech import _picoscope, PicoTech_PicoScope
+from qmi.instruments.picotech import _picoscope
 from qmi.core.exceptions import QMI_InstrumentException, QMI_UnknownNameException
 
 import tests.instruments.picotech.picosdk_stub
@@ -12,7 +12,7 @@ from tests.instruments.picotech.ps4000a_stub import ps4000a
 
 class PicoscopeFind3403InstrumentsTestCase(unittest.TestCase):
     def setUp(self) -> None:
-        self._picoscope = PicoTech_PicoScope
+        self._picoscope = _picoscope.PicoTech_PicoScope
         _picoscope.COMMAND_DICT = {}
         _picoscope._ps = tests.instruments.picotech.ps3000a_stub.ps3000a
         _picoscope._ps.ps3000aEnumerateUnits = Mock(return_value=0)
@@ -41,7 +41,7 @@ class PicoscopeFind3403InstrumentsTestCase(unittest.TestCase):
 
 class PicoscopeFind4824InstrumentsTestCase(unittest.TestCase):
     def setUp(self) -> None:
-        self._picoscope = PicoTech_PicoScope
+        self._picoscope = _picoscope.PicoTech_PicoScope
         _picoscope.COMMAND_DICT = {}
         _picoscope._ps = tests.instruments.picotech.ps4000a_stub.ps4000a
         _picoscope._ps.ps4000aEnumerateUnits = Mock(return_value=0)

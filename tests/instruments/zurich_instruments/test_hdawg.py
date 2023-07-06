@@ -8,6 +8,7 @@ import warnings
 import numpy as np
 
 import qmi
+from qmi.instruments.zurich_instruments import ZurichInstruments_Hdawg
 import qmi.instruments.zurich_instruments.hdawg as hdawg
 from qmi.core.exceptions import QMI_InvalidOperationException
 
@@ -22,7 +23,7 @@ class TestHDAWGInit(unittest.TestCase):
     def setUp(self):
         logging.getLogger("qmi.core.instrument").setLevel(logging.CRITICAL)
 
-        qmi.start("TestContext", init_logging=False)
+        qmi.start("test_hdawg_openclose", init_logging=False)
         self._awg_module = Mock()
         self._awg_module.finished = Mock()
 
@@ -36,7 +37,7 @@ class TestHDAWGInit(unittest.TestCase):
 
         self._hdawg = qmi.make_instrument(
             "HDAWG",
-            hdawg.ZurichInstruments_HDAWG,
+            ZurichInstruments_Hdawg,
             server_host=_DEVICE_HOST,
             server_port=_DEVICE_PORT,
             device_name=_DEVICE_NAME
@@ -198,7 +199,7 @@ class TestHDAWG(unittest.TestCase):
     def setUp(self):
         logging.getLogger("qmi.instruments.zurich_instruments.hdawg").setLevel(logging.CRITICAL)
 
-        qmi.start("TestContext", init_logging=False)
+        qmi.start("TestHDAWGMethods", init_logging=False)
         self._awg_module = Mock()
         self._awg_module.finished = Mock()
         self._awg_module.finished.side_effect = [True, False, False, True]
@@ -217,7 +218,7 @@ class TestHDAWG(unittest.TestCase):
 
         self._hdawg = qmi.make_instrument(
             "HDAWG",
-            hdawg.ZurichInstruments_HDAWG,
+            ZurichInstruments_Hdawg,
             server_host=_DEVICE_HOST,
             server_port=_DEVICE_PORT,
             device_name=_DEVICE_NAME

@@ -20,6 +20,7 @@ import colorama
 import psutil
 
 import qmi
+from qmi.core.config_defs import CfgQmi
 from qmi.core.exceptions import (
     QMI_Exception, QMI_ApplicationException, QMI_UnknownNameException,
     QMI_RpcTimeoutException
@@ -27,14 +28,10 @@ from qmi.core.exceptions import (
 from qmi.core.util import format_address_and_port, is_valid_object_name
 
 
-def _path_eq(p1, p2):
-    return p1 == p2 or os.path.normcase(p1) == os.path.normcase(p2)
-
-
 # Am I running in a windows virtual environment?
-# sys.executable and sys._base_executable are not equal within a Windows python virtual environment.
-# Within a linux python virtual environment they are equal.
-WINENV = not _path_eq(sys.executable, sys._base_executable)  # type: ignore
+# sys.prefix and sys.base_prefix are not equal within a virtual environment.
+# This is the documented way of validation: https://docs.python.org/3/library/venv.html#how-venvs-work.
+WINENV = (sys.prefix != sys.base_prefix and os.name == 'nt')  # type: ignore
 
 # Time in seconds to wait until a context shuts down after a request.
 CONTEXT_SHUTDOWN_TIMEOUT = 8
@@ -641,26 +638,83 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
             pass  # apparently already disconnected
 
 
-def select_contexts(context_name: Optional[str]) -> List[str]:
-    """Return a list of applicable context names."""
+def select_context_by_name(cfg: CfgQmi, context_name: str) -> List[str]:
+    """Return input the context name in a list if it is valid.
+
+    Parameters:
+        cfg: The current QMI configuration.
+        context_name: The name of the context to validate.
+
+    Raises:
+        QMI_ApplicationException: If context name is not within known contexts or name is invalid.
+
+    Returns:
+        The input context name in a list.
+    """
+    # Return only the specified context.
+    if context_name not in cfg.contexts:
+        raise QMI_ApplicationException("Unknown context name '{}'".format(context_name))
+
+    if not is_valid_object_name(context_name):
+        raise QMI_ApplicationException("Invalid context name '{}'".format(context_name))
+
+    return [context_name]
+
+
+def select_contexts(cfg: CfgQmi) -> List[str]:
+    """Return a list of all applicable context names.
+
+    Parameters:
+        cfg: The current QMI configuration.
+
+    Raises:
+        QMI_ApplicationException: If no contexts are enabled in the configuration, or name is invalid.
+
+    Returns:
+        All context names as a list.
+    """
 
     context_names = []
 
-    # Get QMI configuration.
-    cfg = qmi.context().get_config()
+    # Return all enabled contexts.
+    for (ctxname, ctxcfg) in cfg.contexts.items():
+        if ctxcfg.enabled:
+            context_names.append(ctxname)
+    if not context_names:
+        raise QMI_ApplicationException("There are no enabled contexts in the configuration")
 
-    if context_name:
-        # Return only the specified context.
-        if context_name not in cfg.contexts:
-            raise QMI_ApplicationException("Unknown context name '{}'".format(context_name))
-        context_names.append(context_name)
-    else:
-        # Return all enabled contexts.
-        for (ctxname, ctxcfg) in cfg.contexts.items():
-            if ctxcfg.enabled:
-                context_names.append(ctxname)
-        if not context_names:
-            raise QMI_ApplicationException("There are no enabled contexts in the configuration")
+    # Sanity check on context names.
+    # Note that our remote process management protocol does not correctly
+    # handle context names containing whitespace or non-ASCII characters.
+    for ctxname in context_names:
+        if not is_valid_object_name(ctxname):
+            raise QMI_ApplicationException("Invalid context name '{}'".format(ctxname))
+
+    return context_names
+
+
+def select_local_contexts(cfg: CfgQmi) -> List[str]:
+    """Return a list of all applicable local context names.
+
+    Parameters:
+        cfg: The current QMI configuration.
+
+    Raises:
+        QMI_ApplicationException: If no local contexts are enabled in the configuration, or name is invalid.
+
+    Returns:
+        Local context names as a list.
+    """
+
+    context_names = []
+
+    # Return all enabled local contexts.
+    for (ctxname, ctxcfg) in cfg.contexts.items():
+        if ctxcfg.enabled and ctxcfg.host and is_local_host(ctxcfg.host):
+            context_names.append(ctxname)
+
+    if not context_names:
+        raise QMI_ApplicationException("There are no enabled local contexts in the configuration")
 
     # Sanity check on context names.
     # Note that our remote process management protocol does not correctly
@@ -681,18 +735,23 @@ def show_progress_msg(msg: str) -> None:
     sys.stdout.flush()
 
 
-def proc_server() -> int:
+def proc_server(cfg: CfgQmi) -> int:
     """Run the process manager in server mode.
 
-    :return: Exit status (0 = success).
+    Parameters:
+        cfg: The current QMI configuration.
+
+    Raises:
+        ProcessException: If process is unknown or should not run on this host.
+        ValueError: By invalid command.
+
+    Returns:
+        Exit status (0 = success).
     """
 
     _logger.debug("Running qmi_proc in server mode")
 
     ret = 0
-
-    # Get QMI configuration.
-    cfg = qmi.context().get_config()
 
     # Serve remote requests via stdin/stdout until EOF on stdin.
     while True:
@@ -776,11 +835,19 @@ def proc_server() -> int:
     return ret
 
 
-def proc_start(context_name: Optional[str]) -> int:
+def proc_start(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
     """Start one or more processes.
 
-    :param context_name: Process to start, or None to stop all configured processes.
-    :return: Exit status (0 = success).
+    Parameters:
+        cfg:          The current QMI configuration.
+        context_name: Process to start, or None to start all configured processes.
+        local:        Boolean flag to indicate if we only look at local processes (True) or all processes (False).
+
+    Raises:
+        ProcessException: By unexpected PID number in check.
+
+    Returns:
+        Exit status (0 = success).
     """
 
     colorama.init()
@@ -790,7 +857,12 @@ def proc_start(context_name: Optional[str]) -> int:
     ret = 0
 
     # Select applicable contexts.
-    context_names = select_contexts(context_name)
+    if context_name:
+        context_names = select_context_by_name(cfg, context_name)
+    elif local:
+        context_names = select_local_contexts(cfg)
+    else:
+        context_names = select_contexts(cfg)
 
     print("Starting QMI processes:")
 
@@ -802,7 +874,6 @@ def proc_start(context_name: Optional[str]) -> int:
         sys.stdout.flush()
 
         try:
-
             # Perhaps the process is already running.
             # Check if the peer context responds via TCP.
             pid, ver = get_context_status(context_name)
@@ -848,11 +919,19 @@ def proc_start(context_name: Optional[str]) -> int:
     return ret
 
 
-def proc_stop(context_name: Optional[str]) -> int:
+def proc_stop(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
     """Stop one or more running processes.
 
-    :param context_name: Process to report, or None to stop all running processes.
-    :return: Exit status (0 = success).
+    Parameters:
+        cfg:          The current QMI configuration.
+        context_name: Process to start, or None to stop all configured processes.
+        local:        Boolean flag to indicate if we only look at local processes (True) or all processes (False).
+
+    Raises:
+        ProcessException: By unexpected error in stopping the process.
+
+    Returns:
+        Exit status (0 = success).
     """
 
     colorama.init()
@@ -862,7 +941,12 @@ def proc_stop(context_name: Optional[str]) -> int:
     ret = 0
 
     # Select applicable contexts.
-    context_names = select_contexts(context_name)
+    if context_name:
+        context_names = select_context_by_name(cfg, context_name)
+    elif local:
+        context_names = select_local_contexts(cfg)
+    else:
+        context_names = select_contexts(cfg)
 
     print("Stopping QMI processes:")
 
@@ -905,11 +989,18 @@ def proc_stop(context_name: Optional[str]) -> int:
     return ret
 
 
-def proc_status(context_name: Optional[str]) -> int:
+def proc_status(cfg: CfgQmi, context_name: Optional[str]) -> int:
     """Show the status of one or more processes.
 
-    :param context_name: Process to report, or None to report status of all processes.
-    :return: Exit status (0 = success).
+    Parameters:
+        cfg:          The current QMI configuration.
+        context_name: Process to get status for, or None to get all configured processes.
+
+    Raises:
+        ProcessException: By unexpected error when checking the status.
+
+    Returns:
+        Exit status (0 = success).
     """
 
     colorama.init()
@@ -919,7 +1010,11 @@ def proc_status(context_name: Optional[str]) -> int:
     ret = 0
 
     # Select applicable contexts.
-    context_names = select_contexts(context_name)
+    if context_name:
+        context_names = select_context_by_name(cfg, context_name)
+    else:
+        context_names = select_contexts(cfg)
+
     max_len_context_name = len(max(context_names, key=len))
 
     print("QMI process status:")
@@ -960,8 +1055,9 @@ def main() -> int:
         or on a remote, network-connected computer."""
     parser.add_argument("--config", action="store", type=str,
                         help="specify the QMI configuration file")
-    parser.add_argument("--all", action="store_true",
-                        help="start or stop all configured processes")
+    mutex_group = parser.add_mutually_exclusive_group()
+    mutex_group.add_argument("--all", action="store_true", help="start or stop all configured processes")
+    mutex_group.add_argument("--locals", action="store_true", help="start or stop local configured processes")
     parser.add_argument("command", action="store", choices=["start", "stop", "restart", "status", "server"],
                         help="'start' to start the specified process; 'stop' to stop a running process;"
                              + " 'restart' to restart the running process; 'status' to show the process status")
@@ -969,7 +1065,7 @@ def main() -> int:
                         help="context name of the process to start or stop")
     args = parser.parse_args()
 
-    if args.command == "server" and (args.all or args.context_name):
+    if args.command == "server" and (args.all or args.context_name or args.locals):
         print("ERROR: Can not specify server mode together with other options")
         return 1
 
@@ -977,29 +1073,35 @@ def main() -> int:
         print("ERROR: Can not specify a context_name together with --all", file=sys.stderr)
         return 1
 
-    if (args.command in ("start", "stop", "restart")) and (not args.all) and (not args.context_name):
-        print("ERROR: Specify either a context_name or --all", file=sys.stderr)
+    if args.locals and args.context_name:
+        print("ERROR: Can not specify a context_name together with --locals", file=sys.stderr)
+        return 1
+
+    if (args.command in ("start", "stop", "restart")) and (not args.all) and (not args.locals) and \
+            (not args.context_name):
+        print("ERROR: Specify either: a context_name, or --all, or --local", file=sys.stderr)
         return 1
 
     qmi.start("proc_mgr", config_file=args.config, console_loglevel="WARNING")
-
+    # Get the QMI configuration.
+    cfg = qmi.context().get_config()
     try:
 
         if args.command == "server":
-            return proc_server()
+            return proc_server(cfg=cfg)
 
         if args.command == "start":
-            return proc_start(context_name=args.context_name)
+            return proc_start(cfg=cfg, context_name=args.context_name, local=args.locals)
 
         elif args.command == "stop":
-            return proc_stop(context_name=args.context_name)
+            return proc_stop(cfg=cfg, context_name=args.context_name, local=args.locals)
 
         elif args.command == "restart":
-            proc_stop(context_name=args.context_name)
-            return proc_start(context_name=args.context_name)
+            proc_stop(cfg=cfg, context_name=args.context_name, local=args.locals)
+            return proc_start(cfg=cfg, context_name=args.context_name, local=args.locals)
 
         elif args.command == "status":
-            return proc_status(context_name=args.context_name)
+            return proc_status(cfg=cfg, context_name=args.context_name)
 
         else:
             print("ERROR: Unknown command {!r}".format(args.command), file=sys.stderr)

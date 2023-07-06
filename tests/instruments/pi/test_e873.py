@@ -1,22 +1,17 @@
 import unittest
-import qmi
-
-from string import punctuation
-
-from typing import cast
-
 from unittest.mock import MagicMock, call, patch
 
+from string import punctuation
+from typing import cast
+
+import qmi
 from qmi.core.transport import QMI_TcpTransport
-
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
-
-from qmi.instruments.pi.e873 import PI_E873
-from qmi.instruments.pi.e873 import ReferenceTarget
+from qmi.instruments.pi import PI_E873, ReferenceTarget
 
 
 class TestE8738(unittest.TestCase):
-    def setUp(self) -> None:
+    def setUp(self):
         qmi.start("TestContext")
         self._transport_mock = MagicMock(spec=QMI_TcpTransport)
         with patch(
@@ -28,10 +23,10 @@ class TestE8738(unittest.TestCase):
             )
             self.instr = cast(PI_E873, self.instr)
 
-    def tearDown(self) -> None:
+    def tearDown(self):
         qmi.stop()
 
-    def _instr_open(self) -> None:
+    def _instr_open(self):
         """Open the instrument and clear the write mocked calls."""
         self._transport_mock.read_until.return_value = b"1\r\n"
         self.instr.open()
@@ -41,7 +36,7 @@ class TestE8738(unittest.TestCase):
         with self.assertRaises(QMI_InstrumentException):
             function(response, "", "")
 
-    def _test_get_macros(self, function, command) -> None:
+    def _test_get_macros(self, function, command):
         self._instr_open()
         self._transport_mock.read_until.side_effect = [
             b"test1 \n",
@@ -70,7 +65,7 @@ class TestE8738(unittest.TestCase):
         for i in punctuation:  # special characters
             set_variable_helper("BLA" + i)
 
-    def _test_set_cmd_function(self, function, command) -> None:
+    def _test_set_cmd_function(self, function, command):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"0\n"
         function(0.001)
@@ -80,7 +75,7 @@ class TestE8738(unittest.TestCase):
             [call(command.encode("UTF-8") + b" 1 0.00100000\n"), call(b"ERR?\n")]
         )
 
-    def _test_float_get_address_function(self, function, address) -> None:
+    def _test_float_get_address_function(self, function, address):
         self._instr_open()
         t = f"1 0X{address:X}".encode("UTF-8")
         self._transport_mock.read_until.return_value = t + b"=0.001\n"
@@ -90,7 +85,7 @@ class TestE8738(unittest.TestCase):
         self._transport_mock.write.assert_called_once_with(b"SPA? " + t + b"\n")
         self.assertEqual(r, 0.001)
 
-    def _test_float_get_cmd_function(self, function, command) -> None:
+    def _test_float_get_cmd_function(self, function, command):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"1=0.001\n"
         r = function()
@@ -109,7 +104,7 @@ class TestE8738(unittest.TestCase):
             [call(command.encode("UTF-8") + b" 1 1\n"), call(b"ERR?\n")]
         )
 
-    def _test_bool_get_cmd_function(self, function, command) -> None:
+    def _test_bool_get_cmd_function(self, function, command):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"1=1\n"
         r = function()
@@ -124,7 +119,7 @@ class TestE8738(unittest.TestCase):
             function(5, *args, **kwargs)
         self.instr.close()
 
-    def _test_set_digital_output(self, function, command) -> None:
+    def _test_set_digital_output(self, function, command):
         for i in [1, 2, 3, 4]:
             self._instr_open()
             self._transport_mock.read_until.return_value = b"0\n"
@@ -137,7 +132,7 @@ class TestE8738(unittest.TestCase):
             )
             self.instr.close()
 
-    def _test_get_digital_output(self, function, command) -> None:
+    def _test_get_digital_output(self, function, command):
         for i in [1, 2, 3, 4]:
             self._instr_open()
             self._transport_mock.read_until.return_value = f"{i}=1\n".encode("UTF-8")
@@ -148,7 +143,7 @@ class TestE8738(unittest.TestCase):
             )
             self.assertEqual(s, 1)
 
-    def test_open_close(self) -> None:
+    def test_open_close(self):
         self._transport_mock.read_until.return_value = b"1\r\n"
         self.instr.open()
         self.instr.close()
@@ -157,13 +152,13 @@ class TestE8738(unittest.TestCase):
         self._transport_mock.write.assert_has_calls([call(b"ERR?\n"), call(b"SAI?\n")])
         self._transport_mock.close.assert_called_once_with()
 
-    def test_open_invalid(self) -> None:
+    def test_open_invalid(self):
         self._transport_mock.read_until.return_value = b"2\r\n"
         with self.assertRaises(QMI_InstrumentException):
             self.instr.open()
         self.instr.close()
 
-    def test_ask_invalid(self) -> None:
+    def test_ask_invalid(self):
         # Build a mock instrument to access ._ask
         instr = MagicMock(spec=PI_E873)
         instr._is_open = MagicMock(return_value=True)
@@ -177,17 +172,17 @@ class TestE8738(unittest.TestCase):
         invalid_helper("", QMI_TimeoutException)
         invalid_helper(" ", QMI_InstrumentException)
 
-    def test_parse_response_item_invalid(self) -> None:
+    def test_parse_response_item_invalid(self):
         self._test_parse_invalid(PI_E873._parse_response_item, "\n\n")
         self._test_parse_invalid(PI_E873._parse_response_item, "NOKEY\n")
 
-    def test_parse_int_invalid(self) -> None:
+    def test_parse_int_invalid(self):
         self._test_parse_invalid(PI_E873._parse_int, "NOTINT")
 
-    def test_parse_float_invalid(self) -> None:
+    def test_parse_float_invalid(self):
         self._test_parse_invalid(PI_E873._parse_float, "NOTFLOAT")
 
-    def test_reset(self) -> None:
+    def test_reset(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"0\n"
         self.instr.reset()
@@ -195,7 +190,7 @@ class TestE8738(unittest.TestCase):
 
         self._transport_mock.write.assert_has_calls([call(b"RBT\n"), call(b"ERR?\n")])
 
-    def test_get_idn(self) -> None:
+    def test_get_idn(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = (
             b"vendor,model,serial,version\r\n"
@@ -209,7 +204,7 @@ class TestE8738(unittest.TestCase):
         self.assertEqual(i.serial, "serial")
         self.assertEqual(i.version, "version")
 
-    def test_get_idn_invalid(self) -> None:
+    def test_get_idn_invalid(self):
         self._instr_open()
         with self.assertRaises(QMI_InstrumentException):
             self._transport_mock.read_until.return_value = b"\n"
@@ -218,7 +213,7 @@ class TestE8738(unittest.TestCase):
 
         self._transport_mock.write.assert_called_once_with(b"*IDN?\n")
 
-    def test_get_stage_info(self) -> None:
+    def test_get_stage_info(self):
         self._instr_open()
         self._transport_mock.read_until.side_effect = r = []
         c = []
@@ -235,7 +230,7 @@ class TestE8738(unittest.TestCase):
         self.assertEqual(s.assembly_date, "result3")
         self.assertEqual(s.hw_version, "result4")
 
-    def test_get_error(self) -> None:
+    def test_get_error(self):
         def get_error_helper(value):
             self._instr_open()
             self._transport_mock.read_until.return_value = f"{value}\n".encode("UTF-8")
@@ -248,7 +243,7 @@ class TestE8738(unittest.TestCase):
         get_error_helper(0)
         get_error_helper(1)
 
-    def test_get_system_status(self) -> None:
+    def test_get_system_status(self):
         sm = {
             # id: (shift, mask, val)
             "negative_limit_switch": (0, 0x1, 1),
@@ -272,7 +267,7 @@ class TestE8738(unittest.TestCase):
                 i := getattr(ss, key), v, msg=f"{key}: is {i} expected {v}."
             )
 
-    def test_stop_all(self) -> None:
+    def test_stop_all(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"10\n"
         self.instr.stop_all()
@@ -282,14 +277,14 @@ class TestE8738(unittest.TestCase):
 
         self.instr.close()
 
-    def test_stop_all_with_error(self) -> None:
+    def test_stop_all_with_error(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"1\n"
         with self.assertRaises(QMI_InstrumentException):
             self.instr.stop_all()
         self.instr.close()
 
-    def test_stop_smooth(self) -> None:
+    def test_stop_smooth(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"10\n"
         self.instr.stop_smooth()
@@ -298,7 +293,7 @@ class TestE8738(unittest.TestCase):
         self._transport_mock.write.assert_any_call(b"HLT\n")
         self._transport_mock.write.assert_called_with(b"ERR?\n")
 
-    def test_get_physical_unit(self) -> None:
+    def test_get_physical_unit(self):
         self._instr_open()
         t = f"1 0X{0x07000601:X}".encode("UTF-8")
         self._transport_mock.read_until.return_value = t + b"=result\n"
@@ -308,7 +303,7 @@ class TestE8738(unittest.TestCase):
         self._transport_mock.write.assert_called_once_with(b"SPA? " + t + b"\n")
         self.assertEqual(p, "result")
 
-    def test_get_position_range(self) -> None:
+    def test_get_position_range(self):
         self._instr_open()
         self._transport_mock.read_until.side_effect = [
             b"1=0.001\r\n",
@@ -322,19 +317,19 @@ class TestE8738(unittest.TestCase):
         )
         self.assertEqual((0.001, 0.002), p)
 
-    def test_get_max_position_error(self) -> None:
+    def test_get_max_position_error(self):
         self._test_float_get_address_function(self.instr.get_max_position_error, 0x8)
 
-    def test_get_max_velocity(self) -> None:
+    def test_get_max_velocity(self):
         self._test_float_get_address_function(self.instr.get_max_velocity, 0xA)
 
-    def test_get_max_acceleration(self) -> None:
+    def test_get_max_acceleration(self):
         self._test_float_get_address_function(self.instr.get_max_acceleration, 0x4A)
 
-    def test_get_max_deceleration(self) -> None:
+    def test_get_max_deceleration(self):
         self._test_float_get_address_function(self.instr.get_max_deceleration, 0x4B)
 
-    def test_get_reference_signal_mode(self) -> None:
+    def test_get_reference_signal_mode(self):
         self._instr_open()
         t = f"1 0X{0x70:X}".encode("UTF-8")
         self._transport_mock.read_until.return_value = t + b"=1\n"
@@ -344,50 +339,50 @@ class TestE8738(unittest.TestCase):
         self._transport_mock.write.assert_called_once_with(b"SPA? " + t + b"\n")
         self.assertEqual(m.value, 1)
 
-    def test_get_reference_velocity(self) -> float:
+    def test_get_reference_velocity(self):
         self._test_float_get_address_function(self.instr.get_reference_velocity, 0x50)
 
-    def test_set_acceleration(self) -> None:
+    def test_set_acceleration(self):
         self._test_set_cmd_function(self.instr.set_acceleration, "ACC")
 
-    def test_get_acceleration(self) -> None:
+    def test_get_acceleration(self):
         self._test_float_get_cmd_function(self.instr.get_acceleration, "ACC?")
 
-    def test_set_deceleration(self) -> None:
+    def test_set_deceleration(self):
         self._test_set_cmd_function(self.instr.set_deceleration, "DEC")
 
-    def test_get_deceleration(self) -> None:
+    def test_get_deceleration(self):
         self._test_float_get_cmd_function(self.instr.get_deceleration, "DEC?")
 
-    def test_set_velocity(self) -> None:
+    def test_set_velocity(self):
         self._test_set_cmd_function(self.instr.set_velocity, "VEL")
 
-    def test_set_velocity_negative(self) -> None:
+    def test_set_velocity_negative(self):
         self._instr_open()
         with self.assertRaises(QMI_InstrumentException):
             self.instr.set_velocity(-1)
         self.instr.close()
 
-    def test_get_velocity(self) -> None:
+    def test_get_velocity(self):
         self._test_float_get_cmd_function(self.instr.get_velocity, "VEL?")
 
-    def test_set_servo_mode(self) -> None:
+    def test_set_servo_mode(self):
         self._test_bool_set_cmd_function(self.instr.set_servo_mode, "SVO")
 
-    def test_get_servo_mode(self) -> None:
+    def test_get_servo_mode(self):
         self._test_bool_get_cmd_function(self.instr.get_servo_mode, "SVO?")
 
-    def test_set_reference_definition_mode(self) -> None:
+    def test_set_reference_definition_mode(self):
         self._test_bool_set_cmd_function(
             self.instr.set_reference_definition_mode, "RON"
         )
 
-    def test_get_reference_definition_mode(self) -> None:
+    def test_get_reference_definition_mode(self):
         self._test_bool_get_cmd_function(
             self.instr.get_reference_definition_mode, "RON?"
         )
 
-    def test_reference_move(self) -> None:
+    def test_reference_move(self):
         def reference_move_helper(target, command):
             self._instr_open()
             self._transport_mock.read_until.return_value = b"0\n"
@@ -402,22 +397,22 @@ class TestE8738(unittest.TestCase):
         reference_move_helper(ReferenceTarget.POSITIVE_LIMIT, "FPL")
         reference_move_helper(ReferenceTarget.NEGATIVE_LIMIT, "FNL")
 
-    def test_get_reference_result(self) -> None:
+    def test_get_reference_result(self):
         self._test_bool_get_cmd_function(self.instr.get_reference_result, "FRF?")
 
-    def test_move_absolute(self) -> None:
+    def test_move_absolute(self):
         self._test_set_cmd_function(self.instr.move_absolute, "MOV")
 
-    def test_move_relative(self) -> None:
+    def test_move_relative(self):
         self._test_set_cmd_function(self.instr.move_relative, "MVR")
 
-    def test_get_target_position(self) -> None:
+    def test_get_target_position(self):
         self._test_float_get_cmd_function(self.instr.get_target_position, "MOV?")
 
-    def test_get_position(self) -> None:
+    def test_get_position(self):
         self._test_float_get_cmd_function(self.instr.get_position, "POS?")
 
-    def test_wait_motion_complete(self) -> None:
+    def test_wait_motion_complete(self):
         self._instr_open()
         self._transport_mock.read_until.side_effect = [
             f"{1<<13}\r\n".encode("UTF-8"),
@@ -429,7 +424,7 @@ class TestE8738(unittest.TestCase):
 
         self.assertEqual(r, True)
 
-    def test_wait_motion_complete_timeout(self) -> None:
+    def test_wait_motion_complete_timeout(self):
         self._instr_open()
         self._transport_mock.read_until.side_effect = [
             f"{1<<13}\r\n".encode("UTF-8"),
@@ -444,7 +439,7 @@ class TestE8738(unittest.TestCase):
 
         self.assertEqual(r, False)
 
-    def test_set_trigger_inmotion(self) -> None:
+    def test_set_trigger_inmotion(self):
         for i in [1, 2, 3, 4]:
             self._instr_open()
             self._transport_mock.read_until.return_value = b"0\n"
@@ -458,10 +453,10 @@ class TestE8738(unittest.TestCase):
                 ]
             )
 
-    def test_set_trigger_inmotion_invalid(self) -> None:
+    def test_set_trigger_inmotion_invalid(self):
         self._test_dig_out_invalid(self.instr.set_trigger_inmotion)
 
-    def test_set_trigger_position_offset(self) -> None:
+    def test_set_trigger_position_offset(self):
         for i in [1, 2, 3, 4]:
             self._instr_open()
             self._transport_mock.read_until.return_value = b"0\n"
@@ -478,36 +473,36 @@ class TestE8738(unittest.TestCase):
                 ]
             )
 
-    def test_set_trigger_position_offset_invalid(self) -> None:
+    def test_set_trigger_position_offset_invalid(self):
         self._test_dig_out_invalid(
             self.instr.set_trigger_position_offset, 0.1, 0.2, 0.3
         )
 
-    def test_set_trigger_output_state(self) -> None:
+    def test_set_trigger_output_state(self):
         self._test_set_digital_output(self.instr.set_trigger_output_state, "TRO")
 
-    def test_set_trigger_output_state_invalid(self) -> None:
+    def test_set_trigger_output_state_invalid(self):
         self._test_dig_out_invalid(self.instr.set_trigger_output_state, True)
 
-    def test_get_trigger_output_state(self) -> None:
+    def test_get_trigger_output_state(self):
         self._test_get_digital_output(self.instr.get_trigger_output_state, "TRO?")
 
-    def test_get_trigger_output_state_invalid(self) -> None:
+    def test_get_trigger_output_state_invalid(self):
         self._test_dig_out_invalid(self.instr.get_trigger_output_state)
 
-    def test_set_digital_output(self) -> None:
+    def test_set_digital_output(self):
         self._test_set_digital_output(self.instr.set_digital_output, "DIO")
 
-    def test_set_digital_output_invalid(self) -> None:
+    def test_set_digital_output_invalid(self):
         self._test_dig_out_invalid(self.instr.set_digital_output, True)
 
-    def test_get_digital_input(self) -> None:
+    def test_get_digital_input(self):
         self._test_get_digital_output(self.instr.get_digital_input, "DIO?")
 
-    def test_get_digital_input_invalid(self) -> None:
+    def test_get_digital_input_invalid(self):
         self._test_dig_out_invalid(self.instr.get_digital_input)
 
-    def test_define_macro(self) -> None:
+    def test_define_macro(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"0\n"
         c = ["TESTCMD1", "TESTCMD2", "TESTCMD3"]
@@ -525,7 +520,7 @@ class TestE8738(unittest.TestCase):
             ]
         )
 
-    def test_delete_macro(self) -> None:
+    def test_delete_macro(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"0\n"
         self.instr.delete_macro("test")
@@ -538,10 +533,10 @@ class TestE8738(unittest.TestCase):
             ]
         )
 
-    def test_get_defined_macros(self) -> None:
+    def test_get_defined_macros(self):
         self._test_get_macros(self.instr.get_defined_macros, "MAC?")
 
-    def test_start_macro(self) -> None:
+    def test_start_macro(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"0\n"
         self.instr.start_macro("test", "arg1", "arg2")
@@ -554,7 +549,7 @@ class TestE8738(unittest.TestCase):
             ]
         )
 
-    def test_start_macro_repeat(self) -> None:
+    def test_start_macro_repeat(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"0\n"
         self.instr.start_macro("test", "arg1", "arg2", 3)
@@ -567,7 +562,7 @@ class TestE8738(unittest.TestCase):
             ]
         )
 
-    def test_start_macro_invalid(self) -> None:
+    def test_start_macro_invalid(self):
         self._instr_open()
         with self.assertRaises(QMI_InstrumentException):
             self.instr.start_macro("test", None, "arg2", 3)
@@ -575,10 +570,10 @@ class TestE8738(unittest.TestCase):
             self.instr.start_macro("test", "arg1", "arg2", 0)
         self.instr.close()
 
-    def test_get_running_macros(self) -> None:
+    def test_get_running_macros(self):
         self._test_get_macros(self.instr.get_running_macros, "RMC?")
 
-    def test_set_variable(self) -> None:
+    def test_set_variable(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"0\n"
         self.instr.set_variable("test", None)
@@ -591,7 +586,7 @@ class TestE8738(unittest.TestCase):
             ]
         )
 
-    def test_set_variable_value(self) -> None:
+    def test_set_variable_value(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"0\n"
         self.instr.set_variable("test", "valuetest")
@@ -604,10 +599,10 @@ class TestE8738(unittest.TestCase):
             ]
         )
 
-    def test_set_variable_invalid(self) -> None:
+    def test_set_variable_invalid(self):
         self._test_variable_name_invalid(self.instr.set_variable, "")
 
-    def test_get_variable(self) -> None:
+    def test_get_variable(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = b"test=test1\n"
         variable = self.instr.get_variable("test")
@@ -619,7 +614,7 @@ class TestE8738(unittest.TestCase):
     def test_get_variable_invalid(self):
         self._test_variable_name_invalid(self.instr.get_variable)
 
-    def test_get_variables(self) -> None:
+    def test_get_variables(self):
         self._instr_open()
         self._transport_mock.read_until.return_value = (
             b"test1=val1\ntest2=val2\ntest3=val3\n"
