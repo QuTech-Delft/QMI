@@ -16,7 +16,7 @@ import qmi
 from qmi.utils.context_managers import open_close
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.transport import QMI_TcpTransport
-from qmi.instruments.tektronix.awg5014 import Tektronix_Awg5014
+from qmi.instruments.tektronix import Tektronix_Awg5014
 
 
 ### GLOBALS ###

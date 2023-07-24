@@ -7,7 +7,7 @@ from unittest.mock import patch
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException
 from qmi.instruments.picoquant.support._mhlib_function_signatures import _mhlib_function_signatures
-from qmi.instruments.picoquant.multiharp import PicoQuant_MultiHarp150
+from qmi.instruments.picoquant import PicoQuant_MultiHarp150
 
 
 class MultiHarpOldLibrayTestCase(unittest.TestCase):

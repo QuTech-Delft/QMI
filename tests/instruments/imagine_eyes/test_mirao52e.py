@@ -5,7 +5,7 @@ import os
 import numpy
 
 import qmi
-from qmi.instruments.imagine_eyes.mirao52e import ImagineEyes_Mirao52e, MirrorStatus
+from qmi.instruments.imagine_eyes import ImagineEyes_Mirao52e, MirrorStatus
 from qmi.core.exceptions import QMI_InstrumentException
 
 readline_mock = Mock()

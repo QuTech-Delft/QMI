@@ -9,19 +9,19 @@ from unittest.mock import MagicMock, call, patch
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
-from qmi.instruments.tt.tgf import TT_TGF_3000_4000_Series, WaveformType, CounterInputChannel
+from qmi.instruments.tt import AimTTi_Tgf30004000, WaveformType, CounterInputChannel
 
 
 class TestTGF(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("TestContext")
+        qmi.start("Test_tgf_3000_4000")
         self._transport_mock = MagicMock(spec=QMI_TcpTransport)
         with patch(
                 'qmi.instruments.tt.tgf.create_transport',
                 return_value=self._transport_mock):
-            self.instr: TT_TGF_3000_4000_Series = qmi.make_instrument("instr", TT_TGF_3000_4000_Series, "transport_descriptor")
-            self.instr = cast(TT_TGF_3000_4000_Series, self.instr)
+            self.instr: AimTTi_Tgf30004000 = qmi.make_instrument("instr", AimTTi_Tgf30004000, "transport_descriptor")
+            self.instr = cast(AimTTi_Tgf30004000, self.instr)
 
     def tearDown(self):
         qmi.stop()

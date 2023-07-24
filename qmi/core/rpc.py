@@ -581,7 +581,7 @@ class QMI_RpcNonBlockingProxy:
             method = make_rpc_forward_function(method_descriptor.name)
 
             # Update special attributes to make the forward function look like the method it is a proxy for.
-            docstring = "RPC proxy for {}{} method of {} instance".format(method_descriptor.name,
+            docstring = "rpc proxy for {}{} method of {} instance".format(method_descriptor.name,
                                                                           method_descriptor.signature,
                                                                           self._rpc_class_fqn)
 
@@ -838,7 +838,7 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
         """Return the optional name of the category this object belongs to.
 
         A category name is a free-form string that has no special significance.
-        Its pupose is to distinguish between groups of RPC objects that fulfill
+        Its purpose is to distinguish between groups of RPC objects that fulfill
         similar roles.
         """
         return None
@@ -1188,7 +1188,7 @@ class _RpcThread(QMI_Thread):
 
         Wait until initialization of the RpcObject instance is finished,
         if necessary. If initialization was successful, return the object
-        instance. Otherwise re-raise the exception that occurred during
+        instance. Otherwise, re-raise the exception that occurred during
         initialization.
         """
         with self._cv:

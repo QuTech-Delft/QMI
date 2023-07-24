@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 
-from qmi.instruments.montana.cryostation_s50 import Montana_CryostationS50
+from qmi.instruments.montana import Montana_CryostationS50
+from qmi.instruments.montana.cryostation_s50 import Montana_CryostationS50_System_Goal, Montana_CryostationS50_System_State
 
 
 class TestCryostation50(unittest.TestCase):
@@ -36,7 +37,7 @@ class TestCryostation50(unittest.TestCase):
 
     @patch('urllib.request.urlopen')
     def test_get_system_goal(self, urlopen_mock: MagicMock):
-        expected_system_goal = "vent"
+        expected_system_goal = "Vent"
         urlopen_mock.return_value.__enter__.return_value.status = 200
         urlopen_mock.return_value.__enter__.return_value.read.return_value = bytes(
             f'{{"systemGoal": "{expected_system_goal}"}}', 'utf-8')
@@ -47,11 +48,11 @@ class TestCryostation50(unittest.TestCase):
         self.assertEqual(req.full_url, f"{self.controller_properties_url}/systemGoal")
         self.assertEqual(req.method, 'GET')
         self.assertIsNone(req.data)
-        self.assertEqual(sys_goal, expected_system_goal)
+        self.assertEqual(sys_goal, Montana_CryostationS50_System_Goal.VENT)
 
     @patch('urllib.request.urlopen')
     def test_get_system_state(self, urlopen_mock: MagicMock):
-        expected_system_state = "vent"
+        expected_system_state = "Ready"
         urlopen_mock.return_value.__enter__.return_value.status = 200
         urlopen_mock.return_value.__enter__.return_value.read.return_value = bytes(
             f'{{"systemState": "{expected_system_state}"}}', 'utf-8')
@@ -62,7 +63,7 @@ class TestCryostation50(unittest.TestCase):
         self.assertEqual(req.full_url, f"{self.controller_properties_url}/systemState")
         self.assertEqual(req.method, 'GET')
         self.assertIsNone(req.data)
-        self.assertEqual(sys_state, expected_system_state)
+        self.assertEqual(sys_state, Montana_CryostationS50_System_State.READY)
 
     @patch('urllib.request.urlopen')
     def test_cooldown_allowed(self, urlopen_mock: MagicMock):

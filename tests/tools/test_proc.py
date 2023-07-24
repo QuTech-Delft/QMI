@@ -1,19 +1,16 @@
 #! /usr/bin/env python3
 
 """Test qmi/tools/proc.py"""
-
 import unittest
+from unittest.mock import MagicMock, patch, call
 import socket
-import os
-import qmi
-
-import qmi.tools.proc as proc
+import os, sys
 import psutil
 import subprocess
+from argparse import Namespace, ArgumentError
 
-from unittest.mock import MagicMock
-from unittest.mock import patch
-from unittest.mock import call
+import qmi
+import qmi.tools.proc as proc
 
 from qmi.core.config_defs import CfgQmi
 from qmi.core.config_defs import CfgContext
@@ -22,12 +19,14 @@ from qmi.core.config_defs import CfgProcessHost
 
 from qmi.core.context import QMI_Context
 
+from qmi.core.exceptions import QMI_ApplicationException
+
 
 class ProcessManagementClientTestCase(unittest.TestCase):
     def _start_qmi_context(self):
         """Start qmi and initialize the context with a configuration. Returns the configuration."""
         config = {
-            "ip": "10.10.10.10",
+            "ip": "10.10.10.10",  # Local IP address
             "port": 512,
             "server_command": "test_config_server_command",
             "ssh_host": "test_config_ssh_host",
@@ -35,25 +34,40 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             "program_module": "test_program_module",
             "program_args": ["test_program_args"],
         }
-        qmi.start("ContextName2")
-        qmi.context()._config = CfgQmi(
-            contexts={
-                "ContextName1": CfgContext(
-                    host=config["ip"],
-                    tcp_server_port=config["port"],
-                    program_module=config["program_module"],
-                    program_args=config["program_args"],
-                    enabled=True,
-                ),
+        config0 = {
+            "ip": "172.16.4.2",
+            "port": 5005,
+            "program_module": "test_local_module",
+            "program_args": ["test_program_args"],
+        }
+        qmi.start("ContextName2", context_cfg={
+                "ContextName2": {"tcp_server_port": 511},
+                "ContextName1": {
+                    "host": config["ip"],
+                    "tcp_server_port": config["port"],
+                    "program_module": config["program_module"],
+                    "program_args": config["program_args"],
+                    "enabled": True,
+                },
+                "ContextName0": {
+                    "host": config0["ip"],
+                    "tcp_server_port": config0["port"],
+                    "program_module": config0["program_module"],
+                    "program_args": config0["program_args"],
+                    "connect_to_peers": ["ContextName1"],
+                    "enabled": True,
+                }
             },
         )
-        return config
+        return {"config": config, "config0": config0}
 
     def setUp(self):
         proc.subprocess = MagicMock(spec=subprocess)
         proc.subprocess.SubprocessError = subprocess.SubprocessError
         proc.open = MagicMock()
         self._config = self._start_qmi_context()
+        proc.print = MagicMock()
+        proc._logger = MagicMock()
 
     def tearDown(self):
         qmi.stop()
@@ -65,21 +79,21 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             context._config = CfgQmi(
                 contexts={
                     "ContextName1": CfgContext(
-                        host=self._config["ip"], tcp_server_port=0
+                        host=self._config["config"]["ip"], tcp_server_port=0
                     ),
                 },
                 process_management=CfgProcessManagement(
                     hosts={
-                        self._config["ip"]: CfgProcessHost(
-                            server_command=self._config["server_command"],
-                            ssh_host=self._config["ssh_host"],
-                            ssh_user=self._config["ssh_user"],
+                        self._config["config"]["ip"]: CfgProcessHost(
+                            server_command=self._config["config"]["server_command"],
+                            ssh_host=self._config["config"]["ssh_host"],
+                            ssh_user=self._config["config"]["ssh_user"],
                         )
                     }
                 ),
             )
             context.get_config = MagicMock(return_value=context._config)
-            proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+            proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
             proc.subprocess.Popen.assert_called_once_with(
                 [
                     "ssh",
@@ -91,8 +105,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
                     "BatchMode yes",
                     "-l",
                     "test_config_ssh_user",
-                    self._config["ssh_host"],
-                    self._config["server_command"],
+                    self._config["config"]["ssh_host"],
+                    self._config["config"]["server_command"],
                 ],
                 stdin=proc.subprocess.PIPE,
                 stdout=proc.subprocess.PIPE,
@@ -100,7 +114,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
 
     def test_pmc_init_default(self):
         """Test ProcessManagementClient.__init__, happy flow, default parameters."""
-        proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+        proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
         proc.subprocess.Popen.assert_called_once_with(
             [
                 "ssh",
@@ -110,7 +124,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
                 "-q",
                 "-o",
                 "BatchMode yes",
-                self._config["ip"],
+                self._config["config"]["ip"],
                 proc.DEFAULT_SERVER_COMMAND,
             ],
             stdin=proc.subprocess.PIPE,
@@ -121,11 +135,11 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test ProcessManagementClient.__init__, os error on Popen."""
         with patch("qmi.tools.proc.subprocess.Popen", MagicMock(side_effect=OSError)):
             with self.assertRaises(proc.ProcessException):
-                proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+                proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
 
     def test_pmc_close(self):
         """Test ProcessManagementClient.close, happy flow."""
-        manager = proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+        manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
         manager.close()
         manager._proc.stdin.close.assert_called_once_with()
         manager._proc.stdout.close.assert_called_once_with()
@@ -133,7 +147,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
 
     def test_pmc_close_timeout(self):
         """Test whether ProcessManagementClient.close kills the process when a timeout happened."""
-        manager = proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+        manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
         with patch("qmi.tools.proc.qmi.context", MagicMock()), patch.object(
             manager._proc, "wait", side_effect=TimeoutError
         ):
@@ -145,7 +159,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test ProcessManagementClient.start_process, happy flow."""
         with patch("qmi.tools.proc.qmi.context", MagicMock()):
             self._build_mock_config()
-            manager = proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
             with patch.object(
                 manager._proc.stdout, "readline", return_value="OK 123".encode("ascii")
             ):
@@ -160,7 +174,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test whether ProcessManagementClient.start_process value error pid."""
         with patch("qmi.tools.proc.qmi.context", MagicMock()):
             self._build_mock_config()
-            manager = proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
             with patch.object(
                 manager._proc.stdout,
                 "readline",
@@ -173,7 +187,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test whether ProcessManagementClient.start_process raises an exception when a error response is received."""
         with patch("qmi.tools.proc.qmi.context", MagicMock()):
             self._build_mock_config()
-            manager = proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
             with patch.object(
                 manager._proc.stdout, "readline", return_value="ERR 123".encode("ascii")
             ):
@@ -184,7 +198,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test whether ProcessManagementClient.start_process raises an exception when no response is received."""
         with patch("qmi.tools.proc.qmi.context", MagicMock()):
             self._build_mock_config()
-            manager = proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
 
             with patch.object(
                 manager._proc.stdout, "readline", return_value="".encode("ascii")
@@ -196,7 +210,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test whether ProcessManagementClient.start_process raises an exception when a invalid response is received."""
         with patch("qmi.tools.proc.qmi.context", MagicMock()):
             self._build_mock_config()
-            manager = proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
 
             with patch.object(
                 manager._proc.stdout,
@@ -210,7 +224,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test ProcessManagementClient.stop_process, happy flow."""
         with patch("qmi.tools.proc.qmi.context", MagicMock()):
             self._build_mock_config()
-            manager = proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
 
             with patch.object(
                 manager._proc.stdout, "readline", return_value="OK 1".encode("ascii")
@@ -226,7 +240,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test whether ProcessManagementClient.stop_process value error pid."""
         with patch("qmi.tools.proc.qmi.context", MagicMock()):
             self._build_mock_config()
-            manager = proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
             with patch.object(
                 manager._proc.stdout,
                 "readline",
@@ -239,7 +253,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test whether ProcessManagementClient.stop_process raises an exception when no response is returned."""
         with patch("qmi.tools.proc.qmi.context", MagicMock()):
             self._build_mock_config()
-            manager = proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
 
             with patch.object(
                 manager._proc.stdout, "readline", return_value="".encode("ascii")
@@ -251,7 +265,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test whether ProcessManagementClient.stop_process raises an exception when an error is returned."""
         with patch("qmi.tools.proc.qmi.context", MagicMock()):
             self._build_mock_config()
-            manager = proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
 
             with patch.object(
                 manager._proc.stdout, "readline", return_value="ERR 1".encode("ascii")
@@ -263,7 +277,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test whether ProcessManagementClient.stop_process raises an exception when a invalid response is returned by a context."""
         with patch("qmi.tools.proc.qmi.context", MagicMock()):
             self._build_mock_config()
-            manager = proc.ProcessManagementClient(self._config["ip"], "ContextName1")
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
 
             with patch.object(
                 manager._proc.stdout,
@@ -288,7 +302,14 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         self.assertTrue(proc.is_local_host("::1"))
         self.assertFalse(proc.is_local_host("INVALID"))
 
-        # Collect a local ip address. that is not a loopback address.
+        # c0 = QMI_Context("ContextName0", CfgQmi(
+        #     contexts={
+        #         "ContextName0": CfgContext(host=self._config["config0"]["ip"], tcp_server_port=self._config["config0"]["port"], enabled=True)
+        #     }
+        # ))
+        # c0.start()
+        # c0.connect_to_peer("ContextName2", c0.discover_peer_contexts()[0][1])
+        # Collect a local ip address that is not a loopback address.
         test_addr = None
         for addr in psutil.net_if_addrs().values():
             for a in addr:
@@ -297,7 +318,9 @@ class ProcessManagementClientTestCase(unittest.TestCase):
                     break
             if test_addr:
                 break
-        self.assertTrue(proc.is_local_host(test_addr.address))
+
+        if test_addr:
+            self.assertTrue(proc.is_local_host(test_addr.address))
 
     def test_start_local_process(self):
         """Test start_local_process, happy flow."""
@@ -325,6 +348,27 @@ class ProcessManagementClientTestCase(unittest.TestCase):
                 start_new_session=True,
                 env=os.environ.copy(),
             )
+
+    def test_start_local_process_winenv(self):
+        """Test start_local_process, happy flow, windows environment."""
+        mock_pid_parent = MagicMock()
+        mock_pid_parent.children = MagicMock(return_value=[(mock_pid:=MagicMock())])
+        with patch("qmi.tools.proc.qmi.context", MagicMock()), patch(
+            "qmi.tools.proc.open", MagicMock(return_value=(fopen := MagicMock()))
+        ), patch(
+            "qmi.tools.proc.subprocess.Popen",
+            MagicMock(return_value=(popen := MagicMock())),
+        ), patch(
+            "qmi.tools.proc.os.path.isdir", MagicMock(return_value=True)
+        ), patch(
+            "sys.executable", (exec := MagicMock())
+        ), patch(
+            "os.environ.copy", MagicMock()
+        ), patch("qmi.tools.proc.WINENV", True), patch('qmi.tools.proc.psutil.Process', MagicMock(return_value=mock_pid_parent)):
+            _, _, ctxcfg = self._build_mock_config()
+            popen.poll = MagicMock(return_value=None)
+            rt_val = proc.start_local_process("ContextName1")
+            self.assertEqual(rt_val, mock_pid.pid)
 
     def test_start_local_process_stopped(self):
         """Test whether start_local_process raises an exception when the process is not successfully started."""
@@ -802,33 +846,52 @@ class ProcessManagementClientTestCase(unittest.TestCase):
 
     def test_select_contexts(self):
         """Test select_contexts, happy flow."""
-        contexts = proc.select_contexts("")
+        _, config, _ = self._build_mock_config()
+        # Make the contexts "proper" contexts for the 'is_local_host' check.
+        config.contexts["ContextName0"] = CfgContext()
+        config.contexts["ContextName0"].host = "127.0.0.1"  # Local
+        config.contexts["ContextName0"].enabled = True
+        config.contexts["ContextName1"] = CfgContext()
+        config.contexts["ContextName1"].host = "123.456.78.9"  # Not local
+        config.contexts["ContextName1"].enabled = True
+        # Select and assert
+        contexts = proc.select_contexts(config)
         self.assertEqual(contexts[0], "ContextName1")
-
-        contexts = proc.select_contexts("ContextName1")
-        self.assertEqual(contexts[0], "ContextName1")
+        # This patch we need for the 'is_local_host' check in the call.
+        with patch(
+                "qmi.tools.proc.get_context_status",
+                MagicMock(
+                    side_effect=[
+                        (-1, "SomeVersion"),
+                        (123, "SomeVersion"),
+                    ]
+                ),
+        ):
+            contexts = proc.select_local_contexts(config)
+            self.assertEqual(contexts[0], "ContextName0")
 
     def test_select_contexts_not_in_config(self):
-        """Test select_contexts when provided context is not configured."""
+        """Test select_context_by_name when provided context is not configured."""
         with self.assertRaises(proc.QMI_ApplicationException):
-            proc.select_contexts("InvalidContextName")
+            proc.select_context_by_name(MagicMock(), "InvalidContextName")
 
     def test_select_contexts_no_names(self):
-        """Test select_contexts when no contextes are configured."""
+        """Test select_contexts when no contexts are configured."""
         _, config, _ = self._build_mock_config()
         config.contexts = {}
         with self.assertRaises(proc.QMI_ApplicationException):
-            proc.select_contexts("")
+            proc.select_contexts(config)
 
     def test_select_contexts_invalid_name(self):
-        """Test select_contexts when a invalid context name is configured."""
+        """Test select_context_by_name when an invalid context name is configured."""
         _, config, _ = self._build_mock_config()
         config.contexts = {"!INVALID": MagicMock()}
         with self.assertRaises(proc.QMI_ApplicationException):
-            proc.select_contexts("!INVALID")
+            proc.select_context_by_name(config, "!INVALID")
 
     def test_proc_server_start(self):
         """Test proc_server_start happy flow."""
+        _, config, _ = self._build_mock_config()
         with patch(
             "qmi.tools.proc.start_local_process", MagicMock(return_value=123)
         ), patch("qmi.tools.proc.is_local_host", MagicMock(return_value=True)), patch(
@@ -836,7 +899,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         ), patch(
             "sys.stdin.readline", MagicMock(side_effect=["START ContextName1", ""])
         ):
-            rt_val = proc.proc_server()
+            rt_val = proc.proc_server(config)
             proc.start_local_process.assert_called_once_with("ContextName1")
             self.assertEqual(rt_val, 0)
 
@@ -851,7 +914,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         ):
             _, config, _ = self._build_mock_config()
             config.contexts = {}
-            proc.proc_server()
+            proc.proc_server(config)
             proc.print.assert_called_with("ERR Unknown context")
 
     def test_proc_server_start_not_local_host(self):
@@ -865,7 +928,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         ), patch(
             "qmi.tools.proc.print", MagicMock()
         ):
-            proc.proc_server()
+            _, config, _ = self._build_mock_config()
+            proc.proc_server(config)
             proc.print.assert_called_with("ERR Context should not run on this host")
             # sadly the only valid way to test this.
 
@@ -880,7 +944,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         ), patch(
             "qmi.tools.proc.print", MagicMock()
         ):
-            rt_val = proc.proc_server()
+            _, config, _ = self._build_mock_config()
+            rt_val = proc.proc_server(config)
             proc.stop_local_process.assert_called_once_with("ContextName1", 123)
             self.assertEqual(rt_val, 0)
 
@@ -891,8 +956,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         ), patch(
             "sys.stdin.readline", MagicMock(side_effect=["STOP ContextName1 0", ""])
         ):
-            _, _, _ = self._build_mock_config()
-            rt_val = proc.proc_server()
+            _, config, _ = self._build_mock_config()
+            rt_val = proc.proc_server(config)
             self.assertEqual(rt_val, 1)
 
     def test_proc_server_stop_no_ctxcfg(self):
@@ -906,7 +971,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         ):
             _, config, _ = self._build_mock_config()
             config.contexts = {"ContextName1": None}
-            proc.proc_server()
+            proc.proc_server(config)
             proc.print.assert_called_with("ERR Unknown context")
 
     def test_proc_server_stop_no_local_host(self):
@@ -920,7 +985,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         ), patch(
             "qmi.tools.proc.print", MagicMock()
         ):
-            proc.proc_server()
+            _, config, _ = self._build_mock_config()
+            proc.proc_server(config)
             proc.print.assert_called_with("ERR Context should not run on this host")
 
     def test_proc_server_value_error(self):
@@ -928,7 +994,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         with patch("sys.stdout.flush", MagicMock()), patch(
             "sys.stdin.readline", MagicMock(side_effect="INVALID")
         ), patch("qmi.tools.proc.print", MagicMock()):
-            rt_val = proc.proc_server()
+            _, config, _ = self._build_mock_config()
+            rt_val = proc.proc_server(config)
             self.assertEqual(rt_val, 1)
 
     def test_proc_start(self):
@@ -942,7 +1009,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
                 ]
             ),
         ), patch("qmi.tools.proc.start_process", MagicMock(return_value=123)):
-            rt_val = proc.proc_start("ContextName1")
+            _, config, _ = self._build_mock_config()
+            rt_val = proc.proc_start(config, "ContextName1", False)
             self.assertEqual(rt_val, 0)
 
     def test_proc_start_already_running(self):
@@ -953,7 +1021,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
                 return_value=(123, "SomeVersion"),
             ),
         ), patch("qmi.tools.proc.start_process", MagicMock(return_value=123)):
-            rt_val = proc.proc_start("ContextName1")
+            _, config, _ = self._build_mock_config()
+            rt_val = proc.proc_start(config, "ContextName1", False)
             self.assertEqual(rt_val, 0)
 
     def test_proc_start_not_responding(self):
@@ -962,7 +1031,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             "qmi.tools.proc.get_context_status",
             MagicMock(return_value=(-1, "SomeVersion")),
         ), patch("qmi.tools.proc.start_process", MagicMock(return_value=123)):
-            rt_val = proc.proc_start("ContextName1")
+            _, config, _ = self._build_mock_config()
+            rt_val = proc.proc_start(config, "ContextName1", False)
             self.assertEqual(rt_val, 1)
 
     def test_proc_start_invalid_pid(self):
@@ -976,34 +1046,38 @@ class ProcessManagementClientTestCase(unittest.TestCase):
                 ]
             ),
         ), patch("qmi.tools.proc.start_process", MagicMock(return_value=123)):
-            rt_val = proc.proc_start("ContextName1")
+            _, config, _ = self._build_mock_config()
+            rt_val = proc.proc_start(config, "ContextName1", False)
             self.assertEqual(rt_val, 1)
 
     def test_proc_stop(self):
         """Test proc_stop happy flow."""
+        _, config, _ = self._build_mock_config()
         with patch(
             "qmi.tools.proc.shutdown_context",
             MagicMock(return_value=proc.ShutdownResult(True, 123, True)),
         ):
-            rt_val = proc.proc_stop("ContextName1")
+            rt_val = proc.proc_stop(config, "ContextName1", False)
             self.assertEqual(rt_val, 0)
 
     def test_proc_stop_not_responding(self):
         """Test proc_stop context not responding."""
+        _, config, _ = self._build_mock_config()
         with patch(
             "qmi.tools.proc.shutdown_context",
             MagicMock(return_value=proc.ShutdownResult(False, 123, False)),
         ):
-            rt_val = proc.proc_stop("ContextName1")
+            rt_val = proc.proc_stop(config, "ContextName1", False)
             self.assertEqual(rt_val, 0)
 
     def test_proc_stop_kill(self):
         """Test proc_stop kill has is killed."""
+        _, config, _ = self._build_mock_config()
         with patch(
             "qmi.tools.proc.shutdown_context",
             MagicMock(return_value=proc.ShutdownResult(True, 123, False)),
         ), patch("qmi.tools.proc.stop_process", MagicMock(return_value=True)):
-            rt_val = proc.proc_stop("ContextName1")
+            rt_val = proc.proc_stop(config, "ContextName1", False)
             self.assertEqual(rt_val, 0)
 
     def test_proc_stop_failure_responding(self):
@@ -1012,7 +1086,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             "qmi.tools.proc.shutdown_context",
             MagicMock(return_value=proc.ShutdownResult(True, 123, False)),
         ), patch("qmi.tools.proc.stop_process", MagicMock(return_value=False)):
-            rt_val = proc.proc_stop("ContextName1")
+            _, config, _ = self._build_mock_config()
+            rt_val = proc.proc_stop(config, "ContextName1", False)
             self.assertEqual(rt_val, 0)
 
     def test_proc_stop_exception(self):
@@ -1021,7 +1096,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             "qmi.tools.proc.shutdown_context",
             MagicMock(side_effect=proc.ProcessException),
         ):
-            rt_val = proc.proc_stop("ContextName1")
+            _, config, _ = self._build_mock_config()
+            rt_val = proc.proc_stop(config, "ContextName1", False)
             self.assertEqual(rt_val, 1)
 
     def test_proc_status(self):
@@ -1030,7 +1106,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             "qmi.tools.proc.get_context_status",
             MagicMock(return_value=(123, "SomeVersion")),
         ):
-            rt_val = proc.proc_status("ContextName1")
+            _, config, _ = self._build_mock_config()
+            rt_val = proc.proc_status(config, "ContextName1")
             self.assertEqual(rt_val, 0)
 
     def test_proc_status_offline(self):
@@ -1039,7 +1116,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             "qmi.tools.proc.get_context_status",
             MagicMock(return_value=(-1, "SomeVersion")),
         ):
-            rt_val = proc.proc_status("ContextName1")
+            _, config, _ = self._build_mock_config()
+            rt_val = proc.proc_status(config, "ContextName1")
             self.assertEqual(rt_val, 0)
 
     def test_proc_status_exception(self):
@@ -1048,5 +1126,212 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             "qmi.tools.proc.get_context_status",
             MagicMock(side_effect=proc.ProcessException),
         ):
-            rt_val = proc.proc_status("ContextName1")
+            _, config, _ = self._build_mock_config()
+            rt_val = proc.proc_status(config, "ContextName1")
             self.assertEqual(rt_val, 1)
+
+
+class ArgParserTestCase(unittest.TestCase):
+
+    def setUp(self) -> None:
+        # suppress print-outs
+        self._stderr = sys.stderr
+        sys.stderr = open(os.devnull, 'w')  # redirect stderr to null device
+        context_cfg = {
+            "somectx": CfgContext(
+                host="127.0.0.1",
+                tcp_server_port=12345,
+                program_module="test_program_module",
+                enabled=True
+            )
+        }
+        self.context_cfg = CfgQmi(contexts=context_cfg)
+        ctx_patcher = patch("qmi.core.context.QMI_Context.get_config", return_value=self.context_cfg)
+        self.addCleanup(ctx_patcher.stop)
+        peer_patcher = patch("qmi.core.context.QMI_Context.connect_to_peer")
+        self.addCleanup(peer_patcher.stop)
+        ctx_patcher.start()
+        peer_patcher.start()
+
+    def tearDown(self) -> None:
+        sys.stderr = self._stderr
+
+    @patch("builtins.print")
+    def test_start_server_mode_fails(self, print_patch):
+        """Test that server mode start fails with incompatible commands."""
+        fail_all = Namespace(command="server", all=True, locals=False, context_name=None, config=None)
+        fail_local = Namespace(command="server", all=False, locals=True, context_name=None, config=None)
+        fail_context_name = Namespace(command="server", all=False, locals=False, context_name="somectx", config=None)
+        with patch("argparse.ArgumentParser.parse_args", return_value=fail_all):
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+
+        print_patch.assert_called_with("ERROR: Can not specify server mode together with other options")
+        print_patch.reset()
+
+        with patch("argparse.ArgumentParser.parse_args", return_value=fail_local):
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+
+        print_patch.assert_called_with("ERROR: Can not specify server mode together with other options")
+        print_patch.reset()
+
+        with patch("argparse.ArgumentParser.parse_args", return_value=fail_context_name):
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+
+        print_patch.assert_called_with("ERROR: Can not specify server mode together with other options")
+
+    @patch("builtins.print")
+    @patch("sys.stderr", return_value=None)
+    def test_start_all_fails(self, sys_patch, print_patch):
+        """Test that starting all contexts fails with incompatible commands."""
+        fail_context_name = Namespace(command="start", all=True, locals=False, context_name="fail_ctx", config=None)
+        with patch("argparse.ArgumentParser.parse_args", return_value=fail_context_name):
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+
+        print_patch.assert_called_with("ERROR: Can not specify a context_name together with --all", file=sys_patch)
+        print_patch.reset()
+
+        # We cannot test the same way the mutex as the argparse goes to sys.exit() at ArgumentError. Patch!
+        sys.argv = ["command", "start", "--all", "--locals"]
+        with patch("qmi.tools.proc.argparse.ArgumentParser.error", side_effect=[ArgumentError(MagicMock(), "Fail!")]):
+            with self.assertRaises(ArgumentError) as arg_err:
+                retval = proc.main()
+
+        self.assertEqual(retval, 1)
+        self.assertEqual("argument : Fail!", str(arg_err.exception))
+
+        # But one true and one false should not raise ArgumentError, even if it fails otherwise!
+        sys.argv = ["command", "start", "--all"]
+        retval = proc.main()
+        self.assertEqual(retval, 1)
+
+        sys.argv = ["command", "start", "--locals"]
+        retval = proc.main()
+        self.assertEqual(retval, 1)
+
+    @patch("builtins.print")
+    @patch("sys.stderr", return_value=None)
+    def test_start_locals_fails(self, sys_patch, print_patch):
+        """Test that starting local contexts fails with incompatible context name."""
+        fail_context_name = Namespace(command="start", all=False, locals=True, context_name="fail_ctx", config=None)
+        with patch("argparse.ArgumentParser.parse_args", return_value=fail_context_name):
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+
+        print_patch.assert_called_with("ERROR: Can not specify a context_name together with --locals", file=sys_patch)
+
+    @patch("builtins.print")
+    @patch("sys.stderr", return_value=None)
+    def test_start_stop_restart_fails(self, sys_patch, print_patch):
+        """Test that 'start', 'stop' and 'restart' commands require extra arguments."""
+        commands = ["start", "stop", "restart"]
+        for command in commands:
+            fail_command = Namespace(command=command, all=False, locals=False, context_name=None, config=None)
+            with patch("argparse.ArgumentParser.parse_args", return_value=fail_command):
+                retval = proc.main()
+                self.assertEqual(retval, 1)
+
+            print_patch.assert_called_with("ERROR: Specify either: a context_name, or --all, or --local", file=sys_patch)
+            print_patch.reset()
+
+    def test_start_server_mode(self):
+        """Test that server mode is started with command 'server'."""
+        return_value = Namespace(command="server", all=False, locals=False, context_name=None, config=None)
+        with patch("argparse.ArgumentParser.parse_args", return_value=return_value):
+            with patch("sys.stdin.readline", return_value=None) as sys_readline:
+                retval = proc.main()
+                sys_readline.assert_called_once()
+                self.assertEqual(retval, 0)
+
+    def test_start_context_name(self):
+        """Test that select_(local_)context is called with command 'start'."""
+        ctx = self.context_cfg
+        ctx_name = list(ctx.contexts.keys())[0]
+        local_ctx = None
+        start_ctx = Namespace(command="start", all=False, locals=False, context_name=ctx_name, config=None)
+        start_local_ctx = Namespace(command="start", all=False, locals=True, context_name=local_ctx, config=None)
+        with patch("argparse.ArgumentParser.parse_args", return_value=start_ctx),\
+             patch("qmi.tools.proc.select_context_by_name", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+            sel_ctx.assert_called_once_with(ctx, ctx_name)
+
+        with patch("argparse.ArgumentParser.parse_args", return_value=start_local_ctx),\
+             patch("qmi.tools.proc.select_local_contexts", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+            sel_ctx.assert_called_once_with(ctx)
+
+    def test_stop_context_name(self):
+        """Test that select_(local_)context is called with command 'stop'."""
+        ctx = self.context_cfg
+        ctx_name = list(ctx.contexts.keys())[0]
+        local_ctx = None
+        stop_ctx = Namespace(command="stop", all=False, locals=False, context_name=ctx_name, config=None)
+        stop_local_ctx = Namespace(command="stop", all=False, locals=True, context_name=local_ctx, config=None)
+        with patch("argparse.ArgumentParser.parse_args", return_value=stop_ctx),\
+             patch("qmi.tools.proc.select_context_by_name", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+            sel_ctx.assert_called_once_with(ctx, ctx_name)
+
+        with patch("argparse.ArgumentParser.parse_args", return_value=stop_local_ctx),\
+             patch("qmi.tools.proc.select_local_contexts", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+            sel_ctx.assert_called_once_with(ctx)
+
+    def test_restart_context_name(self):
+        """Test that select_(local_)context is called with command 'restart'.
+        Actually this will call only `proc_stop` as we set it to except. But the logic is then tested.
+        """
+        ctx = self.context_cfg
+        ctx_name = list(ctx.contexts.keys())[0]
+        local_ctx = None
+        restart_ctx = Namespace(command="restart", all=False, locals=False, context_name=ctx_name, config=None)
+        restart_local_ctx = Namespace(command="restart", all=False, locals=True, context_name=local_ctx, config=None)
+        with patch("argparse.ArgumentParser.parse_args", return_value=restart_ctx),\
+             patch("qmi.tools.proc.select_context_by_name", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+            sel_ctx.assert_called_once_with(ctx, ctx_name)
+
+        with patch("argparse.ArgumentParser.parse_args", return_value=restart_local_ctx),\
+             patch("qmi.tools.proc.select_local_contexts", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+            sel_ctx.assert_called_once_with(ctx)
+
+    def test_status_context_name(self):
+        """Test that select_(local_)context is called with command 'restart'.
+        Actually this will call only `proc_stop` as we set it to except. But the logic is then tested.
+        """
+        ctx = self.context_cfg
+        ctx_name = list(ctx.contexts.keys())[0]
+        status_ctx = Namespace(command="status", all=False, locals=False, context_name=ctx_name, config=None)
+        with patch("argparse.ArgumentParser.parse_args", return_value=status_ctx),\
+             patch("qmi.tools.proc.select_context_by_name", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+            sel_ctx.assert_called_once_with(ctx, ctx_name)
+
+    def test_unknown_command(self):
+        """Test that unknown command just returns without trying to select a context.
+        This test is not fully exclusive, but should demonstrate w.r.t. previous tests that this is the case.
+        """
+        unknown_ctx = Namespace(command="unknown", all=True, locals=False, context_name=None, config=None)
+        unknown_local_ctx = Namespace(command="unknown", all=True, locals=True, context_name=None, config=None)
+        with patch("argparse.ArgumentParser.parse_args", return_value=unknown_ctx),\
+             patch("qmi.tools.proc.select_contexts", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+            sel_ctx.assert_not_called()
+
+        with patch("argparse.ArgumentParser.parse_args", return_value=unknown_local_ctx),\
+             patch("qmi.tools.proc.select_local_contexts", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
+            retval = proc.main()
+            self.assertEqual(retval, 1)
+            sel_ctx.assert_not_called()

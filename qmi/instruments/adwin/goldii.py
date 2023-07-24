@@ -3,7 +3,6 @@ Instrument driver for the Adwin Gold II. Inherits from Adwin_Base class in adwin
 """
 from qmi.core.context import QMI_Context
 from qmi.instruments.adwin.adwin import Adwin_Base
-from qmi.core.exceptions import QMI_InstrumentException
 
 
 class Adwin_GoldII(Adwin_Base):

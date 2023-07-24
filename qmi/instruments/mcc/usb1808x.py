@@ -31,7 +31,7 @@ def _import_modules() -> None:
     """
     global uldaq
     if uldaq is None:
-        import uldaq  #pylint: disable=W0621
+        import uldaq  # pylint: disable=W0621
 
 
 class MCC_USB1808X(QMI_Instrument):
@@ -68,22 +68,26 @@ class MCC_USB1808X(QMI_Instrument):
 
     @rpc_method
     def open(self) -> None:
-
         self._check_is_closed()
 
         device = None
 
         device_descriptors = uldaq.get_daq_device_inventory(uldaq.InterfaceType.USB)
         for device_descriptor in device_descriptors:
-            if ((device_descriptor.product_name == "USB-1808X")
-                    and (device_descriptor.unique_id == self._unique_id)):
+            if (device_descriptor.product_name == "USB-1808X") and (
+                device_descriptor.unique_id == self._unique_id
+            ):
                 device = uldaq.DaqDevice(device_descriptor)
 
         if device is None:
-            raise QMI_InstrumentException("USB-1808X with unique_id {!r} not found".format(self._unique_id))
+            raise QMI_InstrumentException(
+                f"USB-1808X with unique_id {self._unique_id!r} not found"
+            )
 
         try:
-            _logger.debug("%s: Connecting to USB-1808X device %s", self._name, self._unique_id)
+            _logger.debug(
+                "%s: Connecting to USB-1808X device %s", self._name, self._unique_id
+            )
             device.connect()
 
             try:
@@ -112,7 +116,9 @@ class MCC_USB1808X(QMI_Instrument):
     def close(self) -> None:
         self._check_is_open()
         assert self._device is not None
-        _logger.debug("%s: Closing connection to USB-1808X device %s", self._name, self._unique_id)
+        _logger.debug(
+            "%s: Closing connection to USB-1808X device %s", self._name, self._unique_id
+        )
         self._dio_device = None
         self._ai_device = None
         self._ao_device = None
@@ -129,10 +135,12 @@ class MCC_USB1808X(QMI_Instrument):
         desc = self._device.get_descriptor()
         cfg = self._device.get_config()
         version = cfg.get_version(uldaq.DevVersionType.FW_MAIN)
-        return QMI_InstrumentIdentification(vendor="Measurement Computing",
-                                            model=desc.product_name,
-                                            serial=desc.unique_id,
-                                            version=version)
+        return QMI_InstrumentIdentification(
+            vendor="Measurement Computing",
+            model=desc.product_name,
+            serial=desc.unique_id,
+            version=version,
+        )
 
     @rpc_method
     def get_dio_num_channels(self) -> int:
@@ -211,7 +219,7 @@ class MCC_USB1808X(QMI_Instrument):
         self._check_is_open()
         assert self._ai_device is not None
         ranges = self._ai_device.get_info().get_ranges(uldaq.AiChanType.VOLTAGE)
-        return [rn.name for rn in ranges]
+        return [urange.name for urange in ranges]
 
     @rpc_method
     def get_ai_value(self, channel: int, input_mode: str, analog_range: str) -> float:
@@ -225,8 +233,8 @@ class MCC_USB1808X(QMI_Instrument):
         self._check_is_open()
         assert self._ai_device is not None
         mod = uldaq.AiInputMode[input_mode]
-        rn = uldaq.Range[analog_range]
-        return self._ai_device.a_in(channel, mod, rn, uldaq.AInFlag.DEFAULT)
+        urange = uldaq.Range[analog_range]
+        return self._ai_device.a_in(channel, mod, urange, uldaq.AInFlag.DEFAULT)
 
     @rpc_method
     def get_ao_num_channels(self) -> int:
@@ -245,7 +253,7 @@ class MCC_USB1808X(QMI_Instrument):
         self._check_is_open()
         assert self._ao_device is not None
         ranges = self._ao_device.get_info().get_ranges()
-        return [rn.name for rn in ranges]
+        return [urange.name for urange in ranges]
 
     @rpc_method
     def set_ao_value(self, channel: int, analog_range: str, value: float) -> None:
@@ -257,5 +265,5 @@ class MCC_USB1808X(QMI_Instrument):
         """
         self._check_is_open()
         assert self._ao_device is not None
-        rn = uldaq.Range[analog_range]
-        self._ao_device.a_out(channel, rn, uldaq.AOutFlag.DEFAULT, value)
+        urange = uldaq.Range[analog_range]
+        self._ao_device.a_out(channel, urange, uldaq.AOutFlag.DEFAULT, value)

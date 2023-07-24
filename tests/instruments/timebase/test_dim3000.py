@@ -3,10 +3,12 @@ import unittest
 from unittest.mock import patch, ANY, create_autospec, PropertyMock
 
 import qmi
-from qmi.instruments.timebase.dim3000 import TimeBase_DIM3000, DIM3000SweepMode, DIM3000FMDeviation
+from qmi.instruments.timebase import TimeBase_Dim3000
+from qmi.instruments.timebase.dim3000 import DIM3000SweepMode, DIM3000FMDeviation
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.instrument import QMI_InstrumentIdentification
 from qmi.core.transport import QMI_Transport
+
 
 class TestDim3000(unittest.TestCase):
 
@@ -23,7 +25,7 @@ class TestDim3000(unittest.TestCase):
         self._transport_factory = patcher.start()
         self.addCleanup(patcher.stop)
 
-        self.instr: TimeBase_DIM3000 = qmi.make_instrument('dim3000', TimeBase_DIM3000, "foo")
+        self.instr: TimeBase_Dim3000 = qmi.make_instrument('dim3000', TimeBase_Dim3000, "foo")
         self.instr.open()
 
     def tearDown(self) -> None:
@@ -105,16 +107,16 @@ class TestDim3000(unittest.TestCase):
             asdict(init_data)
         )
 
-    @patch.object(TimeBase_DIM3000, "MINIMUM_EXEC_DELAY_S", new_callable=PropertyMock(return_value=0.0))
+    @patch.object(TimeBase_Dim3000, "MINIMUM_EXEC_DELAY_S", new_callable=PropertyMock(return_value=0.0))
     def test_setters(self, _):
         self.instr.set_output_frequency(1000)
         self._transport_mock.write.assert_called_with(b'Sfreq:1000\n')
 
         with self.assertRaises(ValueError):
-            self.instr.set_output_frequency(TimeBase_DIM3000.FREQ_RANGE[0]-1)
+            self.instr.set_output_frequency(TimeBase_Dim3000.FREQ_RANGE[0]-1)
 
         with self.assertRaises(ValueError):
-            self.instr.set_output_frequency(TimeBase_DIM3000.FREQ_RANGE[1]+1)
+            self.instr.set_output_frequency(TimeBase_Dim3000.FREQ_RANGE[1]+1)
 
         self.instr.set_output_amplitude(15.4)
         self._transport_mock.write.assert_called_with(b'Sampl:154\n')
@@ -126,37 +128,37 @@ class TestDim3000(unittest.TestCase):
         self._transport_mock.write.assert_called_with(b'Sswps:1000\n')
 
         with self.assertRaises(ValueError):
-            self.instr.set_sweep_start_frequency(TimeBase_DIM3000.FREQ_RANGE[0]-1)
+            self.instr.set_sweep_start_frequency(TimeBase_Dim3000.FREQ_RANGE[0]-1)
 
         with self.assertRaises(ValueError):
-            self.instr.set_sweep_start_frequency(TimeBase_DIM3000.FREQ_RANGE[1]+1)
+            self.instr.set_sweep_start_frequency(TimeBase_Dim3000.FREQ_RANGE[1]+1)
 
         self.instr.set_sweep_stop_frequency(100)
         self._transport_mock.write.assert_called_with(b'Sswpp:100\n')
 
         with self.assertRaises(ValueError):
-            self.instr.set_sweep_stop_frequency(TimeBase_DIM3000.FREQ_RANGE[0]-1)
+            self.instr.set_sweep_stop_frequency(TimeBase_Dim3000.FREQ_RANGE[0]-1)
 
         with self.assertRaises(ValueError):
-            self.instr.set_sweep_stop_frequency(TimeBase_DIM3000.FREQ_RANGE[1]+1)
+            self.instr.set_sweep_stop_frequency(TimeBase_Dim3000.FREQ_RANGE[1]+1)
 
         self.instr.set_sweep_step_frequency(100)
         self._transport_mock.write.assert_called_with(b'Sswpf:100\n')
 
         with self.assertRaises(ValueError):
-            self.instr.set_sweep_step_frequency(TimeBase_DIM3000.FREQ_RANGE[0]-1)
+            self.instr.set_sweep_step_frequency(TimeBase_Dim3000.FREQ_RANGE[0]-1)
 
         with self.assertRaises(ValueError):
-            self.instr.set_sweep_step_frequency(TimeBase_DIM3000.FREQ_RANGE[1]+1)
+            self.instr.set_sweep_step_frequency(TimeBase_Dim3000.FREQ_RANGE[1]+1)
 
         self.instr.set_sweep_step_time(500)
         self._transport_mock.write.assert_called_with(b'Sswpt:500\n')
 
         with self.assertRaises(ValueError):
-            self.instr.set_sweep_step_time(TimeBase_DIM3000.TIME_RANGE[0]-1)
+            self.instr.set_sweep_step_time(TimeBase_Dim3000.TIME_RANGE[0]-1)
 
         with self.assertRaises(ValueError):
-            self.instr.set_sweep_step_time(TimeBase_DIM3000.TIME_RANGE[1]+1)
+            self.instr.set_sweep_step_time(TimeBase_Dim3000.TIME_RANGE[1]+1)
 
         self.instr.enable_fm_input()
         self._transport_mock.write.assert_called_with(b'Sfmon:1\n')
@@ -177,28 +179,28 @@ class TestDim3000(unittest.TestCase):
         self._transport_mock.write.assert_called_with(b'Splsfr:1000\n')
 
         with self.assertRaises(ValueError):
-            self.instr.set_pulse_frequency(TimeBase_DIM3000.PULSE_FREQ_RANGE[0]-1)
+            self.instr.set_pulse_frequency(TimeBase_Dim3000.PULSE_FREQ_RANGE[0]-1)
 
         with self.assertRaises(ValueError):
-            self.instr.set_pulse_frequency(TimeBase_DIM3000.PULSE_FREQ_RANGE[1]+1)
+            self.instr.set_pulse_frequency(TimeBase_Dim3000.PULSE_FREQ_RANGE[1]+1)
 
         self.instr.set_pulse_duty_cycle(50)
         self._transport_mock.write.assert_called_with(b'Splsdt:50\n')
 
         with self.assertRaises(ValueError):
-            self.instr.set_pulse_duty_cycle(TimeBase_DIM3000.DUTY_CYCLE_RANGE[0]-1)
+            self.instr.set_pulse_duty_cycle(TimeBase_Dim3000.DUTY_CYCLE_RANGE[0]-1)
 
         with self.assertRaises(ValueError):
-            self.instr.set_pulse_duty_cycle(TimeBase_DIM3000.DUTY_CYCLE_RANGE[1]+1)
+            self.instr.set_pulse_duty_cycle(TimeBase_Dim3000.DUTY_CYCLE_RANGE[1]+1)
 
         self.instr.set_fsk_frequency(100)
         self._transport_mock.write.assert_called_with(b'Sffreq:100\n')
 
         with self.assertRaises(ValueError):
-            self.instr.set_fsk_frequency(TimeBase_DIM3000.FREQ_RANGE[0]-1)
+            self.instr.set_fsk_frequency(TimeBase_Dim3000.FREQ_RANGE[0]-1)
 
         with self.assertRaises(ValueError):
-            self.instr.set_fsk_frequency(TimeBase_DIM3000.FREQ_RANGE[1]+1)
+            self.instr.set_fsk_frequency(TimeBase_Dim3000.FREQ_RANGE[1]+1)
 
         self.instr.set_fsk_amplitude(30.6)
         self._transport_mock.write.assert_called_with(b'Sfampl:306\n')
@@ -207,7 +209,7 @@ class TestDim3000(unittest.TestCase):
         self._transport_mock.write.assert_called_with(b'Samoffs:0\n')
 
         with self.assertRaises(ValueError):
-            self.instr.set_am_offset(TimeBase_DIM3000.AM_OFFSET_RANGE[0]-1)
+            self.instr.set_am_offset(TimeBase_Dim3000.AM_OFFSET_RANGE[0]-1)
 
         with self.assertRaises(ValueError):
-            self.instr.set_am_offset(TimeBase_DIM3000.AM_OFFSET_RANGE[1]+1)
+            self.instr.set_am_offset(TimeBase_Dim3000.AM_OFFSET_RANGE[1]+1)

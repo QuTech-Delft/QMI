@@ -1,7 +1,6 @@
 import logging
 import unittest
 import unittest.mock
-import warnings
 
 import numpy as np
 import pydwf
@@ -11,7 +10,7 @@ from pydwf.core.dwf_device import DwfDevice
 import qmi
 from qmi.core.exceptions import QMI_InvalidOperationException, QMI_InstrumentException, QMI_UsageException, \
     QMI_TimeoutException
-from qmi.instruments.digilent import AnalogDiscovery2, OnClose, Filter
+from qmi.instruments.digilent import Digilent_AnalogDiscovery2, OnClose, Filter
 
 
 class AnalogDiscovery2OpenCloseTestCase(unittest.TestCase):
@@ -28,22 +27,23 @@ class AnalogDiscovery2OpenCloseTestCase(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.addCleanup(open_patcher.stop)
 
-        qmi.start('test')
+        qmi.start('analog_discovery_openclose_test')
+
+        logging.getLogger("qmi.core.instrument").setLevel(logging.CRITICAL)
+        self._ad2: Digilent_AnalogDiscovery2 = qmi.make_instrument('AD2', Digilent_AnalogDiscovery2, '210321AD12A4')
 
     def tearDown(self) -> None:
         qmi.stop()
         logging.getLogger("qmi.core.instrument").setLevel(logging.NOTSET)
 
     def test_open_close(self):
-        ad2: AnalogDiscovery2 = qmi.make_instrument('AD2', AnalogDiscovery2, '210321AD12A4')
 
-        ad2.open()
-        ad2.close()
+        self._ad2.open()
+        self._ad2.close()
 
         self._open_dwf_device_mock.assert_called_once_with(self._dwf_lib_mock, serial_number_filter='210321AD12A4')
 
     def test_open_fail_when_not_found(self):
-        ad2: AnalogDiscovery2 = qmi.make_instrument('AD2', AnalogDiscovery2, '210321AD12A4')
 
         def raise_value_error(lib, serial_number_filter):
             raise ValueError('Fake value error')
@@ -51,10 +51,9 @@ class AnalogDiscovery2OpenCloseTestCase(unittest.TestCase):
         self._open_dwf_device_mock.side_effect = raise_value_error
 
         with self.assertRaises(ValueError):
-            ad2.open()
+            self._ad2.open()
 
     def test_open_raises_instrument_exception_when_lib_error(self):
-        ad2: AnalogDiscovery2 = qmi.make_instrument('AD2', AnalogDiscovery2, '210321AD12A4')
 
         def raise_value_error(lib, serial_number_filter):
             raise pydwf.DwfLibraryError(code=pydwf.DwfErrorCode.UnknownError, msg='Fake lib error')
@@ -62,30 +61,79 @@ class AnalogDiscovery2OpenCloseTestCase(unittest.TestCase):
         self._open_dwf_device_mock.side_effect = raise_value_error
 
         with self.assertRaises(QMI_InstrumentException):
-            ad2.open()
+            self._ad2.open()
 
     def test_open_fails_when_opened_double(self):
-        logging.getLogger("qmi.core.instrument").setLevel(logging.CRITICAL)
-        ad2: AnalogDiscovery2 = qmi.make_instrument('AD2', AnalogDiscovery2, '210321AD12A4')
 
-        ad2.open()
+        self._ad2.open()
         with self.assertRaises(QMI_InvalidOperationException):
-            ad2.open()
-        ad2.close()
+            self._ad2.open()
+        self._ad2.close()
 
     def test_close_fails_when_closed_before_opened(self):
-        logging.getLogger("qmi.core.instrument").setLevel(logging.CRITICAL)
-        ad2: AnalogDiscovery2 = qmi.make_instrument('AD2', AnalogDiscovery2, '210321AD12A4')
 
         with self.assertRaises(QMI_InvalidOperationException):
-            ad2.close()
+            self._ad2.close()
+
+    def test_raise_usage_exception_when_invoke_method_without_open(self):
+
+        with self.assertRaises(QMI_UsageException):
+            self._ad2.prepare_analog_output_channel_for_static_output(1, 1.5)
+
+        with self.assertRaises(QMI_UsageException):
+            self._ad2.set_analog_output_voltage_output(1, 1.5)
+
+        with self.assertRaises(QMI_UsageException):
+            self._ad2.get_analog_output_voltage_output(1)
+
+        with self.assertRaises(QMI_UsageException):
+            self._ad2.set_device_on_close(OnClose.SHUTDOWN)
+
+        with self.assertRaises(QMI_UsageException):
+            self._ad2.reset_analog_input()
+
+        with self.assertRaises(QMI_UsageException):
+            self._ad2.prepare_analog_input_sample(1, 10.0, 0.001)
+
+        with self.assertRaises(QMI_UsageException):
+            self._ad2.get_analog_input_sample(1)
+
+        with self.assertRaises(QMI_UsageException):
+            self._ad2.get_analog_input_acquire_samples(1)
+
+        with self.assertRaises(QMI_UsageException):
+            self._ad2.prepare_analog_input_record(1, 10.0, 1.0, 0.001)
+
+        with self.assertRaises(QMI_UsageException):
+            self._ad2.get_analog_input_record(1)
+
+
+class AnalogDiscovery2ErrorTestCase(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self._device_mock = unittest.mock.MagicMock(spec=DwfDevice)
+
+        patcher = unittest.mock.patch('pydwf.DwfLibrary')
+        self._dwf_lib_mock = patcher.start().return_value
+
+        open_patcher = unittest.mock.patch('pydwf.utilities.openDwfDevice', return_value=self._device_mock)
+        self._open_dwf_device_mock = open_patcher.start()
+
+        self.addCleanup(patcher.stop)
+        self.addCleanup(open_patcher.stop)
+
+        qmi.start('analogdiscovery2_error_test')
+
+    def tearDown(self) -> None:
+        qmi.stop()
+        logging.getLogger("qmi.core.instrument").setLevel(logging.NOTSET)
 
     def test_close_raises_instrument_error_when_lib_error(self):
         def raise_value_error():
             raise pydwf.DwfLibraryError(code=pydwf.DwfErrorCode.UnknownError, msg='Fake lib error')
         self._device_mock.close.side_effect = raise_value_error
 
-        ad2: AnalogDiscovery2 = qmi.make_instrument('AD2', AnalogDiscovery2, '210321AD12A4')
+        ad2: Digilent_AnalogDiscovery2 = qmi.make_instrument('AD2', Digilent_AnalogDiscovery2, '210321AD12A4')
 
         ad2.open()
 
@@ -96,41 +144,8 @@ class AnalogDiscovery2OpenCloseTestCase(unittest.TestCase):
         self._device_mock.close.side_effect = None
         ad2.close()
 
-    def test_raise_usage_exception_when_invoke_method_without_open(self):
-        ad2: AnalogDiscovery2 = qmi.make_instrument('AD2', AnalogDiscovery2, '210321AD12A4')
 
-        with self.assertRaises(QMI_UsageException):
-            ad2.prepare_analog_output_channel_for_static_output(1, 1.5)
-
-        with self.assertRaises(QMI_UsageException):
-            ad2.set_analog_output_voltage_output(1, 1.5)
-
-        with self.assertRaises(QMI_UsageException):
-            ad2.get_analog_output_voltage_output(1)
-
-        with self.assertRaises(QMI_UsageException):
-            ad2.set_device_on_close(OnClose.SHUTDOWN)
-
-        with self.assertRaises(QMI_UsageException):
-            ad2.reset_analog_input()
-
-        with self.assertRaises(QMI_UsageException):
-            ad2.prepare_analog_input_sample(1, 10.0, 0.001)
-
-        with self.assertRaises(QMI_UsageException):
-            ad2.get_analog_input_sample(1)
-
-        with self.assertRaises(QMI_UsageException):
-            ad2.get_analog_input_acquire_samples(1)
-
-        with self.assertRaises(QMI_UsageException):
-            ad2.prepare_analog_input_record(1, 10.0, 1.0, 0.001)
-
-        with self.assertRaises(QMI_UsageException):
-            ad2.get_analog_input_record(1)
-
-
-class AnalogDiscovery2TestCase(unittest.TestCase):
+class AnalogDiscovery2MethodsTestCase(unittest.TestCase):
 
     def setUp(self) -> None:
 
@@ -145,8 +160,8 @@ class AnalogDiscovery2TestCase(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.addCleanup(open_patcher.stop)
 
-        qmi.start('test')
-        self._ad2: AnalogDiscovery2 = qmi.make_instrument('AD2', AnalogDiscovery2, '210321AD12A4')
+        qmi.start('analogdiscovery2_methods_test')
+        self._ad2: Digilent_AnalogDiscovery2 = qmi.make_instrument('AD2', Digilent_AnalogDiscovery2, '210321AD12A4')
 
         self._analog_out_mock = unittest.mock.create_autospec(spec=pydwf.core.dwf_device.AnalogOut)
         self._device_mock.analogOut = self._analog_out_mock
@@ -163,7 +178,9 @@ class AnalogDiscovery2TestCase(unittest.TestCase):
     def test_prepare_analog_output_channel_for_static_output(self):
         self._ad2.prepare_analog_output_channel_for_static_output(1, 5.5)
 
-        self._analog_out_mock.nodeFunctionSet.assert_called_with(1, pydwf.DwfAnalogOutNode.Carrier, pydwf.DwfAnalogOutFunction.Square)
+        self._analog_out_mock.nodeFunctionSet.assert_called_with(
+            1, pydwf.DwfAnalogOutNode.Carrier, pydwf.DwfAnalogOutFunction.Square
+        )
         self._analog_out_mock.idleSet.assert_called_with(1, pydwf.DwfAnalogOutIdle.Initial)
         self._analog_out_mock.nodeAmplitudeSet.assert_called_with(1,  pydwf.DwfAnalogOutNode.Carrier, 5.5)
         self._analog_out_mock.nodeEnableSet.assert_called_with(1,  pydwf.DwfAnalogOutNode.Carrier, True)

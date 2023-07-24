@@ -1,0 +1,77 @@
+digraph {
+    // ranksep=1.0
+    nodesep=1.0
+
+    // qmi module
+
+    qmi_module            [shape=record label="{ qmi\n(__init__.py) | <ctx_singleton> context_singleton | ObjectRegistry }"];
+
+    // Classes without a superclass.
+
+    cls_qmi_context       [shape=record label="{ <ctx_top> QMI_Context\n(qmi.core.context)\n'$context' | <oid> _oid | <sub_ctx> subscribe_signal(..., receiver) | <unsub_ctx> unsubscribe_signal(..., receiver) | <pub_ctx> publish_signal(...) | <send_message> send_message(..., message) }"];
+
+    cls_qmi_message       [shape=record label="{ QMI_Message\n(qmi.core.messaging) | <sour_addr> source_address | <dest_addr> destination_address }" ];
+
+    cls_qmi_signal        [shape=record label="{ <sig_top> QMI_Signal\n(qmi.core.pubsub) | arg_types | <sig_pub> _publish(self, *args)_}" ];
+
+    cls_registered_signal [shape=record label="{ <regsig_top> QMI_RegisteredSignal\n(qmi.core.pubsub) | <regsig_ctx> _context | publisher_name | signal_name | arg_types | <pub_reg> publish(...) }"];
+
+    cls_signal_subscriber [shape=record label="{ QMI_SignalSubscriber\n(qmi.core.pubsub) | <sigsub_ctx> context | publisher_context | publisher_name | signal_name | signal_arg_types | <sigsub_sub> subscribe(..., receiver) | <sigsub_unsub> unsubscribe(..., receiver)  }" ];
+
+    // QMI_Message and pubsub signal subclasses
+
+    cls_signal_manager    [shape=record label="{ SignalManager\n(qmi.core.pubsub)\n'$pubsub' | <sigman_ctx> _context | <local_subs> _local_subscriptions | <pending_subs_id> _pending_subscription...by...id | <pending_subs_name> _pending_subscription...by...name | <sub_sig> subscribe_signal(..., receiver) | <unsub_sig> unsubscribe_signal(..., receiver) | <pub_sig> publish_signal(...) | <handle_sig> handle_message(..., message) }"];
+    cls_signal_receiver   [shape=record label="{ QMI_SignalReceiver\n(qmi.core.pubsub) | <recv_sig> _receive_signal(..., message) }" ];
+    cls_signal_message    [shape=record label="{ QMI_SignalMessage\n(qmi.core.pubsub) | signal_name | args }" ];
+    cls_signal_removed    [shape=record label="{ QMI_SignalRemovedMessage\n(qmi.core.pubsub) | publisher_name | signal_name }" ];
+
+    // Signal use case classes
+    cls_qmi_task          [shape=record label="{ QMI_Task\n(qmi.core.task) | <sig_settings_updated> sig_settings_updated | <qmi_signals> _qmi_signals | <update_settings> update_settings(self) }"];
+    cls_qmi_looptask      [shape=record label="{ QMI_LoopTask\n(qmi.core.task) | <sig_status_updated> sig_status_updated | <run_looptask> run(self) }"];
+
+    // QMI_MessageHandler class and its specializations
+
+    cls_qmi_message_handler [shape=record label="{ QMI_MessageHandler\n(qmi.core.messaging) | <msghanlderaddr> address | <msg_handler_handle_msg> handle_message(..., message) }" ];
+
+    // Specializations
+
+    cls_qmi_message_handler -> cls_signal_manager      [dir="back" arrowtail="onormal" color="green"];
+
+    cls_qmi_message         -> cls_signal_message      [dir="back" arrowtail="onormal" color="green"];
+    cls_qmi_message         -> cls_signal_removed      [dir="back" arrowtail="onormal" color="green"];
+
+    // Ownership
+
+    cls_qmi_task:sig_settings_updated:w    -> cls_qmi_signal:n             [color="blue" label="(one)"];
+    cls_qmi_looptask:sig_status_updated  -> cls_qmi_signal             [color="blue" label="(one)"];
+    cls_qmi_context:ctx_top     -> cls_registered_signal:regsig_ctx            [dir="back" color="blue" label="(zero or more)"];
+    cls_qmi_context:ctx_top        ->  cls_signal_manager:sigman_ctx         [dir="back" color="blue" label="(one)"]
+    cls_qmi_signal:sig_pub:s               -> cls_registered_signal:pub_reg [dir="back" color="blue" label="(zero or more)"];
+    cls_signal_subscriber:sigsub_ctx:e     -> cls_qmi_context:ctx_top            [color="blue" label="(zero or more)"];
+    cls_qmi_task:qmi_signals:w             -> cls_registered_signal:regsig_top      [color="blue" label="(zero or more)"]
+
+    // Argument types.
+
+    cls_qmi_context:send_message:s -> cls_qmi_message                     [color="black" arrowhead="onormal" style="dashed"]
+    cls_qmi_message_handler:msg_handler_handle_msg:e -> cls_qmi_message   [color="black" arrowhead="onormal" style="dashed"]
+    cls_signal_manager:handle_sig ->  cls_qmi_message                   [color="black" arrowhead="onormal" style="dashed"]
+
+    cls_signal_manager:sub_sig:e   -> cls_signal_receiver:ne         [color="black" arrowhead="onormal" style="dashed"]
+    cls_signal_manager:unsub_sig:e -> cls_signal_receiver         [color="black" arrowhead="onormal" style="dashed"]
+
+    cls_signal_receiver:recv_sig -> cls_signal_message                  [color="black" arrowhead="onormal" style="dashed"]
+
+    // Usage
+
+    qmi_module:object_registry          -> cls_qmi_context:oid              [color="black"];
+
+    cls_registered_signal:pub_reg       -> cls_qmi_context:pub_ctx          [color="black"];
+    cls_signal_subscriber:sigsub_sub:w    -> cls_qmi_context:sub_ctx:w          [color="black"];
+    cls_signal_subscriber:sigsub_unsub:w  -> cls_qmi_context:unsub_ctx:w        [color="black"];
+    cls_signal_manager:pub_sig:w          -> cls_qmi_context:send_message:sw     [color="black"];
+    cls_signal_manager:sub_sig:w        -> cls_qmi_context:sub_ctx:e        [color="black"];
+    cls_signal_manager:unsub_sig:w        -> cls_qmi_context:unsub_ctx:e        [color="black"];
+
+    cls_qmi_task:update_settings:s        -> cls_qmi_signal:sig_pub         [color="black"];
+    cls_qmi_looptask:run_looptask:s       -> cls_qmi_signal:sig_pub           [color="black"];
+}

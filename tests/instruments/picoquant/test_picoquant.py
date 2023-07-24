@@ -149,7 +149,7 @@ class PicoQuantSomeHarpOpenTestCase(unittest.TestCase):
     def tearDown(self) -> None:
         qmi.stop()
 
-    def test_open(self):
+    def test_open_close(self):
         """Test regular open where SN is returned immediately."""
         someharp = qmi.make_instrument('someharp', PicoQuant_SomeHarp000, '1111111')
 
@@ -162,6 +162,8 @@ class PicoQuantSomeHarpOpenTestCase(unittest.TestCase):
         with patch('sys.platform', 'linux1'):
             with patch('ctypes.create_string_buffer', return_value=string_buffer):
                 someharp.open()
+
+            someharp.close()
 
     def test_open_model_not_implemented_exception(self):
         """Test that model type 'SH' raises an exception if no device serial number is immediately received."""

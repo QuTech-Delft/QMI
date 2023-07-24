@@ -1,7 +1,8 @@
-import unittest, unittest.mock
+import unittest
+import unittest.mock
 
 import qmi
-from qmi.instruments.agiltron.ff1x4 import Agiltron_FF1x4
+from qmi.instruments.agiltron import Agiltron_Ff1x4
 
 import qmi.core.exceptions
 from qmi.core.context import QMI_Context
@@ -17,7 +18,7 @@ class TestAgiltronFF1x4(unittest.TestCase):
         self.baudrate = 9600
         self.timeout = 1
         transport_id = "serial:{}:baudrate={}".format(self.ser_address, self.baudrate)
-        self.agiltron = Agiltron_FF1x4(qmi_context, "switchy", transport_id)
+        self.agiltron = Agiltron_Ff1x4(qmi_context, "switchy", transport_id)
 
     def tearDown(self) -> None:
         self.agiltron.close()

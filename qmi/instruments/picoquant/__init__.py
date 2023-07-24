@@ -1,6 +1,10 @@
-"""The qmi.instruments.picoquant package provides support for devices manufactured by PicoQuant.
+"""
+PicoQuant, time tagger instruments and event handling.
 
-Currently, three instruments are supported: MultiHarp 150, HydraHarp 400 and PicoHarp 300.
+The qmi.instruments.pi package provides support for:
+- MultiHarp 150
+- HydraHarp 400
+- PicoHarp 300.
 """
 from qmi.instruments.picoquant.support._decoders import EventDataType, EventFilterMode, SYNC_TYPE
 from qmi.instruments.picoquant.support._realtime import RealTimeHistogram, RealTimeCountRate, TttrHistogram

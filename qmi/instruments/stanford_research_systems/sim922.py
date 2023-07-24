@@ -5,6 +5,7 @@ from qmi.core.rpc import rpc_method
 from qmi.instruments.stanford_research_systems.sim900 import Sim900
 from qmi.core.exceptions import QMI_UsageException, QMI_InstrumentException
 
+
 class SIM922(QMI_Instrument):
     """Instrument driver for the Stanford Research Systems SIM922 Temperature Monitor """
 
@@ -28,7 +29,7 @@ class SIM922(QMI_Instrument):
         Returns:
             Module identification string.
         """
-        return self._sim900.ask_module(self._port,"*IDN?")
+        return self._sim900.ask_module(self._port, "*IDN?")
 
     @rpc_method
     def get_voltage(self, channel: int) -> float:
@@ -38,29 +39,31 @@ class SIM922(QMI_Instrument):
             Readout voltage in millivolts.
         """
         self._is_valid(channel)
-        voltage_string = self._sim900.ask_module(self._port,f"VOLT? {channel}")
+        voltage_string = self._sim900.ask_module(self._port, f"VOLT? {channel}")
         try:
             return float(voltage_string)
         except ValueError as error:
             raise QMI_InstrumentException(
-                "Value returned by module should have been a string representation of a float, "\
-                f"instead received \"{voltage_string}\".") from error
+                "Value returned by module should have been a string representation of a float, "
+                f"instead received \"{voltage_string}\"."
+            ) from error
 
     @rpc_method
     def get_temperature(self, channel: int) -> float:
         """ Query the temperature on the specified channel.
 
         Returns:
-            Temperature in kelvin.
+            Temperature in Kelvin.
         """
         self._is_valid(channel)
-        temperature_string = self._sim900.ask_module(self._port,f"TVAL? {channel}")
+        temperature_string = self._sim900.ask_module(self._port, f"TVAL? {channel}")
         try:
             return float(temperature_string)
         except ValueError as error:
             raise QMI_InstrumentException(
-                "Value returned by module should have been a string representation of a float, "\
-                f"instead received \"{temperature_string}\"") from error
+                "Value returned by module should have been a string representation of a float, "
+                f"instead received \"{temperature_string}\""
+            ) from error
 
     @rpc_method
     def is_excited(self, channel: int) -> bool:
@@ -79,22 +82,23 @@ class SIM922(QMI_Instrument):
             return True
         else:
             raise QMI_InstrumentException(
-                "Value returned by module should state whether excitation current is ON/1 or OFF/0, "\
-                f"instead received \"{excitation_string}\"")
+                "Value returned by module should state whether excitation current is ON/1 or OFF/0, "
+                f"instead received \"{excitation_string}\""
+            )
 
     @rpc_method
     def set_excitation(self, channel: int, current_on: bool) -> None:
         """ Set current excitation to the specified channel to on/off.
         Arguments:
             channel: Channel to set excitation current.
-            on: True if current on, else False.
+            current_on: True if current on, else False.
         """
         self._is_valid(channel)
         if not isinstance(current_on, bool):
             raise QMI_UsageException(f"Expected parameter \"current_on\" to be of type bool, but is {current_on!r}")
-        self._sim900.send_terminated_message(self._port,f"EXON {channel},{'ON' if current_on else 'OFF'}")
+        self._sim900.send_terminated_message(self._port, f"EXON {channel},{'ON' if current_on else 'OFF'}")
 
-    def _is_valid(self, channel: int)-> None:
+    def _is_valid(self, channel: int) -> None:
         if not self._channel_limits[0] <= channel <= self._channel_limits[1]:
             raise QMI_UsageException(
                 f"Channel has to be between {self._channel_limits[0]} and "

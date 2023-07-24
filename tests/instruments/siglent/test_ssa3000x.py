@@ -6,13 +6,13 @@ import numpy as np
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
 from qmi.core.transport import QMI_TcpTransport
-from qmi.instruments.siglent import SSA3000X
+from qmi.instruments.siglent import Siglent_Ssa3000x
 
 
 class TestSSA3000X(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("TestContext", init_logging=False)
+        qmi.start("TestSiglentSSA3000X", init_logging=False)
         # Add patches
         patcher = patch('qmi.instruments.siglent.ssa3000x.create_transport', spec=QMI_TcpTransport)
         self._transport_mock = patcher.start().return_value
@@ -21,8 +21,8 @@ class TestSSA3000X(unittest.TestCase):
         self._scpi_mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
         # Make DUT
-        self.instr: SSA3000X = qmi.make_instrument("SSA3000X", SSA3000X, "")
-        self.instr = cast(SSA3000X, self.instr)
+        self.instr: Siglent_Ssa3000x = qmi.make_instrument("SSA3000X", Siglent_Ssa3000x, "")
+        self.instr = cast(Siglent_Ssa3000x, self.instr)
         self.instr.open()
 
     def tearDown(self):

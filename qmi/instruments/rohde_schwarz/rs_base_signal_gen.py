@@ -52,8 +52,17 @@ class RohdeSchwarz_Base(QMI_Instrument):
                                            default_timeout=self._timeout)
 
     def _is_valid_param(self, inp: str, params: List[str]) -> str:
-        """
-        Checks if input is a valid parameter.
+        """ Checks if input string is a valid parameter string.
+
+        Parameters:
+            inp:    String parameter to be checked.
+            params: Allowed parameter strings as a list
+
+        Raises:
+            ValueError: If the input value is not in the allowed parameters list.
+
+        Return:
+            The input string in upper case.
         """
         if inp.upper() in params:
             return inp.upper()
@@ -84,7 +93,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         try:
             return float(resp)
         except ValueError as exc:
-            raise QMI_InstrumentException("Unexpected response to command {!r}: {!r}".format(cmd, resp)) from exc
+            raise QMI_InstrumentException(f"Unexpected response to command {cmd!r}: {resp!r}") from exc
 
     def _ask_bool(self, cmd: str) -> bool:
         """Send a query and return a boolean response."""
@@ -95,7 +104,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         elif value in ("0", "OFF"):
             return False
         else:
-            raise QMI_InstrumentException("Unexpected response to command {!r}: {!r}".format(cmd, resp))
+            raise QMI_InstrumentException(f"Unexpected response to command {cmd!r}: {resp!r}")
 
     def _check_error(self) -> None:
         """Read the instrument error queue and raise an exception if there is an error."""
@@ -103,10 +112,19 @@ class RohdeSchwarz_Base(QMI_Instrument):
         # When there are no errors, the response is '0,"No error"'.
         if not re.match(r"^\s*0\s*,", resp):
             # Some error occurred.
-            raise QMI_InstrumentException("Instrument returned error: {}".format(resp))
+            raise QMI_InstrumentException(f"Instrument returned error: {resp}")
 
     def _internal_poll_calibration_finished(self) -> bool:
-        """Check for ongoing calibration; returns True if the calibration is finished."""
+        """Check for ongoing calibration.
+
+        Attributes:
+            self._calibrating: Set to `False` if response is received from instrument.
+            self._calibration_result: Integer result from the response or `None`.
+            self._calibration_error:  String describing the erroneous response or `None`.
+
+        Return:
+            True if the calibration is finished (with or without error), else False.
+        """
         assert self._calibrating
         assert self._transport is not None
 
@@ -121,14 +139,13 @@ class RohdeSchwarz_Base(QMI_Instrument):
         # Store it for future reference.
         self._calibrating = False
         self._calibration_result = None
-        self._calibration_error = "Unexpected response to calibration command"
+        self._calibration_error = None
         resp = resp.rstrip(b"\r\n")
         try:
             self._calibration_result = int(resp)
-            self._calibration_error = None
         except ValueError:
             _logger.warning("Unexpected response to calibration command: %r", resp)
-            self._calibration_error = "Unexpected response to calibration command: {!r}".format(resp)
+            self._calibration_error = f"Unexpected response to calibration command: {resp!r}"
             return True
 
         _logger.info("Internal adjustments finished with status %d", self._calibration_result)
@@ -140,13 +157,17 @@ class RohdeSchwarz_Base(QMI_Instrument):
         if not re.match(r"^\s*0\s*,", calibration_resp):
             # Some error occurred.
             _logger.warning("Calibration failed with error: %s", calibration_resp)
-            self._calibration_error = "Instrument returned error: {}".format(calibration_resp)
+            self._calibration_error = f"Instrument returned error: {calibration_resp}"
 
         # Calibration finished.
         return True
 
     def _check_calibrating(self) -> None:
-        """Raise an exception if a calibration is still running."""
+        """Check if a calibration is still running.
+
+        Raises:
+            QMI_InstrumentException: If the calibration is still in progress.
+        """
         self._check_is_open()
         if self._calibrating:
             # Calibration started and result not yet received.
@@ -154,6 +175,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
             if not self._internal_poll_calibration_finished():
                 # Calibration still not finished.
                 raise QMI_InstrumentException("Calibration in progress") from None
+
             assert not self._calibrating
 
     def _get_external_reference_frequency(self) -> str:
@@ -171,31 +193,67 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """
         frequency = self._is_valid_param(frequency, options)
         self._check_calibrating()
-        self._scpi_protocol.write(":ROSC:EXT:FREQ {}".format(frequency))
+        self._scpi_protocol.write(f":ROSC:EXT:FREQ {frequency}")
         self._check_error()
 
     @rpc_method
     def get_idn(self) -> QMI_InstrumentIdentification:
-        """Read instrument type and version and return QMI_InstrumentIdentification instance."""
+        """Read instrument type and version and return QMI_InstrumentIdentification instance.
+
+        Raises:
+            QMI_InstrumentException: on unexpected response to query.
+
+        Returns:
+            QMI_InstrumentIdentification: Instance of the instrument.
+        """
         self._check_calibrating()
         resp = self._scpi_protocol.ask("*IDN?")
         words = resp.rstrip().split(",")
         if len(words) != 4:
-            raise QMI_InstrumentException("Unexpected response to *IDN?, got {!r}".format(resp))
+            raise QMI_InstrumentException(f"Unexpected response to *IDN?, got {resp!r}")
         return QMI_InstrumentIdentification(vendor=words[0].strip(),
                                             model=words[1].strip(),
                                             serial=words[2].strip(),
                                             version=words[3].strip())
 
     @rpc_method
+    def start_calibration(self) -> None:
+        """Start internal adjustments. Needs to be implemented further in the deriving classes.
+
+        This function returns immediately after starting the calibration.
+
+        Calibration can take up to 10 minutes. Call poll_calibration() to see
+        whether calibration is complete. No other commands can be processed
+        while the instrument is calibrating.
+
+        The instrument must be at stable temperature (30 minutes to warm up)
+        before starting internal adjustments.
+
+        Attributes:
+            self._calibrating: Set to `True` if starting the calibration succeeded.
+
+        Raises:
+            QMI_InstrumentException: If the result of previous calibration is still pending
+        """
+        self._check_calibrating()
+        if self._calibration_result is not None:
+            raise QMI_InstrumentException("Result of previous calibration is still pending")
+
+        _logger.info("Starting internal adjustments")
+        self._calibrating = True
+
+    @rpc_method
     def poll_calibration(self) -> Optional[int]:
         """Check whether an ongoing calibration is finished.
 
-        If calibration is not yet finished, this function returns None.
+        Raises:
+            QMI_InstrumentException on calibration error.
 
-        If calibration is finished, this function returns a status code:
-          0 if calibration was successful;
-          1 if calibration failed.
+        Returns:
+            If calibration is not yet finished, this function returns None.
+            If calibration is finished, this function returns a status code:
+                0 if calibration was successful;
+                1 if calibration failed.
         """
         self._check_is_open()
         if self._calibrating:
@@ -244,7 +302,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
             phase:  target phase delta in degrees.
         """
         self._check_calibrating()
-        self._scpi_protocol.write(":PHAS {}".format(phase))
+        self._scpi_protocol.write(f":PHAS {phase}")
         self._check_error()
 
     @rpc_method
@@ -265,11 +323,10 @@ class RohdeSchwarz_Base(QMI_Instrument):
         Parameters:
             source: desired reference source (accepted values: "INT", "EXT"); see also get_reference_source().
         """
-        source = source.upper()
-        if source not in ("INT", "EXT"):
-            raise ValueError("Unknown value {}".format(source))
+        options = ["INT", "EXT"]
+        source = self._is_valid_param(source, options)
         self._check_calibrating()
-        self._scpi_protocol.write(":ROSC:SOUR {}".format(source))
+        self._scpi_protocol.write(f":ROSC:SOUR {source}")
         self._check_error()
 
     @rpc_method
@@ -286,19 +343,27 @@ class RohdeSchwarz_Base(QMI_Instrument):
             frequency:  target frequency in Hertz.
         """
         self._check_calibrating()
-        self._scpi_protocol.write(":FREQ {}".format(frequency))
+        self._scpi_protocol.write(f":FREQ {frequency}")
         self._check_error()
 
     @rpc_method
     def get_pulsemod_ext_source(self) -> bool:
-        """Return True if pulse modulation uses an external source."""
+        """Check pulse modulation source.
+
+        Return:
+            True if pulse modulation uses an external source, else False.
+
+        Raises:
+            QMI_InstrumentException: On unexpected response.
+        """
         self._check_calibrating()
         source = self._scpi_protocol.ask(":PULM:SOUR?").strip().upper()
         if source.startswith("EXT"):
             return True
         elif source.startswith("INT"):
             return False
-        raise QMI_InstrumentException("Unexpected response {!r} to command :PULM:SOUR?".format(source))
+
+        raise QMI_InstrumentException(f"Unexpected response {source!r} to command :PULM:SOUR?")
 
     @rpc_method
     def set_pulsemod_ext_source(self, ext: bool) -> None:
@@ -314,6 +379,9 @@ class RohdeSchwarz_Base(QMI_Instrument):
 
         Parameters:
             ext:    Boolean flag indicating if external modulation must be enabled.
+
+        Raises:
+            QMI_InstrumentException: If using internal source and power above max power limit.
         """
         source = "EXT" if ext else "INT"
         self._check_calibrating()
@@ -322,10 +390,11 @@ class RohdeSchwarz_Base(QMI_Instrument):
         if (self._max_continuous_power is not None) and (not ext):
             if self.get_power() > self._max_continuous_power:
                 raise QMI_InstrumentException(
-                    "Power limited to {} dBm unless external pulse modulation source is selected".format(
-                        self._max_continuous_power))
+                    f"Power limited to {self._max_continuous_power} dBm " +
+                    "unless external pulse modulation source is selected"
+                )
 
-        self._scpi_protocol.write(":PULM:SOUR {}".format(source))
+        self._scpi_protocol.write(f":PULM:SOUR {source}")
         self._check_error()
 
     @rpc_method
@@ -346,23 +415,29 @@ class RohdeSchwarz_Base(QMI_Instrument):
         Parameters:
             policy: desired policy (accepted values: "OFF", "UNCH"); see also get_power_on_output_policy().
         """
-        policy = policy.upper()
-        if policy not in ("OFF", "UNCH"):
-            raise ValueError("Unknown value {}".format(policy))
+        options = ["OFF", "UNCH"]
+        policy = self._is_valid_param(policy, options)
         self._check_calibrating()
-        self._scpi_protocol.write(":OUTP:PON {}".format(policy))
+        self._scpi_protocol.write(f":OUTP:PON {policy}")
         self._check_error()
 
     @rpc_method
     def get_pulsemod_polarity(self) -> bool:
-        """Return True if the external pulse modulation polarity is inverted; False if it is normal."""
+        """Get pulse modulation polarity.
+
+        Raises:
+            QMI_InstrumentException: On unexpected response.
+
+        Return:
+             True if the external pulse modulation polarity is inverted; False if it is normal.
+        """
         self._check_calibrating()
         resp = self._scpi_protocol.ask(":PULM:POL?").strip().upper()
         if resp.startswith("INV"):
             return True
         elif resp.startswith("NORM"):
             return False
-        raise QMI_InstrumentException("Unexpected response {!r} ot command :PULM:POL?".format(resp))
+        raise QMI_InstrumentException(f"Unexpected response {resp!r} ot command :PULM:POL?")
 
     @rpc_method
     def set_pulsemod_polarity(self, inverted: bool) -> None:
@@ -372,6 +447,9 @@ class RohdeSchwarz_Base(QMI_Instrument):
             inverted:   Boolean flag indicating if external modulation should be inverted.
                         For normal polarity (False), the RF signal is suppressed when the TRIG pulse is low.
                         For inverted polarity (True), the RF signal is suppressed when the TRIG pulse is high.
+
+        Raises:
+            QMI_InstrumentException: On using power beyond the max power limit.
         """
         self._check_calibrating()
 
@@ -382,7 +460,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
                     "Power limited to {} dBm unless pulse modulation source is non-inverted".format(
                         self._max_continuous_power))
 
-        self._scpi_protocol.write(":PULM:POL {}".format("INV" if inverted else "NORM"))
+        self._scpi_protocol.write(f":PULM:POL {'INV' if inverted else 'NORM'}")
         self._check_error()
 
     @rpc_method
@@ -397,6 +475,9 @@ class RohdeSchwarz_Base(QMI_Instrument):
 
         Parameters:
             power:  target output power in dBm.
+
+        Raises:
+            QMI_InstrumentException: On power exceeding the power limit.
         """
         self._check_calibrating()
 
@@ -414,7 +495,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
                     "Power limited to {} dBm unless external pulse source polarity is non-inverted".format(
                         self._max_continuous_power))
 
-        self._scpi_protocol.write(":POW {}".format(power))
+        self._scpi_protocol.write(f":POW {power}")
         self._check_error()
 
     @rpc_method
@@ -429,6 +510,9 @@ class RohdeSchwarz_Base(QMI_Instrument):
 
         Parameters:
             enable: target enabled state.
+
+        Raises:
+            QMI_InstrumentException: On power exceeding the power limit.
         """
         self._check_calibrating()
 
@@ -451,7 +535,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
                             self._max_continuous_power
                         ))
 
-        self._scpi_protocol.write(":OUTP {}".format(1 if enable else 0))
+        self._scpi_protocol.write(f":OUTP {1 if enable else 0}")
         self._check_error()
 
     @rpc_method
@@ -466,6 +550,9 @@ class RohdeSchwarz_Base(QMI_Instrument):
 
         Parameters:
             enable: target enabled state.
+
+        Raises:
+            QMI_InstrumentException: On power exceeding the power limit.
         """
         self._check_calibrating()
 
@@ -476,7 +563,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
                     "Pulse modulation cannot be enabled as power is set to {} dBm which is higher than the maximum {} dBm".format(
                         self.get_power(), self._max_continuous_power))
 
-        self._scpi_protocol.write(":PULM:STAT {}".format(1 if enable else 0))
+        self._scpi_protocol.write(f":PULM:STAT {1 if enable else 0}")
         self._check_error()
 
     @rpc_method
@@ -493,7 +580,129 @@ class RohdeSchwarz_Base(QMI_Instrument):
             enable: target enabled state.
         """
         self._check_calibrating()
-        self._scpi_protocol.write(":IQ:STAT {}".format(1 if enable else 0))
+        self._scpi_protocol.write(f":IQ:STAT {1 if enable else 0}")
+        self._check_error()
+
+    @rpc_method
+    def get_iq_wideband(self) -> bool:
+        """Return True if wideband IQ modulation is enabled, False if disabled."""
+        self._check_calibrating()
+        return self._ask_bool(":IQ:WBST?")
+
+    @rpc_method
+    def set_iq_wideband(self, enable: bool) -> None:
+        """Enable or disable wideband IQ modulation.
+
+        Parameters:
+            enable: target enabled state.
+        """
+        self._check_calibrating()
+        self._scpi_protocol.write(f":IQ:WBST {1 if enable else 0}")
+        self._check_error()
+
+    @rpc_method
+    def get_iq_quadrature_offset(self) -> float:
+        """Return the current IQ quadrature offset."""
+        self._check_calibrating()
+        return self._ask_float(":IQ:IMP:QUAD?")
+
+    @rpc_method
+    def set_iq_quadrature_offset(self, phase: float) -> None:
+        """Set the IQ quadrature offset between -8 and 8 degrees in increments of 0.01.
+
+        Parameters:
+            phase:  desired phase offset in degrees.
+
+        Raises:
+            ValueError: If phase offset not within -8 - 8 degrees.
+        """
+        if not -8.0 <= phase <= 8.0:
+            raise ValueError("Phase offset should be in [-8, 8].")
+        self._check_calibrating()
+        self._scpi_protocol.write(f":IQ:IMP:QUAD {phase:.2f}")
+        self._check_error()
+
+    @rpc_method
+    def get_iq_leakage_i(self) -> float:
+        """Return the current I leakage amplitude (percent)."""
+        self._check_calibrating()
+        return self._ask_float(":IQ:IMP:LEAK:I?")
+
+    @rpc_method
+    def set_iq_leakage_i(self, leakage: float) -> None:
+        """Set the I leakage amplitude between -5 and 5 (percent), in increments of 0.01.
+
+        Parameters:
+            leakage:    leakage amplitude in percent.
+
+        Raises:
+            ValueError: If leakage amplitude not within -5 - 5 percent.
+        """
+        if not -5.0 <= leakage <= 5.0:
+            raise ValueError("Leakage offset should be in [-5, 5].")
+        self._check_calibrating()
+        self._scpi_protocol.write(f":IQ:IMP:LEAK:I {leakage:.2f}")
+        self._check_error()
+
+    @rpc_method
+    def get_iq_leakage_q(self) -> float:
+        """Return the current Q leakage amplitude (percent)."""
+        self._check_calibrating()
+        return self._ask_float(":IQ:IMP:LEAK:Q?")
+
+    @rpc_method
+    def set_iq_leakage_q(self, leakage: float) -> None:
+        """Set the Q leakage amplitude between -5 and 5 (percent), in increments of 0.01.
+
+        Parameters:
+            leakage:    leakage amplitude in percent.
+
+        Raises:
+            ValueError: If leakage amplitude not within -5 - 5 percent.
+        """
+        if not -5.0 <= leakage <= 5.0:
+            raise ValueError("Leakage offset should be in [-5, 5].")
+        self._check_calibrating()
+        self._scpi_protocol.write(f":IQ:IMP:LEAK:Q {leakage:.2f}")
+        self._check_error()
+
+    @rpc_method
+    def get_iq_gain_imbalance(self) -> float:
+        """Return the current IQ gain imbalance (dB)."""
+        self._check_calibrating()
+        return self._ask_float(":IQ:IMP:IQR:MAGN?")
+
+    @rpc_method
+    def set_iq_gain_imbalance(self, gain: float) -> None:
+        """Set the IQ gain imbalance in dB in range -1 to 1, increments of 0.001.
+
+        Parameters:
+            gain:   desired gain in dB.
+
+        Raises:
+            ValueError: If gain imbalance not within -1 - 1 dB.
+        """
+        if not -1.0 <= gain <= 1.0:
+            raise ValueError("Gain imbalance should be in [-1, 1].")
+        self._check_calibrating()
+        self._scpi_protocol.write(f":IQ:IMP:IQR:MAGN {gain:.3f}")
+        self._check_error()
+
+    @rpc_method
+    def get_iq_crest_factor(self) -> float:
+        """Return the current IQ crest factor compensation in dB."""
+        self._check_calibrating()
+        return self._ask_float(":IQ:CRES?")
+
+    @rpc_method
+    def set_iq_crest_factor(self, factor: float) -> None:
+        """Set the IQ crest factor compensation in dB.
+
+        Parameters:
+            factor: crest factor in dB.
+        """
+        self._check_calibrating()
+        self._scpi_protocol.write(f":IQ:CRES {factor}")
         self._check_error()
 
     @rpc_method

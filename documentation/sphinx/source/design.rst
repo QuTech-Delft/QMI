@@ -2,7 +2,7 @@
 Design
 ======
 
-THis page describes the design of QMI.
+This page describes the design of QMI.
 
 Design Goals
 ------------
@@ -136,7 +136,10 @@ Most of the features of QMI have been touched on above:
   such as control loops, that are (almost) always active.
 
 * *Network transparency* means that instruments and tasks can be accessed over the network. But the visibility and
-  access should also be controllable so that these can be restricted to e.g. selected work groups.
+  access should also be controllable so that these can be restricted to e.g. selected work groups. To hide a process
+  from the default search of QMI contexts in the network, set the "workgroup" parameter in the QMI configuration to
+  a specific string. Then, only searches which have as a selective parameter this workgroup name can find it. The
+  default workgroup name is simply "default".
 
 * *Cross platform support* means that we support Linux and Windows (and secondarily, also macOS).
 
@@ -153,46 +156,201 @@ The boxes in this graph denote *classes*. Classes with a red border are *active 
 
 Green arrows denote *inheritance*, i.e., an 'is-a' relation between classes.
 
-Blue arrows denote _ownership_. Ownerships arrows start in a named field of a class instance, and the arrow carries a label that shows how many
+Blue arrows denote *ownership*. Ownerships arrows start in a named field of a class instance, and the arrow carries a label that shows how many
 instances are owned, e.g., '(one)' or '(zero or more)'.
 
 We discuss these classes below.
 
-* The **QMI_Context** class is the centralized entry-point to all functionality of QMI. A QMI process has a single **QMI_Context** that
-  is initialized by a call to qmi.start() and discarded by a call to qmi.stop(). In between these calls, the context can be accessed
-  by a call to qmi.context().
+**QMI Contexts**
+================
 
-  The QMI owns (directly or indirectly) all QMI-related object in a process. Many of them are administrative in nature and will not normally
-  be accessed by the user, but the **QMI_Instrument** and **QMI_Task** instances are examples of user-accessible projects that are
-  managed and owned by the QMI_Context; the user merely gets a handle to them.
+The **QMI_Context** class is the centralized entry-point to all functionality of QMI. A QMI process has a single **QMI_Context** that
+is initialized by a call to ``qmi.start()`` and discarded by a call to ``qmi.stop()``. In between these calls, the context can be accessed
+by a call to ``qmi.context()``. The configuration of a context is based on customized *@configstruct* data classes **CfgQmi** and **CfgContext**. These
+are JSON-like structures and can be read in from a configuration file, or given as an argument input in ``qmi.start()``.
 
-* The network facilities of QMI are managed by a number of closely-related classes. QMI networking is based on *messages* that can be delivered to
-  instances of class **MessageHandler** (an abstract class). This class has several subclasses that can serve as the target for QMI messages:
-  the **RpcObjectManager** which handles RPC requests for one particular RPC-capable object, the **SignalManager** which handles publish-subscribe
-  type communications, and the **RpcFuture**, which represents the result of a pending RPC call (for example, to an instrument).
+The QMI owns (directly or indirectly) all QMI-related objects in a process. Many of them are administrative in nature and will not normally
+be accessed by the user, but the **QMI_Instrument** and **QMI_Task** instances are examples of user-accessible projects that are
+managed and owned by the QMI_Context; the user merely gets a handle to them. **QMI_RpcObject** instances can also be directly accessed.
 
-  The **MessageRouter** is a class that is capable of local and remote delivery of messages. Remote messages travel over TCP as pickled classes, whereas
-  local message delivery skips the pickle/unpickle step and is therefore much more efficient. The MessageRouter has a *SocketManager* that manages
-  a bunch of 'live' sockets; the **UdpResponder** manages a single datagram socket that responds to UDP (broadcast) messages that are used to
-  enumerate all QMI processes in a given network; a **PeerTcpConnection** is a live, bi-directional connection to another network-accessible QMI_Context;
-  at any given the, the local QMI_Context may have sockets open to multiple QMI_Contexts in other processes or even computers. The single **TcpServer**
-  allows other QMI_Sockets to initiate a **PeerTcpConnection** to us.
+**Threading in QMI**
+====================
 
-  Message delivery among a set of QMI processes is always point-to-point; there is no routing. If a QMI process needs to exchanges messages with some
-  other QMI process, it will need to have an active, direct **PeerTcpConnection**.
+The **QMI_Thread** class is a thin wrapper around bare Python threads, that support a common patterns for thread termination. The QMI_Thread is
+for internal use within QMI only; it is emphatically *not* intended to be used by QMI users. We prefer to hide the complexity of thread management
+as much as possible from QMI users, since they are error-prone and tend to lead to hard-to-understand code, in the hands of non software-engineers.
 
-* One particularly important mechanism built on to of QMI messaging is RPC (remote procedure calls). Each RPC-capable object is represented by its own
-  **RpcObjectManager** that is owned by the QMI_Context. Its associated **_RpcThread** object owns a **QMI_RpcObject** and is responsible for executing
-  incoming RPC calls to the object.
+**Remote Procedure Calls**
+==========================
 
-  The **_ContextRpcObject** answers RPC calls that can be made to the QMI_Context itself. A **QMI_Instrument** is a superclass for all equipment,
-  and equipment is generally also accessed by RPC calls (e.g. 'getVoltage()', 'setVoltage()'). A **QMI_TaskRunner** responds to a standardized set
-  of RPC methods that can be used to communicate with **QMI_Task** instances. Note in particular that tasks themselves are not RPC-capable objects!
-  This decision was made to keep the **QMI_Task** semantics as simple as possible; the all-important 'run()' method of a QMI_Task does not
-  have to deal with the possibility that other methods can be run while it is active. This was deemed too error-prone and fragile for the intended
-  users of QMI. Instead of that, the QIM_Task's run() method is inspected to explicitly handle incoming requests in its main loop. This behavior is
-  highly stylized and, while strictly less powerful than supporting full RPC-capability, provides enough flexibility to handle the most common use-cases.
+One particularly important mechanism built on to of QMI messaging is RPC (remote procedure calls). Each RPC-capable object is represented by its own
+**RpcObjectManager** that is owned by the **QMI_Context**. Its associated **_RpcThread** object owns a **QMI_RpcObject** and is responsible for executing
+incoming RPC calls to the object. The incoming calls can be from the same context itself, but also from another context. This is made possible by
+creating a proxy to the context in another context. **QMI_Context** can make and/or return a **QMI_RpcProxy** object of a running
+**_RpcThread._rpc_object** instance, through the target **QMI_RpcObjectManager** mapped in *_rpc_object_map*.
 
-* The **QMI_Thread** class is a thin wrapper around bare Python threads, that support a common patterns for thread termination. The QMI_Thread is
-  for internal use within QMI only; it is emphatically *not* intended to be used by QMI users. We prefer to hide the complexity of thread management
-  as much as possible from QMI users, since they are error-prone and tend to lead to hard-to-understand code, in the hands of non software-engineers.
+The **_ContextRpcObject** answers RPC calls that can be made to the **QMI_Context** itself. A **QMI_Instrument** is a superclass for all equipment,
+and equipment is generally also accessed by RPC calls (e.g. 'getVoltage()', 'setVoltage()'). A **QMI_TaskRunner** responds to a standardized set
+of RPC methods that can be used to communicate with **QMI_Task** instances. Note in particular that tasks themselves are not RPC-capable objects!
+This decision was made to keep the **QMI_Task** semantics as simple as possible; the all-important ``run()`` method of a QMI_Task does not
+have to deal with the possibility that other methods can be run while it is active. This was deemed too error-prone and fragile for the intended
+users of QMI. Instead of that, the **QMI_Task.run()** method is instructed to explicitly handle incoming requests in its main loop. This behavior is
+highly stylized and, while strictly less powerful than supporting full RPC-capability, provides enough flexibility to handle the most common use-cases.
+
+Example contexts
+================
+
+.. image:: images/example_contexts.png
+
+We could have as an example three contexts: In context one, we have made two instances of **QMI_Instrument** (e.g. A signal generator and an oscilloscope
+on a lab PC). Then we have a second context, that runs a task, utilizing **QMI_LoopTask**, which is configured to make connection to context one, and to
+control the instruments in it. This context could reside e.g. in an office PC close to the lab. This second contexts now sends also out *settings* and
+*status* signals which can e.g. be forwarder to a database. Also on the office PC could run a third context that monitors the task status in context two
+and instrument status in context one. This context is hooked in the *status* signal and at specific signal values or circumstances could either tell
+context two to change settings or stop task, or send specific commands to the instruments in context one.
+
+Blocking and Non-blocking Proxies
+=================================
+
+The RPC objects that run on other threads, in the same or other contexts, are controlled through their proxies. As shown before, these proxies are made to
+**_RpcThread._rpc_object** instances of RPC objects. The regular **QMI_RpcProxy** object calls are *blocking*, meaning that when a RPC call is made, it
+will not return until it is finished, blocking the thread of the object from handling other RPC calls in the meanwhile. The function
+``blocking_rpc_method_call`` is used and this creates a ``future`` object with **QMI_RpcFuture**. This object then sends the RPC request message for the
+method in question in the RPC call, and return the result or ``None`` of the call. Or exits with some exception.
+
+As some calls might have long execution times or get stuck in a loop or e.g. slow instrument response, the blocking of the RPC object might result in an
+overload of calls and a crash. For systems sensitive to this kinds of issues the proxy object has also ``rpc_nonblocking`` object as attribute, created by
+calling **QMI_RpcNonBlockingProxy** with the same ``context`` and ``descriptor`` inputs. Lets assume a proxy to an object is made with
+
+>>> proxy_instrument = qmi.get_instrument("context.instrument")
+
+You would make a regular call with
+
+>>> result = proxy_instrument.get_some_value()
+
+Now this could block the script making this call, and the RPC object itself, until (or if!) it returns. Instead we can make a call
+
+>>> result_future = proxy_instrument.rpc_nonblocking.get_some_value()
+>>> assert isinstance(future, QMI_RpcFuture)
+>>> # Could possibly do other calls here
+>>> result = result_future.wait()  # Blocks this script only, not the RPC object
+
+The call now uses function `non_blocking_rpc_method_call` that returns the **QMI_RpcFuture** object itself, and the result is then obtained in the
+call script (if it should return one) or just wait until the call is finished.
+
+Note that if the issue is slowly responding hardware, and several non-blocking calls are made which want to get a response from the hardware, this
+could lead into unexpected hardware responses and/or other kinds of issues, and crashing of the code.
+
+Further, the proxies have the possibility of *locking* their objects to be controlled by a specific context only. The use of the ``lock()``,
+``unlock()``, ``force_unlock()`` and ``is_locked()`` methods are illustrated in the Tutorial.
+
+**Messaging**
+=============
+
+The network facilities of QMI are managed by a number of closely-related classes. QMI networking is based on *messages* that can be delivered to
+instances of class **MessageHandler** (an abstract class). This class has several subclasses that can serve as the target for QMI messages:
+the **RpcObjectManager** which handles RPC requests for one particular RPC-capable object, the **SignalManager** which handles publish-subscribe
+type communications, and the **RpcFuture**, which represents the result of a pending RPC call (for example, to an instrument).
+
+The **MessageRouter** is a class that is capable of local and remote delivery of messages. Remote messages travel over TCP as pickled classes, whereas
+local message delivery skips the pickle/unpickle step and is therefore much more efficient. The MessageRouter has a *_socket_manager* that manages
+a bunch of 'live' sockets; the **UdpResponder** manages a single datagram socket that responds to UDP (broadcast) messages that are used to
+enumerate all QMI processes in a given network; a **PeerTcpConnection** is a live, bi-directional connection to another network-accessible QMI_Context;
+at any given the, the local QMI_Context may have sockets open to multiple QMI_Contexts in other processes or even computers. The single **TcpServer**
+allows other QMI_Sockets to initiate a **PeerTcpConnection** to us.
+
+Message delivery among a set of QMI processes is always point-to-point; there is no routing. If a QMI process needs to exchanges messages with some
+other QMI process, it will need to have an active, direct **PeerTcpConnection**.
+
+Messaging more in detail
+========================
+
+.. image:: images/class_diagram_messaging.png
+
+The figure above outlines the class inheritance, ownership, parameter type and usage relations of the QMI messaging and signalling.
+
+Green arrows denote *inheritance*, i.e., an 'is-a' relation between classes.
+
+Blue arrows denote *ownership*. Ownerships arrows start in a named field of a class instance, and the arrow carries a label that shows how many
+instances are owned, e.g., '(one)' or '(zero or more)'.
+
+Black dashed arrows with open arrow heads means that a method call's argument or arguments are of class type of target.
+
+Black arrows with full arrow heads means that a method is implemented and/or called in the target class method.
+
+The **QMI_Message** can have multiple instances with unique source and destination addresses. The **QMI_RequestMessage** and **QMI_ReplyMessage**
+classes take a *request_id*, which is generated when making a request, as a random 64-bit integer string. **QMI_InitialHandshakeMessage** is sent when making a connection
+to a peer, trialling if the connection can receive messages. By messaging errors, a **QMI_ErrorReplyMessage** is formulated with descriptive message and sent.
+
+All the messages are subclasses of **QMI_Message** and at delivery routed through the **MessageRouter.send_message** of the context.
+
+**Signalling**
+==============
+
+A closely related group of classes to messaging are the *signalling* classes. RPC objects can be set to contain signals that broadcast data. The **SignalManager**
+class takes care of publishing data via signals and handling (pending) subscriptions of receivers that would like to listen to the broadcast.
+In **QMI_Task** and **QMI_LoopTask** there are "settings" and "status" signals, respectively, as standard signals. The user can modify these signals to broadcast
+the wanted data. By a simple **QMI_Task** object the request to broadcast settings has to be done manually, or be done in a custom loop. The **QMI_LoopTask** instead
+has a standard loop that updates both "settings" (from parent class) and "status" and, if implemented in some *Task*, publishes these signals. It also
+publishes data from custom signals, if implemented.
+
+Signals, being it publishers or receivers, can be added to any RPC object, but the use of those will need more manual work. For example, when a
+QMI task or tasks are made to be part of a *service*, the service can then be made to control the signalling (also between tasks) and data publication.
+
+Signalling more in detail
+=========================
+
+.. image:: images/class_diagram_signalling.png
+
+The figure above outlines the class inheritance, ownership, parameter type and usage relations of the QMI messaging and signalling.
+
+Green arrows denote *inheritance*, i.e., an 'is-a' relation between classes.
+
+Blue arrows denote *ownership*. Ownerships arrows start in a named field of a class instance, and the arrow carries a label that shows how many
+instances are owned, e.g., '(one)' or '(zero or more)'.
+
+Black dashed arrows with open arrow heads means that a method call's argument or arguments are of class type of target.
+
+Black dashed arrows with full arrow heads means that a method is used and/or implemented in the target class method.
+
+From this fourth figure it can be seen how the subscribing and unsubscribing of receivers to signals are done via the **QMI_Context** methods, and also publishing of
+data is routed via it. This way the QMI context can keep an object registry of which broadcasts it should listen to and which data to publish.
+The signals use **QMI_SignalMessage** to broadcast signals between contexts. Each context owns exactly one **SignalManager** instance. The signal subscription and
+unsubscribing is routed to **QMI_SignalSubscriber** class. The subscription of signals is done by using **QMI_SignaSubscriptionReply** which inherits from the **QMI_ReplyMessage**.
+Subscription and unsubscribing requires as *receiver* input parameter an instance of **QMI_SignalReceiver**, which contains a queue of received signals.
+When any such signal gets published, the published signal is automatically added to the receive queue of the **QMI_SignalReceiver**.
+
+The *_queue* of **QMI_SignalReceiver** is from *collections.deque*.
+
+Publishing of a signal is implemented in **QMI_RegisteredSignal.publish** which is an implementation of the abstract base class **QMI_Signal**.
+Actual publishing happens in **QMI_context** when *publish_signal* method of the context is called. After that it is available for any receivers.
+
+Logging
+=======
+
+QMI makes use of Python's built-in ``logging`` module, and logs data in a log file. The default name and location is `$QMI_HOME/qmi.log`. If the
+environmental variable ``QMI_HOME`` is not set, it defaults to the user's home directory. The name of the log file can be customized by giving another name
+in ``CfgLogging.logfile`` instance of ``CfgQmi.logging`` configuration entry. If the logger is started normally (not in DEBUG mode), using ``qmi.start``
+with ``console_loglevel=`` keyword argument, the default logging level to console can be adjusted. Or it can be set in the configuration file.
+
+Further, in the configuration file the log level of all modules' loggers can be set with ``loglevel`` keyword argument, or module-specifically with
+``loglevels`` keyword argument. The latter requires as input a string: string dictionary.
+An example of a logging setup in ``qmi.conf`` could be::
+
+    "logging": {
+        "loglevel": "WARNING",
+        "console_loglevel": "ERROR",
+        "logfile": "focus_on_task_and_rpc.log"
+        "loglevels": {
+            "qmi.core.task": "INFO",
+            "qmi.core.rpc": "INFO"
+    }
+In this example we raise the generic loglevel to "WARNING" and console loglevel to "ERROR" so that logging "INFO" entries will not come to the log file,
+and we will see only "ERROR" level messages on the console. Then, we set the logging to be done in a special log file with only *qmi.core.task* and *qmi.core.rpc*
+modules logging everything starting from the "INFO" level. This could be useful when an user wants to filter out other modules' "INFO" messages to
+focus more on what is going on in a task and its RPC calls.
+
+the possible options are "INFO" (default log level), "WARNING" (default for console log level), "DEBUG", "CRITICAL",
+"FATAL", "ERROR", "WARN", "NOTSET". "DEBUG" should not be used directly, but rather via the ``QMI_DEBUG``
+environment variable. By setting ``QMI_DEBUG`` as environmental variable (to any value), at ``qmi.start()`` call both log levels to
+log file and to console are set into "DEBUG" level.

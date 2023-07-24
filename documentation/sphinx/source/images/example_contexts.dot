@@ -1,0 +1,16 @@
+digraph {
+    context_1 [label="CONTEXT 1\n Instrument 1 \n Instrument 2"];
+    context_2 [label="CONTEXT 2\n Task 1\n - publisher"];
+    context_3 [label="CONTEXT 3\n Task 2\n - receiver"];
+    signals  [shape=polygon,sides=5,peripheries=3,color=lightblue,style=filled];
+    database  [shape=record]
+
+
+    context_2 -> context_1 [label="control instruments"]
+    context_1 -> context_3 [dir="back" label="control instruments"]
+    context_2 -> context_3 [dir="back" label="control task"]
+
+    context_2 -> signals [label="signals:\nsettings, status" color="blue" style="dashed"]
+    signals -> context_3 [dir="back" label="status" color="green" style="dashed"]
+    signals -> database  [label="all data" color="blue" style="dashed"]
+}

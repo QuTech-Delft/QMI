@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
-from qmi.instruments.edwards.turbo_instrument_controller import Edwards_TurboInstrumentController
+from qmi.instruments.edwards import EdwardsVacuum_TIC
 
 
 class TestTurboInstrumentController(unittest.TestCase):
@@ -22,14 +22,10 @@ class TestTurboInstrumentController(unittest.TestCase):
         self._scpi_mock: Mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
         # Make DUTs
-        self.instr: Edwards_TurboInstrumentController = qmi.make_instrument(
-            "test_instr", Edwards_TurboInstrumentController, "transport_str")
+        self.instr: EdwardsVacuum_TIC = qmi.make_instrument(
+            "test_instr", EdwardsVacuum_TIC, "transport_str")
 
     def tearDown(self):
-        qmi.stop()
-
-    def tearDown(self):
-        logging.getLogger("qmi.instruments.edwards.turbo_instrument_controller").setLevel(logging.NOTSET)
         qmi.stop()
 
     def test_open_close(self):

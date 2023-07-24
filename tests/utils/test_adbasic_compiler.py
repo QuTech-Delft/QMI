@@ -170,7 +170,7 @@ class TestRunAdBasicCompiler(unittest.TestCase):
                 self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
                 pretty_print
                 )
-
+            
         # Assert
         self.assertTrue(adbasic_result_linux.success)
         self.assertTrue(adbasic_result_win.success)
@@ -213,7 +213,7 @@ class TestRunAdBasicCompiler(unittest.TestCase):
                 self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
                 pretty_print
                 )
-
+            
         # Assert
         self.assertFalse(adbasic_result_linux.success)
         self.assertFalse(adbasic_result_win.success)

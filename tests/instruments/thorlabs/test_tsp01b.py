@@ -92,7 +92,7 @@ sys.modules['usb.core.find'] = _usb_core_find_mock
 sys.modules['usb.util'] = _usb_util_mock
 sys.modules['usb.util.claim_interface'] = unittest.mock.Mock()
 
-from qmi.instruments.thorlabs.tsp01b import Thorlabs_TSP01B
+from qmi.instruments.thorlabs import Thorlabs_Tsp01b
 import qmi.core.exceptions
 from qmi.utils.context_managers import open_close
 
@@ -133,7 +133,7 @@ class TestThorlabsTsp01b(unittest.TestCase):
 
         qmi.start("TestTsp01bContext")
         self._serial = "123456"
-        self.instr: Thorlabs_TSP01B = qmi.make_instrument("instr", Thorlabs_TSP01B, self._serial)
+        self.instr: Thorlabs_Tsp01b = qmi.make_instrument("instr", Thorlabs_Tsp01b, self._serial)
 
     def tearDown(self):
         qmi.stop()
@@ -217,7 +217,7 @@ class TestThorlabsTsp01bMethods(unittest.TestCase):
         else:
             byte_string = bytes([0xf0, len(data), 0x00, 0x01, code])
             # I use the same static method for the CRC-8-AUTOSAR calculation from the code
-            crc8_byte = bytes([Thorlabs_TSP01B._crc8(byte_string)])
+            crc8_byte = bytes([Thorlabs_Tsp01b._crc8(byte_string)])
 
         # bytes 5-6
         byte_string += crc8_byte + bytes([0xf1])
@@ -250,7 +250,7 @@ class TestThorlabsTsp01bMethods(unittest.TestCase):
         _usb_util_mock.endpoint_direction = endpoint_direction
         qmi.start("TestTsp01bContext")
         self._serial = "123456"
-        self.instr: Thorlabs_TSP01B = qmi.make_instrument("instr", Thorlabs_TSP01B, self._serial)
+        self.instr: Thorlabs_Tsp01b = qmi.make_instrument("instr", Thorlabs_Tsp01b, self._serial)
 
     def tearDown(self):
         self.patch_dispose.stop()

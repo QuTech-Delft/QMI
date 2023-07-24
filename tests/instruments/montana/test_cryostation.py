@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, Mock, call, patch
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException, QMI_TimeoutException
 from qmi.core.transport import QMI_TcpTransport
-from qmi.instruments.montana.cryostation import Montana_Cryostation
+from qmi.instruments.montana import Montana_Cryostation
 
 
 class TestCryostation(unittest.TestCase):

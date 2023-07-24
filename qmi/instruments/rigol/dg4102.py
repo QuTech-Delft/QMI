@@ -70,7 +70,7 @@ class Rigol_Dg4102(QMI_Instrument):
 
     def _ask_bool(self, cmd: str) -> bool:
         """Send a query and return a boolean response.
-
+        
         Parameters:
             cmd: The query string.
         """
@@ -85,7 +85,7 @@ class Rigol_Dg4102(QMI_Instrument):
 
     def _check_error(self) -> None:
         """Read the instrument error queue and raise an exception if there is an error.
-
+        
         Raises:
             QMI_InstrumentException if response error code is not 0.
         """
@@ -97,8 +97,8 @@ class Rigol_Dg4102(QMI_Instrument):
 
     @rpc_method
     def get_idn(self) -> QMI_InstrumentIdentification:
-        """Read instrument type and version.
-
+        """Read instrument type and version. 
+        
         Returns:
             QMI_InstrumentIdentification instance.
         """

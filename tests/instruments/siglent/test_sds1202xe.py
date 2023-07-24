@@ -4,7 +4,7 @@ from unittest.mock import call, patch
 import numpy as np
 
 import qmi
-from qmi.instruments.siglent.sds1202xe import SDS1202XE, CommHeader, TriggerCondition
+from qmi.instruments.siglent import Siglent_Sds1202xE, CommHeader, TriggerCondition
 from qmi.core.transport import QMI_TcpTransport
 from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
 
@@ -13,7 +13,7 @@ class TestSDS1202XE(unittest.TestCase):
     """ Testcase of the TestSDS1202XE oscilloscope """
 
     def setUp(self):
-        qmi.start("TestContext")
+        qmi.start("TestSiglentSDS1202X-E")
         # Add patches
         patcher = patch('qmi.instruments.siglent.sds1202xe.create_transport', spec=QMI_TcpTransport)
         self._transport_mock = patcher.start().return_value
@@ -22,7 +22,7 @@ class TestSDS1202XE(unittest.TestCase):
         self._scpi_mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
         # Make DUT
-        self.scope: SDS1202XE = qmi.make_instrument("SDS1202XE", SDS1202XE, "")
+        self.scope: Siglent_Sds1202xE = qmi.make_instrument("SDS1202XE", Siglent_Sds1202xE, "")
         self.scope.open()
 
     def tearDown(self):

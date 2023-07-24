@@ -15,6 +15,7 @@ from qmi.core.context import QMI_Context
 from qmi.core.instrument import QMI_Instrument
 from qmi.core.rpc import rpc_method
 
+
 def _import_modules() -> None:
     """Import the Raspberry Pi GPIO module.
 

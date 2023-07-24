@@ -1,5 +1,4 @@
 from collections import namedtuple
-from typing import NamedTuple
 import logging
 import unittest
 from unittest.mock import Mock, call, patch
@@ -7,16 +6,20 @@ from unittest.mock import Mock, call, patch
 import qmi
 from qmi.core.exceptions import QMI_TimeoutException, QMI_InstrumentException
 from qmi.core.transport import QMI_Transport
-from qmi.instruments.nkt_photonics import adjustik
+from qmi.instruments.nkt_photonics import NktPhotonics_KoherasAdjustik
+from qmi.instruments.nkt_photonics.nkt_photonics_interbus_protocol import NKTPhotonicsInterbusProtocol
 
 
 class TestTransportOperations(unittest.TestCase):
 
     def setUp(self) -> None:
-        qmi.start("test_adjustik")
-        self.transport = Mock(spec=QMI_Transport)
-        adjustik.create_transport = Mock(return_value=self.transport)
-        self.laser = qmi.make_instrument("test_laser",adjustik.KoherasAdjustikLaser,"transport_stub")
+        # Add patches
+        patcher = patch(
+            'qmi.instruments.nkt_photonics.adjustik.create_transport', spec=QMI_Transport)
+        self.transport = patcher.start().return_value
+        self.addCleanup(patcher.stop)
+        qmi.start("test_adjustik_open_close")
+        self.laser = qmi.make_instrument("test_laser", NktPhotonics_KoherasAdjustik, "transport_stub")
 
     def tearDown(self) -> None:
         if self.laser.is_open():
@@ -45,21 +48,20 @@ class TestTransportOperations(unittest.TestCase):
 class TestMethods(unittest.TestCase):
 
     def setUp(self) -> None:
-        qmi.start("test_adjustik")
+        qmi.start("test_adjustik_methods")
 
-        # Mock transport
-        self.transport = Mock(spec=QMI_Transport)
-        adjustik.create_transport = Mock(return_value=self.transport)
-
-        # Patch interbus
+        patcher = patch(
+            'qmi.instruments.nkt_photonics.adjustik.create_transport', spec=QMI_Transport)
+        self.transport = patcher.start().return_value
+        self.addCleanup(patcher.stop)
         patcher = patch(
             'qmi.instruments.nkt_photonics.adjustik.NKTPhotonicsInterbusProtocol',
-            spec=adjustik.NKTPhotonicsInterbusProtocol
+            spec=NKTPhotonicsInterbusProtocol
         )
         self.interbus = patcher.start().return_value
         self.addCleanup(patcher.stop)
 
-        self.laser = qmi.make_instrument("test_laser",adjustik.KoherasAdjustikLaser,"transport_stub")
+        self.laser = qmi.make_instrument("test_laser", NktPhotonics_KoherasAdjustik, "transport_stub")
         self.laser.open()
 
     def tearDown(self) -> None:
@@ -100,7 +102,7 @@ class TestMethods(unittest.TestCase):
                 self.interbus.get_register.return_value = test.value_bytes
                 expected_dest = 0x01 if "basik" in test.method_name else 0x80 if "adjustik" in test.method_name else 0x00
                 # act
-                actual_rv = getattr(self.laser,test.method_name)()
+                actual_rv = getattr(self.laser, test.method_name)()
                 # assert
                 self.assertEqual(actual_rv, test.value)
                 self.interbus.get_register.assert_called_once_with(expected_dest, test.register)
@@ -123,31 +125,9 @@ class TestMethods(unittest.TestCase):
                 # arrange
                 expected_dest = 0x01 if "basik" in test.method_name else 0x80 if "adjustik" in test.method_name else 0x00
                 # act
-                getattr(self.laser,test.method_name)(*test.value)
+                getattr(self.laser, test.method_name)(*test.value)
                 # assert
                 self.interbus.set_register.assert_called_once_with(expected_dest, test.register, test.value_bytes)
-
-    # def test_get_basik_module_type(self):
-    #     # arrange
-    #     expected_rv   = 0x33
-    #     expected_reg  = 0x61
-    #     self.interbus.get_register.return_value = bytes([expected_rv])
-    #     # act
-    #     actual_rv = self.laser.get_basik_module_type()
-    #     # assert
-    #     self.assertEqual(actual_rv, expected_rv)
-    #     self.interbus.get_register.assert_called_once_with(self.expected_dest, expected_reg)
-
-    # def test_get_basik_module_type_2(self):
-    #     # arrange
-    #     expected_rv   = 0x33
-    #     expected_reg  = 0x61
-    #     self.interbus.get_register.return_value = bytes([expected_rv])
-    #     # act
-    #     actual_rv = self.laser.get_basik_module_type()
-    #     # assert
-    #     self.assertEqual(actual_rv, expected_rv)
-    #     self.interbus.get_register.assert_called_once_with(self.expected_dest, expected_reg)
 
 
 class TestInterbus(unittest.TestCase):
@@ -163,7 +143,7 @@ class TestInterbus(unittest.TestCase):
         self._mock_transport = Mock()
 
         with patch("qmi.instruments.nkt_photonics.adjustik.create_transport", return_value=self._mock_transport):
-            self._laser = adjustik.KoherasAdjustikLaser(context, "laser", "transport_stub")
+            self._laser = NktPhotonics_KoherasAdjustik(context, "laser", "transport_stub")
 
         self._laser.open()
 

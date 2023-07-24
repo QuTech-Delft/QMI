@@ -13,7 +13,8 @@ _patcher = patcher.start()
 
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.context import QMI_Context
-from qmi.instruments.adwin import adwin, proii, goldii
+from qmi.instruments.adwin import adwin
+from qmi.instruments.adwin import JagerMessTechnik_AdwinGoldII, JagerMessTechnik_AdwinProII
 
 # Class constants from ADwin.ADwin class
 ADWIN_DATATYPE_INT8 = 1
@@ -26,7 +27,7 @@ ADWIN_DATATYPE_INT64 = 7
 
 class AdwinProIITest(unittest.TestCase):
     def test_class_constants_are_ok(self) -> None:
-        self._adwin = proii.Adwin_ProII(QMI_Context("test"), "Adwin", 1234)
+        self._adwin = JagerMessTechnik_AdwinProII(QMI_Context("test"), "Adwin", 1234)
         self.assertEqual(self._adwin.MAX_PAR, 80)
         self.assertEqual(self._adwin.MAX_DATA, 200)
         self.assertEqual(self._adwin.MAX_PROCESS_NO, 10)
@@ -34,7 +35,7 @@ class AdwinProIITest(unittest.TestCase):
 
 class AdwinGoldIITest(unittest.TestCase):
     def test_class_constants_are_ok(self) -> None:
-        self._adwin = goldii.Adwin_GoldII(QMI_Context("test"), "Adwin", 1234)
+        self._adwin = JagerMessTechnik_AdwinGoldII(QMI_Context("test"), "Adwin", 1234)
         self.assertEqual(self._adwin.MAX_PAR, 80)
         self.assertEqual(self._adwin.MAX_DATA, 200)
         self.assertEqual(self._adwin.MAX_PROCESS_NO, 10)

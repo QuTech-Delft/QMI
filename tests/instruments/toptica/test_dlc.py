@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import Mock, patch, ANY
 
-from qmi.instruments.toptica.dlc import Toptica_DLC
+from qmi.instruments.toptica import Toptica_DlcPro
 
 
 class TestTopticaDlc(unittest.TestCase):
@@ -18,7 +18,7 @@ class TestTopticaDlc(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
         transport_string = "some_transport"
-        self.dlc = Toptica_DLC(Mock(name="context"), "dlc_under_test", transport_string)
+        self.dlc = Toptica_DlcPro(Mock(name="context"), "dlc_under_test", transport_string)
         patched_create_transport.assert_called_with(transport_string)
 
     def test_open_close(self):

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_SerialTransport
-from qmi.instruments.cobolt.laser_06_01 import Cobolt_Laser_06_01
+from qmi.instruments.cobolt import Hubner_Cobolt0601
 
 
 class TestLaser_06_01(unittest.TestCase):
@@ -17,7 +17,7 @@ class TestLaser_06_01(unittest.TestCase):
         with patch(
                 'qmi.instruments.cobolt.laser_06_01.create_transport',
                 return_value=self._transport_mock):
-            self.instr = qmi.make_instrument("instr", Cobolt_Laser_06_01, "transport_descriptor")
+            self.instr = qmi.make_instrument("instr", Hubner_Cobolt0601, "transport_descriptor")
 
     def tearDown(self):
         qmi.stop()

@@ -1,7 +1,7 @@
 import unittest, unittest.mock
 from typing import cast
 
-from qmi.instruments.thorlabs.tsp01 import Thorlabs_TSP01
+from qmi.instruments.thorlabs import Thorlabs_Tsp01
 from qmi.core.transport_usbtmc_visa import QMI_VisaUsbTmcTransport
 import qmi.core.exceptions
 from qmi.utils.context_managers import open_close
@@ -14,8 +14,8 @@ class TestThorlabsTsp01(unittest.TestCase):
         with unittest.mock.patch(
                 'qmi.instruments.thorlabs.tsp01.create_transport',
                 return_value=self._transport_mock):
-            self.instr: Thorlabs_TSP01 = qmi.make_instrument("instr", Thorlabs_TSP01, "transport_descriptor")
-            self.instr = cast(Thorlabs_TSP01, self.instr)
+            self.instr: Thorlabs_Tsp01 = qmi.make_instrument("instr", Thorlabs_Tsp01, "transport_descriptor")
+            self.instr = cast(Thorlabs_Tsp01, self.instr)
 
     def tearDown(self):
         qmi.stop()

@@ -6,7 +6,7 @@ from unittest.mock import patch
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException
 from qmi.instruments.picoquant.support._phlib_function_signatures import _phlib_function_signatures
-from qmi.instruments.picoquant.picoharp import PicoQuant_PicoHarp300
+from qmi.instruments.picoquant import PicoQuant_PicoHarp300
 
 
 class PicoHarpOldLibrayTestCase(unittest.TestCase):

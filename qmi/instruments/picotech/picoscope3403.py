@@ -14,7 +14,8 @@ import numpy as np
 from qmi.core.context import QMI_Context
 from qmi.core.rpc import rpc_method
 
-from qmi.instruments.picotech import PicoTech_PicoScope, ChannelCoupling, TriggerEdge, _check_error
+from qmi.instruments.picotech import ChannelCoupling, TriggerEdge
+from qmi.instruments.picotech._picoscope import PicoTech_PicoScope, _check_error
 
 # Lazy import of the "picosdk" module. See the function _import_modules() _picoscope.py.
 if TYPE_CHECKING:

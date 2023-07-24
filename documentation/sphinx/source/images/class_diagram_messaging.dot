@@ -1,0 +1,64 @@
+digraph {
+
+    // Classes without a superclass.
+
+    cls_qmi_context       [shape=record label="{ QMI_Context\n(qmi.core.context)\n'$context' | <message_router> _message_router | <send_message> send_message(..., message) }"];
+
+    cls_qmi_message       [shape=record label="{ QMI_Message\n(qmi.core.messaging) | <sour_addr> source_address | <dest_addr> destination_address }" ];
+
+    cls_message_router    [shape=record label="{ <msg_router_top> MessageRouter\n(qmi.core.messaging) | <reg_msg_handler> [un]register_message_handler(..., message_handler) | <deliver_message> deliver_message(..., message) | <router_send_message> send_message(..., message) }" ];
+
+    // Support classes without superclass
+
+    // cls_cfg_ctx        [shape=record label="{ @configstruct\nCfgContext\n(qmi.core.config_defs) | host | tcp_server_port | connect_to_peers | enabled | program_module | program_args | python_path | virtualenv_path }"];
+
+    // QMI_Message and pubsub signal subclasses
+
+    cls_request_message   [shape=record label="{ QMI_RequestMessage\n(qmi.core.messaging) | <request_message_id> request_id }" ];
+    cls_reply_message     [shape=record label="{ QMI_ReplyMessage\n(qmi.core.messaging) | <reply_request_id> request_id }" ];
+    cls_error_reply       [shape=record label="{ QMI_ErrorReplyMessage\n(qmi.core.messaging) | <error_msg> error_msg }" ];
+    cls_initial_handshake [shape=record label="{ QMI_InitialHandshakeMessage\n(qmi.core.messaging) | <version> version | <is_server_handshake> is_server_handshake }" ];
+
+    cls_signal_sub_req    [shape=record label="{ QMI_SignalSubscriptionRequest\n(qmi.core.pubsub) | publisher_name | signal_name | subscribe }" ];
+    cls_signal_sub_rly    [shape=record label="{ QMI_SignalSubscriptionReply\n(qmi.core.pubsub) | success | error_msg }" ];
+
+    // QMI_MessageHandler class and its specializations
+
+    cls_qmi_message_handler [shape=record label="{ QMI_MessageHandler\n(qmi.core.messaging) | <msghanlderaddr> address | <msg_handler_handle_msg> handle_message(..., message) }" ];
+    cls_rpc_object_manager  [shape=record label="{ RpcObjectManager\n(qmi.core.rpc) | <rpc_thread> _rpc_thread | <rpc_obj_mkr> _rpc_object_maker }" ];
+    cls_rpc_future          [shape=record label="{ RpcFuture\n(qmi.core.rpc) }" ];
+
+    // Specializations
+
+    cls_qmi_message_handler -> cls_rpc_object_manager  [dir="back" arrowtail="onormal" color="green"];
+    cls_qmi_message_handler -> cls_rpc_future          [dir="back" arrowtail="onormal" color="green"];
+
+    cls_qmi_message         -> cls_request_message     [dir="back" arrowtail="onormal" color="green"];
+    cls_qmi_message         -> cls_reply_message       [dir="back" arrowtail="onormal" color="green"];
+    cls_qmi_message         -> cls_initial_handshake   [dir="back" arrowtail="onormal" color="green"];
+    cls_request_message     -> cls_signal_sub_req      [dir="back" arrowtail="onormal" color="green"];
+    cls_reply_message       -> cls_signal_sub_rly      [dir="back" arrowtail="onormal" color="green"];
+    // cls_reply_message       -> cls_error_reply         [dir="back" arrowtail="onormal" color="green"];
+    cls_error_reply       -> cls_reply_message         [arrowhead="onormal" color="green"];
+
+    // Ownership
+
+    // cls_message_router:msg_router_top:e -> cls_qmi_context:message_router:e [dir="back" color="blue", label="(one)"];
+    cls_qmi_context:message_router:w -> cls_message_router:msg_router_top [color="blue", label="(one)"];
+
+    // Argument types.
+
+    // cls_qmi_message         -> cls_qmi_context:send_message:w [dir="back" color="black" arrowtail="onormal" style="dashed"]
+    cls_qmi_context:send_message:e         -> cls_qmi_message [color="black" arrowhead="onormal" style="dashed"]
+
+    cls_qmi_message         -> cls_qmi_message_handler:msg_handler_handle_msg:e [dir="back" color="black" arrowtail="onormal" style="dashed"]
+    // cls_qmi_message         -> cls_message_router:deliver_message:e [dir="back" color="black" arrowtail="onormal" style="dashed"]
+    // cls_qmi_message         -> cls_message_router:router_send_message:e [dir="back" color="black" arrowtail="onormal" style="dashed"]
+    cls_message_router:deliver_message:e         -> cls_qmi_message [color="black" arrowhead="onormal" style="dashed"]
+    cls_message_router:router_send_message:e     -> cls_qmi_message [color="black" arrowhead="onormal" style="dashed"]
+    cls_message_router:reg_msg_handler:w  -> cls_qmi_message_handler:msg_handler_handle_msg:w  [color="black" arrowhead="onormal"style="dashed"];
+
+    // Usage
+    // cls_qmi_context:send_message:w         -> cls_message_router:router_send_message:e [color="black"]
+    cls_message_router:router_send_message:w         -> cls_qmi_context:send_message:w [dir="back" color="black"]
+}

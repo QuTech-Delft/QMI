@@ -4,7 +4,7 @@ import logging
 import struct
 
 import qmi
-from qmi.instruments.parallax.usb_propeller import Parallax_UsbPropeller
+from qmi.instruments.parallax import Parallax_UsbPropeller
 
 
 class ParallaxUsbPropellerOpenCloseTestCase(unittest.TestCase):

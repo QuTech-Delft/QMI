@@ -1,20 +1,20 @@
 import unittest
-
-import qmi.instruments.ptgrey.blackfly_aravis as ba
-import tests.instruments.ptgrey.aravis_stub as Aravis
-import numpy as np
-import qmi
-
+from unittest.mock import MagicMock, patch
+import logging
 from typing import cast
 
-from unittest.mock import MagicMock, call, patch
+import numpy as np
 
+import qmi
+from qmi.core.context import QMI_Context
 from qmi.core.exceptions import (
     QMI_InstrumentException,
     QMI_UsageException,
     QMI_TimeoutException,
 )
-from qmi.core.context import QMI_Context
+from qmi.instruments.ptgrey import Flir_Blackfly_Aravis
+import qmi.instruments.ptgrey.blackfly_aravis as ba
+import tests.instruments.ptgrey.aravis_stub as Aravis
 
 
 class Region:
@@ -30,7 +30,7 @@ class Region:
 class TestPtGreyBlackFly(unittest.TestCase):
     def _create_instr_obj(self):
         """Create a PtGeyBlackFlyAravis object using an serial_number."""
-        instr: ba.PtGrey_BlackFly_Aravis = ba.PtGrey_BlackFly_Aravis(
+        instr: Flir_Blackfly_Aravis = Flir_Blackfly_Aravis(
             QMI_Context("context"),
             "name",
             "SerialNumber",
@@ -40,24 +40,24 @@ class TestPtGreyBlackFly(unittest.TestCase):
 
     def _create_instr_ser(self):
         """Create a PtGeyBlackFlyAravis instrument using a serial_number."""
-        instr: ba.PtGrey_BlackFly_Aravis = qmi.make_instrument(
+        instr: Flir_Blackfly_Aravis = qmi.make_instrument(
             "name",
-            ba.PtGrey_BlackFly_Aravis,
+            Flir_Blackfly_Aravis,
             "SerialNumber",
             None,
         )
-        instr = cast(ba.PtGrey_BlackFly_Aravis, instr)
+        instr = cast(Flir_Blackfly_Aravis, instr)
         return instr
 
     def _create_instr_ip(self):
         """Create a PtGeyBlackFlyAravis instrument using an ip_address."""
-        instr: ba.PtGrey_BlackFly_Aravis = qmi.make_instrument(
+        instr: Flir_Blackfly_Aravis = qmi.make_instrument(
             "name",
-            ba.PtGrey_BlackFly_Aravis,
+            Flir_Blackfly_Aravis,
             None,
             "10.10.10.10",
         )
-        instr = cast(ba.PtGrey_BlackFly_Aravis, instr)
+        instr = cast(Flir_Blackfly_Aravis, instr)
         return instr
 
     def _get_feature(self, feat):
@@ -66,6 +66,7 @@ class TestPtGreyBlackFly(unittest.TestCase):
         return self.feature_map[feat]
 
     def setUp(self):
+        logging.getLogger("qmi.instruments.ptgrey.blackfly_aravis").setLevel(logging.CRITICAL)
         qmi.start("TestContext")
         ba.Aravis = self.aravis = MagicMock(spec=Aravis)
 
@@ -95,6 +96,7 @@ class TestPtGreyBlackFly(unittest.TestCase):
 
     def tearDown(self) -> None:
         qmi.stop()
+        logging.getLogger("qmi.instruments.ptgrey.blackfly_aravis").setLevel(logging.NOTSET)
 
     def test_open_ser(self):
         """Test whether a camera is found using a serial number."""
@@ -1005,7 +1007,7 @@ class TestPtGreyBlackFly(unittest.TestCase):
     def test_list_instrument(self):
         """Test PtGreyBlackFly.list_instruments()."""
         self.aravis.get_n_devices = MagicMock(return_value=1)
-        d = ba.PtGrey_BlackFly_Aravis.list_instruments()
+        d = Flir_Blackfly_Aravis.list_instruments()
         self.assertEqual(d[0].vendor_name, self.aravis.get_device_vendor(1))
         self.assertEqual(d[0].model_name, self.aravis.get_device_model(1))
         self.assertEqual(d[0].serial_number, self.aravis.get_device_serial_nbr(1))
@@ -1015,7 +1017,7 @@ class TestPtGreyBlackFly(unittest.TestCase):
     def test_init_usage_exception(self):
         """Create a PtGeyBlackFlyAravis object usage exception due to invalid input."""
         with self.assertRaises(QMI_UsageException):
-            ba.PtGrey_BlackFly_Aravis(
+            Flir_Blackfly_Aravis(
                 QMI_Context("context"),
                 "name",
                 None,

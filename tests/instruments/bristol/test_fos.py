@@ -1,10 +1,9 @@
-import sys
 import unittest
 from unittest.mock import Mock, call, patch
 
 import qmi
 import qmi.instruments.bristol.fos
-from qmi.instruments.bristol.fos import Bristol_FOS
+from qmi.instruments.bristol import Bristol_FOS
 from qmi.utils.context_managers import open_close
 
 
