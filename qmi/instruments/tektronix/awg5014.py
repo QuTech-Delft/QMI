@@ -1,8 +1,10 @@
 """QMI Instrument driver for the Tektronix's AWG 5014 arbitrary waveform generator."""
+from pathlib import PureWindowsPath
 import socket
-from typing import List, Union
+from typing import List, Tuple, Union
 import logging
 import re
+from time import time, sleep
 
 from qmi.core.context import QMI_Context
 from qmi.core.instrument import QMI_Instrument
@@ -50,7 +52,7 @@ class Tektronix_Awg5014(QMI_Instrument):
     def _check_error(self) -> None:
         """Read the instrument error queue and raise an exception if there is an error."""
         # Read error queue.
-        resp = self._scpi_transport.ask("SYST:ERR?")
+        resp = self._scpi_transport.ask("SYST:ERR?", discard=True)
         if not re.match(r"^\s*[+-]?0\s*,", resp):
             # Report the error.
             raise QMI_InstrumentException("Instrument returned error: {}".format(resp))
@@ -88,7 +90,6 @@ class Tektronix_Awg5014(QMI_Instrument):
     def wait_and_clear(self) -> None:
         """Wait and clear (responses of) previous command(s)."""
         # Wait until all pending commands are finished.
-        self._transport.discard_read()
         self._scpi_transport.write("*WAI")
         try:
             # Clear out any possible hanging responses from the Tektronix
@@ -98,19 +99,41 @@ class Tektronix_Awg5014(QMI_Instrument):
             # In case no hanging responses were present
             pass
 
-    @rpc_method
-    def reset(self) -> None:
-        """Resets the instrument to default values."""
-        _logger.info("Resetting instrument [%s]", self._name)
-        # In practise, it was seen that *CLS does not clear the memory as intended for stale responses.
-        # By making this as an inquiry, it clears up one possible delayed response from the scpi_protocol.
-        try:
+        finally:
+            # Clear transport buffer
             self._transport.discard_read()
 
+    @rpc_method
+    def wait_command_completion(self) -> None:
+        """Wait completion of previous command."""
+        self._scpi_transport.write("*OPC")
+        start = time()
+        try:
+            while (time() - start) < self.RESPONSE_TIMEOUT:
+                operation_complete = self._scpi_transport.ask("*OPC?")
+                if operation_complete == "1":
+                    break
+
+                sleep(1)
+
         except (QMI_TimeoutException, socket.timeout):
-            # In case no hanging responses were present
+            # We ignore timeout errors and go to check if there were errors from the controller
             pass
 
+        finally:
+            # Clear the error queue from "error" -800,"Operation complete"
+            resp = self._scpi_transport.ask("SYST:ERR?", discard=True)
+            if not re.match(r"^\s*-800\s*,", resp) and not re.match(r"^\s*[+-]?0\s*,", resp):
+                # Report the error.
+                raise QMI_InstrumentException(f"Instrument returned error: {resp}")
+
+    @rpc_method
+    def reset(self) -> None:
+        """Resets the instrument to default values. In practise, it was seen that *CLS does not clear the memory as
+        intended for stale responses. By making this as a query with discarding data in transport buffer, it clears
+        up possible delayed response(s) from the scpi_protocol.
+        """
+        _logger.info("Resetting instrument [%s]", self._name)
         # Do reset
         self._scpi_transport.write("*RST")
         # Re-enable OPC
@@ -140,6 +163,18 @@ class Tektronix_Awg5014(QMI_Instrument):
         """
         state = self._scpi_transport.ask("AWGC:RSTATE?")
         return self._instrument_status[state.strip()]
+
+    @rpc_method
+    def get_setup_file_name(self) -> Tuple[str, str]:
+        """Returns the current setup file name of the arbitrary waveform generator.
+           The response contains the full path for the file including the disk drive.
+           Example: '"\\my\\project\\awg\\setup\\a1.awg","D:"'
+
+        Returns:
+            tuple: File path and name, e.g. ("\\Users\\OEM\\Documents", "newAWGfile.awg").
+        """
+        resp = PureWindowsPath(self._scpi_transport.ask("AWGC:SNAM?"))
+        return str(resp.parent).lstrip('"'), resp.name.split(",")[0].rstrip('"')
 
     @rpc_method
     def get_file_names(self) -> List[str]:
@@ -239,6 +274,9 @@ class Tektronix_Awg5014(QMI_Instrument):
             #512234xxxxx... where 5 indicates that the following 5 digits (12234) specify the length of the data in
             bytes; xxxxx... indicates actual data or #0xxxxx...<LF><&EOI>.
 
+        As this command is slow with large AWG files, successive command calls without waiting for the sending to
+        complete can cause errors. Therefore, it is recommended to call `wait_command_completion` after this command.
+
         Parameters:
             file_name:           The file name, e.g. "newAWGfile.awg".
             awg_file_block_data: Block data for the file in bytes, should be sum of values of io.BytesIO objects
@@ -256,6 +294,9 @@ class Tektronix_Awg5014(QMI_Instrument):
     def load_awg_file(self, file_name: str) -> None:
         """This command shall load the given .awg file into the AWG memory. Note that it will also overwrite
         all the current instrument settings with the values in the file.
+
+        As this command is slow with large AWG files, successive command calls without waiting for the upload to
+        complete can cause errors. Therefore, it is recommended to call `wait_command_completion` after this command.
 
         Parameters:
             file_name: The file name, e.g. "newAWGfile.awg".
@@ -298,7 +339,11 @@ class Tektronix_Awg5014(QMI_Instrument):
 
     @rpc_method
     def start(self) -> None:
-        """Initiates the output of a waveform or a sequence."""
+        """Initiates the output of a waveform or a sequence.
+
+        As this command can run for a relatively long time, successive command calls can cause errors. Therefore,
+        it is recommended to call `wait_command_completion` after this command.
+        """
         self._scpi_transport.write("AWGC:RUN")
 
     @rpc_method
@@ -678,8 +723,8 @@ class Tektronix_Awg5014(QMI_Instrument):
         """Set trigger polarity sign.
 
         Parameters:
-            Trigger polarity sign as string "POS" or "POSitive" for positive polarity and "NEG" or "NEGative" for
-            negative polarity.
+            polarity: Trigger polarity sign as string "POS" or "POSitive" for positive polarity and "NEG" or "NEGative"
+                      for negative polarity.
         """
         if polarity.upper() in ["POS", "POSITIVE"]:
             target_polarity = "POSitive"
@@ -691,6 +736,34 @@ class Tektronix_Awg5014(QMI_Instrument):
             raise ValueError(f"Invalid polarity sign {polarity}")
 
         self._scpi_transport.write(f"TRIG:POL {target_polarity}")
+
+    @rpc_method
+    def get_waveform_output_data_position(self) -> str:
+        """Query The output data position of a waveform while the instrument is in the waiting-for-trigger state.
+        This is valid only when Run Mode is Triggered or Gated.
+
+        Returns:
+            Waveform output data position as "FIRS" or "LAST".
+        """
+        return self._scpi_transport.ask("TRIG:SEQ:WVAL?").strip()
+
+    @rpc_method
+    def set_waveform_output_data_position(self, position: str) -> None:
+        """
+        This command sets the output data position of a waveform. This is valid only when
+        Run Mode is Triggered or Gated.
+
+        Parameters:
+            position: Sets a position of a waveform as the output level. Possible values are "FIRS[t]" and "LAST".
+        """
+        if position.upper() not in ["FIRS", "FIRST", "LAST"]:
+            raise ValueError(f"Invalid waveform position {position}")
+
+        # Check the current Run mode before allowing to set
+        if self.get_run_mode() not in ["TRIG", "GAT"]:
+            raise QMI_InstrumentException("The Run mode must be Triggered or Gated to set WF output data position")
+
+        self._scpi_transport.write(f"TRIG:SEQ:WVAL {position}")
 
     @rpc_method
     def force_trigger_event(self) -> None:
@@ -900,7 +973,7 @@ class Tektronix_Awg5014(QMI_Instrument):
             The waveform type of the sequence element channel.
         """
         self._check_channel_number(channel)
-        return self._scpi_transport.ask(f"SEQ:ELEM{element_no}:WAV{channel}?").strip()
+        return self._scpi_transport.ask(f"SEQ:ELEM{element_no}:WAV{channel}?", discard=True).strip()
 
     @rpc_method
     def set_sequence_element_waveform(self, element_no: int, channel: int, waveform: str) -> None:

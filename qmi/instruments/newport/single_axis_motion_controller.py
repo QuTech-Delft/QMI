@@ -233,7 +233,8 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         self._check_error(controller_address)
 
     @rpc_method
-    def set_home_search_timeout(self, timeout: Optional[float] = None, controller_address: Optional[int] = None) -> None:
+    def set_home_search_timeout(
+            self, timeout: Optional[float] = None, controller_address: Optional[int] = None) -> None:
         """
         Set the timeout for the home search.
 
@@ -259,6 +260,10 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         """
         Get the timeout for the home search.
 
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
+
         Returns:
             The timeout in seconds.
         """
@@ -275,7 +280,9 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         Use other methods such as `get_positioner_error_and_state` to query the state of the controller.
 
         Parameters:
-            position:   New position to move to, in encoder units.
+            position:           New position to move to, in encoder units.
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
         """
         _logger.info(
             "Performing an absolute move of instrument [%s] to [%s]", self._name, position)
@@ -296,6 +303,10 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         """
         Get the actual position of the actuator according to the encoder value.
 
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
+
         Returns:
             Current position in encoder units.
         """
@@ -311,7 +322,9 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         Perform a relative move from the current position.
 
         Parameters:
-            displacement:   Displacement from current position.
+            displacement:       Displacement from current position.
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
         """
         _logger.info("Performing relative move of instrument [%s]", self._name)
         self._scpi_protocol.write(
@@ -325,6 +338,10 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         is not in the NOT REFERENCE state, then call the `reset` method.
         NOTE:   In this state the parameters are stored in the flash memory of the controller.
                 The device supports up to 100 writes, so this command should not be used often.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
         """
         _logger.info(
             "Entering configuration state of instrument [%s]", self._name)
@@ -348,6 +365,10 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
     def get_encoder_increment_value(self, controller_address: Optional[int] = None) -> float:
         """
         Get the encoder increment value.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
 
         Returns:
             Encoder increment value.
@@ -375,7 +396,9 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         https://www.newport.com/mam/celum/celum_assets/np/resources/CONEX-CC_-_Controller_Documentation.pdf?0
 
         Parameters:
-            value:    Increment value.
+            value:              Increment value.
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
         """
         _logger.info(
             "Setting encoder increment value of instrument [%s] to [%s]", self._name, value)
@@ -394,11 +417,13 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         Set the velocity at which the actuator moves.
 
         Parameters:
-            velocity:   Velocity in unit/s. The unit depends on the encoder resolution,
-                        which is usually set to 1mm
-            persist:    Flag to indicate if the velocity should be persisted to the controller's memory, so it
-                        is still available after powering down the controller. When not persisted, the maximum allowable
-                        velocity that can be set is the one stored in the controller's memory.
+            velocity:           Velocity in unit/s. The unit depends on the encoder resolution,
+                                which is usually set to 1mm
+            persist:            Flag to indicate if the velocity should be persisted to the controller's memory, so it
+                                is still available after powering down the controller. When not persisted, the maximum allowable
+                                velocity that can be set is the one stored in the controller's memory.
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
         """
         _logger.info(
             "Setting velocity of instrument [%s] to [%s]", self._name, velocity)
@@ -426,6 +451,10 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         """
         Get the velocity of the actuator in unit/s, so if the the encoder unit is mm,
         then the returned value is in mm/s.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
         """
         _logger.info("Getting velocity of instrument [%s]", self._name)
         # if controller address is not given use the default one
@@ -445,6 +474,10 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         """
         Get the currently memorised error.
 
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
+
         Returns:
             A tuple containing the error code and the human readable error message.
         """
@@ -461,8 +494,57 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
     def stop_motion(self, controller_address: Optional[int] = None) -> None:
         """
         Stop the motion of the actuator by decelerating it.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
         """
         _logger.info("Stop motion of instrument [%s]", self._name)
         self._scpi_protocol.write(
             self._build_command("ST", controller_address=controller_address))
         self._check_error(controller_address)
+
+    @rpc_method
+    def set_backlash_compensation(self, backlash_comp: float, controller_address: Optional[int] = None) -> None:
+        """
+        Set the backlash compensation of a controller.
+
+        Parameters:
+            backlash_comp:      backlash compensation in encoder units.
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
+        """
+        # if controller address is not given use the default one.
+        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
+        _logger.info(
+            "Setting backlash compensation of controller [%s] instrument [%s] to [%s]", controller_address, self._name,
+            backlash_comp)
+        # instrument must be in configuration state to set the backlash compensation.
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        self._scpi_protocol.write(self._build_command("BA", backlash_comp, controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+
+    @rpc_method
+    def get_backlash_compensation(self, controller_address: Optional[int] = None) -> float:
+        """
+        Get the backlash value in encoder units.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default
+                                it is set to the initialised value of the controller address.
+        """
+        # if controller address is not given use the default one
+        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
+        _logger.info("Getting backlash compensation of controller [%s] instrument [%s]", controller_address, self._name)
+        # instrument must be in configuration state to get the backlash compensation.
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        backlash_comp = self._scpi_protocol.ask(
+            self._build_command("BA?", controller_address=controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+        return float(backlash_comp[3:])

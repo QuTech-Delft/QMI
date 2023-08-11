@@ -1,8 +1,7 @@
 """QMI driver for the NKT Photonics Instruments "Boostik" laser amplifier.
 
-The protocol implemented in this driver is documented in the document 'NKT_Photonics_BoostiK_HPA_Users_Manual rev06.pdf',
-  section 4.3.2.
-
+The protocol implemented in this driver is documented in the document
+'NKT_Photonics_BoostiK_HPA_Users_Manual rev06.pdf', section 4.3.2.
 """
 
 import logging
@@ -19,22 +18,27 @@ _logger = logging.getLogger(__name__)
 
 
 class KoherasBoostikLaserAmplifier(QMI_Instrument):
-
     DEFAULT_TIMEOUT = 0.500  # 500 ms ought to be plenty.
 
-    def __init__(self, context: QMI_Context, name: str, transport: str, timeout: Optional[float]=None):
-
+    def __init__(
+        self,
+        context: QMI_Context,
+        name: str,
+        transport: str,
+        timeout: Optional[float] = DEFAULT_TIMEOUT,
+    ):
         super().__init__(context, name)
-        self._transport = create_transport(transport,
-                                           default_attributes={
-                                               "baudrate": 9600,
-                                               "bytesize": 8,
-                                               "parity": 'N',
-                                               "stopbits": 1.0,
-                                               "rtscts": False})
+        self._transport = create_transport(
+            transport,
+            default_attributes={
+                "baudrate": 9600,
+                "bytesize": 8,
+                "parity": "N",
+                "stopbits": 1.0,
+                "rtscts": False,
+            },
+        )
 
-        if timeout is None:
-            timeout = self.DEFAULT_TIMEOUT
         self._timeout = timeout
 
     @rpc_method
@@ -82,7 +86,7 @@ class KoherasBoostikLaserAmplifier(QMI_Instrument):
 
     @rpc_method
     def get_actual_current(self) -> float:
-        """Retrieve the the real current value, in [A]."""
+        """Retrieve the real current value, in [A]."""
         return self._get_float("AMC")
 
     @rpc_method
@@ -92,7 +96,7 @@ class KoherasBoostikLaserAmplifier(QMI_Instrument):
 
     @rpc_method
     def get_ambient_temperature(self) -> float:
-        """Retrieve the ambient temperature valuee, in [°C]."""
+        """Retrieve the ambient temperature, in [°C]."""
         return self._get_float("CMA")
 
     @rpc_method
@@ -115,18 +119,22 @@ class KoherasBoostikLaserAmplifier(QMI_Instrument):
         """Set the ACC current setpoint, in [A].
 
         The command returns the actual setpoint after executing the command.
-        In case the command was unsuccesful (current out of range), the unchanged
+        In case the command was unsuccessful (current out of range), the unchanged
         current setpoint is returned.
+
+        Parameters:
+            current: In Amperes.
         """
-        cmd = "ACC {}".format(current)
-        return self._get_float(cmd)
+        return self._get_float(f"ACC {current}")
 
     @rpc_method
     def set_amplifier_enabled(self, enable: bool) -> bool:
         """Enable or disable the amplifier.
 
         The command returns the enabled status after the command.
+
+        Parameters:
+            enable: Boolean for disabling (False) or enabling (True).
         """
         value = int(bool(enable))
-        cmd = "CDO {}".format(value)
-        return self._get_boolean(cmd)
+        return self._get_boolean(f"CDO {value}")

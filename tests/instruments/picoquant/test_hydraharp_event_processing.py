@@ -47,7 +47,8 @@ class TestHydraHarpEventFilter(unittest.TestCase):
             channels=[0, 1, 2, 3],
             seed=1234)
 
-    def gen_events(self, max_events, sync_period):
+    @staticmethod
+    def gen_events(max_events, sync_period):
         events_in = np.empty(max_events, dtype=EventDataType)
         events_in["type"] = 0
         events_in["timestamp"] = np.cumsum(np.random.randint(1, sync_period, max_events))
@@ -751,7 +752,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         sync_period = int(1E12 // self.SYNC_FREQUENCY_32MHz)
         # Generate a bunch of events that just barely fit into the pending event buffer.
         max_events = self.PATCHED_MAX_PENDING_EVENTS - 1
-        events_in = self.gen_events(max_events, sync_period)
+        events_in = TestHydraHarpEventFilter.gen_events(max_events, sync_period)
 
         # Patch the readFifo() function.
         # This fill feed the first part of the events to the driver (not enough to overflow the buffer).
@@ -802,7 +803,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         self._hydraharp.stop_measurement()
 
         # Generate new events to check that a subsequent measurement runs cleanly after overflow.
-        events_in = self.gen_events(max_events, sync_period)
+        events_in = TestHydraHarpEventFilter.gen_events(max_events, sync_period)
 
         fifo_words_in = self.events_to_fifo(events_in, sync_period, resolution.value)
         self._library_mock.ReadFiFo.side_effect = self.make_patched_read_fifo(fifo_words_in, done_event)

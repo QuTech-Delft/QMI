@@ -6,4 +6,4 @@ The qmi.instruments.wavelength package provides support for:
 """
 from qmi.instruments.wavelength.tclab import AutotuneMode, TemperatureControllerCondition
 # Alternative, QMI naming convention approved name
-from qmi.instruments.wavelength.tclab import Wavelength_TC_Lab as Wavelenght_TcLab
+from qmi.instruments.wavelength.tclab import Wavelength_TC_Lab as Wavelength_TcLab

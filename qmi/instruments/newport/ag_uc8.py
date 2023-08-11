@@ -10,6 +10,7 @@ from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
+
 # Global variable holding the logger for this module.
 from qmi.core.transport import create_transport
 
@@ -18,6 +19,7 @@ _logger = logging.getLogger(__name__)
 
 class AxisStatus(enum.IntEnum):
     """Axis status codes."""
+
     READY = 0
     STEPPING = 1
     JOGGING = 2
@@ -76,13 +78,15 @@ class Newport_AG_UC8(QMI_Instrument):
         :argument transport: QMI transport descriptor for command interface.
         """
         super().__init__(context, name)
-        self._transport = create_transport(transport,
-                                           default_attributes={
-                                               "baudrate": 921600,
-                                               "bytesize": 8,
-                                               "parity": "N",
-                                               "stopbits": 1,
-                                           })
+        self._transport = create_transport(
+            transport,
+            default_attributes={
+                "baudrate": 921600,
+                "bytesize": 8,
+                "parity": "N",
+                "stopbits": 1,
+            },
+        )
         self._current_channel: Optional[int] = None
 
     @rpc_method
@@ -109,7 +113,7 @@ class Newport_AG_UC8(QMI_Instrument):
         self._check_is_open()
 
         # Send command, terminated with \r\n.
-        rawcmd = cmd.encode('ascii') + b"\r\n"
+        rawcmd = cmd.encode("ascii") + b"\r\n"
         self._transport.write(rawcmd)
 
         # Sleep until command completed.
@@ -120,14 +124,14 @@ class Newport_AG_UC8(QMI_Instrument):
         self._check_is_open()
 
         # Send command, terminated with \r\n.
-        rawcmd = cmd.encode('ascii') + b"\r\n"
+        rawcmd = cmd.encode("ascii") + b"\r\n"
         self._transport.write(rawcmd)
 
         # Read response.
         resp = self._transport.read_until(message_terminator=b"\n", timeout=timeout)
         resp = resp.rstrip(b"\r\n")
 
-        return resp.decode('ascii', errors='replace')
+        return resp.decode("ascii", errors="replace")
 
     def _get_attribute(self, cmd: str, timeout: float = RESPONSE_TIMEOUT) -> int:
         """Send the specified command to the device and expect an integer value as result.
@@ -148,22 +152,22 @@ class Newport_AG_UC8(QMI_Instrument):
                 # Invalid numeric format.
                 # Ignore error; it will be reported below.
                 pass
+
         _logger.warning("Unexpected response to command %s: %r", cmd, resp)
         raise QMI_InstrumentException(f"Unexpected response to command {cmd}: '{resp}'")
 
     @rpc_method
     def get_last_error(self) -> int:
         """Send a TE command (get error of previous command) and return
-        a numerical error code.
+        a numerical error code. This function is called automatically after each command sent
+        to the device.
+
+        Raises:
+            QMI_InstrumentException: When a command results in error.
 
         Returns:
-            error (int): Error code for previous command.
-                Value 0 means no error (success).
-                See class attribute ERROR_CODES for the meaning of the codes.
-
-        This function is called automatically after each command sent
-        to the device. When a command results in error,
-        QMI_InstrumentException is raised.
+            error: Integer error code for previous command. Value 0 means no error (success).
+                   See class attribute ERROR_CODES for the meaning of the codes.
         """
         return self._get_attribute("TE")
 
@@ -177,25 +181,51 @@ class Newport_AG_UC8(QMI_Instrument):
         if err != 0:
             errstr = self.ERROR_CODES.get(err, "unknown")
             _logger.warning("Command %s failed with error %d (%s)", cmd, err, errstr)
-            raise QMI_InstrumentException(f"Command {cmd} failed with error {err} ({errstr})")
+            raise QMI_InstrumentException(
+                f"Command {cmd} failed with error {err} ({errstr})"
+            )
 
-    def _get_axis_attribute(self, attr: str, axis: int, timeout: float = RESPONSE_TIMEOUT) -> int:
-        """Read the specified axis attribute and return an integer value."""
+    def _get_axis_attribute(
+        self, attr: str, axis: int, timeout: float = RESPONSE_TIMEOUT
+    ) -> int:
+        """Read the specified axis attribute and return an integer value.
+
+        Parameters:
+            attr: The axis attribute to be obtained.
+            axis: The axis number. Must be 1 or 2.
+            timeout: Timeout for instrument response.
+
+        Raises:
+            QMI_UsageException: If invalid axis index is given as input.
+
+        Returns:
+            The value of the queried attribute on selected axis.
+        """
         if axis not in (1, 2):
             raise QMI_UsageException(f"Invalid axis index {axis}")
         return self._get_attribute(f"{axis}{attr}", timeout)
 
     def _set_axis_attribute(self, attr: str, axis: int, value: int) -> None:
-        """Set the specified axis attribute."""
+        """Set the specified axis attribute.
+
+        Parameters:
+            attr: The axis attribute to be set.
+            axis: The axis number. Must be 1 or 2.
+            value: An integer value for the attribute.
+
+        Raises:
+            QMI_UsageException: If invalid axis index is given as input.
+        """
         if axis not in (1, 2):
             raise QMI_UsageException(f"Invalid axis index {axis}")
+
         cmd = f"{axis}{attr}{value}"
         self._write(cmd)
         self._check_error(cmd)
 
     @rpc_method
     def reset(self) -> None:
-        """Reset the motor controller."""
+        """Reset the motor controller. Re-enables remote mode afterwards"""
         _logger.info("[%s] reset", self._name)
         self._current_channel = None
         self._write("RS")
@@ -216,11 +246,12 @@ class Newport_AG_UC8(QMI_Instrument):
             version = words[1]
         else:
             _logger.warning("Unexpected response to VE command: %r", resp)
-            raise QMI_InstrumentException(f"Unexpected response to VE command: '{resp}'")
-        return QMI_InstrumentIdentification(vendor="Newport",
-                                            model=model,
-                                            serial=None,
-                                            version=version)
+            raise QMI_InstrumentException(
+                f"Unexpected response to VE command: '{resp}'"
+            )
+        return QMI_InstrumentIdentification(
+            vendor="Newport", model=model, serial=None, version=version
+        )
 
     @rpc_method
     def select_channel(self, channel: int) -> None:
@@ -231,6 +262,12 @@ class Newport_AG_UC8(QMI_Instrument):
         "channel" parameter.
 
         Changing the channel is only allowed when the axis is not moving.
+
+        Parameters:
+            channel: The channel number. Must in range 1-4.
+
+        Raises:
+            QMI_UsageException: By invalid channel number input.
         """
 
         # Check channel index.
@@ -249,6 +286,7 @@ class Newport_AG_UC8(QMI_Instrument):
         """Get the limit switch status for the specified channel.
 
         :argument channel: Channel index (range 1 .. 4).
+        :raises: QMI_InstrumentException if invalid response is received.
         :return: Tuple (axis1_limit_active, axis2_limit_active).
         """
         self.select_channel(channel)
@@ -286,6 +324,7 @@ class Newport_AG_UC8(QMI_Instrument):
 
         :argument axis: Axis index (1 .. 2).
         :argument direction: Direction (0=positive, 1=negative).
+        :raises: QMI_UsageException by invalid direction index number.
         :return: Step amplitude (1 .. 50).
         """
         if direction == 0:
@@ -303,6 +342,7 @@ class Newport_AG_UC8(QMI_Instrument):
         :argument axis: Axis index (1 .. 2).
         :argument direction: Step direction (0=positive, 1=negative).
         :argument value: New step amplitude (1 .. 50).
+        :raises: QMI_UsageException by invalid direction index number.
         """
         if direction == 0:
             attr = "SU+"
@@ -326,6 +366,7 @@ class Newport_AG_UC8(QMI_Instrument):
         """Reset the step counter to zero.
 
         :argument axis: Axis index (1 .. 2).
+        :raises: QMI_UsageException by invalid axis index number.
         """
         if axis not in (1, 2):
             raise QMI_UsageException(f"Invalid axis index {axis}")
@@ -402,7 +443,9 @@ class Newport_AG_UC8(QMI_Instrument):
             of 1/1000 of the total axis range.
         """
         self.select_channel(channel)
-        return self._get_axis_attribute(f"PA{position}", axis, timeout=self.SLOW_RESPONSE_TIMEOUT)
+        return self._get_axis_attribute(
+            f"PA{position}", axis, timeout=self.SLOW_RESPONSE_TIMEOUT
+        )
 
     @rpc_method
     def move_rel(self, channel: int, axis: int, steps: int) -> None:
@@ -413,8 +456,9 @@ class Newport_AG_UC8(QMI_Instrument):
         :argument steps: Number of steps to move relative to the current position.
             Positive values move in positive direction;
             negative values move in negative direction.
+        :raises: QMI_UsageException by input steps number out of range.
         """
-        if abs(steps) > 2 ** 31:
+        if abs(steps) > 2**31:
             raise QMI_UsageException(f"Number of steps out of range {steps}")
         self.select_channel(channel)
         self._set_axis_attribute("PR", axis, steps)
@@ -424,6 +468,7 @@ class Newport_AG_UC8(QMI_Instrument):
         """Stop current movement.
 
         :argument axis: Axis index (1 .. 2).
+        :raises: QMI_UsageException by invalid axis index number.
         """
         if axis not in (1, 2):
             raise QMI_UsageException(f"Invalid axis index {axis}")

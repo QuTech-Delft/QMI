@@ -299,25 +299,29 @@ SerialTransportDescriptorParser = TransportDescriptorParser(
     [("device", (str, True))],
     {'baudrate': (int, False), 'bytesize': (int, False),
      'parity': (str, False),
-     'stopbits': (float, False)})
+     'stopbits': (float, False)}
+)
 
 TcpTransportDescriptorParser = TransportDescriptorParser(
     "tcp",
     [("host", (str, True)),
      ('port', (int, True))],
-    {'connect_timeout': (float, False)})
+    {'connect_timeout': (float, False)}
+)
 
 UsbTmcTransportDescriptorParser = TransportDescriptorParser(
     "usbtmc",
     [],
     {'vendorid': (int, False),
      'productid': (int, False),
-     'serialnr': (str, True)})
+     'serialnr': (str, True)}
+)
 
 Vxi11TransportDescriptorParser = TransportDescriptorParser(
     "vxi11",
     [("host", (str, True))],
-    {})
+    {}
+)
 
 
 class QMI_SerialTransport(QMI_Transport):
@@ -681,7 +685,6 @@ class QMI_TcpTransport(QMI_Transport):
                 # NOTE: Reading up to 4096 bytes here.
                 #       Exact amount does not matter but a small power of 2 is recommended, e.g. 4096
                 #       by socket.recv() documentation.
-                # b = self._safe_socket.recv(4096)
                 b = self._safe_socket.recv(512)
             except (BlockingIOError, socket.timeout):
                 # timeout in socket.recv()
@@ -1038,7 +1041,14 @@ class QMI_Vxi11Transport(QMI_Transport):
 
         # Attempt to read the data.
         try:
-            data = self._safe_instr.read_raw()
+            data = b''
+            while True:
+                data += self._safe_instr.read_raw()
+                # Validate terminator.
+                data_term_char = data[-1:]  # use slice rather than index to get back bytes()
+                if data_term_char == message_terminator:
+                    break
+
         except vxi11.vxi11.Vxi11Exception as err:
             if err.err == 15:
                 # Raise timeout exception separately to provide opportunity for upper layer to handle it.
@@ -1052,13 +1062,6 @@ class QMI_Vxi11Transport(QMI_Transport):
             self._safe_instr.term_char = old_term_char
             self._safe_instr.timeout = old_timeout
 
-        # Validate terminator.
-        data_term_char = data[-1:]  # use slice rather than index to get back bytes()
-        if data_term_char != message_terminator:
-            # raise QMI_InstrumentException("Expected message terminator {!r}, instead received {!r}".format(
-            #     message_terminator, data_term_char))
-            raise QMI_InstrumentException("Expected message terminator {!r}, instead received {!r}".format(
-                message_terminator, data))
         return data
 
     def discard_read(self) -> None:

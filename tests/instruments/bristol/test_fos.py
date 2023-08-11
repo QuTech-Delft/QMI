@@ -80,6 +80,24 @@ class TestFos(unittest.TestCase):
         with self.assertRaises(ValueError):
             fos.open()
 
+    def test_device_connection_errors(self):
+        """Test exception if device has connection issues."""
+        # arrange
+        expected_calls = [
+            call.connect(),
+            call.get_dio_device(),
+            call.disconnect(),
+            call.release()
+        ]
+        self.device_mock.get_dio_device = Mock(return_value=BaseException)
+        # act
+        fos: Bristol_FOS = qmi.make_instrument("fos", Bristol_FOS, self.UNIQUE_ID)
+        # assert
+        with self.assertRaises(BaseException):
+            fos.open()
+
+        self.assertEqual(expected_calls, self.device_mock.method_calls)
+
     def test_select_channel(self):
         """Test selecting channel"""
 

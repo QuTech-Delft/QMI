@@ -1154,6 +1154,7 @@ class ArgParserTestCase(unittest.TestCase):
         peer_patcher.start()
 
     def tearDown(self) -> None:
+        sys.stderr.close()
         sys.stderr = self._stderr
 
     @patch("builtins.print")

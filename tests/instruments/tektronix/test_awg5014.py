@@ -283,13 +283,14 @@ class TektronixAWG5014TestCase(unittest.TestCase):
         self._transport_mock.close.assert_called_once_with()
 
     def test_wait_and_clear(self):
-        """Test wait and clear function."""
+        """Test wait_and_clear function."""
         with open_close(self.instr):
             self._transport_mock.read_until.side_effect = [b"\n"]
             self.instr.wait_and_clear()
-            self.assertIn(call(b"*WAI\n"), self._transport_mock.write.mock_calls)
-            self.assertIn(call(b"*CLS\n"), self._transport_mock.write.mock_calls)
-            self.assertEqual(self._transport_mock.write.mock_calls.count(call(b"*CLS\n")), 1)
+
+        self.assertIn(call(b"*WAI\n"), self._transport_mock.write.mock_calls)
+        self.assertIn(call(b"*CLS\n"), self._transport_mock.write.mock_calls)
+        self.assertEqual(self._transport_mock.write.mock_calls.count(call(b"*CLS\n")), 1)
 
     def test_wait_and_clear_with_passing_timeouts(self):
         """Test wait_and_clear to pass the timeouts. Check that at least 1 second was passed"""
@@ -304,6 +305,38 @@ class TektronixAWG5014TestCase(unittest.TestCase):
 
         end = time()
         self.assertGreater(end - start, 1.0)
+
+    def test_wait_command_completion(self):
+        """Test wait_command_completion function."""
+        with open_close(self.instr):
+            self._transport_mock.read_until.side_effect = [b"0\n", b"1\n", b'-800,"Operation complete"\n']
+            self.instr.wait_command_completion()
+
+        self.assertIn(call(b"*OPC\n"), self._transport_mock.write.mock_calls)
+        self.assertIn(call(b"*OPC?\n"), self._transport_mock.write.mock_calls)
+        self.assertIn(call(b"SYST:ERR?\n"), self._transport_mock.write.mock_calls)
+        self.assertEqual(self._transport_mock.write.mock_calls.count(call(b"*OPC?\n")), 2)
+
+    def test_wait_command_completion_with_passing_timeouts(self):
+        """Test wait_command_completion to pass the timeouts. Check that at least 1 second was passed"""
+        start = time()
+        with open_close(self.instr):
+            self._transport_mock.read_until.side_effect = [b"0\n", QMI_TimeoutException, b'0,"No error"\n']
+            self.instr.wait_command_completion()
+
+        end = time()
+        self.assertGreater(end - start, 1.0)
+
+        self.assertIn(call(b"*OPC\n"), self._transport_mock.write.mock_calls)
+        self.assertIn(call(b"*OPC?\n"), self._transport_mock.write.mock_calls)
+        self.assertIn(call(b"SYST:ERR?\n"), self._transport_mock.write.mock_calls)
+        self.assertEqual(self._transport_mock.write.mock_calls.count(call(b"*OPC?\n")), 2)
+
+    def test_wait_command_completion_excepts(self):
+        """Test wait_command_completion function excepts with some error other than -800."""
+        with open_close(self.instr), self.assertRaises(QMI_InstrumentException):
+            self._transport_mock.read_until.side_effect = [b"1\n", b'-1,"Some error"\n']
+            self.instr.wait_command_completion()
 
     def test_reset_no_errors(self):
         """Test reset call. It calls also to check errors to clear them"""
@@ -354,6 +387,14 @@ class TektronixAWG5014TestCase(unittest.TestCase):
             self._transport_mock.read_until.side_effect = [b"-1\n"]
             with self.assertRaises(KeyError):
                 self.instr.get_state()
+
+    def test_get_setup_file_name(self):
+        """Test file name query for current AWG file."""
+        expected = ("\\Users\\OEM\\Documents", "SAMPLE1.AWG")
+        with open_close(self.instr):
+            self._transport_mock.read_until.return_value = b'"\\Users\\OEM\\Documents\\SAMPLE1.AWG","C:"\n'
+            file_and_path = self.instr.get_setup_file_name()
+            self.assertTupleEqual(expected, file_and_path)
 
     def test_get_file_names(self):
         """Test file name query from a 'folder'."""
@@ -932,6 +973,41 @@ class TektronixAWG5014TestCase(unittest.TestCase):
         """Test setting the polarity with invalid value"""
         with open_close(self.instr), self.assertRaises(ValueError):
             self.instr.set_trigger_polarity("NEUtral")
+
+    def test_get_waveform_output_data_position(self):
+        """Test waveform output data position query."""
+        expected_call = b"TRIG:SEQ:WVAL?\n"
+        with open_close(self.instr):
+            self._transport_mock.read_until.side_effect = [b"FIRS\n"]
+            position = self.instr.get_waveform_output_data_position()
+            self._transport_mock.write.assert_called_with(expected_call)
+            self.assertEqual(position, "FIRS")
+
+    def test_set_waveform_output_data_position(self):
+        """Test that the waveform output data position set is called when in "Triggered" or "Gated" Run mode."""
+        expected_call = b"TRIG:SEQ:WVAL LAST\n"
+        with open_close(self.instr):
+            self._transport_mock.read_until.side_effect = [b"GAT\n"]
+            self.instr.set_waveform_output_data_position("LAST")
+            self._transport_mock.write.assert_called_with(expected_call)
+
+    def test_set_waveform_output_data_position_invalid(self):
+        """Test setting waveform output data position with invalid position."""
+        ipos = "MID"
+        expected_error = f"Invalid waveform position {ipos}"
+        with open_close(self.instr), self.assertRaises(ValueError) as exc:
+            self.instr.set_waveform_output_data_position(ipos)
+
+        self.assertEqual(expected_error, str(exc.exception))
+
+    def test_set_waveform_output_data_position_excepts(self):
+        """Test setting waveform output data position when Run mode is not "Triggered" or "Gated"."""
+        expected_error = "The Run mode must be Triggered or Gated to set WF output data position"
+        with open_close(self.instr), self.assertRaises(QMI_InstrumentException) as exc:
+            self._transport_mock.read_until.side_effect = [b"CONT\n"]
+            self.instr.set_waveform_output_data_position("FIRSt")
+
+        self.assertEqual(expected_error, str(exc.exception))
 
     def test_force_trigger_event(self):
         """See that force trigger event gets called correct."""
