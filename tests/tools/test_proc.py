@@ -27,7 +27,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Start qmi and initialize the context with a configuration. Returns the configuration."""
         config = {
             "ip": "10.10.10.10",  # Local IP address
-            "port": 512,
+            "port": 1032,
             "server_command": "test_config_server_command",
             "ssh_host": "test_config_ssh_host",
             "ssh_user": "test_config_ssh_user",
@@ -41,7 +41,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             "program_args": ["test_program_args"],
         }
         qmi.start("ContextName2", context_cfg={
-                "ContextName2": {"tcp_server_port": 511},
+                "ContextName2": {"tcp_server_port": 1031},
                 "ContextName1": {
                     "host": config["ip"],
                     "tcp_server_port": config["port"],
@@ -337,6 +337,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             "os.environ.copy", MagicMock()
         ):
             _, _, ctxcfg = self._build_mock_config()
+            popen.pid = 0
             popen.poll = MagicMock(return_value=None)
             rt_val = proc.start_local_process("ContextName1")
             self.assertEqual(rt_val, popen.pid)
@@ -408,6 +409,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         ):
             _, _, ctxcfg = self._build_mock_config()
             popen.poll = MagicMock(return_value=None)
+            popen.pid = 0
             ctxcfg.python_path = "SOMEOTHERPATH"
             proc.start_local_process("ContextName1")
             self.assertEqual(env_copy["PYTHONPATH"], "SOMEOTHERPATH")
@@ -444,6 +446,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             context, _, ctxcfg = self._build_mock_config()
             ctxcfg.process_management.output_dir = "SomeOutputDir"
             popen.poll = MagicMock(return_value=None)
+            popen.pid = 0
             context.resolve_file_name = MagicMock(return_value="ResolvedOutputDir")
             proc.start_local_process("ContextName1")
             proc.open.assert_called_once_with(
