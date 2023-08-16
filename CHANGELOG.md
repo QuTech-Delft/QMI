@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - The Tektronix AWG 5014 QMI driver error checking method. It clears the transport buffer before the error query to avoid mixed response
 - The `read_until` method of VXI11 transport protocol now tries to repeatedly read until terminating character until timeout, not just once.
+- Changed the port numbers in `test_proc.py` from 511 and 512 to be > 1024, as the smaller port numbers caused permission issues.
+- In some other tests in `test_proc.py` specified explicitly `popen.pid = 0` as the latest Python 3.11 otherwise throws an error about
+  comparison of a MagicMock object with an int, like in `if pid >= 0:`.
 
 # [0.40.0] - 2023-07-06
 
