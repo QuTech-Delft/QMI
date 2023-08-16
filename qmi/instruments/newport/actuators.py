@@ -35,3 +35,6 @@ TRB6CC: LinearActuator = LinearActuator(
 
 CMA25CCL: LinearActuator = LinearActuator(
     25, 0.4, 0.05, 0.0002, 90, 0.000048828)
+
+UTS100PP: LinearActuator = LinearActuator(
+    100, 20, 0.05, 300e-6, 200, 0.0)

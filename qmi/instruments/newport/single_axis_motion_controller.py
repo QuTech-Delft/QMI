@@ -108,7 +108,9 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         self._serial = serial
         self._actuators = actuators
 
-    def _build_command(self, cmd: str, value: Optional[float] = None, controller_address: Optional[int] = None) -> str:
+    def _build_command(
+            self, cmd: str, value: Optional[float, int] = None, controller_address: Optional[int] = None
+    ) -> str:
         """Build the command.
 
         Parameters:
@@ -284,8 +286,6 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default
                                 it is set to the initialised value of the controller address.
         """
-        _logger.info(
-            "Performing an absolute move of instrument [%s] to [%s]", self._name, position)
         # if controller address is not given use the default one
         controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
         if position > self._actuators[controller_address].TRAVEL_RANGE:
@@ -294,6 +294,9 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         if position < self._actuators[controller_address].MIN_INCREMENTAL_MOTION:
             raise QMI_InstrumentException(
                 f"Provided value {position} lower than minimum {self._actuators[controller_address].MIN_INCREMENTAL_MOTION}")
+
+        _logger.info(
+            "Performing an absolute move of instrument [%s] to [%s]", self._name, position)
         self._scpi_protocol.write(self._build_command(
             "PA", position, controller_address))
         self._check_error(controller_address)
@@ -362,56 +365,6 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             self._build_command("PW", 0, controller_address))
 
     @rpc_method
-    def get_encoder_increment_value(self, controller_address: Optional[int] = None) -> float:
-        """
-        Get the encoder increment value.
-
-        Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default
-                                it is set to the initialised value of the controller address.
-
-        Returns:
-            Encoder increment value.
-        """
-        _logger.info(
-            "Getting encoder increment value of instrument [%s]", self._name)
-        # if controller address is not given use the default one
-        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
-        # instrument must be in configuration state to get the encoder increment value.
-        self.reset(controller_address)
-        self.enter_configuration_state(controller_address)
-        res = self._scpi_protocol.ask(
-            self._build_command("SU?", controller_address=controller_address))
-        sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
-        self.exit_configuration_state(controller_address)
-        return self._actuators[controller_address].ENCODER_RESOLUTION / float(res[3:])
-
-    @rpc_method
-    def set_encoder_increment_value(self, value: float, controller_address: Optional[int] = None) -> None:
-        """
-        Set the encoder increment value. By default to be as close to 1mm as possible.
-        Check the example (SU command) in the doc below to see how the increment value is
-        calculated:
-        https://www.newport.com/mam/celum/celum_assets/np/resources/CONEX-CC_-_Controller_Documentation.pdf?0
-
-        Parameters:
-            value:              Increment value.
-            controller_address: Optional address of the controller that needs to be controlled. By default
-                                it is set to the initialised value of the controller address.
-        """
-        _logger.info(
-            "Setting encoder increment value of instrument [%s] to [%s]", self._name, value)
-        # instrument must be in configuration state to set the encoder increment value.
-        self.reset(controller_address)
-        self.enter_configuration_state(controller_address)
-        self._scpi_protocol.write(self._build_command(
-            "SU", value, controller_address))
-        sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
-        self.exit_configuration_state(controller_address)
-
-    @rpc_method
     def set_velocity(self, velocity: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
         """
         Set the velocity at which the actuator moves.
@@ -425,8 +378,6 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default
                                 it is set to the initialised value of the controller address.
         """
-        _logger.info(
-            "Setting velocity of instrument [%s] to [%s]", self._name, velocity)
         # if controller address is not given use the default one
         controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
         # instrument must be in configuration state to persist the set velocity.
@@ -439,6 +390,9 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         if velocity < self._actuators[controller_address].MIN_VELOCITY:
             raise QMI_InstrumentException(
                 f"Provided value {velocity} lower than minimum {self._actuators[controller_address].MIN_VELOCITY}")
+
+        _logger.info(
+            "Setting velocity of instrument [%s] to [%s]", self._name, velocity)
         self._scpi_protocol.write(self._build_command(
             "VA", velocity, controller_address))
         sleep(self.COMMAND_EXEC_TIME)
@@ -449,7 +403,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
     @rpc_method
     def get_velocity(self, controller_address: Optional[int] = None) -> float:
         """
-        Get the velocity of the actuator in unit/s, so if the the encoder unit is mm,
+        Get the velocity of the actuator in unit/s, so if the encoder unit is mm,
         then the returned value is in mm/s.
 
         Parameters:
