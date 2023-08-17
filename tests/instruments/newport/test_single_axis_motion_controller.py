@@ -30,11 +30,11 @@ class TestDerivingClassCase(unittest.TestCase):
         """
         Test SMC100PP
         """
-        expected_rpc_class = "qmi.instruments.newport.smc_100cc.Newport_SMC100PP"
+        expected_rpc_class = "qmi.instruments.newport.smc_100pp.Newport_SMC100PP"
         with start_stop(qmi, "TestSMC100PP", console_loglevel="CRITICAL"):
             # Make DUT
             self.instr: Newport_Smc100Pp = qmi.make_instrument(
-                "sam_controller", Newport_Smc100Pp, "Beverly_Hills", "FT5TMFGL",
+                "pp_controller", Newport_Smc100Pp, "Beverly_Hills", "FT5TMFGL",
                 {1: UTS100PP}, 90210
             )
             # Test __init__ is of correct module
@@ -565,7 +565,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
     def test_set_backlash_compensation_with_controller_address_sets_compensation(self):
         """Test set backlash compensation with controller address."""
         comp = 0.004
-        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        self._scpi_mock.ask.side_effect = ["3BH0", "@", "@", "@"]
         expected_write_calls = [
             call("3RS\r\n"),
             call("3PW1\r\n"),
@@ -573,6 +573,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
             call("3PW0\r\n")
         ]
         expected_ask_calls = [
+            call("3BH?\r\n"),
             call("3TE\r\n"),
             call("3TE\r\n"),
             call("3TE\r\n")
@@ -584,7 +585,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
     def test_set_backlash_compensation_without_controller_address_sets_compensation(self):
         """Test set backlash compensation."""
         comp = 13
-        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        self._scpi_mock.ask.side_effect = [f"{self.controller_address}BH0", "@", "@", "@"]
         expected_write_calls = [
             call(f"{self.controller_address}RS\r\n"),
             call(f"{self.controller_address}PW1\r\n"),
@@ -592,6 +593,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
             call(f"{self.controller_address}PW0\r\n")
         ]
         expected_ask_calls = [
+            call(f"{self.controller_address}BH?\r\n"),
             call(f"{self.controller_address}TE\r\n"),
             call(f"{self.controller_address}TE\r\n"),
             call(f"{self.controller_address}TE\r\n")
