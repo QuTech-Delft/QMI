@@ -329,6 +329,24 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         self._check_error(controller_address)
 
     @rpc_method
+    def get_setpoint(self, controller_address: Optional[int] = None) -> float:
+        """
+        Get the set-point position of the actuator according to the encoder value.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+
+        Returns:
+            Set-point position in encoder units.
+        """
+        _logger.info("Getting set-point of instrument [%s]", self._name)
+        setpoint = self._scpi_protocol.ask(
+            self._build_command("TH", controller_address=controller_address))
+        self._check_error(controller_address)
+        return float(setpoint[3:])
+
+    @rpc_method
     def get_position(self, controller_address: Optional[int] = None) -> float:
         """
         Get the actual position of the actuator according to the encoder value.
@@ -376,7 +394,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         """
         _logger.info("Getting motion time for a relative move of instrument [%s]", self._name)
         move_time = self._scpi_protocol.ask(
-            self._build_command("PT", displacement, controller_address=controller_address))
+            self._build_command("PT", displacement, controller_address))
         self._check_error(controller_address)
         return float(move_time[3:])
 
@@ -909,9 +927,235 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
                     f"Averaging period for rms current calculation not in valid range 0.01 < averaging_time <= 100.0")
 
         _logger.info(
-            "Setting averaging period for rms current calculation of controller [%s] instrument [%s] to [%f]", controller_address, self._name,
-            averaging_time)
+            "Setting averaging period for rms current calculation of controller [%s] instrument [%s] to [%f]",
+            controller_address, self._name, averaging_time)
         self._scpi_protocol.write(self._build_command("QIT", averaging_time, controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+
+    @rpc_method
+    def get_analog_input_value(self, controller_address: Optional[int] = None) -> float:
+        """
+        Get the analog input value.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+
+        Returns:
+            Analog input value in Volts.
+        """
+        _logger.info("Getting analog input value of instrument [%s]", self._name)
+        analog_input = self._scpi_protocol.ask(
+            self._build_command("RA", controller_address=controller_address))
+        self._check_error(controller_address)
+        return float(analog_input[3:])
+
+    @rpc_method
+    def get_ttl_input_value(self, controller_address: Optional[int] = None) -> int:
+        """
+        Get the TTL input value. The returned decimal number represents the binary word made of all 4 inputs,
+        where bit 0 is input 1, bit 1 is input 2, bit 2 is input 3, and bit 3 is input 4.
+
+        The TTL input value is 1 when the corresponding voltage on the pin is larger than 2.4
+        volts, and it is 0 when the corresponding voltage is below 0.8 volt. When the voltage is
+        between these two values, the result is unreliable and can be 1 or 0.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+
+        Returns:
+            TTL input value in bits. E.g. '5' means input 0 and 2 are high, all others are low.
+        """
+        _logger.info("Getting TTL input value of instrument [%s]", self._name)
+        ttl_input = self._scpi_protocol.ask(
+            self._build_command("RB", controller_address=controller_address))
+        self._check_error(controller_address)
+        return int(ttl_input[3:])
+
+    @rpc_method
+    def get_ttl_output_value(self, controller_address: Optional[int] = None) -> int:
+        """
+        Get the TTL output value. The returned decimal number represents the binary word made of all 4 outputs,
+        where bit 0 is output 1, bit 1 is output 2, bit 2 is output 3, and bit 3 is output 4.
+
+        A 1 represents closed collector output transistor of the output. A 0 represents open
+        collector output transistor of the output.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+
+        Returns:
+            TTL output value in bits. E.g. '3' means TTL outputs 1 & 2 are closed and outputs 3 & 4 open.
+        """
+        _logger.info("Getting TTL output value of instrument [%s]", self._name)
+        ttl_output = self._scpi_protocol.ask(
+            self._build_command("SB?", controller_address=controller_address))
+        self._check_error(controller_address)
+        return int(ttl_output[3:])
+
+    @rpc_method
+    def set_ttl_output_value(self, ttl_output_value: int, controller_address: Optional[int] = None) -> None:
+        """
+        Get the TTL output value. The value is a binary word made of all 4 outputs,
+        where bit 0 is output 1, bit 1 is output 2, bit 2 is output 3, and bit 3 is output 4.
+
+        A 1 closes the open collector output transistor of the output. A 0 blocks the open
+        collector output transistor of the output.
+
+        Parameters:
+            ttl_output_value:   New TTL output value.
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+        """
+        if ttl_output_value not in range(16):
+            raise QMI_InstrumentException(
+                f"Provided value {ttl_output_value} not in valid range 0-15 (all open - all closed).")
+
+        _logger.info(
+            "Setting the TTL output value for instrument [%s] to [%i]", self._name, ttl_output_value
+        )
+        self._scpi_protocol.write(self._build_command(
+            "SB", ttl_output_value, controller_address))
+        self._check_error(controller_address)
+
+    @rpc_method
+    def get_controller_rs485_address(self) -> int:
+        """
+        Get the controller’s RS-485 address. Controller address is always 1 for this command.
+
+        Returns:
+            rs485_address:      Controller's axis number for new RS485 address.
+        """
+        controller_address = self.DEFAULT_CONTROLLER_ADDRESS
+        # instrument must be in configuration state to get the RS485 address.
+        _logger.info(
+            "Getting RS485 address of controller [%s] instrument [%s]", controller_address, self._name
+        )
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        axis = self._scpi_protocol.ask(self._build_command("SA?", controller_address=controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+        return int(axis[3:])
+
+    @rpc_method
+    def set_controller_rs485_address(self, rs485_address: int) -> None:
+        """
+        Set the controller’s RS-485 address. Controller address is always 1 for this command.
+
+        Parameters:
+            rs485_address:      Controller's axis number for new RS485 address.
+        """
+        controller_address = self.DEFAULT_CONTROLLER_ADDRESS
+        if 2 > rs485_address > 31:
+            raise QMI_InstrumentException(
+                f"Invalid controller axis number {rs485_address}")
+
+        # instrument must be in configuration state to set the RS485 address.
+        _logger.info(
+            "Setting RS485 address of controller [%s] instrument [%s] to axis [%i]",
+            controller_address, self._name, rs485_address
+        )
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        self._scpi_protocol.write(self._build_command("SA", rs485_address, controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+
+    @rpc_method
+    def get_negative_software_limit(self) -> float:
+        """
+        Get the negative software limit.
+
+        Returns:
+            neg_sw_limit:      Controller's negative software limit.
+        """
+        controller_address = self.DEFAULT_CONTROLLER_ADDRESS
+        # instrument must be in configuration state to get the negative software limit.
+        _logger.info(
+            "Getting the negative software limit of controller [%s] instrument [%s]", controller_address, self._name
+        )
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        neg_sw_limit = self._scpi_protocol.ask(self._build_command("SL?", controller_address=controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+        return float(neg_sw_limit[3:])
+
+    @rpc_method
+    def set_negative_software_limit(self, neg_sw_limit: float) -> None:
+        """
+        Set the negative software limit.
+
+        Parameters:
+            neg_sw_limit:      Controller's negative software limit.
+        """
+        controller_address = self.DEFAULT_CONTROLLER_ADDRESS
+        if -1E12 >= neg_sw_limit > 0:
+            raise QMI_InstrumentException(
+                f"Negative software limit {neg_sw_limit} not in valid range -1E12 < {neg_sw_limit} <= 0")
+
+        # instrument must be in configuration state to set the RS485 address.
+        _logger.info(
+            "Setting negative software limit of controller [%s] instrument [%s] to [%f]",
+            controller_address, self._name, neg_sw_limit
+        )
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        self._scpi_protocol.write(self._build_command("SL", neg_sw_limit, controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+
+    @rpc_method
+    def get_positive_software_limit(self) -> float:
+        """
+        Get the positive software limit.
+
+        Returns:
+            pos_sw_limit:      Controller's positive software limit.
+        """
+        controller_address = self.DEFAULT_CONTROLLER_ADDRESS
+        # instrument must be in configuration state to get the positive software limit.
+        _logger.info(
+            "Getting the positive software limit of controller [%s] instrument [%s]", controller_address, self._name
+        )
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        pos_sw_limit = self._scpi_protocol.ask(self._build_command("SR?", controller_address=controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+        return float(pos_sw_limit[3:])
+
+    @rpc_method
+    def set_positive_software_limit(self, pos_sw_limit: float) -> None:
+        """
+        Set the positive software limit.
+
+        Parameters:
+            pos_sw_limit:      Controller's positive software limit.
+        """
+        controller_address = self.DEFAULT_CONTROLLER_ADDRESS
+        if 0 > pos_sw_limit >= 1E12:
+            raise QMI_InstrumentException(
+                f"Positive software limit {pos_sw_limit} not in valid range 0 <= {pos_sw_limit} <= 1E12")
+
+        # instrument must be in configuration state to set the RS485 address.
+        _logger.info(
+            "Setting positive software limit of controller [%s] instrument [%s] to [%f]",
+            controller_address, self._name, pos_sw_limit
+        )
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        self._scpi_protocol.write(self._build_command("SR", pos_sw_limit, controller_address))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error(controller_address)
         self.exit_configuration_state(controller_address)

@@ -7,8 +7,8 @@ import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.utils.context_managers import start_stop
-from qmi.instruments.newport import Newport_Smc100Cc, Newport_ConexCc
-from qmi.instruments.newport.actuators import TRA12CC, TRB6CC, CMA25CCL
+from qmi.instruments.newport import Newport_Smc100Pp, Newport_Smc100Cc, Newport_ConexCc
+from qmi.instruments.newport.actuators import TRA12CC, TRB6CC, CMA25CCL, UTS100PP
 from qmi.instruments.newport.single_axis_motion_controller import Newport_Single_Axis_Motion_Controller
 
 
@@ -25,6 +25,20 @@ class TestDerivingClassCase(unittest.TestCase):
             'qmi.instruments.newport.single_axis_motion_controller.ScpiProtocol', autospec=True)
         self._scpi_mock: Mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
+
+    def test_smc100pp(self):
+        """
+        Test SMC100PP
+        """
+        expected_rpc_class = "qmi.instruments.newport.smc_100cc.Newport_SMC100PP"
+        with start_stop(qmi, "TestSMC100PP", console_loglevel="CRITICAL"):
+            # Make DUT
+            self.instr: Newport_Smc100Pp = qmi.make_instrument(
+                "sam_controller", Newport_Smc100Pp, "Beverly_Hills", "FT5TMFGL",
+                {1: UTS100PP}, 90210
+            )
+            # Test __init__ is of correct module
+            self.assertIn(expected_rpc_class, str(self.instr.__init__))
 
     def test_smc100cc(self):
         """
@@ -384,44 +398,6 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self._scpi_mock.ask.assert_has_calls(expected_calls)
 
-    def test_set_encoder_resolution_without_controller_address_sets_resolution(self):
-        """Test set encoder resolution."""
-        resolution = 0.004
-        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
-        expected_write_calls = [
-            call(f"{self.controller_address}RS\r\n"),
-            call(f"{self.controller_address}PW1\r\n"),
-            call(f"{self.controller_address}SU%s\r\n" % resolution),
-            call(f"{self.controller_address}PW0\r\n")
-        ]
-        expected_ask_calls = [
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n")
-        ]
-        self.instr.set_encoder_increment_value(resolution)
-        self._scpi_mock.write.assert_has_calls(expected_write_calls)
-        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
-
-    def test_set_encoder_resolution_with_controller_address_sets_resolution(self):
-        """Test set encoder resolution with controller address."""
-        resolution = 0.004
-        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
-        expected_write_calls = [
-            call("3RS\r\n"),
-            call("3PW1\r\n"),
-            call(f"3SU{resolution}\r\n"),
-            call("3PW0\r\n")
-        ]
-        expected_ask_calls = [
-            call("3TE\r\n"),
-            call("3TE\r\n"),
-            call("3TE\r\n")
-        ]
-        self.instr.set_encoder_increment_value(resolution, 3)
-        self._scpi_mock.write.assert_has_calls(expected_write_calls)
-        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
-
     def test_set_home_search_timeout_without_controller_address_sets_timeout(self):
         """Test set home search timeout."""
         timeout = 13
@@ -457,50 +433,6 @@ class TestSingleAxisMotionController(unittest.TestCase):
             call("3TE\r\n")
         ]
         self.instr.set_home_search_timeout(timeout, 3)
-        self._scpi_mock.write.assert_has_calls(expected_write_calls)
-        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
-
-    def test_get_encoder_increment_value_without_controller_address_gets_value(self):
-        """Test get encoder increment value."""
-        expected_encoder_unit = 10
-        encoder_resolution = TRA12CC.ENCODER_RESOLUTION
-        self._scpi_mock.ask.side_effect = [
-            "@", "@", f"{self.controller_address}SU %s" % (encoder_resolution / expected_encoder_unit), "@"]
-        expected_write_calls = [
-            call(f"{self.controller_address}RS\r\n"),
-            call(f"{self.controller_address}PW1\r\n"),
-            call(f"{self.controller_address}PW0\r\n")
-        ]
-        expected_ask_calls = [
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}SU?\r\n"),
-            call(f"{self.controller_address}TE\r\n")
-        ]
-        actual_encoder_unit = self.instr.get_encoder_increment_value()
-        self.assertEqual(expected_encoder_unit, actual_encoder_unit)
-
-        self._scpi_mock.write.assert_has_calls(expected_write_calls)
-        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
-
-    def test_get_encoder_increment_value_with_controller_address_gets_value(self):
-        """Test get encoder increment value with controller address."""
-        expected_encoder_unit = 10
-        encoder_resolution = CMA25CCL.ENCODER_RESOLUTION
-        self._scpi_mock.ask.side_effect = [
-            "@", "@", f"3SU {encoder_resolution / expected_encoder_unit}", "@"]
-        expected_write_calls = [
-            call("3RS\r\n"),
-            call("3PW1\r\n"),
-            call("3PW0\r\n")
-        ]
-        expected_ask_calls = [
-            call("3TE\r\n"),
-            call("3SU?\r\n"),
-            call("3TE\r\n")
-        ]
-        actual_encoder_unit = self.instr.get_encoder_increment_value(3)
-        self.assertEqual(expected_encoder_unit, actual_encoder_unit)
-
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
