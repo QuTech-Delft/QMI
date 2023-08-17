@@ -45,7 +45,7 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         Get the micro-step per full step factor of the motor configuration.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
         _logger.info(
@@ -54,7 +54,7 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
             self._build_command("FRM?", controller_address=controller_address))
 
         self._check_error(controller_address)
-        return float(factor[3:])
+        return float(factor[4:])
 
     @rpc_method
     def set_micro_step_per_full_step_factor(self, factor: int, controller_address: Optional[int] = None) -> None:
@@ -63,7 +63,7 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
 
         Parameters:
             factor:             Micro-step per full step factor.
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
         _logger.info(
@@ -81,7 +81,7 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         Get the motion distance per motor’s full step.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
         _logger.info(
@@ -90,7 +90,7 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
             self._build_command("FRS?", controller_address=controller_address))
 
         self._check_error(controller_address)
-        return float(m_dist[3:])
+        return float(m_dist[4:])
 
     @rpc_method
     def set_motion_distance_per_full_step(self, m_dist: float, controller_address: Optional[int] = None) -> None:
@@ -99,7 +99,7 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
 
         Parameters:
             m_dist:             Full step value.
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
         _logger.info(
@@ -117,7 +117,7 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         Get the profile generator base velocity.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
         _logger.info(
@@ -135,7 +135,7 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
 
         Parameters:
             base_velocity:      New profile generator base velocity.
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
         # instrument must be in configuration state to get the current maximum velocity.

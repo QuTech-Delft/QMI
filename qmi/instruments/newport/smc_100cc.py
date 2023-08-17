@@ -4,6 +4,7 @@ Instrument driver for the Newport SMC100CC motion controller.
 import logging
 from time import sleep
 from typing import Dict, Optional
+import enum
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
@@ -13,6 +14,11 @@ from qmi.instruments.newport.single_axis_motion_controller import Newport_Single
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
+
+
+class ControlLoopState(enum.IntEnum):
+    OPEN = 0
+    CLOSED = 1
 
 
 class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
@@ -45,7 +51,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         Get the encoder increment value.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
 
         Returns:
@@ -68,18 +74,18 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
     @rpc_method
     def set_encoder_increment_value(self, value: float, controller_address: Optional[int] = None) -> None:
         """
-        Set the encoder increment value. By default to be as close to 1mm as possible.
+        Set the encoder increment value. By default, to be as close to 1mm as possible.
         Check the example (SU command) in the doc below to see how the increment value is
         calculated:
         https://www.newport.com/mam/celum/celum_assets/np/resources/CONEX-CC_-_Controller_Documentation.pdf?0
 
         Parameters:
             value:              Increment value.
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
         _logger.info(
-            "Setting encoder increment value of instrument [%s] to [%s]", self._name, value)
+            "Setting encoder increment value of instrument [%s] to [%f]", self._name, value)
         # instrument must be in configuration state to set the encoder increment value.
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
@@ -95,7 +101,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         Get the max. output voltage of the driver to the motor.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
         _logger.info(
@@ -113,7 +119,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
 
         Parameters:
             driver_voltage:      New profile generator base velocity.
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
         if 48 < driver_voltage < 12:
@@ -134,7 +140,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         Get the low pass filter cut-off frequency Kd.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
 
         Returns:
@@ -162,10 +168,10 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
 
         Parameters:
             frequency:          Cutoff frequency Kd.
-            persist:            Flag to indicate if the frequency cutoff should be persisted to the controller's memory, so it
-                                is still available after powering down the controller. When not persisted, the frequency
-                                cutoff is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            persist:            Flag to indicate if the frequency cutoff should be persisted to the controller's memory,
+                                so it is still available after powering down the controller. When not persisted, the
+                                frequency cutoff is the one stored in the controller's memory.
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised frequency of the controller address.
         """
         if 2000 <= frequency <= 1E-6:
@@ -191,7 +197,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         Get the maximum allowed following error.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
 
         Returns:
@@ -219,10 +225,10 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
 
         Parameters:
             error_limit:        The value for the maximum allowed following error.
-            persist:            Flag to indicate if the error limit should be persisted to the controller's memory, so it
-                                is still available after powering down the controller. When not persisted, the error
+            persist:            Flag to indicate if the error limit should be persisted to the controller's memory, so
+                                it is still available after powering down the controller. When not persisted, the error
                                 limit is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default
+            controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised error limit of the controller address.
         """
         if 1E12 <= error_limit <= 1E-6:
@@ -230,7 +236,9 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
                 f"Provided value {error_limit} not in valid range 1E-6 > error limit > 1E12.")
 
         _logger.info(
-            "Setting the value for the maximum allowed following error of instrument [%s] to [%s]", self._name, error_limit)
+            "Setting the value for the maximum allowed following error of instrument [%s] to [%f]",
+            self._name, error_limit
+        )
         # instrument must be in configuration state to persist the set velocity.
         if persist:
             self.reset(controller_address)
@@ -241,3 +249,338 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         self._check_error(controller_address)
         if persist:
             self.exit_configuration_state(controller_address)
+
+    @rpc_method
+    def get_friction_compensation(self, controller_address: Optional[int] = None) -> float:
+        """
+        Get the friction compensation.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+        """
+        # instrument must be in configuration state to get the friction compensation.
+        _logger.info(
+            "Getting the friction compensation of instrument [%s]", self._name)
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        friction_compensation = self._scpi_protocol.ask(
+            self._build_command("FF?", controller_address=controller_address))
+
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+        return float(friction_compensation[3:])
+
+    @rpc_method
+    def set_friction_compensation(
+            self, friction_compensation: float, persist: bool = False, controller_address: Optional[int] = None
+    ) -> None:
+        """
+        Set the friction compensation. It must not be larger than the maximum velocity set by VA command.
+
+        Parameters:
+            friction_compensation:      New friction compensation value.
+            persist:            Flag to indicate if the friction compensation should be persisted to the controller's
+                                memory, so it is still available after powering down the controller. When not persisted,
+                                the friction compensation is the one stored in the controller's memory.
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+        """
+        response = self._scpi_protocol.ask(
+            self._build_command("DV?", controller_address=controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        driver_voltage = float(response[3:])
+        if driver_voltage < friction_compensation < 0:
+            raise QMI_InstrumentException(
+                f"Provided value {friction_compensation} not in valid range 0 >= friction_compensation >= {driver_voltage}."
+            )
+
+        _logger.info(
+            "Setting the friction compensation of instrument [%s] to [%f]", self._name, friction_compensation)
+        # instrument must be in configuration state to get the friction compensation.
+        if persist:
+            self.reset(controller_address)
+            self.enter_configuration_state(controller_address)
+        self._scpi_protocol.write(self._build_command(
+            "FF", friction_compensation, controller_address))
+        self._check_error(controller_address)
+
+        if persist:
+            self.exit_configuration_state(controller_address)
+
+    @rpc_method
+    def get_derivative_gain(self, controller_address: Optional[int] = None) -> float:
+        """
+        Get the derivative gain of the PID control loop.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+
+        Returns:
+            The derivative gain of the PID control loop.
+        """
+        _logger.info(
+            "Getting derivative gain of the PID control loop of instrument [%s]", self._name)
+        # if controller address is not given use the default one
+        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
+        # instrument must be in configuration state to get the derivative gain of the PID control loop value.
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        res = self._scpi_protocol.ask(
+            self._build_command("KD?", controller_address=controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+        return float(res[3:])
+
+    @rpc_method
+    def set_derivative_gain(
+            self, derivative_gain: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+        """
+        Set the derivative gain of the PID control loop.
+
+        Parameters:
+            derivative_gain:    New derivative_gain value in Volt * second/preset unit.
+            persist:            Flag to indicate if the derivative gain should be persisted to the controller's memory,
+                                so it is still available after powering down the controller. When not persisted, the
+                                derivative gain is the one stored in the controller's memory.
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised derivative_gain of the controller address.
+        """
+        if 1E12 <= derivative_gain < 0:
+            raise QMI_InstrumentException(
+                f"Provided value {derivative_gain} not in valid range 0 >= derivative_gain > 1E12.")
+
+        _logger.info(
+            "Setting derivative gain of the PID control loop of instrument [%s] to [%f]",
+            self._name, derivative_gain
+        )
+        # instrument must be in configuration state to persist the set derivative gain of the PID control loop.
+        if persist:
+            self.reset(controller_address)
+            self.enter_configuration_state(controller_address)
+        self._scpi_protocol.write(self._build_command(
+            "KD", derivative_gain, controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        if persist:
+            self.exit_configuration_state(controller_address)
+
+    @rpc_method
+    def get_integral_gain(self, controller_address: Optional[int] = None) -> float:
+        """
+        Get the integral gain of the PID control loop.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+
+        Returns:
+            The integral gain of the PID control loop.
+        """
+        _logger.info(
+            "Getting integral gain of the PID control loop of instrument [%s]", self._name)
+        # if controller address is not given use the default one
+        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
+        # instrument must be in configuration state to get the integral gain of the PID control loop value.
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        res = self._scpi_protocol.ask(
+            self._build_command("KI?", controller_address=controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+        return float(res[3:])
+
+    @rpc_method
+    def set_integral_gain(
+            self, integral_gain: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+        """
+        Set the integral gain of the PID control loop.
+
+        Parameters:
+            integral_gain:    New integral_gain value in Volt * second/preset unit.
+            persist:            Flag to indicate if the integral gain should be persisted to the controller's memory,
+                                so it is still available after powering down the controller. When not persisted, the
+                                integral gain is the one stored in the controller's memory.
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised integral_gain of the controller address.
+        """
+        if 1E12 <= integral_gain < 0:
+            raise QMI_InstrumentException(
+                f"Provided value {integral_gain} not in valid range 0 >= integral_gain > 1E12.")
+
+        _logger.info(
+            "Setting integral gain of the PID control loop of instrument [%s] to [%f]",
+            self._name, integral_gain
+        )
+        # instrument must be in configuration state to persist the set integral gain of the PID control loop.
+        if persist:
+            self.reset(controller_address)
+            self.enter_configuration_state(controller_address)
+        self._scpi_protocol.write(self._build_command(
+            "KI", integral_gain, controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        if persist:
+            self.exit_configuration_state(controller_address)
+
+    @rpc_method
+    def get_proportional_gain(self, controller_address: Optional[int] = None) -> float:
+        """
+        Get the proportional gain of the PID control loop.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+
+        Returns:
+            The proportional gain of the PID control loop.
+        """
+        _logger.info(
+            "Getting proportional gain of the PID control loop of instrument [%s]", self._name)
+        # if controller address is not given use the default one
+        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
+        # instrument must be in configuration state to get the proportional gain of the PID control loop value.
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        res = self._scpi_protocol.ask(
+            self._build_command("KP?", controller_address=controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+        return float(res[3:])
+
+    @rpc_method
+    def set_proportional_gain(
+            self, proportional_gain: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+        """
+        Set the proportional gain of the PID control loop.
+
+        Parameters:
+            proportional_gain:    New proportional_gain value in Volt * second/preset unit.
+            persist:            Flag to indicate if the proportional gain should be persisted to the controller's memory,
+                                so it is still available after powering down the controller. When not persisted, the
+                                proportional gain is the one stored in the controller's memory.
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised proportional_gain of the controller address.
+        """
+        if 1E12 <= proportional_gain < 0:
+            raise QMI_InstrumentException(
+                f"Provided value {proportional_gain} not in valid range 0 >= proportional_gain > 1E12.")
+
+        _logger.info(
+            "Setting proportional gain of the PID control loop of instrument [%s] to [%f]",
+            self._name, proportional_gain
+        )
+        # instrument must be in configuration state to persist the set proportional gain of the PID control loop.
+        if persist:
+            self.reset(controller_address)
+            self.enter_configuration_state(controller_address)
+        self._scpi_protocol.write(self._build_command(
+            "KP", proportional_gain, controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        if persist:
+            self.exit_configuration_state(controller_address)
+
+    @rpc_method
+    def get_velocity_feed_forward(self, controller_address: Optional[int] = None) -> float:
+        """
+        Get the velocity feed forward of the PID control loop.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+
+        Returns:
+            The velocity feed forward of the PID control loop.
+        """
+        _logger.info(
+            "Getting velocity feed forward of the PID control loop of instrument [%s]", self._name)
+        # if controller address is not given use the default one
+        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
+        # instrument must be in configuration state to get the velocity feed forward of the PID control loop value.
+        self.reset(controller_address)
+        self.enter_configuration_state(controller_address)
+        res = self._scpi_protocol.ask(
+            self._build_command("KV?", controller_address=controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        self.exit_configuration_state(controller_address)
+        return float(res[3:])
+
+    @rpc_method
+    def set_velocity_feed_forward(
+            self, velocity_feed_forward: float, persist: bool = False, controller_address: Optional[int] = None
+    ) -> None:
+        """
+        Set the velocity feed forward of the PID control loop.
+
+        Parameters:
+            velocity_feed_forward:    New velocity_feed_forward value in Volt * second/preset unit.
+            persist:            Flag to indicate if the velocity feed forward should be persisted to the controller's memory,
+                                so it is still available after powering down the controller. When not persisted, the
+                                velocity feed forward is the one stored in the controller's memory.
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised velocity_feed_forward of the controller address.
+        """
+        if 1E12 <= velocity_feed_forward < 0:
+            raise QMI_InstrumentException(
+                f"Provided value {velocity_feed_forward} not in valid range 0 >= velocity_feed_forward > 1E12.")
+
+        _logger.info(
+            "Setting velocity feed forward of the PID control loop of instrument [%s] to [%f]",
+            self._name, velocity_feed_forward
+        )
+        # instrument must be in configuration state to persist the set velocity feed forward of the PID control loop.
+        if persist:
+            self.reset(controller_address)
+            self.enter_configuration_state(controller_address)
+        self._scpi_protocol.write(self._build_command(
+            "KV", velocity_feed_forward, controller_address))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error(controller_address)
+        if persist:
+            self.exit_configuration_state(controller_address)
+
+    @rpc_method
+    def get_control_loop_state(self, controller_address: Optional[int] = None) -> int:
+        """
+        Get the current state of the control loop.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+        """
+        _logger.info(
+            "Getting the current state of the control loop of instrument [%s]", self._name)
+        control_loop_state = self._scpi_protocol.ask(
+            self._build_command("SC?", controller_address=controller_address))
+
+        self._check_error(controller_address)
+        return int(control_loop_state[3:])
+
+    @rpc_method
+    def set_control_loop_state(self, control_loop_state: int, controller_address: Optional[int] = None) -> None:
+        """
+        Set the current state of the control loop.
+
+        Parameters:
+            control_loop_state: New state for the control loop.
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+        """
+        if control_loop_state not in iter(ControlLoopState):
+            raise QMI_InstrumentException(
+                f"Provided value {control_loop_state} not in valid range {[s.value for s in set(ControlLoopState)]}.")
+
+        _logger.info(
+            "Setting the state of the control loop of instrument [%s] to [%s]",
+            self._name, ControlLoopState(control_loop_state).name
+        )
+        self._scpi_protocol.write(self._build_command(
+            "SC", control_loop_state, controller_address))
+        self._check_error(controller_address)
