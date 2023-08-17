@@ -1,6 +1,8 @@
 """Context managers for QMI RPC protocol contexts."""
 from contextlib import contextmanager
-from typing import Iterator, Protocol, TypeVar
+from typing import Iterator, Optional, Protocol, TypeVar
+
+from qmi.core.pubsub import QMI_SignalReceiver, QMI_SignalSubscriber
 
 
 class StartStoppable(Protocol):
@@ -69,3 +71,16 @@ def lock_unlock(thing: _LU, *args, **kwargs) -> Iterator[_LU]:
         yield thing
     finally:
         thing.unlock()
+
+
+@contextmanager
+def subscribe_unsubscribe(
+        signal: QMI_SignalSubscriber, receiver: Optional[QMI_SignalReceiver]
+    ) -> Iterator[QMI_SignalReceiver]:
+    receiver = receiver if receiver is not None else QMI_SignalReceiver()
+    signal.subscribe(receiver)
+    try:
+        yield receiver
+    finally:
+        signal.unsubscribe(receiver)
+

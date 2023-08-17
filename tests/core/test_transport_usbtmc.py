@@ -1,4 +1,4 @@
-import sys, os
+import sys
 import unittest.mock
 sys.modules["usb.core"] = unittest.mock.Mock()
 sys.modules["usb.core.find"] = unittest.mock.Mock()

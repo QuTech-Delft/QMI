@@ -4,17 +4,14 @@ This driver depends on a custom helper program to access the deformable mirror.
 The helper program is written in C and links with the Boston Micromachines
 libraries to access the mirror via USB.
 
-See `qmi/toolage/boston_micromachines_multidm/` for the source code of this
-helper program.
+See `qmi/toolage/boston_micromachines_multidm/` for the source code of this helper program.
 """
 
-import sys
 import logging
 import os
 import os.path
 import re
 import subprocess
-import time
 
 from typing import List
 
@@ -91,6 +88,9 @@ class BostonMicromachines_MultiDM(QMI_Instrument):
             name: Name for this instrument instance.
             serial_number: Serial number of the deformable mirror.
             set_shape_prog: Location of helper program to load a mirror shape.
+
+        Raises:
+            QMI_InstrumentException: By invalid serial number length or string.
         """
 
         if len(serial_number) != self.BMC_SERIAL_NUMBER_LEN:
@@ -127,7 +127,7 @@ class BostonMicromachines_MultiDM(QMI_Instrument):
         try:
 
             # Provide input to helper program and capture output from program.
-            (helper_output, helper_errors) = proc.communicate(input=helper_input, timeout=self.SET_SHAPE_TIMEOUT)
+            (helper_output, _) = proc.communicate(input=helper_input, timeout=self.SET_SHAPE_TIMEOUT)
 
             # Check for error messages in the output from the program.
             output_str = helper_output.decode('latin1')

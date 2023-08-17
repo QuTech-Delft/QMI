@@ -171,9 +171,9 @@ class TestQmiTransportFactory(unittest.TestCase):
 
     @unittest.mock.patch("qmi.core.transport.QMI_TcpTransport")
     def test_parse_tcp_attrs(self, mock):
-        trans = create_transport("tcp:localhost:1234:connect_timeout=5")
+        trans = create_transport("tcp:localhost:1234:connect_timeout=1")
         self.assertIs(trans, mock.return_value)
-        mock.assert_called_once_with(host="localhost", port=1234, connect_timeout=5.0)
+        mock.assert_called_once_with(host="localhost", port=1234, connect_timeout=1.0)
 
     def test_parse_tcp_missing_port(self):
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
@@ -358,7 +358,7 @@ class TestQmiTcpTransport(unittest.TestCase):
     def test_tcp_basic(self):
 
         # Create TCP transport connected to local server.
-        trans = QMI_TcpTransport("localhost", self.server_port, connect_timeout=5)
+        trans = QMI_TcpTransport("localhost", self.server_port, connect_timeout=1)
         trans.open()
 
         # Accept the connection on server side.
@@ -447,7 +447,7 @@ class TestQmiTcpTransport(unittest.TestCase):
     def test_remote_close(self):
 
         # Create TCP transport connected to local server.
-        trans = QMI_TcpTransport("127.0.0.1", self.server_port, connect_timeout=5)
+        trans = QMI_TcpTransport("127.0.0.1", self.server_port, connect_timeout=1)
         trans.open()
 
         # Accept the connection on server side.
@@ -486,7 +486,7 @@ class TestQmiTcpTransport(unittest.TestCase):
     def test_read_until_timeout(self):
 
         # Create TCP transport connected to local server.
-        trans = QMI_TcpTransport("localhost", self.server_port, connect_timeout=5)
+        trans = QMI_TcpTransport("localhost", self.server_port, connect_timeout=1)
         trans.open()
 
         # Accept the connection on server side.
@@ -542,24 +542,24 @@ class TestQmiTcpTransport(unittest.TestCase):
 
         # Try to connect to non-existing host name.
         with self.assertRaises(OSError):
-            trans = QMI_TcpTransport("imaginary-host", 5123, connect_timeout=2)
+            trans = QMI_TcpTransport("imaginary-host", 5123, connect_timeout=1)
             trans.open()
 
         # Try to connect to closed TCP port.
         # This may trigger connection refused, or timeout if the port is firewalled.
         with self.assertRaises((OSError, qmi.core.exceptions.QMI_TimeoutException)):
-            trans = QMI_TcpTransport("localhost", self.dummy_port, connect_timeout=2)
+            trans = QMI_TcpTransport("localhost", self.dummy_port, connect_timeout=1)
             trans.open()
 
         # Try to connect to unroutable IP address.
         with self.assertRaises(Exception):
-            trans = QMI_TcpTransport("192.168.231.11", 5123, connect_timeout=2)
+            trans = QMI_TcpTransport("192.168.231.11", 5123, connect_timeout=1)
             trans.open()
 
     def test_tcp_async(self):
 
         # Create TCP transport connected to local server.
-        trans = QMI_TcpTransport("localhost", self.server_port, connect_timeout=5)
+        trans = QMI_TcpTransport("localhost", self.server_port, connect_timeout=1)
         trans.open()
 
         # Accept the connection on server side.
@@ -979,7 +979,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         """
         self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(err=15, note="Test error!")
         with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
-            _ = self.instr.read(nbytes=8, timeout=1.5)
+            _ = self.instr.read(nbytes=8, timeout=0.5)
 
     def test_read_error(self):
         """ Test exception during read.
@@ -1028,11 +1028,9 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
 
     def test_read_until_missing_term_char(self):
         """ Tests whether the function catches a missing terminator from instrument. """
-        self.mock().read_raw.return_value = "test"
-        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
-            _ = self.instr.read_until(message_terminator=bytes("\n", "utf-8"), timeout=1.5)
-
-    # TEST discard_read
+        self.mock().read_raw.side_effect = [b"test", vxi11.vxi11.Vxi11Exception(err=15, note="Test error!")]
+        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
+            _ = self.instr.read_until(message_terminator=bytes("\n", "utf-8"), timeout=0.001)
 
     def test_discard_read(self):
         """ Test discard_read command.

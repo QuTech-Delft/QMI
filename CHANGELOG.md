@@ -6,6 +6,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+## [0.41.0] - 2023-08-11
+
+### Added
+- Unittest for BRISTOL_871A.
+- Unittest for Wavelength_TC_Lab.
+- Unittest for BostonMicromachines_MultiDM.
+- Unittest for Newport_AG_UC8.
+- Unittest for OZOptics_DD100MC.
+- Unittest for KoherasBoostikLaserAmplifier.
+- New context manager 'subscribe_unsubscribe' for managing QMI signals in `qmi/utils/context_managers.py`.
+- driver calls to set and get the relay state for `EdwardsVacuum_TIC.`
+- tests/core/test_usbtmc.py: Created unit-tests for the qmi.core.usbtmc module.
+- Backlash compensation calls for Newport Single Axis Motion Controllers.
+- New functions to the `awg5014.py` instrument driver: `wait_command_completion`, `get_setup_file_name` and 
+  `get/set_waveform_output_data_position`.
+
+### Changed
+- responses of driver calls for `EdwardsVacuum_TIC` to return objects instead of dictionaries.
+
+### Fixed
+- The Tektronix AWG 5014 QMI driver error checking method. It clears the transport buffer before the error query to avoid mixed response
+- The `read_until` method of VXI11 transport protocol now tries to repeatedly read until terminating character until timeout, not just once.
+- Changed the port numbers in `test_proc.py` from 511 and 512 to be > 1024, as the smaller port numbers caused permission issues.
+- In some other tests in `test_proc.py` specified explicitly `popen.pid = 0` as the latest Python 3.11 otherwise throws an error about
+  comparison of a MagicMock object with an int, like in `if pid >= 0:`.
+
 # [0.40.0] - 2023-07-06
 
 ### Added

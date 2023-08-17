@@ -19,11 +19,16 @@ from qmi.core.transport import create_transport, QMI_Transport
 _logger = logging.getLogger(__name__)
 
 # Wavelength measurements produced by instrument.
-Measurement = NamedTuple('Measurement', [('timestamp', float),
-                                         ('index', int),
-                                         ('status', int),
-                                         ('wavelength', float),
-                                         ('power', float)])
+Measurement = NamedTuple(
+    "Measurement",
+    [
+        ("timestamp", float),
+        ("index", int),
+        ("status", int),
+        ("wavelength", float),
+        ("power", float),
+    ],
+)
 
 
 class _ReaderThread(QMI_Thread):
@@ -43,7 +48,6 @@ class _ReaderThread(QMI_Thread):
         """Read measurements from serial port and append to internal queue."""
 
         while not self._shutdown_requested:
-
             # Read next measurement from serial stream.
             measurement = self._read_measurement()
 
@@ -51,10 +55,6 @@ class _ReaderThread(QMI_Thread):
                 # Append measurement to queue.
                 # NOTE: Appending to a deque is thread-safe.
                 self._queue.append(measurement)
-
-    def _request_shutdown(self) -> None:
-        # Don't need to do anything.
-        pass
 
     def _read_measurement(self) -> Optional[Measurement]:
         """Read a single measurement from the serial port.
@@ -81,8 +81,10 @@ class _ReaderThread(QMI_Thread):
         buf = bytearray()
         escape_pending = False
         while (not self._shutdown_requested) and (len(buf) < message_length):
-            data = self._transport.read_until_timeout(message_length - len(buf), timeout=self.POLL_DURATION)
-            position = data.find(0x7e)
+            data = self._transport.read_until_timeout(
+                message_length - len(buf), timeout=self.POLL_DURATION
+            )
+            position = data.find(0x7E)
             if position >= 0:
                 # Got another start-of-measurement byte (data corruption).
                 buf.clear()
@@ -98,7 +100,7 @@ class _ReaderThread(QMI_Thread):
                     escape_pending = False
                 else:
                     # Find next escape sequence.
-                    escape_sequence_position = data.find(0x7d, position)
+                    escape_sequence_position = data.find(0x7D, position)
                     if escape_sequence_position < 0:
                         # Copy rest of string.
                         buf.extend(data[position:])
@@ -153,24 +155,24 @@ class Bristol_871A(QMI_Instrument):
 
     # Condition codes returned by get_condition(), by bit index.
     CONDITION_BITS = {
-        0:  "The wavelength has already been read for the current scan",
-        2:  "The previous requested calibration has failed",
-        3:  "The power value is outside the valid range of the instrument",
-        4:  "The temperature value is outside the valid rang of the instrument",
-        5:  "The wavelength value is outside the valid range of the instrument",
-        6:  "The detector signal is saturated",
-        7:  "The detector signal is low",
-        8:  "No measurable signal was detected",
-        9:  "The pressure value is outside the valid range of the instrument",
+        0: "The wavelength has already been read for the current scan",
+        2: "The previous requested calibration has failed",
+        3: "The power value is outside the valid range of the instrument",
+        4: "The temperature value is outside the valid rang of the instrument",
+        5: "The wavelength value is outside the valid range of the instrument",
+        6: "The detector signal is saturated",
+        7: "The detector signal is low",
+        8: "No measurable signal was detected",
+        9: "The pressure value is outside the valid range of the instrument",
         10: "At least one bit is set in the questionable hardware condition register",
     }
 
     # Status codes returned in the Measurement.status field, by bit index.
     STATUS_BITS = {
-        2:  "Reference laser locked",
-        3:  "Etalon fringe error",
-        4:  "Etalon saturation error",
-        7:  "Calibration failure",
+        2: "Reference laser locked",
+        3: "Etalon fringe error",
+        4: "Etalon saturation error",
+        7: "Calibration failure",
         11: "Reference laser not stable",
         13: "Temperature high",
         14: "Temperature low",
@@ -194,17 +196,19 @@ class Bristol_871A(QMI_Instrument):
     RESPONSE_TIMEOUT = 2.0
 
     # Status bit mask, indicating all bits that have a well-defined meaning.
-    STATUS_MASK = 0x68fbe89c
+    STATUS_MASK = 0x68FBE89C
 
     # Expected status word for correct, accurate samples.
     STATUS_GOOD = 0x00000004
 
-    def __init__(self,
-                 context: QMI_Context,
-                 name: str,
-                 scpi_transport: Optional[str],
-                 serial_transport: Optional[str],
-                 queue_size: int = DEFAULT_QUEUE_SIZE) -> None:
+    def __init__(
+        self,
+        context: QMI_Context,
+        name: str,
+        scpi_transport: Optional[str],
+        serial_transport: Optional[str],
+        queue_size: int = DEFAULT_QUEUE_SIZE,
+    ) -> None:
         """Initialize the instrument driver.
 
         Args:
@@ -221,13 +225,17 @@ class Bristol_871A(QMI_Instrument):
         super().__init__(context, name)
 
         if scpi_transport is None and serial_transport is None:
-            raise ValueError("Either scpi_transport or serial_transport should be specified.")
+            raise ValueError(
+                "Either scpi_transport or serial_transport should be specified."
+            )
 
         self._scpi_transport = None  # type: Optional[QMI_Transport]
         self._scpi_protocol = None  # type: Optional[ScpiProtocol]
         self._serial_transport = None  # type: Optional[QMI_Transport]
         self._reader_thread = None  # type: Optional[_ReaderThread]
-        self._reader_queue = collections.deque(maxlen=queue_size)  # type: collections.deque
+        self._reader_queue = collections.deque(
+            maxlen=queue_size
+        )  # type: collections.deque
 
         if scpi_transport is not None:
             self._scpi_transport = create_transport(scpi_transport)
@@ -235,13 +243,14 @@ class Bristol_871A(QMI_Instrument):
 
         if serial_transport is not None:
             self._serial_transport = create_transport(serial_transport)
-            self._reader_thread = _ReaderThread(self._serial_transport, self._reader_queue)
+            self._reader_thread = _ReaderThread(
+                self._serial_transport, self._reader_queue
+            )
             self._reader_thread.start()
 
     @rpc_method
     def open(self) -> None:
-        """Open the SCPI and/or serial channel to the wavemeter.
-        """
+        """Open the SCPI and/or serial channel to the wavemeter."""
         _logger.info("Opening connection to instrument")
         if self._scpi_transport is not None:
             self._scpi_transport.open()
@@ -257,8 +266,7 @@ class Bristol_871A(QMI_Instrument):
 
     @rpc_method
     def close(self) -> None:
-        """Close the SCPI and/or serial channel to the wavemeter.
-        """
+        """Close the SCPI and/or serial channel to the wavemeter."""
         _logger.info("Closing connection to instrument")
         self._check_is_open()
         if self._reader_thread is not None:
@@ -289,8 +297,7 @@ class Bristol_871A(QMI_Instrument):
         This resets (most) settings to their default values.
         """
         _logger.info("Resetting %s", self._name)
-        assert self._scpi_protocol is not None
-        self._scpi_protocol.write("*RST")
+        self._write_scpi("*RST")
 
     @rpc_method
     def get_idn(self) -> QMI_InstrumentIdentification:
@@ -302,11 +309,15 @@ class Bristol_871A(QMI_Instrument):
         resp = self._ask_scpi("*IDN?")
         words = resp.rstrip().split(",")
         if len(words) != 4:
-            raise QMI_InstrumentException("Unexpected response to *IDN?, got {!r}".format(resp))
-        return QMI_InstrumentIdentification(vendor=words[0].strip(),
-                                            model=words[1].strip(),
-                                            serial=words[2].strip(),
-                                            version=words[3].strip())
+            raise QMI_InstrumentException(
+                "Unexpected response to *IDN?, got {!r}".format(resp)
+            )
+        return QMI_InstrumentIdentification(
+            vendor=words[0].strip(),
+            model=words[1].strip(),
+            serial=words[2].strip(),
+            version=words[3].strip(),
+        )
 
     def _scpi_handshake(self) -> None:
         """Read initial welcome message from Telnet port."""
@@ -314,11 +325,14 @@ class Bristol_871A(QMI_Instrument):
         assert self._scpi_transport is not None
 
         while True:
-            resp = self._scpi_transport.read_until(message_terminator=b"\n",
-                                                   timeout=self.RESPONSE_TIMEOUT)
+            resp = self._scpi_transport.read_until(
+                message_terminator=b"\n", timeout=self.RESPONSE_TIMEOUT
+            )
             if resp.find(b"no connections available") >= 0:
                 _logger.error("Can not connect to %s SCPI port (%r)", self._name, resp)
-                raise QMI_InstrumentException("Can not connect to {} SCPI port".format(self._name))
+                raise QMI_InstrumentException(
+                    "Can not connect to {} SCPI port".format(self._name)
+                )
             if resp.find(b"Bristol Instruments") >= 0:
                 # This is almost the last line of the welcome message. One more empty line follows.
                 break
@@ -328,11 +342,14 @@ class Bristol_871A(QMI_Instrument):
 
         # Wait for IDN response.
         while True:
-            resp = self._scpi_transport.read_until(message_terminator=b"\n",
-                                                   timeout=self.RESPONSE_TIMEOUT)
+            resp = self._scpi_transport.read_until(
+                message_terminator=b"\n", timeout=self.RESPONSE_TIMEOUT
+            )
             if resp.startswith(b"*IDN?"):
                 # Got command echo. This should never happen.
-                raise QMI_InstrumentException("Instrument {} sent unexpected command echo".format(self._name))
+                raise QMI_InstrumentException(
+                    "Instrument {} sent unexpected command echo".format(self._name)
+                )
             if resp.startswith(b"BRISTOL"):
                 # Got IDN response.
                 break
@@ -346,13 +363,18 @@ class Bristol_871A(QMI_Instrument):
         try:
             return int(resp)
         except ValueError:
-            raise QMI_InstrumentException("Expecting integer response to command {!r} but got {!r}".format(cmd, resp))
+            raise QMI_InstrumentException(
+                "Expecting integer response to command {!r} but got {!r}".format(
+                    cmd, resp
+                )
+            )
 
     @staticmethod
     def is_valid_measurement(measurement: Measurement) -> bool:
         """Return True if the specified measurement represents a valid, accurate measured wavelength."""
-        return (((measurement.status & Bristol_871A.STATUS_MASK) == Bristol_871A.STATUS_GOOD)
-                and (measurement.wavelength > 0))
+        return (
+            (measurement.status & Bristol_871A.STATUS_MASK) == Bristol_871A.STATUS_GOOD
+        ) and (measurement.wavelength > 0)
 
     @rpc_method
     def read_measurement(self) -> Measurement:
@@ -361,14 +383,18 @@ class Bristol_871A(QMI_Instrument):
         timestamp = time.time()
         words = resp.split(",")
         if len(words) != 4:
-            raise QMI_InstrumentException("Unexpected response to :READ:ALL? ({!r})".format(resp))
+            raise QMI_InstrumentException(
+                "Unexpected response to :READ:ALL? ({!r})".format(resp)
+            )
         try:
             index = int(words[0])
             status = int(words[1])
             wavelength = float(words[2])
             power = float(words[3])
         except ValueError:
-            raise QMI_InstrumentException("Unexpected response to :READ:ALL? ({!r})".format(resp))
+            raise QMI_InstrumentException(
+                "Unexpected response to :READ:ALL? ({!r})".format(resp)
+            )
         # Erroneous measurements are signified by the 'status', but also by the
         # (observed, undocumented) fact that the 'wavelength' is returned as 0.0.
         # To prevent accidents, we replace this error value by NaN.
@@ -528,7 +554,11 @@ class Bristol_871A(QMI_Instrument):
         message_length = 20
         nbytes = len(data)
         if nbytes % message_length != 0:
-            raise QMI_InstrumentException("Expected multiple of 20 bytes in memory but got {} bytes".format(nbytes))
+            raise QMI_InstrumentException(
+                "Expected multiple of 20 bytes in memory but got {} bytes".format(
+                    nbytes
+                )
+            )
         nsamples = nbytes // message_length
 
         # Unpack measurement values:
@@ -539,7 +569,7 @@ class Bristol_871A(QMI_Instrument):
         ret = []  # type: List[Measurement]
         timestamp = time.time()
         for i in range(nsamples):
-            sample = data[i * message_length:(i + 1) * message_length]
+            sample = data[i * message_length : (i + 1) * message_length]
             (wavelength, power, status, index) = struct.unpack("<dfII", sample)
             # Erroneous measurements are signified by the 'status', but also by the
             # (observed, undocumented) fact that the 'wavelength' is returned as 0.0.
