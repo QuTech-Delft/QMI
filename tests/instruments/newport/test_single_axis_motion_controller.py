@@ -126,7 +126,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.write.assert_not_called()
         self._scpi_mock.ask.assert_not_called()
 
-    def test_get_idn_without_controller_address_gets_idn(self):
+    def test_get_idn_address_gets_idn(self):
         """Test get idn."""
         self._scpi_mock.ask.side_effect = [
             f"{self.controller_address}VE CONEX-CC 2.0.1", "@"]
@@ -142,22 +142,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self._scpi_mock.ask.assert_has_calls(expected_calls)
 
-    def test_get_idn_with_controller_address_gets_idn(self):
-        """Test get idn with controller_address."""
-        self._scpi_mock.ask.side_effect = ["3VE CONEX-CC 2.0.1", "@"]
-        expected_calls = [
-            call("3VE\r\n"),
-            call("3TE\r\n")
-        ]
-        info = self.instr.get_idn(3)
-        self.assertEqual(info.vendor, "Newport")
-        self.assertEqual(info.version, "2.0.1")
-        self.assertEqual(info.serial, "FT5TMFGL")
-        self.assertEqual(info.model, "CONEX-CC")
-
-        self._scpi_mock.ask.assert_has_calls(expected_calls)
-
-    def test_get_positioner_error_and_state_without_controller_address_gets_positioner_error_and_state(self):
+    def test_get_positioner_error_and_state_gets_positioner_error_and_state(self):
         """Test positioner error and state."""
         self._scpi_mock.ask.return_value = f"{self.controller_address}TS00001E"
         err_and_state = self.instr.get_positioner_error_and_state()
@@ -167,16 +152,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.ask.assert_called_once_with(
             f"{self.controller_address}TS\r\n")
 
-    def test_get_positioner_error_and_state_with_controller_address_gets_positioner_error_and_state(self):
-        """Test positioner error and state with controller address."""
-        self._scpi_mock.ask.return_value = f"{self.controller_address}TS00001E"
-        err_and_state = self.instr.get_positioner_error_and_state(3)
-
-        self.assertEqual(err_and_state[1], "HOMING.")
-        self.assertEqual(len(err_and_state[0]), 0)
-        self._scpi_mock.ask.assert_called_once_with("3TS\r\n")
-
-    def test_home_search_without_controller_address_homes(self):
+    def test_home_search_homes(self):
         """Test home search."""
         self._scpi_mock.ask.return_value = "@"
         self.instr.home_search()
@@ -186,131 +162,62 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.ask.assert_called_once_with(
             f"{self.controller_address}TE\r\n")
 
-    def test_home_search_with_controller_address_homes(self):
-        """Test home search with controller address."""
-        self._scpi_mock.ask.return_value = "@"
-        self.instr.home_search(3)
-
-        self._scpi_mock.write.assert_called_once_with("3OR\r\n")
-        self._scpi_mock.ask.assert_called_once_with("3TE\r\n")
-
-    def test_move_absolute_more_than_max_thrown_exception(self):
-        """Test move absolute more than max."""
-        self._scpi_mock.ask.return_value = "@"
-
-        with self.assertRaises(QMI_InstrumentException):
-            self.instr.move_absolute(1000000)
-
-        self._scpi_mock.write.assert_not_called()
-
-    def test_move_absolute_less_than_min_throws_exception(self):
-        """Test move absolute less than min."""
-        self._scpi_mock.ask.return_value = "@"
-
-        with self.assertRaises(QMI_InstrumentException):
-            self.instr.move_absolute(0.0000000001)
-
-        self._scpi_mock.write.assert_not_called()
-
-    def test_move_absolute_without_controller_address_moves(self):
-        """Test move absolute."""
-        pos = 1
-        self._scpi_mock.ask.return_value = "@"
-        self.instr.move_absolute(pos)
-
-        self._scpi_mock.write.assert_called_once_with(
-            f"{self.controller_address}PA%s\r\n" % pos)
-        self._scpi_mock.ask.assert_called_once_with(
-            f"{self.controller_address}TE\r\n")
-
-    def test_move_absolute_with_controller_address_moves(self):
-        """Test move absolute with controller address."""
-        pos = 1
-        self._scpi_mock.ask.return_value = "@"
-        self.instr.move_absolute(pos, 3)
-
-        self._scpi_mock.write.assert_called_once_with(f"3PA{pos}\r\n")
-        self._scpi_mock.ask.assert_called_once_with("3TE\r\n")
-
-    def test_get_position_without_controller_address_gets_position(self):
-        """Test get position."""
-        expected_pos = 1.2345
-        self._scpi_mock.ask.side_effect = [
-            f"{self.controller_address}TP %s" % expected_pos, "@"]
-        expected_calls = [
-            call(f"{self.controller_address}TP\r\n"),
+    # def test_set_home_search_timeout(self):
+    #     """Test setting home search timeout."""
+    #     self._scpi_mock.ask.return_value = "@"
+    #     self.instr.set_home_search_timeout(3.0)
+    #
+    #     self._scpi_mock.write.assert_called_once_with("1OT3.0\r\n")
+    #     self._scpi_mock.ask.assert_called_once_with("1TE\r\n")
+    #
+    # def test_set_home_search_timeout_default(self):
+    #     """Test setting home search timeout."""
+    #     default_timeout = Newport_Single_Axis_Motion_Controller.DEFAULT_HOME_SEARCH_TIMEOUT
+    #     self._scpi_mock.ask.return_value = "@"
+    #     self.instr.set_home_search_timeout()
+    #
+    #     self._scpi_mock.write.assert_called_once_with(f"1OT{default_timeout}\r\n")
+    #     self._scpi_mock.ask.assert_called_once_with("1TE\r\n")
+    #
+    def test_set_home_search_timeout_sets_timeout(self):
+        """Test set home search timeout."""
+        timeout = 13
+        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}OT%s\r\n" % timeout),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
             call(f"{self.controller_address}TE\r\n")
         ]
-        actual_pos = self.instr.get_position()
-        self.assertEqual(actual_pos, expected_pos)
+        self.instr.set_home_search_timeout(timeout)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
-        self._scpi_mock.ask.assert_has_calls(expected_calls)
-
-    def test_get_position_with_controller_address_gets_position(self):
-        """Test get position with controller address."""
-        expected_pos = 1.2345
-        self._scpi_mock.ask.side_effect = [f"3TP {expected_pos}", "@"]
-        expected_calls = [
-            call("3TP\r\n"),
+    def test_set_home_search_timeout_with_default_timeout_sets_timeout(self):
+        """Test set home search timeout with controller address."""
+        timeout = Newport_Single_Axis_Motion_Controller.DEFAULT_HOME_SEARCH_TIMEOUT
+        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        expected_write_calls = [
+            call("3RS\r\n"),
+            call("3PW1\r\n"),
+            call(f"3OT{timeout}\r\n"),
+            call("3PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call("3TE\r\n"),
+            call("3TE\r\n"),
             call("3TE\r\n")
         ]
-        actual_pos = self.instr.get_position(3)
-        self.assertEqual(actual_pos, expected_pos)
+        self.instr.set_home_search_timeout(controller_address=3)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
-        self._scpi_mock.ask.assert_has_calls(expected_calls)
-
-    def test_move_relative_without_controller_address_moves(self):
-        """Test move relative."""
-        pos = 1
-        self._scpi_mock.ask.return_value = "@"
-        self.instr.move_relative(pos)
-
-        self._scpi_mock.write.assert_called_once_with(
-            f"{self.controller_address}PR%s\r\n" % pos)
-        self._scpi_mock.ask.assert_called_once_with(
-            f"{self.controller_address}TE\r\n")
-
-    def test_move_relative_with_controller_address_moves(self):
-        """Test move relative with controller address."""
-        pos = 1
-        self._scpi_mock.ask.return_value = "@"
-        self.instr.move_relative(pos, 3)
-
-        self._scpi_mock.write.assert_called_once_with(f"3PR{pos}\r\n")
-        self._scpi_mock.ask.assert_called_once_with("3TE\r\n")
-
-    def test_enter_configuration_state_without_controller_address_enters_configuration_state(self):
-        """Test enter configuration state."""
-        self._scpi_mock.ask.return_value = "@"
-        self.instr.enter_configuration_state()
-
-        self._scpi_mock.write.assert_called_once_with(
-            f"{self.controller_address}PW1\r\n")
-        self._scpi_mock.ask.assert_called_once_with(
-            f"{self.controller_address}TE\r\n")
-
-    def test_enter_configuration_state_with_controller_address_enters_configuration_state(self):
-        """Test enter configuration state with controller address."""
-        self._scpi_mock.ask.return_value = "@"
-        self.instr.enter_configuration_state(3)
-
-        self._scpi_mock.write.assert_called_once_with("3PW1\r\n")
-        self._scpi_mock.ask.assert_called_once_with("3TE\r\n")
-
-    def test_exit_configuration_state_without_controller_address_exists_configuration_state(self):
-        """Test enter configuration state."""
-        self.instr.exit_configuration_state()
-
-        self._scpi_mock.write.assert_called_once_with(
-            f"{self.controller_address}PW0\r\n")
-
-    def test_exit_configuration_state_with_controller_address_exists_configuration_state(self):
-        """Test enter configuration state with controller address."""
-        self.instr.exit_configuration_state(3)
-
-        self._scpi_mock.write.assert_called_once_with("3PW0\r\n")
-
-    def test_get_home_search_timeout_without_controller_address_gets_timeout(self):
+    def test_get_home_search_timeout_gets_timeout(self):
         """Test get home search timeout."""
         expected_timeout = 10
         self._scpi_mock.ask.side_effect = [
@@ -320,20 +227,6 @@ class TestSingleAxisMotionController(unittest.TestCase):
             call(f"{self.controller_address}TE\r\n")
         ]
         actual_timeout = self.instr.get_home_search_timeout()
-
-        self.assertEqual(expected_timeout, actual_timeout)
-
-        self._scpi_mock.ask.assert_has_calls(expected_calls)
-
-    def test_get_home_search_timeout_with_controller_address_gets_timeout(self):
-        """Test get home search timeout with controller address."""
-        expected_timeout = 10
-        self._scpi_mock.ask.side_effect = [f"3OT{expected_timeout}", "@"]
-        expected_calls = [
-            call("3OT?\r\n"),
-            call("3TE\r\n")
-        ]
-        actual_timeout = self.instr.get_home_search_timeout(3)
 
         self.assertEqual(expected_timeout, actual_timeout)
 
@@ -354,7 +247,75 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self._scpi_mock.ask.assert_has_calls(expected_calls)
 
-    def test_get_error_with_no_error_and_without_controller_address_gets_error(self):
+    def test_move_absolute_more_than_max_thrown_exception(self):
+        """Test move absolute more than max."""
+        self._scpi_mock.ask.return_value = "@"
+
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.move_absolute(1000000)
+
+        self._scpi_mock.write.assert_not_called()
+
+    def test_move_absolute_less_than_min_throws_exception(self):
+        """Test move absolute less than min."""
+        self._scpi_mock.ask.return_value = "@"
+
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.move_absolute(0.0000000001)
+
+        self._scpi_mock.write.assert_not_called()
+
+    def test_move_absolute_moves(self):
+        """Test move absolute."""
+        pos = 1
+        self._scpi_mock.ask.return_value = "@"
+        self.instr.move_absolute(pos)
+
+        self._scpi_mock.write.assert_called_once_with(
+            f"{self.controller_address}PA%s\r\n" % pos)
+        self._scpi_mock.ask.assert_called_once_with(
+            f"{self.controller_address}TE\r\n")
+
+    def test_get_position_gets_position(self):
+        """Test get position."""
+        expected_pos = 1.2345
+        self._scpi_mock.ask.side_effect = [
+            f"{self.controller_address}TP %s" % expected_pos, "@"]
+        expected_calls = [
+            call(f"{self.controller_address}TP\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_pos = self.instr.get_position()
+        self.assertEqual(actual_pos, expected_pos)
+
+        self._scpi_mock.ask.assert_has_calls(expected_calls)
+
+    def test_move_relative_moves(self):
+        """Test move relative with controller address."""
+        pos = 1
+        self._scpi_mock.ask.return_value = "@"
+        self.instr.move_relative(pos, 3)
+
+        self._scpi_mock.write.assert_called_once_with(f"3PR{pos}\r\n")
+        self._scpi_mock.ask.assert_called_once_with("3TE\r\n")
+
+    def test_enter_configuration_state_enters_configuration_state(self):
+        """Test enter configuration state."""
+        self._scpi_mock.ask.return_value = "@"
+        self.instr.enter_configuration_state()
+
+        self._scpi_mock.write.assert_called_once_with(
+            f"{self.controller_address}PW1\r\n")
+        self._scpi_mock.ask.assert_called_once_with(
+            f"{self.controller_address}TE\r\n")
+
+    def test_exit_configuration_state_exists_configuration_state(self):
+        """Test enter configuration state with controller address."""
+        self.instr.exit_configuration_state(3)
+
+        self._scpi_mock.write.assert_called_once_with("3PW0\r\n")
+
+    def test_get_error_with_no_error_gets_error(self):
         """Test get error with no error."""
         expected_error_code = "@"
         expected_error_message = "No error"
@@ -367,19 +328,6 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self._scpi_mock.ask.assert_called_once_with(
             f"{self.controller_address}TE\r\n")
-
-    def test_get_error_with_no_error_and_controller_address(self):
-        """Test get error with no error with controller address."""
-        expected_error_code = "@"
-        expected_error_message = "No error"
-        self._scpi_mock.ask.return_value = expected_error_code
-
-        actual_error = self.instr.get_error(3)
-
-        self.assertEqual(actual_error[0], expected_error_code)
-        self.assertEqual(actual_error[1], expected_error_message)
-
-        self._scpi_mock.ask.assert_called_once_with("3TE\r\n")
 
     def test_get_error_with_error_gets_error(self):
         """Test get error with an error."""
@@ -397,44 +345,6 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self.assertEqual(actual_error[1], expected_error_message)
 
         self._scpi_mock.ask.assert_has_calls(expected_calls)
-
-    def test_set_home_search_timeout_without_controller_address_sets_timeout(self):
-        """Test set home search timeout."""
-        timeout = 13
-        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
-        expected_write_calls = [
-            call(f"{self.controller_address}RS\r\n"),
-            call(f"{self.controller_address}PW1\r\n"),
-            call(f"{self.controller_address}OT%s\r\n" % timeout),
-            call(f"{self.controller_address}PW0\r\n")
-        ]
-        expected_ask_calls = [
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n")
-        ]
-        self.instr.set_home_search_timeout(timeout)
-        self._scpi_mock.write.assert_has_calls(expected_write_calls)
-        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
-
-    def test_set_home_search_timeout_with_controller_address_sets_timeout(self):
-        """Test set home search timeout with controller address."""
-        timeout = 13
-        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
-        expected_write_calls = [
-            call("3RS\r\n"),
-            call("3PW1\r\n"),
-            call(f"3OT{timeout}\r\n"),
-            call("3PW0\r\n")
-        ]
-        expected_ask_calls = [
-            call("3TE\r\n"),
-            call("3TE\r\n"),
-            call("3TE\r\n")
-        ]
-        self.instr.set_home_search_timeout(timeout, 3)
-        self._scpi_mock.write.assert_has_calls(expected_write_calls)
-        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
     def test_set_velocity_more_than_max_throws_exception(self):
         """Test set velocity more than max."""
@@ -454,7 +364,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self._scpi_mock.write.assert_not_called()
 
-    def test_get_velocity_without_controller_address_gets_velocity(self):
+    def test_get_velocity_gets_velocity(self):
         """Test get velocity."""
         expected_pos = 1.5
         self._scpi_mock.ask.side_effect = [
@@ -475,28 +385,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
-    def test_get_velocity_with_controller_address_gets_velocity(self):
-        """Test get velocity with controller address."""
-        expected_pos = 1.5
-        self._scpi_mock.ask.side_effect = [
-            "@", "@", f"3VA {expected_pos}", "@"]
-        expected_write_calls = [
-            call("3RS\r\n"),
-            call("3PW1\r\n"),
-            call("3PW0\r\n")
-        ]
-        expected_ask_calls = [
-            call("3TE\r\n"),
-            call("3VA?\r\n"),
-            call("3TE\r\n")
-        ]
-        actual_pos = self.instr.get_velocity(3)
-        self.assertEqual(actual_pos, expected_pos)
-
-        self._scpi_mock.write.assert_has_calls(expected_write_calls)
-        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
-
-    def test_set_velocity_with_persist_and_without_controller_address_sets_velocity(self):
+    def test_set_velocity_with_persist_sets_velocity(self):
         """Test set velocity with persisting the velocity."""
         vel = 0.004
         self._scpi_mock.ask.side_effect = ["@", "@", "@"]
@@ -515,25 +404,6 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
-    def test_set_velocity_with_persist_and_controller_address_sets_velocity(self):
-        """Test set velocity with persisting the velocity and providing a controller address."""
-        vel = 0.1
-        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
-        expected_write_calls = [
-            call("3RS\r\n"),
-            call("3PW1\r\n"),
-            call(f"3VA{vel}\r\n"),
-            call("3PW0\r\n")
-        ]
-        expected_ask_calls = [
-            call("3TE\r\n"),
-            call("3TE\r\n"),
-            call("3TE\r\n")
-        ]
-        self.instr.set_velocity(vel, True, 3)
-        self._scpi_mock.write.assert_has_calls(expected_write_calls)
-        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
-
     def test_set_velocity_without_persist_sets_velocity(self):
         """Test set velocity without persisting, i.e. without entering the configuration state."""
         vel = 0.004
@@ -544,7 +414,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.ask.assert_called_once_with(
             f"{self.controller_address}TE\r\n")
 
-    def test_stop_motion_without_controller_address_stops_motion(self):
+    def test_stop_motion_stops_motion(self):
         """Test stop motion."""
         self._scpi_mock.ask.return_value = "@"
         self.instr.stop_motion(3)
@@ -552,20 +422,10 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.write.assert_called_once_with("3ST\r\n")
         self._scpi_mock.ask.assert_called_once_with("3TE\r\n")
 
-    def test_stop_motion_with_controller_address_stops_motion(self):
-        """Test stop motion with controller address."""
-        self._scpi_mock.ask.return_value = "@"
-        self.instr.stop_motion()
-
-        self._scpi_mock.write.assert_called_once_with(
-            f"{self.controller_address}ST\r\n")
-        self._scpi_mock.ask.assert_called_once_with(
-            f"{self.controller_address}TE\r\n")
-
-    def test_set_backlash_compensation_with_controller_address_sets_compensation(self):
+    def test_set_backlash_compensation_sets_compensation(self):
         """Test set backlash compensation with controller address."""
         comp = 0.004
-        self._scpi_mock.ask.side_effect = ["3BH0", "@", "@", "@"]
+        self._scpi_mock.ask.side_effect = ["@", "@", "3BH0", "@", "@"]
         expected_write_calls = [
             call("3RS\r\n"),
             call("3PW1\r\n"),
@@ -573,8 +433,9 @@ class TestSingleAxisMotionController(unittest.TestCase):
             call("3PW0\r\n")
         ]
         expected_ask_calls = [
-            call("3BH?\r\n"),
             call("3TE\r\n"),
+            call("3TE\r\n"),
+            call("3BH?\r\n"),
             call("3TE\r\n"),
             call("3TE\r\n")
         ]
@@ -582,27 +443,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
-    def test_set_backlash_compensation_without_controller_address_sets_compensation(self):
-        """Test set backlash compensation."""
-        comp = 13
-        self._scpi_mock.ask.side_effect = [f"{self.controller_address}BH0", "@", "@", "@"]
-        expected_write_calls = [
-            call(f"{self.controller_address}RS\r\n"),
-            call(f"{self.controller_address}PW1\r\n"),
-            call(f"{self.controller_address}BA{comp}\r\n"),
-            call(f"{self.controller_address}PW0\r\n")
-        ]
-        expected_ask_calls = [
-            call(f"{self.controller_address}BH?\r\n"),
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n")
-        ]
-        self.instr.set_backlash_compensation(comp)
-        self._scpi_mock.write.assert_has_calls(expected_write_calls)
-        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
-
-    def test_get_backlash_compensation_without_controller_address_gets_compensation(self):
+    def test_get_backlash_compensation_gets_compensation(self):
         """Test get backlash compensation."""
         comp = 10
         self._scpi_mock.ask.side_effect = [
@@ -618,27 +459,6 @@ class TestSingleAxisMotionController(unittest.TestCase):
             call(f"{self.controller_address}TE\r\n")
         ]
         actual_comp = self.instr.get_backlash_compensation()
-        self.assertEqual(comp, actual_comp)
-
-        self._scpi_mock.write.assert_has_calls(expected_write_calls)
-        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
-
-    def test_get_backlash_compensation_with_controller_address_gets_compensation(self):
-        """Test get backlash compensation with controller address."""
-        comp = 10
-        self._scpi_mock.ask.side_effect = [
-            "@", "@", f"3BA {comp}", "@"]
-        expected_write_calls = [
-            call("3RS\r\n"),
-            call("3PW1\r\n"),
-            call("3PW0\r\n")
-        ]
-        expected_ask_calls = [
-            call("3TE\r\n"),
-            call("3BA?\r\n"),
-            call("3TE\r\n")
-        ]
-        actual_comp = self.instr.get_backlash_compensation(3)
         self.assertEqual(comp, actual_comp)
 
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
