@@ -67,7 +67,7 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 2000 < factor <= 0:
+        if 2000 < factor or factor <= 0:
             raise QMI_InstrumentException(
                 f"Provided value {factor} not in valid range 0 > factor >= 2000.")
 
@@ -105,7 +105,7 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 1E12 <= m_dist <= 1E-6:
+        if 1E12 <= m_dist or m_dist <= 1E-6:
             raise QMI_InstrumentException(
                 f"Provided value {m_dist} not in valid range 1E-6 > m_dist > 1E12.")
 
@@ -143,20 +143,19 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        # instrument must be in configuration state to get the current maximum velocity.
+        # instrument must be in configuration state to set the current base velocity.
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
         response = self._scpi_protocol.ask(
             self._build_command("VA?"))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
+        self.exit_configuration_state(controller_address)
         velocity = float(response[3:])
-        if velocity < base_velocity < 0:
-            self.exit_configuration_state(controller_address)
+        if base_velocity > velocity or base_velocity < 0:
             raise QMI_InstrumentException(
                 f"Provided value {base_velocity} not in valid range 0 >= base_velocity >= {velocity}.")
 
-        self.exit_configuration_state(controller_address)
         _logger.info(
             "Setting the profile generator base velocity of instrument [%s] to [%f]", self._name, base_velocity)
         self._scpi_protocol.write(self._build_command(
