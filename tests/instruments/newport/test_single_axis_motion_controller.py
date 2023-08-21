@@ -142,6 +142,19 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self._scpi_mock.ask.assert_has_calls(expected_calls)
 
+    def test_get_stage_identifier(self):
+        """Test get stage identifier."""
+        expected_identifier = "URS100CC"
+        self._scpi_mock.ask.side_effect = [f"{expected_identifier}", "@"]
+        expected_calls = [
+            call(f"{self.controller_address}ID?\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        idn = self.instr.get_stage_identifier()
+        self.assertEqual(idn, expected_identifier)
+
+        self._scpi_mock.ask.assert_has_calls(expected_calls)
+
     def test_get_positioner_error_and_state_gets_positioner_error_and_state(self):
         """Test positioner error and state."""
         self._scpi_mock.ask.return_value = f"{self.controller_address}TS00001E"
@@ -149,6 +162,19 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self.assertEqual(err_and_state[1], "HOMING.")
         self.assertEqual(len(err_and_state[0]), 0)
+        self._scpi_mock.ask.assert_called_once_with(
+            f"{self.controller_address}TS\r\n")
+
+    def test_get_positioner_error_and_state_with_an_error_bit(self):
+        """Test positioner error gets added to 'errors' and returned, with state."""
+        expected_errors = [Newport_Single_Axis_Motion_Controller.POSITIONER_ERROR_TABLE[9],
+                           Newport_Single_Axis_Motion_Controller.POSITIONER_ERROR_TABLE[12],
+                           Newport_Single_Axis_Motion_Controller.POSITIONER_ERROR_TABLE[13]]
+        self._scpi_mock.ask.return_value = f"{self.controller_address}TS004C1E"
+        errors, state = self.instr.get_positioner_error_and_state()
+
+        self.assertEqual(state, "HOMING.")
+        self.assertListEqual(expected_errors, errors)
         self._scpi_mock.ask.assert_called_once_with(
             f"{self.controller_address}TS\r\n")
 
@@ -162,23 +188,6 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.ask.assert_called_once_with(
             f"{self.controller_address}TE\r\n")
 
-    # def test_set_home_search_timeout(self):
-    #     """Test setting home search timeout."""
-    #     self._scpi_mock.ask.return_value = "@"
-    #     self.instr.set_home_search_timeout(3.0)
-    #
-    #     self._scpi_mock.write.assert_called_once_with("1OT3.0\r\n")
-    #     self._scpi_mock.ask.assert_called_once_with("1TE\r\n")
-    #
-    # def test_set_home_search_timeout_default(self):
-    #     """Test setting home search timeout."""
-    #     default_timeout = Newport_Single_Axis_Motion_Controller.DEFAULT_HOME_SEARCH_TIMEOUT
-    #     self._scpi_mock.ask.return_value = "@"
-    #     self.instr.set_home_search_timeout()
-    #
-    #     self._scpi_mock.write.assert_called_once_with(f"1OT{default_timeout}\r\n")
-    #     self._scpi_mock.ask.assert_called_once_with("1TE\r\n")
-    #
     def test_set_home_search_timeout_sets_timeout(self):
         """Test set home search timeout."""
         timeout = 13
@@ -235,17 +244,19 @@ class TestSingleAxisMotionController(unittest.TestCase):
     def test_get_home_search_timeout_with_error_throws_exception(self):
         """Test get home search timeout with error."""
         expected_timeout = 10
+        expected_error = ["Error", "C", ": Command not allowed"]
         self._scpi_mock.ask.side_effect = [f"{self.controller_address}OT%s" %
-                                           expected_timeout, "C", f"{self.controller_address}TBD: Command not allowed"]
+                                           expected_timeout, expected_error[1], f"{self.controller_address}TBD{expected_error[2]}"]
         expected_calls = [
             call(f"{self.controller_address}OT?\r\n"),
             call(f"{self.controller_address}TE\r\n"),
             call(f"{self.controller_address}TBC\r\n")
         ]
-        with self.assertRaises(QMI_InstrumentException):
+        with self.assertRaises(QMI_InstrumentException) as exc:
             self.instr.get_home_search_timeout()
 
         self._scpi_mock.ask.assert_has_calls(expected_calls)
+        self.assertEqual(str(exc.exception), expected_error[0] + f" {expected_error[1]}" + expected_error[2])
 
     def test_move_absolute_more_than_max_thrown_exception(self):
         """Test move absolute more than max."""
@@ -276,6 +287,20 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.ask.assert_called_once_with(
             f"{self.controller_address}TE\r\n")
 
+    def test_get_setpoint_gets_setpoint(self):
+        """Test get setpoint."""
+        expected_sp = 1.2345
+        self._scpi_mock.ask.side_effect = [
+            f"{self.controller_address}TH %s" % expected_sp, "@"]
+        expected_calls = [
+            call(f"{self.controller_address}TH\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_sp = self.instr.get_setpoint()
+        self.assertEqual(actual_sp, expected_sp)
+
+        self._scpi_mock.ask.assert_has_calls(expected_calls)
+
     def test_get_position_gets_position(self):
         """Test get position."""
         expected_pos = 1.2345
@@ -298,6 +323,21 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self._scpi_mock.write.assert_called_once_with(f"3PR{pos}\r\n")
         self._scpi_mock.ask.assert_called_once_with("3TE\r\n")
+
+    def test_get_motion_time(self):
+        """Test get motion time."""
+        displacement = 3.21
+        expected_time = 1.23
+        self._scpi_mock.ask.side_effect = [
+            f"{self.controller_address}PT %s" % expected_time, "@"]
+        expected_calls = [
+            call(f"{self.controller_address}PT{displacement}\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_time = self.instr.get_motion_time(displacement)
+        self.assertEqual(actual_time, expected_time)
+
+        self._scpi_mock.ask.assert_has_calls(expected_calls)
 
     def test_enter_configuration_state_enters_configuration_state(self):
         """Test enter configuration state."""
@@ -346,6 +386,67 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self._scpi_mock.ask.assert_has_calls(expected_calls)
 
+    def test_get_acceleration_gets_acceleration(self):
+        """Test get acceleration."""
+        expected_acc = 1.5
+        self._scpi_mock.ask.side_effect = [
+            "@", "@", f"{self.controller_address}AC %s" % expected_acc, "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}AC?\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_acc = self.instr.get_acceleration()
+        self.assertEqual(actual_acc, expected_acc)
+
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_acceleration_with_persist_sets_acceleration(self):
+        """Test set acceleration with persist = True."""
+        acc = 0.004
+        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}AC{acc}\r\n"),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        self.instr.set_acceleration(acc, True)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_acceleration_without_persist_sets_acceleration(self):
+        """Test set acceleration without persisting, i.e. without entering the configuration state."""
+        acc = 0.004
+        self._scpi_mock.ask.return_value = "@"
+        self.instr.set_acceleration(acc)
+        self._scpi_mock.write.assert_called_once_with(
+            f"{self.controller_address}AC{acc}\r\n")
+        self._scpi_mock.ask.assert_called_once_with(
+            f"{self.controller_address}TE\r\n")
+
+    def test_set_acceleration_outside_bounds_throws_exception(self):
+        """Test set acceleration outisde of allowed range raise exception."""
+        self._scpi_mock.ask.return_value = "@"
+        out_of_bounds = [1E-6, 1E12]
+
+        for value in out_of_bounds:
+            with self.assertRaises(QMI_InstrumentException):
+                self.instr.set_acceleration(value)
+
+        self._scpi_mock.write.assert_not_called()
+
     def test_set_velocity_more_than_max_throws_exception(self):
         """Test set velocity more than max."""
         self._scpi_mock.ask.return_value = "@"
@@ -366,9 +467,9 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_get_velocity_gets_velocity(self):
         """Test get velocity."""
-        expected_pos = 1.5
+        expected_vel = 1.5
         self._scpi_mock.ask.side_effect = [
-            "@", "@", f"{self.controller_address}VA %s" % expected_pos, "@"]
+            "@", "@", f"{self.controller_address}VA %s" % expected_vel, "@"]
         expected_write_calls = [
             call(f"{self.controller_address}RS\r\n"),
             call(f"{self.controller_address}PW1\r\n"),
@@ -379,8 +480,8 @@ class TestSingleAxisMotionController(unittest.TestCase):
             call(f"{self.controller_address}VA?\r\n"),
             call(f"{self.controller_address}TE\r\n")
         ]
-        actual_pos = self.instr.get_velocity()
-        self.assertEqual(actual_pos, expected_pos)
+        actual_vel = self.instr.get_velocity()
+        self.assertEqual(actual_vel, expected_vel)
 
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
@@ -414,6 +515,67 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.ask.assert_called_once_with(
             f"{self.controller_address}TE\r\n")
 
+    def test_get_jerk_time_gets_jerk_time(self):
+        """Test get jerk_time."""
+        expected_jerk = 1.5
+        self._scpi_mock.ask.side_effect = [
+            "@", "@", f"{self.controller_address}JR %s" % expected_jerk, "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}JR?\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_jerk = self.instr.get_jerk_time()
+        self.assertEqual(actual_jerk, expected_jerk)
+
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_jerk_time_with_persist_sets_jerk_time(self):
+        """Test set jerk_time with persist = True."""
+        jerk = 0.004
+        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}JR{jerk}\r\n"),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        self.instr.set_jerk_time(jerk, True)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_jerk_time_without_persist_sets_jerk_time(self):
+        """Test set jerk_time without persisting, i.e. without entering the configuration state."""
+        jerk = 0.004
+        self._scpi_mock.ask.return_value = "@"
+        self.instr.set_jerk_time(jerk)
+        self._scpi_mock.write.assert_called_once_with(
+            f"{self.controller_address}JR{jerk}\r\n")
+        self._scpi_mock.ask.assert_called_once_with(
+            f"{self.controller_address}TE\r\n")
+
+    def test_set_jerk_time_outside_bounds_throws_exception(self):
+        """Test set jerk_time outisde of allowed range raise exception."""
+        self._scpi_mock.ask.return_value = "@"
+        out_of_bounds = [0.001, 1E12]
+
+        for value in out_of_bounds:
+            with self.assertRaises(QMI_InstrumentException):
+                self.instr.set_jerk_time(value)
+
+        self._scpi_mock.write.assert_not_called()
+
     def test_stop_motion_stops_motion(self):
         """Test stop motion."""
         self._scpi_mock.ask.return_value = "@"
@@ -443,6 +605,28 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
+    def test_set_backlash_compensation_excepts_because_hysteresis_compensation(self):
+        """Test set backlash compensation exits because hysteresis compensation is enabled."""
+        hyst_comp = 0.1
+        comp = 0.004
+        self._scpi_mock.ask.side_effect = ["@", "@", f"1BH{hyst_comp}", "@"]
+        expected_write_calls = [
+            call("1RS\r\n"),
+            call("1PW1\r\n"),
+            call("1PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call("1TE\r\n"),
+            call("1TE\r\n"),
+            call("1BH?\r\n"),
+            call("1TE\r\n")
+        ]
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.set_backlash_compensation(comp)
+
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
     def test_get_backlash_compensation_gets_compensation(self):
         """Test get backlash compensation."""
         comp = 10
@@ -463,3 +647,505 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_hysteresis_compensation_sets_compensation(self):
+        """Test set hysteresis compensation with controller address."""
+        comp = 0.004
+        self._scpi_mock.ask.side_effect = ["@", "@", "3BH0", "@", "@"]
+        expected_write_calls = [
+            call("3RS\r\n"),
+            call("3PW1\r\n"),
+            call(f"3BH{comp}\r\n"),
+            call("3PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call("3TE\r\n"),
+            call("3TE\r\n"),
+            call("3BA?\r\n"),
+            call("3TE\r\n"),
+            call("3TE\r\n")
+        ]
+        self.instr.set_hysteresis_compensation(comp, 3)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_hysteresis_compensation_excepts_because_backlash_compensation(self):
+        """Test set hysteresis compensation exits because backlash compensation is enabled."""
+        back_comp = 0.1
+        comp = 0.004
+        self._scpi_mock.ask.side_effect = ["@", "@", f"1BA{back_comp}", "@"]
+        expected_write_calls = [
+            call("1RS\r\n"),
+            call("1PW1\r\n"),
+            call("1PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call("1TE\r\n"),
+            call("1TE\r\n"),
+            call("1BA?\r\n"),
+            call("1TE\r\n")
+        ]
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.set_hysteresis_compensation(comp)
+
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_get_hysteresis_compensation_gets_compensation(self):
+        """Test get hysteresis compensation."""
+        comp = 10
+        self._scpi_mock.ask.side_effect = [
+            "@", "@", f"{self.controller_address}BH {comp}", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}BH?\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_comp = self.instr.get_hysteresis_compensation()
+        self.assertEqual(comp, actual_comp)
+
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_get_home_search_type(self):
+        """Test getting home search type."""
+        expected_type = 2
+        self._scpi_mock.ask.side_effect = [
+            f"{self.controller_address}HT %s" % expected_type, "@"]
+        expected_calls = [
+            call(f"{self.controller_address}HT?\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_type = self.instr.get_home_search_type()
+        self.assertEqual(actual_type, expected_type)
+
+        self._scpi_mock.ask.assert_has_calls(expected_calls)
+
+    def test_set_home_search_type(self):
+        """Test setting home search type."""
+        home_type = 1
+        self._scpi_mock.ask.return_value = "@"
+        self.instr.set_home_search_type(home_type)
+
+        self._scpi_mock.write.assert_called_once_with(f"1HT{home_type}\r\n")
+        self._scpi_mock.ask.assert_called_once_with("1TE\r\n")
+
+    def test_set_home_search_type_excepts(self):
+        """Test setting home search type excepts with type out-of-range."""
+        home_type = 5
+        self._scpi_mock.ask.return_value = "@"
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.set_home_search_type(home_type)
+
+        self._scpi_mock.write.assert_not_called()
+        self._scpi_mock.ask.assert_not_called()
+
+    def test_get_peak_current_limit_gets_limit(self):
+        """Test get peak current limit."""
+        expected_limit = 1.0
+        self._scpi_mock.ask.side_effect = ["@", "@",
+            f"{self.controller_address}QIL%s" % expected_limit, "@", "@", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}QIL?\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_limit = self.instr.get_peak_current_limit()
+
+        self.assertEqual(expected_limit, actual_limit)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_peak_current_limit_sets_limit(self):
+        """Test set peak current limit."""
+        limit = 1.3
+        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}QIL%s\r\n" % limit),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        self.instr.set_peak_current_limit(limit)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_peak_current_limit_with_error_throws_exception(self):
+        """Test set peak current limit with error."""
+        out_of_bounds = [0.04999, 3.0001]
+        for value in out_of_bounds:
+            with self.assertRaises(QMI_InstrumentException):
+                self.instr.set_peak_current_limit(value)
+
+        self._scpi_mock.write.assert_not_called()
+        self._scpi_mock.ask.assert_not_called()
+
+    def test_get_rms_current_limit_gets_limit(self):
+        """Test get rms current limit."""
+        rms = 10
+        self._scpi_mock.ask.side_effect = [
+            "@", "@", f"{self.controller_address}QIR {rms}", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}QIR?\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_rms = self.instr.get_rms_current_limit()
+        self.assertEqual(rms, actual_rms)
+
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_rms_current_limit_sets_limit(self):
+        """Test set rms current limit with controller address."""
+        peak = 2.0
+        rms = 0.05
+        controller_address = 2
+        self._scpi_mock.ask.side_effect = ["@", "@", f"{controller_address}QIL{peak}", "@", "@"]
+        expected_write_calls = [
+            call(f"{controller_address}RS\r\n"),
+            call(f"{controller_address}PW1\r\n"),
+            call(f"{controller_address}QIR{rms}\r\n"),
+            call(f"{controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{controller_address}TE\r\n"),
+            call(f"{controller_address}TE\r\n"),
+            call(f"{controller_address}QIL?\r\n"),
+            call(f"{controller_address}TE\r\n"),
+            call(f"{controller_address}TE\r\n")
+        ]
+        self.instr.set_rms_current_limit(rms, controller_address)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_rms_current_limit_sets_limit_under_peak_limit(self):
+        """Test set rms current limit works also with lower peak limit."""
+        peak = 0.06
+        rms = 0.05
+        self._scpi_mock.ask.side_effect = ["@", "@", f"1QIL{peak}", "@", "@"]
+        expected_write_calls = [
+            call("1RS\r\n"),
+            call("1PW1\r\n"),
+            call(f"1QIR{rms}\r\n"),
+            call("1PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call("1TE\r\n"),
+            call("1TE\r\n"),
+            call("1QIL?\r\n"),
+            call("1TE\r\n"),
+            call("1TE\r\n")
+        ]
+        self.instr.set_rms_current_limit(rms)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_rms_current_limit_excepts_because_peak_limit(self):
+        """Test set rms current limit exits because peak limit is lower."""
+        peak = 1.0
+        rms = 1.1
+        self._scpi_mock.ask.side_effect = ["@", "@", f"1QIL{peak}", "@"]
+        expected_write_calls = [
+            call("1RS\r\n"),
+            call("1PW1\r\n"),
+            call("1PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call("1TE\r\n"),
+            call("1TE\r\n"),
+            call("1QIL?\r\n"),
+            call("1TE\r\n")
+        ]
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.set_rms_current_limit(rms)
+
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_get_rms_current_averaging_time_gets_time(self):
+        """Test get rms current averaging time."""
+        expected_time = 10
+        self._scpi_mock.ask.side_effect = ["@", "@",
+            f"{self.controller_address}QIT%s" % expected_time, "@", "@", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}QIT?\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_time = self.instr.get_rms_current_averaging_time()
+
+        self.assertEqual(expected_time, actual_time)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_rms_current_averaging_time_sets_time(self):
+        """Test set rms current averaging time."""
+        time = 13
+        self._scpi_mock.ask.return_value = "@"
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}QIT%i\r\n" % time),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        self.instr.set_rms_current_averaging_time(time)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_rms_current_averaging_time_with_error_throws_exception(self):
+        """Test set rms current averaging time with error."""
+        out_of_bounds = [0.01, 101]
+        for value in out_of_bounds:
+            with self.assertRaises(QMI_InstrumentException):
+                self.instr.set_rms_current_averaging_time(value)
+
+        self._scpi_mock.write.assert_not_called()
+        self._scpi_mock.ask.assert_not_called()
+
+    def test_get_analog_input_value(self):
+        """Test getting analog input value."""
+        expected_value = 2.0
+        self._scpi_mock.ask.side_effect = [
+            f"{self.controller_address}RA %f" % expected_value, "@"]
+        expected_calls = [
+            call(f"{self.controller_address}RA\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_value = self.instr.get_analog_input_value()
+        self.assertEqual(actual_value, expected_value)
+
+        self._scpi_mock.ask.assert_has_calls(expected_calls)
+
+    def test_get_ttl_input_value(self):
+        """Test getting ttl input value."""
+        expected_value = 5
+        self._scpi_mock.ask.side_effect = [
+            f"{self.controller_address}RB %i" % expected_value, "@"]
+        expected_calls = [
+            call(f"{self.controller_address}RB\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_value = self.instr.get_ttl_input_value()
+        self.assertEqual(actual_value, expected_value)
+
+        self._scpi_mock.ask.assert_has_calls(expected_calls)
+
+    def test_get_ttl_output_value(self):
+        """Test getting ttl output value."""
+        expected_value = 3
+        self._scpi_mock.ask.side_effect = [
+            f"{self.controller_address}SB %i" % expected_value, "@"]
+        expected_calls = [
+            call(f"{self.controller_address}SB?\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_value = self.instr.get_ttl_output_value()
+        self.assertEqual(actual_value, expected_value)
+
+        self._scpi_mock.ask.assert_has_calls(expected_calls)
+
+    def test_set_ttl_output_value(self):
+        """Test setting ttl output value."""
+        ttl_output = 1
+        self._scpi_mock.ask.return_value = "@"
+        self.instr.set_ttl_output_value(ttl_output)
+
+        self._scpi_mock.write.assert_called_once_with(f"1SB{ttl_output}\r\n")
+        self._scpi_mock.ask.assert_called_once_with("1TE\r\n")
+
+    def test_set_ttl_output_value_excepts(self):
+        """Test setting ttl output value excepts when value out of valid range."""
+        ttl_output_invalid = [-1, 16]
+        for value in ttl_output_invalid:
+            with self.assertRaises(QMI_InstrumentException):
+                self.instr.set_ttl_output_value(value)
+
+        self._scpi_mock.write.assert_not_called()
+        self._scpi_mock.ask.assert_not_called()
+
+    def test_get_controller_rs485_address(self):
+        """Test getting controller rs485 address."""
+        expected_value = 2
+        self._scpi_mock.ask.side_effect = ["@", "@",
+            f"{self.controller_address}SA%s" % expected_value, "@", "@", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}SA?\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_value = self.instr.get_controller_rs485_address()
+        self.assertEqual(actual_value, expected_value)
+
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_controller_rs485_address(self):
+        """Test setting ttl output value."""
+        controller_rs485_address = 30
+        self._scpi_mock.ask.return_value = "@"
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}SA%i\r\n" % controller_rs485_address),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        self.instr.set_controller_rs485_address(controller_rs485_address)
+
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_controller_rs485_address_excepts(self):
+        """Test setting ttl output value excepts when value out of valid range."""
+        rs485_address_invalid = [1, 32]
+        for value in rs485_address_invalid:
+            with self.assertRaises(QMI_InstrumentException):
+                self.instr.set_controller_rs485_address(value)
+
+        self._scpi_mock.write.assert_not_called()
+        self._scpi_mock.ask.assert_not_called()
+
+    def test_get_negative_software_limit_gets_limit(self):
+        """Test get negative software limit."""
+        expected_limit = -1.0
+        self._scpi_mock.ask.side_effect = ["@", "@",
+            f"{self.controller_address}SL%f" % expected_limit, "@", "@", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}SL?\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_limit = self.instr.get_negative_software_limit()
+
+        self.assertEqual(expected_limit, actual_limit)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_negative_software_limit_sets_limit(self):
+        """Test set negative software limit."""
+        limit = -1.3
+        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}SL%s\r\n" % limit),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        self.instr.set_negative_software_limit(limit)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_negative_software_limit_with_error_throws_exception(self):
+        """Test set negative software limit with error."""
+        out_of_bounds = [0.0001, 1E-12]
+        for value in out_of_bounds:
+            with self.assertRaises(QMI_InstrumentException):
+                self.instr.set_negative_software_limit(value)
+
+        self._scpi_mock.write.assert_not_called()
+        self._scpi_mock.ask.assert_not_called()
+
+    def test_get_positive_software_limit_gets_limit(self):
+        """Test get positive software limit."""
+        expected_limit = 1.0
+        self._scpi_mock.ask.side_effect = ["@", "@",
+            f"{self.controller_address}SL%f" % expected_limit, "@", "@", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}SR?\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        actual_limit = self.instr.get_positive_software_limit()
+
+        self.assertEqual(expected_limit, actual_limit)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_positive_software_limit_sets_limit(self):
+        """Test set positive software limit."""
+        limit = 1.3
+        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}RS\r\n"),
+            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}SR%s\r\n" % limit),
+            call(f"{self.controller_address}PW0\r\n")
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        self.instr.set_positive_software_limit(limit)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_positive_software_limit_with_error_throws_exception(self):
+        """Test set positive software limit with error."""
+        out_of_bounds = [-0.0001, 1E12]
+        for value in out_of_bounds:
+            with self.assertRaises(QMI_InstrumentException):
+                self.instr.set_positive_software_limit(value)
+
+        self._scpi_mock.write.assert_not_called()
+        self._scpi_mock.ask.assert_not_called()

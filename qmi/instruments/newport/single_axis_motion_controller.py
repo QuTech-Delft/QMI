@@ -479,9 +479,9 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 1E-6 >= acceleration >= 1E12:
+        if 1E-6 >= acceleration or acceleration >= 1E12:
             raise QMI_InstrumentException(
-                f"Provided value {acceleration} not in valid range 1E-6 < acceleration 1E12.")
+                f"Provided value {acceleration} not in valid range 1E-6 < acceleration < 1E12.")
 
         self.controller_address = controller_address
         _logger.info(
@@ -587,7 +587,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 0.001 >= jerk_time >= 1E12:
+        if 0.001 >= jerk_time or jerk_time >= 1E12:
             raise QMI_InstrumentException(
                 f"Provided value {jerk_time} not in valid range 0.001 < jerk_time < 1E12")
 
@@ -817,7 +817,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 3.0 < current_limit < 0.05:
+        if 3.0 < current_limit or current_limit < 0.05:
             raise QMI_InstrumentException(
                     f"Current limit value not in valid range 0.05 <= current_limit <= 3.0")
 
@@ -872,7 +872,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         sleep(self.COMMAND_EXEC_TIME)
         peak_current_limit = min(1.5, float(peak_current_limit[4:]))
         self._check_error()
-        if peak_current_limit < current_limit < 0.05:
+        if peak_current_limit < current_limit or current_limit < 0.05:
             self.exit_configuration_state(controller_address)
             raise QMI_InstrumentException(
                     f"Current limit value not in valid range 0.05 <= current_limit <= {peak_current_limit}")
@@ -916,7 +916,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 100.0 < averaging_time <= 0.01:
+        if 100.0 < averaging_time  or averaging_time <= 0.01:
             raise QMI_InstrumentException(
                     f"Averaging period for rms current calculation not in valid range 0.01 < averaging_time <= 100.0")
 
@@ -1053,7 +1053,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         Parameters:
             rs485_address:      Controller's axis number for new RS485 address.
         """
-        if 2 > rs485_address > 31:
+        if 2 > rs485_address or rs485_address > 31:
             raise QMI_InstrumentException(
                 f"Invalid controller axis number {rs485_address}")
 
@@ -1105,7 +1105,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if -1E12 >= neg_sw_limit > 0:
+        if -1E12 >= neg_sw_limit or neg_sw_limit > 0:
             raise QMI_InstrumentException(
                 f"Negative software limit {neg_sw_limit} not in valid range -1E12 < {neg_sw_limit} <= 0")
 
@@ -1156,7 +1156,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 0 > pos_sw_limit >= 1E12:
+        if 0 > pos_sw_limit or pos_sw_limit >= 1E12:
             raise QMI_InstrumentException(
                 f"Positive software limit {pos_sw_limit} not in valid range 0 <= {pos_sw_limit} <= 1E12")
 
