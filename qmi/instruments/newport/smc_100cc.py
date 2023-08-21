@@ -121,7 +121,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 48 < driver_voltage < 12:
+        if 12.0 > driver_voltage or driver_voltage > 48.0:
             raise QMI_InstrumentException(
                 f"Provided value {driver_voltage} not in valid range 12 >= driver_voltage >= 48.")
 
@@ -144,7 +144,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
                                 it is set to the initialised value of the controller address.
 
         Returns:
-            The low pass filter cut-off frequency, Kd.
+            The low pass filter cut-off frequency, Kd, in Hertz.
         """
         _logger.info(
             "Getting encoder increment value of instrument [%s]", self._name)
@@ -156,7 +156,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
         self.exit_configuration_state(controller_address)
-        return self._actuators[controller_address].ENCODER_RESOLUTION / float(res[3:])
+        return float(res[3:])
 
     @rpc_method
     def set_low_pass_filter_cutoff_frequency(
@@ -165,20 +165,20 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         Set the low pass filter cut-off frequency Kd.
 
         Parameters:
-            frequency:          Cutoff frequency Kd.
+            frequency:          Cutoff frequency Kd in Hertz.
             persist:            Flag to indicate if the frequency cutoff should be persisted to the controller's memory,
                                 so it is still available after powering down the controller. When not persisted, the
                                 frequency cutoff is the one stored in the controller's memory.
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised frequency of the controller address.
         """
-        if 2000 <= frequency <= 1E-6:
+        if 2000 <= frequency or frequency <= 1E-6:
             raise QMI_InstrumentException(
                 f"Provided value {frequency} not in valid range 1E-6 > frequency > 2000.")
 
-        self.controller_address = controller_address
         _logger.info(
             "Setting encoder increment frequency of instrument [%s] to [%s]", self._name, frequency)
+        self.controller_address = controller_address
         # instrument must be in configuration state to persist the set velocity.
         if persist:
             self.reset(controller_address)
@@ -213,7 +213,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
         self.exit_configuration_state(controller_address)
-        return self._actuators[self.controller_address].ENCODER_RESOLUTION / float(res[3:])
+        return float(res[3:])
 
     @rpc_method
     def set_following_error_limit(
@@ -229,7 +229,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised error limit of the controller address.
         """
-        if 1E12 <= error_limit <= 1E-6:
+        if 1E12 <= error_limit or error_limit <= 1E-6:
             raise QMI_InstrumentException(
                 f"Provided value {error_limit} not in valid range 1E-6 > error limit > 1E12.")
 
@@ -275,7 +275,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             self, friction_compensation: float, persist: bool = False, controller_address: Optional[int] = None
     ) -> None:
         """
-        Set the friction compensation. It must not be larger than the maximum velocity set by VA command.
+        Set the friction compensation. It must not be larger than the driver voltage set by DV command.
 
         Parameters:
             friction_compensation:      New friction compensation value.
@@ -291,9 +291,9 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
         driver_voltage = float(response[3:])
-        if driver_voltage < friction_compensation < 0:
+        if driver_voltage <= friction_compensation or friction_compensation < 0:
             raise QMI_InstrumentException(
-                f"Provided value {friction_compensation} not in valid range 0 >= friction_compensation >= {driver_voltage}."
+                f"Provided value {friction_compensation} not in valid range 0 >= friction_compensation > {driver_voltage}."
             )
 
         _logger.info(
@@ -347,7 +347,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised derivative_gain of the controller address.
         """
-        if 1E12 <= derivative_gain < 0:
+        if 1E12 <= derivative_gain or derivative_gain < 0:
             raise QMI_InstrumentException(
                 f"Provided value {derivative_gain} not in valid range 0 >= derivative_gain > 1E12.")
 
@@ -406,7 +406,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised integral_gain of the controller address.
         """
-        if 1E12 <= integral_gain < 0:
+        if 1E12 <= integral_gain or integral_gain < 0:
             raise QMI_InstrumentException(
                 f"Provided value {integral_gain} not in valid range 0 >= integral_gain > 1E12.")
 
@@ -465,7 +465,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised proportional_gain of the controller address.
         """
-        if 1E12 <= proportional_gain < 0:
+        if 1E12 <= proportional_gain or proportional_gain < 0:
             raise QMI_InstrumentException(
                 f"Provided value {proportional_gain} not in valid range 0 >= proportional_gain > 1E12.")
 
@@ -524,7 +524,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised velocity_feed_forward of the controller address.
         """
-        if 1E12 <= velocity_feed_forward < 0:
+        if 1E12 <= velocity_feed_forward or velocity_feed_forward < 0:
             raise QMI_InstrumentException(
                 f"Provided value {velocity_feed_forward} not in valid range 0 >= velocity_feed_forward > 1E12.")
 
