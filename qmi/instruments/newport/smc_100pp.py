@@ -50,10 +50,11 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         """
         _logger.info(
             "Getting the micro-step per full step factor of instrument [%s]", self._name)
+        self.controller_address = controller_address
         factor = self._scpi_protocol.ask(
-            self._build_command("FRM?", controller_address=controller_address))
+            self._build_command("FRM?"))
 
-        self._check_error(controller_address)
+        self._check_error()
         return float(factor[4:])
 
     @rpc_method
@@ -66,14 +67,16 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        _logger.info(
-            "Setting the motion distance per motor’s full step of instrument [%s] to [%i]", self._name, factor)
         if 2000 < factor <= 0:
             raise QMI_InstrumentException(
                 f"Provided value {factor} not in valid range 0 > factor >= 2000.")
+
+        _logger.info(
+            "Setting the motion distance per motor’s full step of instrument [%s] to [%i]", self._name, factor)
+        self.controller_address = controller_address
         self._scpi_protocol.write(self._build_command(
-            "FRM", factor, controller_address))
-        self._check_error(controller_address)
+            "FRM", factor))
+        self._check_error()
 
     @rpc_method
     def get_motion_distance_per_full_step(self, controller_address: Optional[int] = None) -> float:
@@ -86,10 +89,10 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         """
         _logger.info(
             "Getting the motion distance per motor’s full step value of instrument [%s]", self._name)
+        self.controller_address = controller_address
         m_dist = self._scpi_protocol.ask(
-            self._build_command("FRS?", controller_address=controller_address))
-
-        self._check_error(controller_address)
+            self._build_command("FRS?"))
+        self._check_error()
         return float(m_dist[4:])
 
     @rpc_method
@@ -102,14 +105,16 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        _logger.info(
-            "Setting the motion distance per motor’s full step of instrument [%s] to [%f]", self._name, m_dist)
         if 1E12 <= m_dist <= 1E-6:
             raise QMI_InstrumentException(
                 f"Provided value {m_dist} not in valid range 1E-6 > m_dist > 1E12.")
+
+        _logger.info(
+            "Setting the motion distance per motor’s full step of instrument [%s] to [%f]", self._name, m_dist)
+        self.controller_address = controller_address
         self._scpi_protocol.write(self._build_command(
-            "FRS", m_dist, controller_address))
-        self._check_error(controller_address)
+            "FRS", m_dist))
+        self._check_error()
 
     @rpc_method
     def get_base_velocity(self, controller_address: Optional[int] = None) -> float:
@@ -122,10 +127,10 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         """
         _logger.info(
             "Getting the profile generator base velocity of instrument [%s]", self._name)
+        self.controller_address = controller_address
         base_velocity = self._scpi_protocol.ask(
-            self._build_command("VB?", controller_address=controller_address))
-
-        self._check_error(controller_address)
+            self._build_command("VB?"))
+        self._check_error()
         return float(base_velocity[3:])
 
     @rpc_method
@@ -142,11 +147,12 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
         response = self._scpi_protocol.ask(
-            self._build_command("VA?", controller_address=controller_address))
+            self._build_command("VA?"))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         velocity = float(response[3:])
         if velocity < base_velocity < 0:
+            self.exit_configuration_state(controller_address)
             raise QMI_InstrumentException(
                 f"Provided value {base_velocity} not in valid range 0 >= base_velocity >= {velocity}.")
 
@@ -154,5 +160,5 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         _logger.info(
             "Setting the profile generator base velocity of instrument [%s] to [%f]", self._name, base_velocity)
         self._scpi_protocol.write(self._build_command(
-            "VB", base_velocity, controller_address))
-        self._check_error(controller_address)
+            "VB", base_velocity))
+        self._check_error()

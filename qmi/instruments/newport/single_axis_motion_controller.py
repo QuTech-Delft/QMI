@@ -285,7 +285,6 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         t = timeout if timeout else self.DEFAULT_HOME_SEARCH_TIMEOUT
         _logger.info(
             "Setting homing timeout of instrument [%s] to [%s]", self._name, t)
-        self.controller_address = controller_address
         # instrument must be in configuration state to set the timeout.
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
@@ -484,6 +483,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             raise QMI_InstrumentException(
                 f"Provided value {acceleration} not in valid range 1E-6 < acceleration 1E12.")
 
+        self.controller_address = controller_address
         _logger.info(
             "Setting acceleration of instrument [%s] to [%f]", self._name, acceleration)
         # instrument must be in configuration state to persist the set acceleration.
@@ -593,6 +593,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
 
         _logger.info(
             "Setting jerk_time of instrument [%s] to [%f]", self._name, jerk_time)
+        self.controller_address = controller_address
         # instrument must be in configuration state to persist the set jerk_time.
         if persist:
             self.reset(controller_address)
@@ -863,7 +864,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        # instrument must be in configuration state to set the current limit.
+        # instrument must be in configuration state to check the peak current limit and to set the RMS current limit.
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
         peak_current_limit = self._scpi_protocol.ask(

@@ -79,7 +79,7 @@ class TestNewportSmc100Cc(unittest.TestCase):
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
-    def test_get_encoder_increment_value_without_controller_address_gets_value(self):
+    def test_get_encoder_increment_value_gets_value(self):
         """Test get encoder increment value."""
         expected_encoder_unit = 10
         encoder_resolution = TRA12CC.ENCODER_RESOLUTION
@@ -96,28 +96,6 @@ class TestNewportSmc100Cc(unittest.TestCase):
             call(f"{self.controller_address}TE\r\n")
         ]
         actual_encoder_unit = self.instr.get_encoder_increment_value()
-        self.assertEqual(expected_encoder_unit, actual_encoder_unit)
-
-        self._scpi_mock.write.assert_has_calls(expected_write_calls)
-        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
-
-    def test_get_encoder_increment_value_with_controller_address_gets_value(self):
-        """Test get encoder increment value with controller address."""
-        expected_encoder_unit = 10
-        encoder_resolution = CMA25CCL.ENCODER_RESOLUTION
-        self._scpi_mock.ask.side_effect = [
-            "@", "@", f"3SU {encoder_resolution / expected_encoder_unit}", "@"]
-        expected_write_calls = [
-            call("3RS\r\n"),
-            call("3PW1\r\n"),
-            call("3PW0\r\n")
-        ]
-        expected_ask_calls = [
-            call("3TE\r\n"),
-            call("3SU?\r\n"),
-            call("3TE\r\n")
-        ]
-        actual_encoder_unit = self.instr.get_encoder_increment_value(3)
         self.assertEqual(expected_encoder_unit, actual_encoder_unit)
 
         self._scpi_mock.write.assert_has_calls(expected_write_calls)

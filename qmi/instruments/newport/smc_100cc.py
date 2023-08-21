@@ -59,17 +59,15 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         """
         _logger.info(
             "Getting encoder increment value of instrument [%s]", self._name)
-        # if controller address is not given use the default one
-        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
         # instrument must be in configuration state to get the encoder increment value.
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
         res = self._scpi_protocol.ask(
-            self._build_command("SU?", controller_address=controller_address))
+            self._build_command("SU?"))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         self.exit_configuration_state(controller_address)
-        return self._actuators[controller_address].ENCODER_RESOLUTION / float(res[3:])
+        return self._actuators[self.controller_address].ENCODER_RESOLUTION / float(res[3:])
 
     @rpc_method
     def set_encoder_increment_value(self, value: float, controller_address: Optional[int] = None) -> None:
@@ -90,9 +88,9 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
         self._scpi_protocol.write(self._build_command(
-            "SU", value, controller_address))
+            "SU", value))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         self.exit_configuration_state(controller_address)
 
     @rpc_method
@@ -106,10 +104,11 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         """
         _logger.info(
             "Getting the max. output voltage of the driver to the motor of instrument [%s]", self._name)
+        self.controller_address = controller_address
         driver_voltage = self._scpi_protocol.ask(
-            self._build_command("DV?", controller_address=controller_address))
+            self._build_command("DV?"))
 
-        self._check_error(controller_address)
+        self._check_error()
         return float(driver_voltage[3:])
 
     @rpc_method
@@ -126,13 +125,14 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             raise QMI_InstrumentException(
                 f"Provided value {driver_voltage} not in valid range 12 >= driver_voltage >= 48.")
 
+        self.controller_address = controller_address
         _logger.info(
             "Setting the max. output voltage of the driver to the motor of instrument [%s] to [%f]",
             self._name, driver_voltage
         )
         self._scpi_protocol.write(self._build_command(
-            "DV", driver_voltage, controller_address))
-        self._check_error(controller_address)
+            "DV", driver_voltage))
+        self._check_error()
 
     @rpc_method
     def get_low_pass_filter_cutoff_frequency(self, controller_address: Optional[int] = None) -> float:
@@ -148,15 +148,13 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         """
         _logger.info(
             "Getting encoder increment value of instrument [%s]", self._name)
-        # if controller address is not given use the default one
-        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
         # instrument must be in configuration state to get the encoder increment value.
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
         res = self._scpi_protocol.ask(
-            self._build_command("FD?", controller_address=controller_address))
+            self._build_command("FD?"))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         self.exit_configuration_state(controller_address)
         return self._actuators[controller_address].ENCODER_RESOLUTION / float(res[3:])
 
@@ -178,16 +176,18 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             raise QMI_InstrumentException(
                 f"Provided value {frequency} not in valid range 1E-6 > frequency > 2000.")
 
+        self.controller_address = controller_address
         _logger.info(
             "Setting encoder increment frequency of instrument [%s] to [%s]", self._name, frequency)
         # instrument must be in configuration state to persist the set velocity.
         if persist:
             self.reset(controller_address)
             self.enter_configuration_state(controller_address)
+
         self._scpi_protocol.write(self._build_command(
-            "FD", frequency, controller_address))
+            "FD", frequency))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         if persist:
             self.exit_configuration_state(controller_address)
 
@@ -205,17 +205,15 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         """
         _logger.info(
             "Getting encoder increment value of instrument [%s]", self._name)
-        # if controller address is not given use the default one
-        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
         # instrument must be in configuration state to get the encoder increment value.
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
         res = self._scpi_protocol.ask(
-            self._build_command("FE?", controller_address=controller_address))
+            self._build_command("FE?"))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         self.exit_configuration_state(controller_address)
-        return self._actuators[controller_address].ENCODER_RESOLUTION / float(res[3:])
+        return self._actuators[self.controller_address].ENCODER_RESOLUTION / float(res[3:])
 
     @rpc_method
     def set_following_error_limit(
@@ -239,14 +237,16 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             "Setting the value for the maximum allowed following error of instrument [%s] to [%f]",
             self._name, error_limit
         )
+        self.controller_address = controller_address
         # instrument must be in configuration state to persist the set velocity.
         if persist:
             self.reset(controller_address)
             self.enter_configuration_state(controller_address)
+
         self._scpi_protocol.write(self._build_command(
-            "FE", error_limit, controller_address))
+            "FE", error_limit))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         if persist:
             self.exit_configuration_state(controller_address)
 
@@ -265,9 +265,8 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
         friction_compensation = self._scpi_protocol.ask(
-            self._build_command("FF?", controller_address=controller_address))
-
-        self._check_error(controller_address)
+            self._build_command("FF?"))
+        self._check_error()
         self.exit_configuration_state(controller_address)
         return float(friction_compensation[3:])
 
@@ -286,10 +285,11 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
+        self.controller_address = controller_address
         response = self._scpi_protocol.ask(
-            self._build_command("DV?", controller_address=controller_address))
+            self._build_command("DV?"))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         driver_voltage = float(response[3:])
         if driver_voltage < friction_compensation < 0:
             raise QMI_InstrumentException(
@@ -302,10 +302,10 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         if persist:
             self.reset(controller_address)
             self.enter_configuration_state(controller_address)
-        self._scpi_protocol.write(self._build_command(
-            "FF", friction_compensation, controller_address))
-        self._check_error(controller_address)
 
+        self._scpi_protocol.write(self._build_command(
+            "FF", friction_compensation))
+        self._check_error()
         if persist:
             self.exit_configuration_state(controller_address)
 
@@ -323,15 +323,13 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         """
         _logger.info(
             "Getting derivative gain of the PID control loop of instrument [%s]", self._name)
-        # if controller address is not given use the default one
-        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
         # instrument must be in configuration state to get the derivative gain of the PID control loop value.
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
         res = self._scpi_protocol.ask(
-            self._build_command("KD?", controller_address=controller_address))
+            self._build_command("KD?"))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         self.exit_configuration_state(controller_address)
         return float(res[3:])
 
@@ -357,14 +355,16 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             "Setting derivative gain of the PID control loop of instrument [%s] to [%f]",
             self._name, derivative_gain
         )
+        self.controller_address = controller_address
         # instrument must be in configuration state to persist the set derivative gain of the PID control loop.
         if persist:
             self.reset(controller_address)
             self.enter_configuration_state(controller_address)
+
         self._scpi_protocol.write(self._build_command(
-            "KD", derivative_gain, controller_address))
+            "KD", derivative_gain))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         if persist:
             self.exit_configuration_state(controller_address)
 
@@ -382,15 +382,13 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         """
         _logger.info(
             "Getting integral gain of the PID control loop of instrument [%s]", self._name)
-        # if controller address is not given use the default one
-        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
         # instrument must be in configuration state to get the integral gain of the PID control loop value.
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
         res = self._scpi_protocol.ask(
-            self._build_command("KI?", controller_address=controller_address))
+            self._build_command("KI?"))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         self.exit_configuration_state(controller_address)
         return float(res[3:])
 
@@ -416,14 +414,16 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             "Setting integral gain of the PID control loop of instrument [%s] to [%f]",
             self._name, integral_gain
         )
+        self.controller_address = controller_address
         # instrument must be in configuration state to persist the set integral gain of the PID control loop.
         if persist:
             self.reset(controller_address)
             self.enter_configuration_state(controller_address)
+
         self._scpi_protocol.write(self._build_command(
-            "KI", integral_gain, controller_address))
+            "KI", integral_gain))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         if persist:
             self.exit_configuration_state(controller_address)
 
@@ -441,15 +441,13 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         """
         _logger.info(
             "Getting proportional gain of the PID control loop of instrument [%s]", self._name)
-        # if controller address is not given use the default one
-        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
         # instrument must be in configuration state to get the proportional gain of the PID control loop value.
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
         res = self._scpi_protocol.ask(
-            self._build_command("KP?", controller_address=controller_address))
+            self._build_command("KP?"))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         self.exit_configuration_state(controller_address)
         return float(res[3:])
 
@@ -476,13 +474,14 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             self._name, proportional_gain
         )
         # instrument must be in configuration state to persist the set proportional gain of the PID control loop.
+        self.controller_address = controller_address
         if persist:
             self.reset(controller_address)
             self.enter_configuration_state(controller_address)
         self._scpi_protocol.write(self._build_command(
-            "KP", proportional_gain, controller_address))
+            "KP", proportional_gain))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         if persist:
             self.exit_configuration_state(controller_address)
 
@@ -500,15 +499,13 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         """
         _logger.info(
             "Getting velocity feed forward of the PID control loop of instrument [%s]", self._name)
-        # if controller address is not given use the default one
-        controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
         # instrument must be in configuration state to get the velocity feed forward of the PID control loop value.
         self.reset(controller_address)
         self.enter_configuration_state(controller_address)
         res = self._scpi_protocol.ask(
-            self._build_command("KV?", controller_address=controller_address))
+            self._build_command("KV?"))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         self.exit_configuration_state(controller_address)
         return float(res[3:])
 
@@ -535,14 +532,15 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             "Setting velocity feed forward of the PID control loop of instrument [%s] to [%f]",
             self._name, velocity_feed_forward
         )
+        self.controller_address = controller_address
         # instrument must be in configuration state to persist the set velocity feed forward of the PID control loop.
         if persist:
             self.reset(controller_address)
             self.enter_configuration_state(controller_address)
         self._scpi_protocol.write(self._build_command(
-            "KV", velocity_feed_forward, controller_address))
+            "KV", velocity_feed_forward))
         sleep(self.COMMAND_EXEC_TIME)
-        self._check_error(controller_address)
+        self._check_error()
         if persist:
             self.exit_configuration_state(controller_address)
 
@@ -557,10 +555,10 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         """
         _logger.info(
             "Getting the current state of the control loop of instrument [%s]", self._name)
+        self.controller_address = controller_address
         control_loop_state = self._scpi_protocol.ask(
-            self._build_command("SC?", controller_address=controller_address))
-
-        self._check_error(controller_address)
+            self._build_command("SC?"))
+        self._check_error()
         return int(control_loop_state[3:])
 
     @rpc_method
@@ -581,6 +579,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             "Setting the state of the control loop of instrument [%s] to [%s]",
             self._name, ControlLoopState(control_loop_state).name
         )
+        self.controller_address = controller_address
         self._scpi_protocol.write(self._build_command(
-            "SC", control_loop_state, controller_address))
-        self._check_error(controller_address)
+            "SC", control_loop_state))
+        self._check_error()
