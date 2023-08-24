@@ -17,6 +17,7 @@ _logger = logging.getLogger(__name__)
 
 
 class ControlLoopState(enum.IntEnum):
+    """Control loop states of the controller."""
     OPEN = 0
     CLOSED = 1
 
@@ -172,9 +173,9 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised frequency of the controller address.
         """
-        if 2000 <= frequency or frequency <= 1E-6:
+        if 2000 <= frequency or frequency <= self.MIN_FLOAT_LIMIT:
             raise QMI_InstrumentException(
-                f"Provided value {frequency} not in valid range 1E-6 > frequency > 2000.")
+                f"Provided value {frequency} not in valid range {self.MIN_FLOAT_LIMIT} > frequency > 2000.")
 
         _logger.info(
             "Setting encoder increment frequency of instrument [%s] to [%s]", self._name, frequency)
@@ -229,9 +230,11 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised error limit of the controller address.
         """
-        if 1E12 <= error_limit or error_limit <= 1E-6:
+        if self.MAX_FLOAT_LIMIT <= error_limit or error_limit <= self.MIN_FLOAT_LIMIT:
             raise QMI_InstrumentException(
-                f"Provided value {error_limit} not in valid range 1E-6 > error limit > 1E12.")
+                f"Provided value {error_limit} not in valid range {self.MIN_FLOAT_LIMIT} > error limit "
+                f"> {self.MAX_FLOAT_LIMIT}."
+            )
 
         _logger.info(
             "Setting the value for the maximum allowed following error of instrument [%s] to [%f]",
@@ -293,7 +296,8 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         driver_voltage = float(response[3:])
         if driver_voltage <= friction_compensation or friction_compensation < 0:
             raise QMI_InstrumentException(
-                f"Provided value {friction_compensation} not in valid range 0 >= friction_compensation > {driver_voltage}."
+                f"Provided value {friction_compensation} not in valid range 0 >= "
+                f"friction_compensation > {driver_voltage}."
             )
 
         _logger.info(
@@ -347,9 +351,9 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised derivative_gain of the controller address.
         """
-        if 1E12 <= derivative_gain or derivative_gain < 0:
+        if self.MAX_FLOAT_LIMIT <= derivative_gain or derivative_gain < 0:
             raise QMI_InstrumentException(
-                f"Provided value {derivative_gain} not in valid range 0 >= derivative_gain > 1E12.")
+                f"Provided value {derivative_gain} not in valid range 0 >= derivative_gain > {self.MAX_FLOAT_LIMIT}.")
 
         _logger.info(
             "Setting derivative gain of the PID control loop of instrument [%s] to [%f]",
@@ -406,9 +410,9 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised integral_gain of the controller address.
         """
-        if 1E12 <= integral_gain or integral_gain < 0:
+        if self.MAX_FLOAT_LIMIT <= integral_gain or integral_gain < 0:
             raise QMI_InstrumentException(
-                f"Provided value {integral_gain} not in valid range 0 >= integral_gain > 1E12.")
+                f"Provided value {integral_gain} not in valid range 0 >= integral_gain > {self.MAX_FLOAT_LIMIT}.")
 
         _logger.info(
             "Setting integral gain of the PID control loop of instrument [%s] to [%f]",
@@ -458,16 +462,18 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         Set the proportional gain of the PID control loop.
 
         Parameters:
-            proportional_gain:    New proportional_gain value in Volt * second/preset unit.
-            persist:            Flag to indicate if the proportional gain should be persisted to the controller's memory,
-                                so it is still available after powering down the controller. When not persisted, the
-                                proportional gain is the one stored in the controller's memory.
+            proportional_gain:  New proportional_gain value in Volt * second/preset unit.
+            persist:            Flag to indicate if the proportional gain should be persisted to the controller's
+                                memory, so it is still available after powering down the controller. When not persisted,
+                                the proportional gain is the one stored in the controller's memory.
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised proportional_gain of the controller address.
         """
-        if 1E12 <= proportional_gain or proportional_gain < 0:
+        if self.MAX_FLOAT_LIMIT <= proportional_gain or proportional_gain < 0:
             raise QMI_InstrumentException(
-                f"Provided value {proportional_gain} not in valid range 0 >= proportional_gain > 1E12.")
+                f"Provided value {proportional_gain} not in valid range 0 >= proportional_gain "
+                f"> {self.MAX_FLOAT_LIMIT}."
+            )
 
         _logger.info(
             "Setting proportional gain of the PID control loop of instrument [%s] to [%f]",
@@ -517,16 +523,18 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         Set the velocity feed forward of the PID control loop.
 
         Parameters:
-            velocity_feed_forward:    New velocity_feed_forward value in Volt * second/preset unit.
-            persist:            Flag to indicate if the velocity feed forward should be persisted to the controller's memory,
-                                so it is still available after powering down the controller. When not persisted, the
-                                velocity feed forward is the one stored in the controller's memory.
+            velocity_feed_forward: New velocity_feed_forward value in Volt * second/preset unit.
+            persist:            Flag to indicate if the velocity feed forward should be persisted to the controller's
+                                memory, so it is still available after powering down the controller. When not persisted,
+                                the velocity feed forward is the one stored in the controller's memory.
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised velocity_feed_forward of the controller address.
         """
-        if 1E12 <= velocity_feed_forward or velocity_feed_forward < 0:
+        if self.MAX_FLOAT_LIMIT <= velocity_feed_forward or velocity_feed_forward < 0:
             raise QMI_InstrumentException(
-                f"Provided value {velocity_feed_forward} not in valid range 0 >= velocity_feed_forward > 1E12.")
+                f"Provided value {velocity_feed_forward} not in valid range 0 >= velocity_feed_forward "
+                f"> {self.MAX_FLOAT_LIMIT}."
+            )
 
         _logger.info(
             "Setting velocity feed forward of the PID control loop of instrument [%s] to [%f]",
@@ -545,13 +553,16 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
             self.exit_configuration_state(controller_address)
 
     @rpc_method
-    def get_control_loop_state(self, controller_address: Optional[int] = None) -> int:
+    def get_control_loop_state(self, controller_address: Optional[int] = None) -> ControlLoopState:
         """
         Get the current state of the control loop.
 
         Parameters:
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
+
+        Returns:
+            control_loop_state: The current control loop state.
         """
         _logger.info(
             "Getting the current state of the control loop of instrument [%s]", self._name)
@@ -559,7 +570,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         control_loop_state = self._scpi_protocol.ask(
             self._build_command("SC?"))
         self._check_error()
-        return int(control_loop_state[3:])
+        return ControlLoopState(int(control_loop_state[3:]))
 
     @rpc_method
     def set_control_loop_state(self, control_loop_state: int, controller_address: Optional[int] = None) -> None:
@@ -567,7 +578,7 @@ class Newport_SMC100CC(Newport_Single_Axis_Motion_Controller):
         Set the current state of the control loop.
 
         Parameters:
-            control_loop_state: New state for the control loop.
+            control_loop_state: New state for the control loop. 0 is OPEN, 1 is CLOSED.
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """

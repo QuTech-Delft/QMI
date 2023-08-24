@@ -21,6 +21,7 @@ _logger = logging.getLogger(__name__)
 
 
 class HomeSearchTypes(enum.IntEnum):
+    """The types of HOME search used with the OR command."""
     MZ_SWITCH_AND_ENCODER_INDEX = 0
     CURRENT_POSITION_AS_HOME = 1
     MZ_SWITCH_ONLY = 2
@@ -48,6 +49,10 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
 
     # Default contoller address to send commands to.
     DEFAULT_CONTROLLER_ADDRESS = 1
+
+    # Floating point value SW limits
+    MIN_FLOAT_LIMIT = 1E-6
+    MAX_FLOAT_LIMIT = 1E12
 
     STATE_TABLE = {
         "0A": "NOT REFERENCED from RESET",
@@ -246,7 +251,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         err = err_and_state[3:7]
         state = err_and_state[7:9]
         errors = []
-        # convert the hexademical error code to binary
+        # convert the hexadecimal error code to binary
         bin_err_str = "{0:016b}".format(int(err, 16))
         # loop over bits and log the errors (i.e. high bits)
         for i, bit in enumerate(bin_err_str):
@@ -327,10 +332,14 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         self.controller_address = controller_address
         if position > self._actuators[self.controller_address].TRAVEL_RANGE:
             raise QMI_InstrumentException(
-                f"Provided value {position} greater than allowed maximum {self._actuators[self.controller_address].TRAVEL_RANGE}")
+                f"Provided value {position} greater than allowed maximum "
+                f"{self._actuators[self.controller_address].TRAVEL_RANGE}"
+            )
         if position < self._actuators[self.controller_address].MIN_INCREMENTAL_MOTION:
             raise QMI_InstrumentException(
-                f"Provided value {position} lower than minimum {self._actuators[self.controller_address].MIN_INCREMENTAL_MOTION}")
+                f"Provided value {position} lower than minimum "
+                f"{self._actuators[self.controller_address].MIN_INCREMENTAL_MOTION}"
+            )
 
         _logger.info(
             "Performing an absolute move of instrument [%s] to [%s]", self._name, position)
@@ -466,22 +475,27 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         return float(vel[3:])
 
     @rpc_method
-    def set_acceleration(self, acceleration: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+    def set_acceleration(
+            self, acceleration: float, persist: bool = False, controller_address: Optional[int] = None
+    ) -> None:
         """
         Set the acceleration at which the actuator moves.
 
         Parameters:
             acceleration:       Acceleration in preset unit/s^2. The unit depends on the encoder resolution,
                                 which is usually set to 1mm.
-            persist:            Flag to indicate if the acceleration should be persisted to the controller's memory, so it
-                                is still available after powering down the controller. When not persisted, the maximum
-                                allowable acceleration that can be set is the one stored in the controller's memory.
+            persist:            Flag to indicate if the acceleration should be persisted to the controller's memory, so
+                                it is still available after powering down the controller. When not persisted, the
+                                maximum allowable acceleration that can be set is the one stored in the controller's
+                                memory.
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 1E-6 >= acceleration or acceleration >= 1E12:
+        if self.MIN_FLOAT_LIMIT >= acceleration or acceleration >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
-                f"Provided value {acceleration} not in valid range 1E-6 < acceleration < 1E12.")
+                f"Provided value {acceleration} not in valid range {self.MIN_FLOAT_LIMIT} "
+                f"< acceleration < {self.MAX_FLOAT_LIMIT}."
+            )
 
         self.controller_address = controller_address
         _logger.info(
@@ -536,10 +550,14 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         self.controller_address = controller_address
         if velocity > self._actuators[self.controller_address].MAX_VELOCITY:
             raise QMI_InstrumentException(
-                f"Provided value {velocity} greater than allowed maximum {self._actuators[self.controller_address].MAX_VELOCITY}")
+                f"Provided value {velocity} greater than allowed maximum "
+                f"{self._actuators[self.controller_address].MAX_VELOCITY}"
+            )
         if velocity < self._actuators[self.controller_address].MIN_VELOCITY:
             raise QMI_InstrumentException(
-                f"Provided value {velocity} lower than minimum {self._actuators[self.controller_address].MIN_VELOCITY}")
+                f"Provided value {velocity} lower than minimum "
+                f"{self._actuators[self.controller_address].MIN_VELOCITY}"
+            )
 
         _logger.info(
             "Setting velocity of instrument [%s] to [%f]", self._name, velocity)
@@ -587,9 +605,9 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 0.001 >= jerk_time or jerk_time >= 1E12:
+        if 0.001 >= jerk_time or jerk_time >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
-                f"Provided value {jerk_time} not in valid range 0.001 < jerk_time < 1E12")
+                f"Provided value {jerk_time} not in valid range 0.001 < jerk_time < {self.MAX_FLOAT_LIMIT}")
 
         _logger.info(
             "Setting jerk_time of instrument [%s] to [%f]", self._name, jerk_time)
@@ -916,7 +934,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 100.0 < averaging_time  or averaging_time <= 0.01:
+        if 100.0 < averaging_time or averaging_time <= 0.01:
             raise QMI_InstrumentException(
                     f"Averaging period for rms current calculation not in valid range 0.01 < averaging_time <= 100.0")
 
@@ -1084,8 +1102,9 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         """
         # instrument must be in configuration state to get the negative software limit.
         self.reset(controller_address)
-        _logger.info("Getting the negative software limit of controller [%s] instrument [%s]",
-                     self.controller_address, self._name
+        _logger.info(
+            "Getting the negative software limit of controller [%s] instrument [%s]",
+            self.controller_address, self._name
         )
         self.enter_configuration_state(controller_address)
         neg_sw_limit = self._scpi_protocol.ask(
@@ -1105,9 +1124,11 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if -1E12 >= neg_sw_limit or neg_sw_limit > 0:
+        if -self.MAX_FLOAT_LIMIT >= neg_sw_limit or neg_sw_limit > 0:
             raise QMI_InstrumentException(
-                f"Negative software limit {neg_sw_limit} not in valid range -1E12 < {neg_sw_limit} <= 0")
+                f"Negative software limit {neg_sw_limit} not in valid range -{self.MAX_FLOAT_LIMIT} "
+                f"< {neg_sw_limit} <= 0"
+            )
 
         # instrument must be in configuration state to set the RS485 address.
         self.reset(controller_address)
@@ -1135,8 +1156,9 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         """
         # instrument must be in configuration state to get the positive software limit.
         self.reset(controller_address)
-        _logger.info("Getting the positive software limit of controller [%s] instrument [%s]",
-                     self.controller_address, self._name
+        _logger.info(
+            "Getting the positive software limit of controller [%s] instrument [%s]",
+            self.controller_address, self._name
         )
         self.enter_configuration_state(controller_address)
         pos_sw_limit = self._scpi_protocol.ask(
@@ -1156,9 +1178,11 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 0 > pos_sw_limit or pos_sw_limit >= 1E12:
+        if 0 > pos_sw_limit or pos_sw_limit >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
-                f"Positive software limit {pos_sw_limit} not in valid range 0 <= {pos_sw_limit} <= 1E12")
+                f"Positive software limit {pos_sw_limit} not in valid range 0 <= "
+                f"{pos_sw_limit} <= {self.MAX_FLOAT_LIMIT}"
+            )
 
         # instrument must be in configuration state to set the RS485 address.
         self.reset(controller_address)

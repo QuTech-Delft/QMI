@@ -47,6 +47,9 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         Parameters:
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
+
+        Returns:
+            factor: The micro-step per full step factor as float.
         """
         _logger.info(
             "Getting the micro-step per full step factor of instrument [%s]", self._name)
@@ -86,6 +89,9 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         Parameters:
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
+
+        Returns:
+            m_dist: Motion distance as float.
         """
         _logger.info(
             "Getting the motion distance per motor’s full step value of instrument [%s]", self._name)
@@ -101,13 +107,14 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         Set the motion distance per motor’s full step.
 
         Parameters:
-            m_dist:             Full step value.
+            m_dist:             Motion distance per motor's full step.
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 1E12 <= m_dist or m_dist <= 1E-6:
+        if self.MAX_FLOAT_LIMIT <= m_dist or m_dist <= self.MIN_FLOAT_LIMIT:
             raise QMI_InstrumentException(
-                f"Provided value {m_dist} not in valid range 1E-6 > m_dist > 1E12.")
+                f"Provided value {m_dist} not in valid range {self.MIN_FLOAT_LIMIT} > m_dist > {self.MAX_FLOAT_LIMIT}."
+            )
 
         _logger.info(
             "Setting the motion distance per motor’s full step of instrument [%s] to [%f]", self._name, m_dist)
@@ -124,6 +131,9 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         Parameters:
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
+
+        Returns:
+            base_velocity: Base velocity as float.
         """
         _logger.info(
             "Getting the profile generator base velocity of instrument [%s]", self._name)
