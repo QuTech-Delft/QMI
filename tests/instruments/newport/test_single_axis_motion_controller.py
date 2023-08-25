@@ -9,7 +9,7 @@ from qmi.core.transport import QMI_TcpTransport
 from qmi.utils.context_managers import start_stop
 from qmi.instruments.newport import Newport_Smc100Pp, Newport_Smc100Cc, Newport_ConexCc
 from qmi.instruments.newport.actuators import TRA12CC, TRB6CC, CMA25CCL, UTS100PP
-from qmi.instruments.newport.single_axis_motion_controller import Newport_Single_Axis_Motion_Controller
+from qmi.instruments.newport.single_axis_motion_controller import Newport_SingleAxisMotionController
 
 
 class TestDerivingClassCase(unittest.TestCase):
@@ -89,11 +89,11 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self.addCleanup(patcher.stop)
         # Make DUTs
         self.controller_address = 1
-        self.instr: Newport_Single_Axis_Motion_Controller = qmi.make_instrument(
-            "sam_controller", Newport_Single_Axis_Motion_Controller, self.TRANSPORT_STR, "FT5TMFGL",
+        self.instr: Newport_SingleAxisMotionController = qmi.make_instrument(
+            "sam_controller", Newport_SingleAxisMotionController, self.TRANSPORT_STR, "FT5TMFGL",
             {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
             90210)
-        self.instr = cast(Newport_Single_Axis_Motion_Controller, self.instr)
+        self.instr = cast(Newport_SingleAxisMotionController, self.instr)
         self.instr.open()
 
     def tearDown(self):
@@ -167,9 +167,9 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_get_positioner_error_and_state_with_an_error_bit(self):
         """Test positioner error gets added to 'errors' and returned, with state."""
-        expected_errors = [Newport_Single_Axis_Motion_Controller.POSITIONER_ERROR_TABLE[9],
-                           Newport_Single_Axis_Motion_Controller.POSITIONER_ERROR_TABLE[12],
-                           Newport_Single_Axis_Motion_Controller.POSITIONER_ERROR_TABLE[13]]
+        expected_errors = [Newport_SingleAxisMotionController.POSITIONER_ERROR_TABLE[9],
+                           Newport_SingleAxisMotionController.POSITIONER_ERROR_TABLE[12],
+                           Newport_SingleAxisMotionController.POSITIONER_ERROR_TABLE[13]]
         self._scpi_mock.ask.return_value = f"{self.controller_address}TS004C1E"
         errors, state = self.instr.get_positioner_error_and_state()
 
@@ -209,7 +209,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_set_home_search_timeout_with_default_timeout_sets_timeout(self):
         """Test set home search timeout with controller address."""
-        timeout = Newport_Single_Axis_Motion_Controller.DEFAULT_HOME_SEARCH_TIMEOUT
+        timeout = Newport_SingleAxisMotionController.DEFAULT_HOME_SEARCH_TIMEOUT
         self._scpi_mock.ask.side_effect = ["@", "@", "@"]
         expected_write_calls = [
             call("3RS\r\n"),
@@ -342,7 +342,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
     def test_enter_configuration_state_enters_configuration_state(self):
         """Test enter configuration state."""
         self._scpi_mock.ask.return_value = "@"
-        self.instr.enter_configuration_state()
+        self.instr._enter_configuration_state()
 
         self._scpi_mock.write.assert_called_once_with(
             f"{self.controller_address}PW1\r\n")
@@ -351,7 +351,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_exit_configuration_state_exists_configuration_state(self):
         """Test enter configuration state with controller address."""
-        self.instr.exit_configuration_state(3)
+        self.instr._exit_configuration_state()
 
         self._scpi_mock.write.assert_called_once_with("3PW0\r\n")
 

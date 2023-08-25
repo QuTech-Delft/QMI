@@ -9,13 +9,13 @@ from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.rpc import rpc_method
 from qmi.instruments.newport.actuators import LinearActuator
-from qmi.instruments.newport.single_axis_motion_controller import Newport_Single_Axis_Motion_Controller
+from qmi.instruments.newport.single_axis_motion_controller import Newport_SingleAxisMotionController
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
 
-class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
+class Newport_SMC100PP(Newport_SingleAxisMotionController):
     """Instrument driver for the Newport SMC100PP servo motion controller."""
 
     def __init__(self,
@@ -51,13 +51,15 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         Returns:
             factor: The micro-step per full step factor as float.
         """
+        self.controller_address = controller_address
         _logger.info(
             "Getting the micro-step per full step factor of instrument [%s]", self._name)
-        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION state to get the full step factor.
+        self._enter_configuration_state()
         factor = self._scpi_protocol.ask(
             self._build_command("FRM?"))
-
         self._check_error()
+        self._exit_configuration_state()
         return float(factor[4:])
 
     @rpc_method
@@ -70,16 +72,20 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 2000 < factor or factor <= 0:
+        if factor <= 0 or factor > 2000:
             raise QMI_InstrumentException(
-                f"Provided value {factor} not in valid range 0 > factor >= 2000.")
+                f"Provided value {factor} not in valid range 0 < factor <= 2000.")
 
-        _logger.info(
-            "Setting the motion distance per motor’s full step of instrument [%s] to [%i]", self._name, factor)
         self.controller_address = controller_address
+        _logger.info(
+            "Setting the micro-step per full step factor of instrument [%s] to [%i]", self._name, factor)
+        # instrument must be in CONFIGURATION state to set the full step factor.
+        self._enter_configuration_state()
         self._scpi_protocol.write(self._build_command(
             "FRM", factor))
+        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
+        self._exit_configuration_state()
 
     @rpc_method
     def get_motion_distance_per_full_step(self, controller_address: Optional[int] = None) -> float:
@@ -93,12 +99,15 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         Returns:
             m_dist: Motion distance as float.
         """
+        self.controller_address = controller_address
         _logger.info(
             "Getting the motion distance per motor’s full step value of instrument [%s]", self._name)
-        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION state to get the motion distance.
+        self._enter_configuration_state()
         m_dist = self._scpi_protocol.ask(
             self._build_command("FRS?"))
         self._check_error()
+        self._exit_configuration_state()
         return float(m_dist[4:])
 
     @rpc_method
@@ -111,17 +120,20 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if self.MAX_FLOAT_LIMIT <= m_dist or m_dist <= self.MIN_FLOAT_LIMIT:
+        if m_dist <= self.MIN_FLOAT_LIMIT or m_dist >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
-                f"Provided value {m_dist} not in valid range {self.MIN_FLOAT_LIMIT} > m_dist > {self.MAX_FLOAT_LIMIT}."
+                f"Provided value {m_dist} not in valid range {self.MIN_FLOAT_LIMIT} < m_dist < {self.MAX_FLOAT_LIMIT}."
             )
 
+        self.controller_address = controller_address
         _logger.info(
             "Setting the motion distance per motor’s full step of instrument [%s] to [%f]", self._name, m_dist)
-        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION state to set the motion distance.
+        self._enter_configuration_state()
         self._scpi_protocol.write(self._build_command(
             "FRS", m_dist))
         self._check_error()
+        self._exit_configuration_state()
 
     @rpc_method
     def get_base_velocity(self, controller_address: Optional[int] = None) -> float:
@@ -135,39 +147,67 @@ class Newport_SMC100PP(Newport_Single_Axis_Motion_Controller):
         Returns:
             base_velocity: Base velocity as float.
         """
+        self.controller_address = controller_address
         _logger.info(
             "Getting the profile generator base velocity of instrument [%s]", self._name)
-        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION, DISABLE or READY state to get the base velocity.
+        try:
+            config_state = False
+            self._state_ready_check("base velocity")
+
+        except QMI_InstrumentException:
+            self._enter_configuration_state()
+            config_state = True
+
         base_velocity = self._scpi_protocol.ask(
             self._build_command("VB?"))
         self._check_error()
+        if config_state:
+            self._exit_configuration_state()
+
+        else:
+            self._exit_disable_state()
+
         return float(base_velocity[3:])
 
     @rpc_method
-    def set_base_velocity(self, base_velocity: float, controller_address: Optional[int] = None) -> None:
+    def set_base_velocity(self, base_velocity: float, persist: bool, controller_address: Optional[int] = None) -> None:
         """
         Set the profile generator base velocity. It must not be larger than the maximum velocity set by VA command.
 
         Parameters:
             base_velocity:      New profile generator base velocity.
+            persist:            Flag to indicate if the velocity should be persisted to the controller's memory, so it
+                                is still available after powering down the controller. When not persisted, the maximum
+                                base velocity that can be set is the one stored in the controller's memory.
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        # instrument must be in configuration state to set the current base velocity.
-        self.reset(controller_address)
-        self.enter_configuration_state(controller_address)
+        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION state to get the current velocity.
+        self._enter_configuration_state()
         response = self._scpi_protocol.ask(
             self._build_command("VA?"))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
         velocity = float(response[3:])
-        if base_velocity > velocity or base_velocity < 0:
+        if base_velocity < 0 or base_velocity > velocity:
             raise QMI_InstrumentException(
-                f"Provided value {base_velocity} not in valid range 0 >= base_velocity >= {velocity}.")
+                f"Provided value {base_velocity} not in valid range 0 <= base_velocity <= {velocity}.")
 
         _logger.info(
             "Setting the profile generator base velocity of instrument [%s] to [%f]", self._name, base_velocity)
+        if not persist:
+            # instrument must be in DISABLE or READY state to get the base velocity.
+            self._exit_configuration_state()
+            self._state_ready_check("base velocity")
+
         self._scpi_protocol.write(self._build_command(
             "VB", base_velocity))
+        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
+        if persist:
+            self._exit_configuration_state()
+
+        else:
+            self._exit_disable_state()

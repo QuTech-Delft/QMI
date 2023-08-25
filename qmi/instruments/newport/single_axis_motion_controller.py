@@ -29,7 +29,7 @@ class HomeSearchTypes(enum.IntEnum):
     EOR_SWITCH_ONLY = 4
 
 
-class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
+class Newport_SingleAxisMotionController(QMI_Instrument):
     """
     Instrument driver for a Newport single-axis motion controller. This device
     is the controller for an actuator and is controlled via serial.
@@ -43,6 +43,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
 
     # Time to execute a command
     COMMAND_EXEC_TIME = 0.5
+    PW0_EXEC_TIME = 10
 
     # Code for no error
     ERROR_CODE_NONE = "@"
@@ -50,7 +51,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
     # Default contoller address to send commands to.
     DEFAULT_CONTROLLER_ADDRESS = 1
 
-    # Floating point value SW limits
+    # Floating point value FW limits
     MIN_FLOAT_LIMIT = 1E-6
     MAX_FLOAT_LIMIT = 1E12
 
@@ -125,6 +126,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
 
     @property
     def controller_address(self) -> int:
+        """Address of the controller that needs to be controlled."""
         return self._controller_address
 
     @controller_address.setter
@@ -163,6 +165,84 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
                 "TB" + error_code)).strip().split(' ', 1)[1]
             raise QMI_InstrumentException(f"Error {error_code}: {error_str}")
 
+    def _state_ready_check(self, parameter: str) -> int:
+        """Check if the state is READY (32-38) or DISABLE (3C-3F). Otherwise, raise an exception.
+
+        Parameters:
+            parameter: String to describe for which parameter the check is made.
+
+        Raises:
+            QMI_InstrumentException: If the state is not READY or DISABLE, with informing the parameter name.
+
+        Returns:
+            istate: The state number as an integer.
+        """
+        err_and_state = self._scpi_protocol.ask(
+            self._build_command("TS")
+        )
+        state = err_and_state[7:9]
+        istate = int(state, 16)
+        if istate < int("32", 16) or istate > int("3F", 16):
+            raise QMI_InstrumentException(
+                f"Cannot set {parameter} in controller state {self.STATE_TABLE[state]}")
+
+        return istate
+
+    def _enter_configuration_state(self) -> None:
+        """
+        Enter the CONFIGURATION state of the controller from the NOT REFERENCED state. If the controller
+        is not in the NOT REFERENCED state, then call the `reset` method.
+        NOTE:   In this state the parameters are stored in the flash memory of the controller.
+                The device supports up to 100 writes, so this command should not be used often.
+        """
+        _logger.info("Entering configuration state of instrument [%s]", self._name)
+        err_and_state = self._scpi_protocol.ask(
+            self._build_command("TS")
+        )
+        state = err_and_state[7:9]
+        # If the state is not NOT REFERENCED (0A-10) or CONFIGURATION (14), then reset.
+        if int(state, 16) > int("14", 16):
+            self._scpi_protocol.write(
+                self._build_command("RS"))
+            sleep(self.COMMAND_EXEC_TIME)
+
+        self._scpi_protocol.write(
+            self._build_command("PW", 1))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error()
+
+    def _exit_configuration_state(self) -> None:
+        """
+        Exit the CONFIGURATION state of the controller to the NOT REFERENCED state.
+        NOTE:   The execution of a PW0 command may take up to 10 seconds. During that time the
+                controller will not respond to any other command.
+        """
+        _logger.info("Exiting configuration state of instrument [%s]", self._name)
+        self._scpi_protocol.write(
+            self._build_command("PW", 0))
+        sleep(self.PW0_EXEC_TIME)
+
+    def _enter_disable_state(self) -> None:
+        """
+        Enter the DISABLE state of the controller from the READY state. If the controller
+        is not in the NOT REFERENCE state, then call the `reset` method.
+        NOTE:   In this state the parameters are stored in the flash memory of the controller.
+                The device supports up to 100 writes, so this command should not be used often.
+        """
+        _logger.info("Entering disable state of instrument [%s]", self._name)
+        self._scpi_protocol.write(
+            self._build_command("MM", 1))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error()
+
+    def _exit_disable_state(self) -> None:
+        """
+        Exit the DISABLE state of the controller to the READY state.
+        """
+        _logger.info("Exiting disable state of instrument [%s]", self._name)
+        self._scpi_protocol.write(
+            self._build_command("MM", 0))
+
     @rpc_method
     def open(self) -> None:
         _logger.info("Opening connection to instrument [%s]", self._name)
@@ -190,6 +270,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         _logger.info("Resetting instrument [%s]", self._name)
         self._scpi_protocol.write(
             self._build_command("RS"))
+        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
 
     @rpc_method
@@ -229,9 +310,12 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         """
         _logger.info("Getting stage identifier of instrument [%s]", self._name)
         self.controller_address = controller_address
+        # instrument must be in CONFIGURATION state to get the stage identifier.
+        self._enter_configuration_state()
         identifier = self._scpi_protocol.ask(
             self._build_command("ID?"))
         self._check_error()
+        self._exit_configuration_state()
         return identifier
 
     @rpc_method
@@ -258,13 +342,13 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             if bit == "1":
                 errors.append(self.POSITIONER_ERROR_TABLE[i])
 
-        return (errors, self.STATE_TABLE[state])
+        return errors, self.STATE_TABLE[state]
 
     @rpc_method
     def home_search(self, controller_address: Optional[int] = None) -> None:
         """
-        Execute the home search. This is needed before any motion commands
-        can be executed. It finds the origin position of the actuator.
+        Execute the home search. This is needed before any motion commands can be executed. It finds an origin position
+        for the actuator. Can be done only in NOT REFERENCED state.
 
         Parameters:
             controller_address: Optional address of the controller that needs to be controlled. By default,
@@ -290,14 +374,14 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         t = timeout if timeout else self.DEFAULT_HOME_SEARCH_TIMEOUT
         _logger.info(
             "Setting homing timeout of instrument [%s] to [%s]", self._name, t)
-        # instrument must be in configuration state to set the timeout.
-        self.reset(controller_address)
-        self.enter_configuration_state(controller_address)
+        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION state to set the timeout.
+        self._enter_configuration_state()
         self._scpi_protocol.write(
             self._build_command("OT", t))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        self._exit_configuration_state()
 
     @rpc_method
     def get_home_search_timeout(self, controller_address: Optional[int] = None) -> float:
@@ -325,7 +409,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         Use other methods such as `get_positioner_error_and_state` to query the state of the controller.
 
         Parameters:
-            position:           New position to move to, in encoder units.
+            position:           New position to move to, in encoder units. Must be within actuator's travel range.
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
@@ -340,6 +424,11 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
                 f"Provided value {position} lower than minimum "
                 f"{self._actuators[self.controller_address].MIN_INCREMENTAL_MOTION}"
             )
+
+        # The move can be made only in READY state.
+        state = self._state_ready_check("absolute move")
+        if state > int("38", 16):
+            raise QMI_InstrumentException("The controller must be in READY state to move.")
 
         _logger.info(
             "Performing an absolute move of instrument [%s] to [%s]", self._name, position)
@@ -395,8 +484,13 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        _logger.info("Performing relative move of instrument [%s]", self._name)
         self.controller_address = controller_address
+        # The move can be made only in READY state.
+        state = self._state_ready_check("relative move")
+        if state > int("38", 16):
+            raise QMI_InstrumentException("The controller must be in READY state to move.")
+
+        _logger.info("Performing relative move of instrument [%s]", self._name)
         self._scpi_protocol.write(
             self._build_command("PR", displacement))
         self._check_error()
@@ -422,36 +516,88 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         return float(move_time[3:])
 
     @rpc_method
-    def enter_configuration_state(self, controller_address: Optional[int] = None) -> None:
+    def get_configuration_state(self, controller_address: Optional[int] = None) -> bool:
         """
-        Enter the CONFIGURATION state of the controller from the NOT REFERENCED state. If the controller
-        is not in the NOT REFERENCE state, then call the `reset` method.
-        NOTE:   In this state the parameters are stored in the flash memory of the controller.
-                The device supports up to 100 writes, so this command should not be used often.
+        Get the CONFIGURATION state of the controller.
 
         Parameters:
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
+
+        Returns:
+            state: Boolean indicating if the controller is in CONFIGURATION state (True) or not (False).
         """
-        _logger.info(
-            "Entering configuration state of instrument [%s]", self._name)
+        _logger.info("Getting CONFIGURATION state of instrument [%s]", self._name)
         self.controller_address = controller_address
-        self._scpi_protocol.write(
-            self._build_command("PW", 1))
+        state = self._scpi_protocol.ask(
+            self._build_command("PW?"))
         self._check_error()
+        return bool(int(state[3:]))
 
     @rpc_method
-    def exit_configuration_state(self, controller_address: Optional[int] = None) -> None:
+    def set_configuration_state(self, state: bool, controller_address: Optional[int] = None) -> None:
         """
-        Exit the CONFIGURATION state of the controller to the NOT REFERENCED state.
-        NOTE:   Due to a quirk, checking the error after exiting this state throws
-                a timeout error, so error checking is removed.
+        Set the NOT REFERENCED or CONFIGURATION state of the controller.
+        If the controller is not in the either state, then an exception is raised in the _check_error.
+        NOTE: In this state the parameters are stored in the flash memory of the controller.
+
+        Parameters:
+            state:              False for setting the configuration state from CONFIGURATION to NOT REFERENECED or
+                                True for setting the configuration state from NOT REFERENECED to CONFIGURATION.
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+
         """
-        _logger.info(
-            "Exiting configuration state of instrument [%s]", self._name)
+        _logger.info("Setting configuration state of instrument [%s] to [%s]", self._name, state)
         self.controller_address = controller_address
         self._scpi_protocol.write(
-            self._build_command("PW", 0))
+            self._build_command("PW", int(state)))
+
+        if not state:
+            # The execution of a PW0 command may take up to 10 seconds. During that time the
+            # controller will not respond to any other command.
+            sleep(self.PW0_EXEC_TIME)
+
+        else:
+            sleep(self.COMMAND_EXEC_TIME)
+
+    @rpc_method
+    def get_disable_state(self, controller_address: Optional[int] = None) -> bool:
+        """
+        Get the DISABLE or READY state of the controller.
+
+        Parameters:
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+
+        Returns:
+            state: Boolean to indicate state is DISABLE (True) or READY (False)
+        """
+        _logger.info("Getting disable state of instrument [%s]", self._name)
+        self.controller_address = controller_address
+        state = self._scpi_protocol.ask(
+            self._build_command("MM?"))
+        self._check_error()
+        return bool(int(state[3:]))
+
+    @rpc_method
+    def set_disable_state(self, state: bool, controller_address: Optional[int] = None) -> None:
+        """
+        Set the DISABLE or READY state of the controller from the READY or DISABLE state, respectively.
+        If the controller is not in the either state, then an exception is raised in the _check_error.
+        NOTE: In this state the parameters are stored in the flash memory of the controller.
+
+        Parameters:
+            state: True for setting state from READY to DISABLE, False for vice versa.
+            controller_address: Optional address of the controller that needs to be controlled. By default,
+                                it is set to the initialised value of the controller address.
+        """
+        _logger.info("Setting disable state of instrument [%s] to [%s]", self._name, state)
+        self.controller_address = controller_address
+        self._scpi_protocol.write(
+            self._build_command("MM", int(state)))
+        sleep(self.COMMAND_EXEC_TIME)
+        self._check_error()
 
     @rpc_method
     def get_acceleration(self, controller_address: Optional[int] = None) -> float:
@@ -464,22 +610,30 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
                                 it is set to the initialised value of the controller address.
         """
         _logger.info("Getting acceleration of instrument [%s]", self._name)
-        # instrument must be in configuration state to get the acceleration.
-        self.reset(controller_address)
-        self.enter_configuration_state(controller_address)
-        vel = self._scpi_protocol.ask(
+        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION, DISABLE or READY state to get the acceleration.
+        try:
+            config_state = False
+            self._state_ready_check("acceleration")
+
+        except QMI_InstrumentException:
+            self._enter_configuration_state()
+            config_state = True
+
+        acceleration = self._scpi_protocol.ask(
             self._build_command("AC?"))
-        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
-        return float(vel[3:])
+        if config_state:
+            self._exit_configuration_state()
+
+        return float(acceleration[3:])
 
     @rpc_method
     def set_acceleration(
             self, acceleration: float, persist: bool = False, controller_address: Optional[int] = None
     ) -> None:
         """
-        Set the acceleration at which the actuator moves.
+        Set the acceleration at which the actuator moves. Can be set only in CONFIGURATION, READY and DISABLE states.
 
         Parameters:
             acceleration:       Acceleration in preset unit/s^2. The unit depends on the encoder resolution,
@@ -497,20 +651,23 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
                 f"< acceleration < {self.MAX_FLOAT_LIMIT}."
             )
 
-        self.controller_address = controller_address
         _logger.info(
             "Setting acceleration of instrument [%s] to [%f]", self._name, acceleration)
-        # instrument must be in configuration state to persist the set acceleration.
+        self.controller_address = controller_address
         if persist:
-            self.reset(controller_address)
-            self.enter_configuration_state(controller_address)
+            # instrument must be in CONFIGURATION state to set persistent acceleration.
+            self._enter_configuration_state()
+
+        else:
+            # instrument must be in DISABLE or READY state to set acceleration.
+            self._state_ready_check("acceleration")
 
         self._scpi_protocol.write(
             self._build_command("AC", acceleration))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
         if persist:
-            self.exit_configuration_state(controller_address)
+            self._exit_configuration_state()
 
     @rpc_method
     def get_velocity(self, controller_address: Optional[int] = None) -> float:
@@ -523,15 +680,24 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
                                 it is set to the initialised value of the controller address.
         """
         _logger.info("Getting velocity of instrument [%s]", self._name)
-        # instrument must be in configuration state to get the velocity.
-        self.reset(controller_address)
-        self.enter_configuration_state(controller_address)
-        vel = self._scpi_protocol.ask(
+        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION, DISABLE or READY state to get the velocity.
+        try:
+            config_state = False
+            self._state_ready_check("velocity")
+
+        except QMI_InstrumentException:
+            self._enter_configuration_state()
+            config_state = True
+
+        velocity = self._scpi_protocol.ask(
             self._build_command("VA?"))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
-        return float(vel[3:])
+        if config_state:
+            self._exit_configuration_state()
+
+        return float(velocity[3:])
 
     @rpc_method
     def set_velocity(self, velocity: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
@@ -540,7 +706,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
 
         Parameters:
             velocity:           Velocity in unit/s. The unit depends on the encoder resolution,
-                                which is usually set to 1mm
+                                which is usually set to 1mm.
             persist:            Flag to indicate if the velocity should be persisted to the controller's memory, so it
                                 is still available after powering down the controller. When not persisted, the maximum
                                 allowable velocity that can be set is the one stored in the controller's memory.
@@ -561,36 +727,52 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
 
         _logger.info(
             "Setting velocity of instrument [%s] to [%f]", self._name, velocity)
-        # instrument must be in configuration state to persist the set velocity.
         if persist:
-            self.reset(controller_address)
-            self.enter_configuration_state(controller_address)
+            # instrument must be in CONFIGURATION state to set persistent velocity.
+            self._enter_configuration_state()
+
+        else:
+            # instrument must be in DISABLE or READY state to set velocity.
+            self.controller_address = controller_address
+            self._state_ready_check("velocity")
+
         self._scpi_protocol.write(
             self._build_command("VA", velocity))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
         if persist:
-            self.exit_configuration_state(controller_address)
+            self._exit_configuration_state()
 
     @rpc_method
     def get_jerk_time(self, controller_address: Optional[int] = None) -> float:
         """
-        Get the jerk_time of the actuator in seconds.
+        Get the jerk time of the actuator.
 
         Parameters:
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
+
+        Returns:
+            jerk_time: Jerk time in seconds.
         """
         _logger.info("Getting jerk time of instrument [%s]", self._name)
-        # instrument must be in configuration state to get the jerk time.
-        self.reset(controller_address)
-        self.enter_configuration_state(controller_address)
-        j_time = self._scpi_protocol.ask(
+        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION, DISABLE or READY state to get the jerk time.
+        try:
+            config_state = False
+            self._state_ready_check("jerk time")
+
+        except QMI_InstrumentException:
+            self._enter_configuration_state()
+            config_state = True
+
+        jerk_time = self._scpi_protocol.ask(
             self._build_command("JR?"))
-        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
-        return float(j_time[3:])
+        if config_state:
+            self._exit_configuration_state()
+
+        return float(jerk_time[3:])
 
     @rpc_method
     def set_jerk_time(self, jerk_time: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
@@ -605,23 +787,27 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 0.001 >= jerk_time or jerk_time >= self.MAX_FLOAT_LIMIT:
+        if jerk_time <= 0.001 or jerk_time >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
                 f"Provided value {jerk_time} not in valid range 0.001 < jerk_time < {self.MAX_FLOAT_LIMIT}")
 
         _logger.info(
-            "Setting jerk_time of instrument [%s] to [%f]", self._name, jerk_time)
+            "Setting jerk time of instrument [%s] to [%f]", self._name, jerk_time)
         self.controller_address = controller_address
-        # instrument must be in configuration state to persist the set jerk_time.
         if persist:
-            self.reset(controller_address)
-            self.enter_configuration_state(controller_address)
+            # instrument must be in CONFIGURATION state to set persistent jerk time.
+            self._enter_configuration_state()
+            
+        else:
+            # instrument must be in DISABLE or READY state to set jerk time.
+            self._state_ready_check("cut-off frequency")
+
         self._scpi_protocol.write(self._build_command(
             "JR", jerk_time))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
         if persist:
-            self.exit_configuration_state(controller_address)
+            self._exit_configuration_state()
 
     @rpc_method
     def get_error(self, controller_address: Optional[int] = None) -> Tuple[str, str]:
@@ -633,7 +819,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
                                 it is set to the initialised value of the controller address.
 
         Returns:
-            A tuple containing the error code and the human readable error message.
+            A tuple containing the error code and the human-readable error message.
         """
         _logger.info("Getting error of instrument [%s]", self._name)
         self.controller_address = controller_address
@@ -649,7 +835,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
     @rpc_method
     def stop_motion(self, controller_address: Optional[int] = None) -> None:
         """
-        Stop the motion of the actuator by decelerating it.
+        Stop the motion of the actuator by decelerating it. Works on DISABLE, READY and MOTION states.
 
         Parameters:
             controller_address: Optional address of the controller that needs to be controlled. By default,
@@ -670,16 +856,15 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        # instrument must be in configuration state to get the backlash compensation.
-        self.reset(controller_address)
+        self.controller_address = controller_address
         _logger.info("Getting backlash compensation of controller [%s] instrument [%s]",
                      self.controller_address, self._name)
-        self.enter_configuration_state(controller_address)
+        # instrument must be in CONFIGURATION state to get the backlash compensation.
+        self._enter_configuration_state()
         backlash_comp = self._scpi_protocol.ask(
             self._build_command("BA?"))
-        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        self._exit_configuration_state()
         return float(backlash_comp[3:])
 
     @rpc_method
@@ -692,16 +877,16 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        # instrument must be in configuration state to set the backlash compensation.
-        self.reset(controller_address)
-        self.enter_configuration_state(controller_address)
+        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION state to set the backlash compensation.
+        self._enter_configuration_state()
+        # First check if the hysteresis compensation is enabled.
         hysteresis_comp = self._scpi_protocol.ask(
             self._build_command("BH?"))
-        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
         if float(hysteresis_comp[3:]) > 0.0:
-            self.exit_configuration_state(controller_address)
-            raise QMI_InstrumentException(f"Backlash compensation cannot be set if hysteresis compensation is enabled!")
+            self._exit_configuration_state()
+            raise QMI_InstrumentException("Backlash compensation cannot be set if hysteresis compensation is enabled!")
 
         _logger.info(
             "Setting backlash compensation of controller [%s] instrument [%s] to [%f]",
@@ -710,7 +895,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             self._build_command("BA", backlash_comp))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        self._exit_configuration_state()
 
     @rpc_method
     def get_hysteresis_compensation(self, controller_address: Optional[int] = None) -> float:
@@ -721,16 +906,15 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        # instrument must be in configuration state to get the hysteresis compensation.
-        self.reset(controller_address)
+        self.controller_address = controller_address
         _logger.info("Getting hysteresis compensation of controller [%s] instrument [%s]",
                      self.controller_address, self._name)
-        self.enter_configuration_state(controller_address)
+        # instrument must be in CONFIGURATION state to get the hysteresis compensation.
+        self._enter_configuration_state()
         hysteresis_comp = self._scpi_protocol.ask(
             self._build_command("BH?"))
-        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        self._exit_configuration_state()
         return float(hysteresis_comp[3:])
 
     @rpc_method
@@ -743,17 +927,17 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        # instrument must be in configuration state to set the hysteresis compensation.
-        self.reset(controller_address)
-        self.enter_configuration_state(controller_address)
+        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION state to set the hysteresis compensation.
+        self._enter_configuration_state()
+        # First check if the backlash compensation is enabled.
         backlash_comp = self._scpi_protocol.ask(
             self._build_command("BA?"))
-        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
         if float(backlash_comp[3:]) > 0.0:
-            self.exit_configuration_state(controller_address)
+            self._exit_configuration_state()
             raise QMI_InstrumentException(
-                    f"Hysteresis compensation cannot be set if backlash compensation is enabled!")
+                    "Hysteresis compensation cannot be set if backlash compensation is enabled!")
 
         _logger.info(
             "Setting hysteresis compensation of controller [%s] instrument [%s] to [%f]",
@@ -762,7 +946,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             self._build_command("BH", hysteresis_comp))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        self._exit_configuration_state()
 
     @rpc_method
     def get_home_search_type(self, controller_address: Optional[int] = None) -> int:
@@ -773,12 +957,15 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
+        self.controller_address = controller_address
         _logger.info(
             "Getting the type of HOME search used with the OR command of instrument [%s]", self._name)
-        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION state to get the home search type.
+        self._enter_configuration_state()
         home_search_type = self._scpi_protocol.ask(
             self._build_command("HT?"))
         self._check_error()
+        self._exit_configuration_state()
         return int(home_search_type[3:])
 
     @rpc_method
@@ -800,9 +987,12 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             self._name, HomeSearchTypes(home_search_type).name
         )
         self.controller_address = controller_address
+        # instrument must be in CONFIGURATION state to set the home search type.
+        self._enter_configuration_state()
         self._scpi_protocol.write(self._build_command(
             "HT", home_search_type))
         self._check_error()
+        self._exit_configuration_state()
 
     @rpc_method
     def get_peak_current_limit(self, controller_address: Optional[int] = None) -> float:
@@ -813,16 +1003,15 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        # instrument must be in configuration state to get the current limit.
-        self.reset(controller_address)
+        self.controller_address = controller_address
         _logger.info("Getting the peak current limit of controller [%s] instrument [%s]",
                      self.controller_address, self._name)
-        self.enter_configuration_state(controller_address)
+        # instrument must be in CONFIGURATION state to get the current limit.
+        self._enter_configuration_state()
         current_limit = self._scpi_protocol.ask(
             self._build_command("QIL?"))
-        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        self._exit_configuration_state()
         return float(current_limit[4:])
 
     @rpc_method
@@ -835,21 +1024,21 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 3.0 < current_limit or current_limit < 0.05:
+        if current_limit < 0.05 or current_limit > 3.0:
             raise QMI_InstrumentException(
-                    f"Current limit value not in valid range 0.05 <= current_limit <= 3.0")
+                    "Current limit value not in valid range 0.05 <= current_limit <= 3.0")
 
-        # instrument must be in configuration state to set the current limit.
-        self.reset(controller_address)
+        self.controller_address = controller_address
         _logger.info(
             "Setting peak current limit of controller [%s] instrument [%s] to [%f]",
             self.controller_address, self._name, current_limit)
-        self.enter_configuration_state(controller_address)
+        # instrument must be in CONFIGURATION state to set the current limit.
+        self._enter_configuration_state()
         self._scpi_protocol.write(
             self._build_command("QIL", current_limit))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        self._exit_configuration_state()
 
     @rpc_method
     def get_rms_current_limit(self, controller_address: Optional[int] = None) -> float:
@@ -860,16 +1049,15 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        # instrument must be in configuration state to get the current limit.
-        self.reset(controller_address)
+        self.controller_address = controller_address
         _logger.info("Getting the RMS current limit of controller [%s] instrument [%s]",
                      self.controller_address, self._name)
-        self.enter_configuration_state(controller_address)
+        # instrument must be in CONFIGURATION state to get the current limit.
+        self._enter_configuration_state()
         current_limit = self._scpi_protocol.ask(
             self._build_command("QIR?"))
-        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        self._exit_configuration_state()
         return float(current_limit[4:])
 
     @rpc_method
@@ -882,16 +1070,15 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        # instrument must be in configuration state to check the peak current limit and to set the RMS current limit.
-        self.reset(controller_address)
-        self.enter_configuration_state(controller_address)
+        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION state to check the peak current limit and to set the RMS current limit.
+        self._enter_configuration_state()
         peak_current_limit = self._scpi_protocol.ask(
             self._build_command("QIL?"))
-        sleep(self.COMMAND_EXEC_TIME)
-        peak_current_limit = min(1.5, float(peak_current_limit[4:]))
         self._check_error()
-        if peak_current_limit < current_limit or current_limit < 0.05:
-            self.exit_configuration_state(controller_address)
+        peak_current_limit = min(1.5, float(peak_current_limit[4:]))
+        if current_limit < 0.05 or current_limit > peak_current_limit:
+            self._exit_configuration_state()
             raise QMI_InstrumentException(
                     f"Current limit value not in valid range 0.05 <= current_limit <= {peak_current_limit}")
 
@@ -901,7 +1088,7 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         self._scpi_protocol.write(self._build_command("QIR", current_limit))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        self._exit_configuration_state()
 
     @rpc_method
     def get_rms_current_averaging_time(self, controller_address: Optional[int] = None) -> float:
@@ -912,16 +1099,15 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        # instrument must be in configuration state to get the current limit.
-        self.reset(controller_address)
+        self.controller_address = controller_address
+        # instrument must be in CONFIGURATION state to get the current limit.
+        self._enter_configuration_state()
         _logger.info("Getting the averaging period for rms current calculation of controller [%s] instrument [%s]",
                      self.controller_address, self._name)
-        self.enter_configuration_state(controller_address)
         averaging_time = self._scpi_protocol.ask(
             self._build_command("QIT?"))
-        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        self._exit_configuration_state()
         return float(averaging_time[4:])
 
     @rpc_method
@@ -934,21 +1120,21 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 100.0 < averaging_time or averaging_time <= 0.01:
+        if averaging_time <= 0.01 or averaging_time > 100.0:
             raise QMI_InstrumentException(
-                    f"Averaging period for rms current calculation not in valid range 0.01 < averaging_time <= 100.0")
+                    "Averaging period for rms current calculation not in valid range 0.01 < averaging_time <= 100.0")
 
-        # instrument must be in configuration state to set the current limit.
-        self.reset(controller_address)
+        self.controller_address = controller_address
         _logger.info(
             "Setting averaging period for rms current calculation of controller [%s] instrument [%s] to [%f]",
             self.controller_address, self._name, averaging_time)
-        self.enter_configuration_state(controller_address)
+        # instrument must be in CONFIGURATION state to set the current limit.
+        self._enter_configuration_state()
         self._scpi_protocol.write(
             self._build_command("QIT", averaging_time))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        self._exit_configuration_state()
 
     @rpc_method
     def get_analog_input_value(self, controller_address: Optional[int] = None) -> float:
@@ -962,8 +1148,8 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         Returns:
             Analog input value in Volts.
         """
-        _logger.info("Getting analog input value of instrument [%s]", self._name)
         self.controller_address = controller_address
+        _logger.info("Getting analog input value of instrument [%s]", self._name)
         analog_input = self._scpi_protocol.ask(
             self._build_command("RA"))
         self._check_error()
@@ -986,8 +1172,8 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         Returns:
             TTL input value in bits. E.g. '5' means input 0 and 2 are high, all others are low.
         """
-        _logger.info("Getting TTL input value of instrument [%s]", self._name)
         self.controller_address = controller_address
+        _logger.info("Getting TTL input value of instrument [%s]", self._name)
         ttl_input = self._scpi_protocol.ask(
             self._build_command("RB"))
         self._check_error()
@@ -1009,8 +1195,8 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         Returns:
             TTL output value in bits. E.g. '3' means TTL outputs 1 & 2 are closed and outputs 3 & 4 open.
         """
-        _logger.info("Getting TTL output value of instrument [%s]", self._name)
         self.controller_address = controller_address
+        _logger.info("Getting TTL output value of instrument [%s]", self._name)
         ttl_output = self._scpi_protocol.ask(
             self._build_command("SB?"))
         self._check_error()
@@ -1034,10 +1220,10 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             raise QMI_InstrumentException(
                 f"Provided value {ttl_output_value} not in valid range 0-15 (all open - all closed).")
 
+        self.controller_address = controller_address
         _logger.info(
             "Setting the TTL output value for instrument [%s] to [%i]", self._name, ttl_output_value
         )
-        self.controller_address = controller_address
         self._scpi_protocol.write(self._build_command(
             "SB", ttl_output_value))
         self._check_error()
@@ -1050,17 +1236,16 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         Returns:
             rs485_address:      Controller's axis number for new RS485 address.
         """
-        # instrument must be in configuration state to get the RS485 address.
+        self.controller_address = self.DEFAULT_CONTROLLER_ADDRESS
         _logger.info(
-            "Getting RS485 address of controller [%s] instrument [%s]", self.DEFAULT_CONTROLLER_ADDRESS, self._name
+            "Getting RS485 address of controller [%s] instrument [%s]", self.controller_address, self._name
         )
-        self.reset()
-        self.enter_configuration_state()
+        # instrument must be in CONFIGURATION state to get the RS485 address.
+        self._enter_configuration_state()
         axis = self._scpi_protocol.ask(
             self._build_command("SA?"))
-        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state()
+        self._exit_configuration_state()
         return int(axis[3:])
 
     @rpc_method
@@ -1075,18 +1260,18 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
             raise QMI_InstrumentException(
                 f"Invalid controller axis number {rs485_address}")
 
-        # instrument must be in configuration state to set the RS485 address.
+        self.controller_address = self.DEFAULT_CONTROLLER_ADDRESS
         _logger.info(
             "Setting RS485 address of controller [%s] instrument [%s] to axis [%i]",
-            self.DEFAULT_CONTROLLER_ADDRESS, self._name, rs485_address
+            self.controller_address, self._name, rs485_address
         )
-        self.reset()
-        self.enter_configuration_state()
+        # instrument must be in CONFIGURATION state to set the RS485 address.
+        self._enter_configuration_state()
         self._scpi_protocol.write(
             self._build_command("SA", rs485_address))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state()
+        self._exit_configuration_state()
 
     @rpc_method
     def get_negative_software_limit(self, controller_address: Optional[int] = None) -> float:
@@ -1100,47 +1285,67 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         Returns:
             neg_sw_limit:      Controller's negative software limit.
         """
-        # instrument must be in configuration state to get the negative software limit.
-        self.reset(controller_address)
+        self.controller_address = controller_address
         _logger.info(
             "Getting the negative software limit of controller [%s] instrument [%s]",
             self.controller_address, self._name
         )
-        self.enter_configuration_state(controller_address)
+        # instrument must be in CONFIGURATION, DISABLE or READY state to get the negative software limit.
+        try:
+            config_state = False
+            self._state_ready_check("negative software limit")
+
+        except QMI_InstrumentException:
+            self._enter_configuration_state()
+            config_state = True
+
         neg_sw_limit = self._scpi_protocol.ask(
             self._build_command("SL?"))
-        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        if config_state:
+            self._exit_configuration_state()
+
         return float(neg_sw_limit[3:])
 
     @rpc_method
-    def set_negative_software_limit(self, neg_sw_limit: float, controller_address: Optional[int] = None) -> None:
+    def set_negative_software_limit(
+            self, neg_sw_limit: float, persist: bool, controller_address: Optional[int] = None
+    ) -> None:
         """
         Set the negative software limit.
 
         Parameters:
-            neg_sw_limit:      Controller's negative software limit.
+            neg_sw_limit:       Controller's negative software limit.
+            persist:            Flag to indicate if the software limit should be persisted to the controller's memory,
+                                so it is still available after powering down the controller. When not persisted, the
+                                negative software limit is the one stored in the controller's memory.
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if -self.MAX_FLOAT_LIMIT >= neg_sw_limit or neg_sw_limit > 0:
+        if neg_sw_limit <= -self.MAX_FLOAT_LIMIT or neg_sw_limit > 0:
             raise QMI_InstrumentException(
                 f"Negative software limit {neg_sw_limit} not in valid range -{self.MAX_FLOAT_LIMIT} "
-                f"< {neg_sw_limit} <= 0"
+                "< neg_sw_limit <= 0"
             )
 
-        # instrument must be in configuration state to set the RS485 address.
-        self.reset(controller_address)
+        self.controller_address = controller_address
         _logger.info(
             "Setting negative software limit of controller [%s] instrument [%s] to [%f]",
             self.controller_address, self._name, neg_sw_limit)
-        self.enter_configuration_state(controller_address)
+        if persist:
+            # instrument must be in CONFIGURATION state to set the software limit.
+            self._enter_configuration_state()
+
+        else:
+            # instrument must be in DISABLE or READY state to set the software limit.
+            self._state_ready_check("negative software limit")
+
         self._scpi_protocol.write(
             self._build_command("SL", neg_sw_limit))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        if persist:
+            self._exit_configuration_state()
 
     @rpc_method
     def get_positive_software_limit(self, controller_address: Optional[int] = None) -> float:
@@ -1154,44 +1359,62 @@ class Newport_Single_Axis_Motion_Controller(QMI_Instrument):
         Returns:
             pos_sw_limit:      Controller's positive software limit.
         """
-        # instrument must be in configuration state to get the positive software limit.
-        self.reset(controller_address)
+        self.controller_address = controller_address
         _logger.info(
             "Getting the positive software limit of controller [%s] instrument [%s]",
             self.controller_address, self._name
         )
-        self.enter_configuration_state(controller_address)
+        # instrument must be in CONFIGURATION, DISABLE or READY state to get the positive software limit.
+        try:
+            config_state = False
+            self._state_ready_check("positive software limit")
+
+        except QMI_InstrumentException:
+            self._enter_configuration_state()
+            config_state = True
+
         pos_sw_limit = self._scpi_protocol.ask(
             self._build_command("SR?"))
-        sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        if config_state:
+            self._exit_configuration_state()
+
         return float(pos_sw_limit[3:])
 
     @rpc_method
-    def set_positive_software_limit(self, pos_sw_limit: float, controller_address: Optional[int] = None) -> None:
+    def set_positive_software_limit(
+            self, pos_sw_limit: float, persist: bool, controller_address: Optional[int] = None) -> None:
         """
         Set the positive software limit.
 
         Parameters:
-            pos_sw_limit:      Controller's positive software limit.
+            pos_sw_limit:       Controller's positive software limit.
+            persist:            Flag to indicate if the software limit should be persisted to the controller's memory,
+                                so it is still available after powering down the controller. When not persisted, the
+                                positive software limit is the one stored in the controller's memory.
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if 0 > pos_sw_limit or pos_sw_limit >= self.MAX_FLOAT_LIMIT:
+        if pos_sw_limit < 0 or pos_sw_limit >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
                 f"Positive software limit {pos_sw_limit} not in valid range 0 <= "
-                f"{pos_sw_limit} <= {self.MAX_FLOAT_LIMIT}"
+                f"pos_sw_limit <= {self.MAX_FLOAT_LIMIT}"
             )
 
-        # instrument must be in configuration state to set the RS485 address.
-        self.reset(controller_address)
+        self.controller_address = controller_address
         _logger.info(
             "Setting positive software limit of controller [%s] instrument [%s] to [%f]",
-            self.controller_address, self._name, pos_sw_limit
-        )
-        self.enter_configuration_state(controller_address)
+            self.controller_address, self._name, pos_sw_limit)
+        if persist:
+            # instrument must be in CONFIGURATION state to set the software limit.
+            self._enter_configuration_state()
+
+        else:
+            # instrument must be in DISABLE or READY state to set the software limit.
+            self._state_ready_check("positive software limit")
+
         self._scpi_protocol.write(self._build_command("SR", pos_sw_limit))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        self.exit_configuration_state(controller_address)
+        if persist:
+            self._exit_configuration_state()
