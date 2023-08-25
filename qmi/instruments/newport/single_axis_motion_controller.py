@@ -202,9 +202,14 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         state = err_and_state[7:9]
         # If the state is not NOT REFERENCED (0A-10) or CONFIGURATION (14), then reset.
         if int(state, 16) > int("14", 16):
+            # Call reset to get to NOT REFERENCED state.
             self._scpi_protocol.write(
                 self._build_command("RS"))
             sleep(self.COMMAND_EXEC_TIME)
+
+        elif int(state, 16) == int("14", 16):
+            # Already in CONFIGURATION state
+            return
 
         self._scpi_protocol.write(
             self._build_command("PW", 1))
@@ -1309,7 +1314,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
     @rpc_method
     def set_negative_software_limit(
-            self, neg_sw_limit: float, persist: bool, controller_address: Optional[int] = None
+            self, neg_sw_limit: float, persist: bool = False, controller_address: Optional[int] = None
     ) -> None:
         """
         Set the negative software limit.
@@ -1383,7 +1388,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
     @rpc_method
     def set_positive_software_limit(
-            self, pos_sw_limit: float, persist: bool, controller_address: Optional[int] = None) -> None:
+            self, pos_sw_limit: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
         """
         Set the positive software limit.
 
