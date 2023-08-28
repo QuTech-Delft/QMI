@@ -537,7 +537,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_get_velocity_gets_velocity(self):
         """Test get velocity."""
-        state = "14"  # Set to CONFIGURATION state to take shortest path
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
         expected_vel = 1.5
         self._scpi_mock.ask.side_effect = [
             f"1TS0000{state}", f"1TS0000{state}", f"{self.controller_address}VA %s" % expected_vel, "@"]
@@ -558,18 +558,16 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_set_velocity_with_persist_sets_velocity(self):
         """Test set velocity with persisting the velocity."""
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
         vel = 0.004
-        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@"]
         expected_write_calls = [
-            call(f"{self.controller_address}RS\r\n"),
-            call(f"{self.controller_address}PW1\r\n"),
             call(f"{self.controller_address}VA%s\r\n" % vel),
             call(f"{self.controller_address}PW0\r\n")
         ]
         expected_ask_calls = [
+            call(f"{self.controller_address}TS\r\n"),
             call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n")
         ]
         self.instr.set_velocity(vel, True)
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
@@ -577,13 +575,20 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_set_velocity_without_persist_sets_velocity(self):
         """Test set velocity without persisting, i.e. without entering the configuration state."""
+        state = "33"
         vel = 0.004
-        self._scpi_mock.ask.return_value = "@"
+        self._scpi_mock.ask.side_effect = [
+            f"1TS0000{state}", "@"]
+        expected_write_calls = [
+            call(f"{self.controller_address}VA{vel}\r\n"),
+        ]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TS\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+        ]
         self.instr.set_velocity(vel)
-        self._scpi_mock.write.assert_called_once_with(
-            f"{self.controller_address}VA%s\r\n" % vel)
-        self._scpi_mock.ask.assert_called_once_with(
-            f"{self.controller_address}TE\r\n")
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
     def test_get_jerk_time_gets_jerk_time(self):
         """Test get jerk_time."""
@@ -623,13 +628,21 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_set_jerk_time_without_persist_sets_jerk_time(self):
         """Test set jerk_time without persisting, i.e. without entering the configuration state."""
+        state = "34"  # READY state
+        self._scpi_mock.ask.side_effect = [
+            f"1TS0000{state}", "@"]
         jerk = 0.004
         self._scpi_mock.ask.return_value = "@"
+        expected_ask_calls = [
+            call(f"{self.controller_address}TS\r\n"),
+            call(f"{self.controller_address}TE\r\n"),
+        ]
+
         self.instr.set_jerk_time(jerk)
+
         self._scpi_mock.write.assert_called_once_with(
             f"{self.controller_address}JR{jerk}\r\n")
-        self._scpi_mock.ask.assert_called_once_with(
-            f"{self.controller_address}TE\r\n")
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
     def test_set_jerk_time_outside_bounds_throws_exception(self):
         """Test set jerk_time outisde of allowed range raise exception."""
@@ -830,7 +843,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_get_peak_current_limit_gets_limit(self):
         """Test get peak current limit."""
-        state = "14"  # Set to CONFIGURATION state to take shortest path
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
         expected_limit = 1.0
         self._scpi_mock.ask.side_effect = [
             f"1TS0000{state}", f"{self.controller_address}QIL %s" % expected_limit, "@"]
@@ -850,20 +863,20 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_set_peak_current_limit_sets_limit(self):
         """Test set peak current limit."""
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
         limit = 1.3
-        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@"]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TS\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
         expected_write_calls = [
-            call(f"{self.controller_address}RS\r\n"),
-            call(f"{self.controller_address}PW1\r\n"),
             call(f"{self.controller_address}QIL%s\r\n" % limit),
             call(f"{self.controller_address}PW0\r\n")
         ]
-        expected_ask_calls = [
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n")
-        ]
+
         self.instr.set_peak_current_limit(limit)
+        
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
@@ -879,7 +892,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_get_rms_current_limit_gets_limit(self):
         """Test get rms current limit."""
-        state = "14"  # Set to CONFIGURATION state to take shortest path
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
         expected_rms = 10
         self._scpi_mock.ask.side_effect = [
             f"1TS0000{state}", f"{self.controller_address}QIR %s" % expected_rms, "@"]
@@ -899,18 +912,18 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_set_rms_current_limit_sets_limit(self):
         """Test set rms current limit with controller address."""
+        state = "0A"  # Set to NOT REFERENCED state
         peak = 2.0
         rms = 0.05
         controller_address = 2
-        self._scpi_mock.ask.side_effect = ["@", "@", f"{controller_address}QIL{peak}", "@", "@"]
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@", f"{controller_address}QIL{peak}", "@", "@"]
         expected_write_calls = [
-            call(f"{controller_address}RS\r\n"),
             call(f"{controller_address}PW1\r\n"),
             call(f"{controller_address}QIR{rms}\r\n"),
             call(f"{controller_address}PW0\r\n")
         ]
         expected_ask_calls = [
-            call(f"{controller_address}TE\r\n"),
+            call(f"{controller_address}TS\r\n"),
             call(f"{controller_address}TE\r\n"),
             call(f"{controller_address}QIL?\r\n"),
             call(f"{controller_address}TE\r\n"),
@@ -922,17 +935,18 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_set_rms_current_limit_sets_limit_under_peak_limit(self):
         """Test set rms current limit works also with lower peak limit."""
-        peak = 0.06
+        state = "0A"  # Set to NOT REFERENCED state to take the shortest path
+        peak = 2.0
         rms = 0.05
-        self._scpi_mock.ask.side_effect = ["@", "@", f"1QIL{peak}", "@", "@"]
+        controller_address = 2
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@", f"{controller_address}QIL{peak}", "@", "@"]
         expected_write_calls = [
-            call("1RS\r\n"),
             call("1PW1\r\n"),
             call(f"1QIR{rms}\r\n"),
             call("1PW0\r\n")
         ]
         expected_ask_calls = [
-            call("1TE\r\n"),
+            call("1TS\r\n"),
             call("1TE\r\n"),
             call("1QIL?\r\n"),
             call("1TE\r\n"),
@@ -944,16 +958,16 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_set_rms_current_limit_excepts_because_peak_limit(self):
         """Test set rms current limit exits because peak limit is lower."""
+        state = "0A"  # Set to NOT REFERENCED state
         peak = 1.0
         rms = 1.1
-        self._scpi_mock.ask.side_effect = ["@", "@", f"1QIL{peak}", "@"]
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@", f"1QIL{peak}", "@", "@"]
         expected_write_calls = [
-            call("1RS\r\n"),
             call("1PW1\r\n"),
             call("1PW0\r\n")
         ]
         expected_ask_calls = [
-            call("1TE\r\n"),
+            call("1TS\r\n"),
             call("1TE\r\n"),
             call("1QIL?\r\n"),
             call("1TE\r\n")
@@ -966,7 +980,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_get_rms_current_averaging_time_gets_time(self):
         """Test get rms current averaging time."""
-        state = "14"  # Set to CONFIGURATION state to take shortest path
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
         expected_time = 10
         self._scpi_mock.ask.side_effect = [
             f"1TS0000{state}", f"{self.controller_address}QIT %s" % expected_time, "@"]
@@ -986,19 +1000,18 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_set_rms_current_averaging_time_sets_time(self):
         """Test set rms current averaging time."""
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
         time = 13
-        self._scpi_mock.ask.return_value = "@"
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@"]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TS\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
         expected_write_calls = [
-            call(f"{self.controller_address}RS\r\n"),
-            call(f"{self.controller_address}PW1\r\n"),
             call(f"{self.controller_address}QIT%i\r\n" % time),
             call(f"{self.controller_address}PW0\r\n")
         ]
-        expected_ask_calls = [
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n")
-        ]
+        self._scpi_mock.ask.return_value = "@"
         self.instr.set_rms_current_averaging_time(time)
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
@@ -1076,7 +1089,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_get_controller_rs485_address(self):
         """Test getting controller rs485 address."""
-        state = "14"  # Set to CONFIGURATION state to take shortest path
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
         expected_value = 2
         self._scpi_mock.ask.side_effect = [
             f"1TS0000{state}", f"{self.controller_address}SA %s" % expected_value, "@"]
@@ -1096,7 +1109,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_set_controller_rs485_address(self):
         """Test setting ttl output value."""
-        state = "14"  # Set to CONFIGURATION state to take shortest path
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
         controller_rs485_address = 30
         self._scpi_mock.ask.side_effect = [
             f"1TS0000{state}", "@"]
@@ -1125,7 +1138,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
     def test_get_negative_software_limit_gets_limit(self):
         """Test get negative software limit."""
-        state = "3C"  # Set to DISABLE state to take shortest path
+        state = "3C"  # Set to DISABLE state to take the shortest path
         expected_limit = -1.0
         self._scpi_mock.ask.side_effect = [
             f"1TS0000{state}", f"{self.controller_address}SL %s" % expected_limit, "@"]
@@ -1140,22 +1153,40 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.write.assert_not_called()
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
-    def test_set_negative_software_limit_sets_limit(self):
-        """Test set negative software limit."""
+    def test_set_negative_software_limit_without_persist_sets_limit(self):
+        """Test set negative software limit without persist."""
+        state = "34"  # Set to READY state
         limit = -1.3
-        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@"]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TS\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
         expected_write_calls = [
-            call(f"{self.controller_address}RS\r\n"),
-            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}SL%s\r\n" % limit),
+        ]
+
+        self.instr.set_negative_software_limit(limit)
+
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_negative_software_limit_with_persist_sets_limit(self):
+        """Test set negative software limit with persist."""
+        state = "14"  # Set to CONFIGURATION state
+        limit = -1.3
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@"]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TS\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        expected_write_calls = [
             call(f"{self.controller_address}SL%s\r\n" % limit),
             call(f"{self.controller_address}PW0\r\n")
         ]
-        expected_ask_calls = [
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n")
-        ]
-        self.instr.set_negative_software_limit(limit)
+
+        self.instr.set_negative_software_limit(limit, True)
+
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
@@ -1190,22 +1221,40 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 
-    def test_set_positive_software_limit_sets_limit(self):
-        """Test set positive software limit."""
+    def test_set_positive_software_limit_without_persist_sets_limit(self):
+        """Test set positive software limit without persist."""
+        state = "34"  # Set to READY state
         limit = 1.3
-        self._scpi_mock.ask.side_effect = ["@", "@", "@"]
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@"]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TS\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
         expected_write_calls = [
-            call(f"{self.controller_address}RS\r\n"),
-            call(f"{self.controller_address}PW1\r\n"),
+            call(f"{self.controller_address}SR%s\r\n" % limit),
+        ]
+
+        self.instr.set_positive_software_limit(limit)
+
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_positive_software_limit_with_persist_sets_limit(self):
+        """Test set positive software limit with persist."""
+        state = "14"  # Set to CONFIGURATION state
+        limit = 1.3
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@"]
+        expected_ask_calls = [
+            call(f"{self.controller_address}TS\r\n"),
+            call(f"{self.controller_address}TE\r\n")
+        ]
+        expected_write_calls = [
             call(f"{self.controller_address}SR%s\r\n" % limit),
             call(f"{self.controller_address}PW0\r\n")
         ]
-        expected_ask_calls = [
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n"),
-            call(f"{self.controller_address}TE\r\n")
-        ]
-        self.instr.set_positive_software_limit(limit)
+
+        self.instr.set_positive_software_limit(limit, True)
+
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 

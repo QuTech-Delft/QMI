@@ -171,7 +171,9 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
         return float(base_velocity[3:])
 
     @rpc_method
-    def set_base_velocity(self, base_velocity: float, persist: bool, controller_address: Optional[int] = None) -> None:
+    def set_base_velocity(
+            self, base_velocity: float, persist: Optional[bool] = False, controller_address: Optional[int] = None
+    ) -> None:
         """
         Set the profile generator base velocity. It must not be larger than the maximum velocity set by VA command.
 
@@ -184,30 +186,28 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
                                 it is set to the initialised value of the controller address.
         """
         self.controller_address = controller_address
-        # instrument must be in CONFIGURATION state to get the current velocity.
-        self._enter_configuration_state()
+        if persist:
+            self._enter_configuration_state()
+
+        else:
+            self._state_ready_check("base velocity")
+
         response = self._scpi_protocol.ask(
             self._build_command("VA?"))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
         velocity = float(response[3:])
         if base_velocity < 0 or base_velocity > velocity:
+            if persist:
+                self._exit_configuration_state()
             raise QMI_InstrumentException(
                 f"Provided value {base_velocity} not in valid range 0 <= base_velocity <= {velocity}.")
 
         _logger.info(
             "Setting the profile generator base velocity of instrument [%s] to [%f]", self._name, base_velocity)
-        if not persist:
-            # instrument must be in DISABLE or READY state to get the base velocity.
-            self._exit_configuration_state()
-            self._state_ready_check("base velocity")
-
         self._scpi_protocol.write(self._build_command(
             "VB", base_velocity))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
         if persist:
             self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()

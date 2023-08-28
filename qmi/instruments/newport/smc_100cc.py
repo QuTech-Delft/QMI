@@ -46,6 +46,57 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         super().__init__(context, name, transport, serial,
                          actuators, baudrate)
 
+    def _get_configuration_or_disable(self, parameter: str) -> bool:
+        """Check the current state and try to enter DISABLE state. Failing that, enter CONFIGURATION state.
+
+        Parameters:
+            parameter: String indicating which controller command is being used for the check.
+
+        Returns:
+            persist: True if the entered state is CONFIGURATION state. False if the entered state is DISABLE state.
+        """
+        try:
+            persist = False
+            istate = self._state_ready_check(parameter)
+            if istate < int("3C", 16):
+                self._enter_disable_state()
+
+        except QMI_InstrumentException:
+            self._enter_configuration_state()
+            persist = True
+
+        return persist
+
+    def _set_configuration_or_disable(self, parameter: str, persist: bool):
+        """The state must be either CONFIGURATION or DISABLE.
+
+        Parameters:
+            parameter: String to indicate which command parameter is being checked
+            persist: If True, force the CONFIGURATION state. If False, try to enter DISABLE state.
+        """
+        if persist:
+            # instrument must be in CONFIGURATION or DISABLE state to get the maximum allowed following error.
+            self._enter_configuration_state()
+
+        else:
+            istate = self._state_ready_check(parameter)
+            # If the state is READY (32-38), we must enter DISABLE state first
+            if istate < int("3C", 16):
+                self._enter_disable_state()
+
+    def _exit_configuration_or_disable(self, exit_persist: bool):
+        """Exit from either CONFIGURATION or DISABLE state to NOT REFERENCED or READY state, respectively.
+
+        Parameters:
+            exit_persist: True to exit from CONFIGURATION state to NOT REFERENCED state.
+                               False to exit from DISABLE state to READY state.
+        """
+        if exit_persist:
+            self._exit_configuration_state()
+
+        else:
+            self._exit_disable_state()
+
     @rpc_method
     def get_encoder_increment_value(self, controller_address: Optional[int] = None) -> float:
         """
@@ -61,7 +112,6 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self.controller_address = controller_address
         _logger.info(
             "Getting encoder increment value of instrument [%s]", self._name)
-        # instrument must be in CONFIGURATION state to get the encoder increment value.
         self._enter_configuration_state()
         res = self._scpi_protocol.ask(
             self._build_command("SU?"))
@@ -84,7 +134,6 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self.controller_address = controller_address
         _logger.info(
             "Setting encoder increment value of instrument [%s] to [%f]", self._name, value)
-        # instrument must be in CONFIGURATION state to set the encoder increment value.
         self._enter_configuration_state()
         self._scpi_protocol.write(self._build_command(
             "SU", value))
@@ -104,7 +153,6 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self.controller_address = controller_address
         _logger.info(
             "Getting the max. output voltage of the driver to the motor of instrument [%s]", self._name)
-        # instrument must be in CONFIGURATION state to get the driver voltage.
         self._enter_configuration_state()
         driver_voltage = self._scpi_protocol.ask(
             self._build_command("DV?"))
@@ -131,7 +179,6 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             "Setting the max. output voltage of the driver to the motor of instrument [%s] to [%f]",
             self._name, driver_voltage
         )
-        # instrument must be in CONFIGURATION state to set persistent driver voltage.
         self._enter_configuration_state()
         self._scpi_protocol.write(self._build_command(
             "DV", driver_voltage))
@@ -154,25 +201,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self.controller_address = controller_address
         _logger.info(
             "Getting encoder increment value of instrument [%s]", self._name)
-        # instrument must be in CONFIGURATION or DISABLE state to get the encoder increment value.
-        try:
-            config_state = False
-            istate = self._state_ready_check("cut-off frequency")
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
-        except QMI_InstrumentException:
-            self._enter_configuration_state()
-            config_state = True
-
+        persist = self._get_configuration_or_disable("cut-off frequency")
         res = self._scpi_protocol.ask(
             self._build_command("FD?"))
         self._check_error()
-        if config_state:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
         return float(res[3:])
 
@@ -197,25 +230,12 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self.controller_address = controller_address
         _logger.info(
             "Setting encoder increment frequency of instrument [%s] to [%s]", self._name, frequency)
-        # instrument must be in CONFIGURATION or DISABLE state to set persistent frequency.
-        if persist:
-            self._enter_configuration_state()
-
-        else:
-            istate = self._state_ready_check("cut-off frequency")
-            # If the state is READY (32-38), we must enter DISABLE state first
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
+        self._set_configuration_or_disable("cut-off frequency", persist)
         self._scpi_protocol.write(self._build_command(
             "FD", frequency))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        if persist:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
     @rpc_method
     def get_following_error_limit(self, controller_address: Optional[int] = None) -> float:
@@ -232,26 +252,12 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self.controller_address = controller_address
         _logger.info(
             "Getting maximum allowed following error of instrument [%s]", self._name)
-        # instrument must be in CONFIGURATION or DISABLE state to get the maximum allowed following error.
-        try:
-            config_state = False
-            istate = self._state_ready_check("maximum allowed following error")
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
-        except QMI_InstrumentException:
-            self._enter_configuration_state()
-            config_state = True
-
+        persist = self._get_configuration_or_disable("maximum allowed following error")
         res = self._scpi_protocol.ask(
             self._build_command("FE?"))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        if config_state:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
         return float(res[3:])
 
@@ -280,25 +286,12 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             "Setting the value for the maximum allowed following error of instrument [%s] to [%f]",
             self._name, error_limit
         )
-        # instrument must be in CONFIGURATION state to set persistent following error limit.
-        if persist:
-            self._enter_configuration_state()
-
-        else:
-            istate = self._state_ready_check("following error limit")
-            # If the state is READY (32-38), we must enter DISABLE state first
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
+        self._set_configuration_or_disable("following error limit", persist)
         self._scpi_protocol.write(self._build_command(
             "FE", error_limit))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        if persist:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
     @rpc_method
     def get_friction_compensation(self, controller_address: Optional[int] = None) -> float:
@@ -312,25 +305,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self.controller_address = controller_address
         _logger.info(
             "Getting the friction compensation of instrument [%s]", self._name)
-        # instrument must be in CONFIGURATION or DISABLE state to get the friction compensation.
-        try:
-            config_state = False
-            istate = self._state_ready_check("friction compensation")
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
-        except QMI_InstrumentException:
-            self._enter_configuration_state()
-            config_state = True
-
+        persist = self._get_configuration_or_disable("friction compensation")
         friction_compensation = self._scpi_protocol.ask(
             self._build_command("FF?"))
         self._check_error()
-        if config_state:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
         return float(friction_compensation[3:])
 
@@ -339,7 +318,10 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             self, friction_compensation: float, persist: bool = False, controller_address: Optional[int] = None
     ) -> None:
         """
-        Set the friction compensation. It must not be larger than the driver voltage set by DV command.
+        Set the friction compensation. It must not be larger than the driver voltage set by DV command. We can check
+        the input value for correct range in CONFIGURATION state, but in READY/DISABLE state we cannot as CONFIGURATION
+        state is needed to check the driver voltage. Exiting the CONFIGURATION state leads to NOT REFERENCED state
+        which cannot then be changed to READY or DISABLE state.
 
         Parameters:
             friction_compensation: New friction compensation value.
@@ -351,24 +333,24 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
                                    it is set to the initialised value of the controller address.
         """
         self.controller_address = controller_address
-        # First we need to check the driver voltage to get valid range for friction compensation.
-        self._enter_configuration_state()
-        response = self._scpi_protocol.ask(
-            self._build_command("DV?"))
-        self._check_error()
-        driver_voltage = float(response[3:])
-        if friction_compensation < 0 or friction_compensation >= driver_voltage:
-            self._exit_configuration_state()
-            raise QMI_InstrumentException(
-                f"Provided value {friction_compensation} not in valid range 0 <= "
-                f"friction_compensation < {driver_voltage}."
-            )
+        if persist:
+            # First we can check the driver voltage to get valid range for friction compensation.
+            self._enter_configuration_state()
+            response = self._scpi_protocol.ask(
+                self._build_command("DV?"))
+            self._check_error()
+            driver_voltage = float(response[3:])
+            if friction_compensation < 0 or friction_compensation >= driver_voltage:
+                self._exit_configuration_state()
+                raise QMI_InstrumentException(
+                    f"Provided value {friction_compensation} not in valid range 0 <= "
+                    f"friction_compensation < {driver_voltage}."
+                )
 
         _logger.info(
             "Setting the friction compensation of instrument [%s] to [%f]", self._name, friction_compensation)
         if not persist:
-            # instrument must be in DISABLE state to get the friction compensation.
-            self._exit_configuration_state()
+            # instrument must be in DISABLE state to set the friction compensation.
             istate = self._state_ready_check("friction compensation")
             # If the state is READY (32-38), we must enter DISABLE state first
             if istate < int("3C", 16):
@@ -378,11 +360,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             "FF", friction_compensation))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        if persist:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
     @rpc_method
     def get_derivative_gain(self, controller_address: Optional[int] = None) -> float:
@@ -399,25 +377,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self.controller_address = controller_address
         _logger.info(
             "Getting derivative gain of the PID control loop of instrument [%s]", self._name)
-        # instrument must be in CONFIGURATION or DISABLE state to get the derivative gain of the PID control loop value.
-        try:
-            config_state = False
-            istate = self._state_ready_check("derivative gain")
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
-        except QMI_InstrumentException:
-            self._enter_configuration_state()
-            config_state = True
-
+        persist = self._get_configuration_or_disable("derivative gain")
         res = self._scpi_protocol.ask(
             self._build_command("KD?"))
         self._check_error()
-        if config_state:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
         return float(res[3:])
 
@@ -444,25 +408,12 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             "Setting derivative gain of the PID control loop of instrument [%s] to [%f]",
             self._name, derivative_gain
         )
-        # instrument must be in CONFIGURATION state to set persistent derivative gain of the PID control loop.
-        if persist:
-            self._enter_configuration_state()
-
-        else:
-            istate = self._state_ready_check("derivative gain")
-            # If the state is READY (32-38), we must enter DISABLE state first
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
+        self._set_configuration_or_disable("derivative gain", persist)
         self._scpi_protocol.write(self._build_command(
             "KD", derivative_gain))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        if persist:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
     @rpc_method
     def get_integral_gain(self, controller_address: Optional[int] = None) -> float:
@@ -479,25 +430,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self.controller_address = controller_address
         _logger.info(
             "Getting integral gain of the PID control loop of instrument [%s]", self._name)
-        # instrument must be in CONFIGURATION or DISABLE state to get the integral gain of the PID control loop value.
-        try:
-            config_state = False
-            istate = self._state_ready_check("derivative gain")
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
-        except QMI_InstrumentException:
-            self._enter_configuration_state()
-            config_state = True
-
+        persist = self._get_configuration_or_disable("integral gain")
         res = self._scpi_protocol.ask(
             self._build_command("KI?"))
         self._check_error()
-        if config_state:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
         return float(res[3:])
 
@@ -524,25 +461,12 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             "Setting integral gain of the PID control loop of instrument [%s] to [%f]",
             self._name, integral_gain
         )
-        # instrument must be in CONFIGURATION state to set persistent integral gain of the PID control loop.
-        if persist:
-            self._enter_configuration_state()
-
-        else:
-            istate = self._state_ready_check("integral gain")
-            # If the state is READY (32-38), we must enter DISABLE state first
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
+        self._set_configuration_or_disable("integral gain", persist)
         self._scpi_protocol.write(self._build_command(
             "KI", integral_gain))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        if persist:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
     @rpc_method
     def get_proportional_gain(self, controller_address: Optional[int] = None) -> float:
@@ -559,25 +483,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self.controller_address = controller_address
         _logger.info(
             "Getting proportional gain of the PID control loop of instrument [%s]", self._name)
-        # instrument must be in CONFIGURATION or DISABLE state to get the proportional gain of the PID control loop.
-        try:
-            config_state = False
-            istate = self._state_ready_check("proportional gain")
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
-        except QMI_InstrumentException:
-            self._enter_configuration_state()
-            config_state = True
-
+        persist = self._get_configuration_or_disable("proportional gain")
         res = self._scpi_protocol.ask(
             self._build_command("KP?"))
         self._check_error()
-        if config_state:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
         return float(res[3:])
 
@@ -606,25 +516,12 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             "Setting proportional gain of the PID control loop of instrument [%s] to [%f]",
             self._name, proportional_gain
         )
-        # instrument must be in CONFIGURATION state to set persistent proportional gain of the PID control loop.
-        if persist:
-            self._enter_configuration_state()
-
-        else:
-            istate = self._state_ready_check("proportional gain")
-            # If the state is READY (32-38), we must enter DISABLE state first
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
+        self._set_configuration_or_disable("proportional gain", persist)
         self._scpi_protocol.write(self._build_command(
             "KP", proportional_gain))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        if persist:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
     @rpc_method
     def get_velocity_feed_forward(self, controller_address: Optional[int] = None) -> float:
@@ -641,25 +538,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self.controller_address = controller_address
         _logger.info(
             "Getting velocity feed forward of the PID control loop of instrument [%s]", self._name)
-        # instrument must be in CONFIGURATION state to get the velocity feed forward of the PID control loop value.
-        try:
-            config_state = False
-            istate = self._state_ready_check("velocity feed forward")
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
-        except QMI_InstrumentException:
-            self._enter_configuration_state()
-            config_state = True
-
+        persist = self._get_configuration_or_disable("velocity feed forward")
         res = self._scpi_protocol.ask(
             self._build_command("KV?"))
         self._check_error()
-        if config_state:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
         return float(res[3:])
 
@@ -689,22 +572,12 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             "Setting velocity feed forward of the PID control loop of instrument [%s] to [%f]",
             self._name, velocity_feed_forward
         )
-        # instrument must be in CONFIGURATION state to set persistent velocity feed forward of the PID control loop.
-        if persist:
-            self._enter_configuration_state()
-            
-        else:
-            istate = self._state_ready_check("velocity feed forward")
-            # If the state is READY (32-38), we must enter DISABLE state first
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
+        self._set_configuration_or_disable("velocity feed forward", persist)
         self._scpi_protocol.write(self._build_command(
             "KV", velocity_feed_forward))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        if persist:
-            self._exit_configuration_state()
+        self._exit_configuration_or_disable(persist)
 
     @rpc_method
     def get_control_loop_state(self, controller_address: Optional[int] = None) -> ControlLoopState:
@@ -721,25 +594,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         _logger.info(
             "Getting the current state of the control loop of instrument [%s]", self._name)
         self.controller_address = controller_address
-        # The controller must be in CONFIGURATION or DISABLE state to get the control loop state.
-        try:
-            config_state = False
-            istate = self._state_ready_check("control loop state")
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
-        except QMI_InstrumentException:
-            self._enter_configuration_state()
-            config_state = True
-
+        persist = self._get_configuration_or_disable("control loop state")
         control_loop_state = self._scpi_protocol.ask(
             self._build_command("SC?"))
         self._check_error()
-        if config_state:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
 
         return ControlLoopState(int(control_loop_state[3:]))
 
@@ -762,23 +621,9 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             "Setting the state of the control loop of instrument [%s] to [%s]",
             self._name, ControlLoopState(control_loop_state).name
         )
-        # The controller must be in CONFIGURATION or DISABLE state to set the control loop state.
-        try:
-            config_state = False
-            istate = self._state_ready_check("control loop state")
-            if istate < int("3C", 16):
-                self._enter_disable_state()
-
-        except QMI_InstrumentException:
-            self._enter_configuration_state()
-            config_state = True
-
+        persist = self._get_configuration_or_disable("control loop state")
         self._scpi_protocol.write(self._build_command(
             "SC", control_loop_state))
         sleep(self.COMMAND_EXEC_TIME)
         self._check_error()
-        if config_state:
-            self._exit_configuration_state()
-
-        else:
-            self._exit_disable_state()
+        self._exit_configuration_or_disable(persist)
