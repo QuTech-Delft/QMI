@@ -165,17 +165,18 @@ class TestNewportSmc100Pp(unittest.TestCase):
 
     def test_get_base_velocity_from_configuration(self):
         """Test getting base velocity from CONFIGURATION state."""
-        state = "3C"  # Set to CONFIGURATION state
+        state = "14"  # Set to CONFIGURATION state
         expected_vel = 1.5
         self._scpi_mock.ask.side_effect = [
-            f"1TS0000{state}", f"{self.controller_address}VB %s" % expected_vel, "@"]
+            f"1TS0000{state}", f"1TS0000{state}", f"{self.controller_address}VB %s" % expected_vel, "@"]
         expected_ask_calls = [
+            call(f"{self.controller_address}TS\r\n"),
             call(f"{self.controller_address}TS\r\n"),
             call(f"{self.controller_address}VB?\r\n"),
             call(f"{self.controller_address}TE\r\n")
         ]
         expected_write_calls = [
-            call(f"{self.controller_address}MM0\r\n")
+            call(f"{self.controller_address}PW0\r\n")
         ]
 
         actual_value = self.instr.get_base_velocity()
