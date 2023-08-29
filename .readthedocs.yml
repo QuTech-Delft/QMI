@@ -1,8 +1,5 @@
 version: 2
 
-build:
-  image: latest
-
 # Build documentation in the documentation/sphinx/ directory with Sphinx
 sphinx:
   configuration: documentation/sphinx/source/conf.py
