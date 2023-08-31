@@ -521,7 +521,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(move_time[3:])
 
     @rpc_method
-    def get_configuration_state(self, controller_address: Optional[int] = None) -> bool:
+    def is_in_configuration_state(self, controller_address: Optional[int] = None) -> bool:
         """
         Get the CONFIGURATION state of the controller.
 
@@ -553,7 +553,9 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
                                 it is set to the initialised value of the controller address.
 
         """
-        _logger.info("Setting configuration state of instrument [%s] to [%s]", self._name, state)
+        _logger.info(
+            "Setting state of instrument [%s] to [%s]", self._name, "CONFIGURATION" if state else "NOT REFERENCED"
+        )
         self.controller_address = controller_address
         self._scpi_protocol.write(
             self._build_command("PW", int(state)))
@@ -567,7 +569,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             sleep(self.COMMAND_EXEC_TIME)
 
     @rpc_method
-    def get_disable_state(self, controller_address: Optional[int] = None) -> bool:
+    def is_in_disable_state(self, controller_address: Optional[int] = None) -> bool:
         """
         Get the DISABLE or READY state of the controller.
 
@@ -578,7 +580,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Returns:
             state: Boolean to indicate state is DISABLE (True) or READY (False)
         """
-        _logger.info("Getting disable state of instrument [%s]", self._name)
+        _logger.info("Getting DISABLE state of instrument [%s]", self._name)
         self.controller_address = controller_address
         state = self._scpi_protocol.ask(
             self._build_command("MM?"))
@@ -597,7 +599,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        _logger.info("Setting disable state of instrument [%s] to [%s]", self._name, state)
+        _logger.info("Setting state of instrument [%s] to [%s]", self._name, "DISABLE" if state else "READY")
         self.controller_address = controller_address
         self._scpi_protocol.write(
             self._build_command("MM", int(state)))

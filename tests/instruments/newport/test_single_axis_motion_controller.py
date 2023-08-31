@@ -404,7 +404,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
         expected_state = False
         self._scpi_mock.ask.side_effect = [f"{contr_addr}PW{int(expected_state)}", "@"]
 
-        state = self.instr.get_configuration_state(controller_address=contr_addr)
+        state = self.instr.is_in_configuration_state(controller_address=contr_addr)
 
         self.assertEqual(state, expected_state)
         self._scpi_mock.ask.assert_any_call(f"{contr_addr}PW?\r\n")
@@ -435,7 +435,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
         expected_state = False
         self._scpi_mock.ask.side_effect = [f"{contr_addr}MM{int(expected_state)}", "@"]
 
-        state = self.instr.get_disable_state(controller_address=contr_addr)
+        state = self.instr.is_in_disable_state(controller_address=contr_addr)
 
         self.assertEqual(state, expected_state)
         self._scpi_mock.ask.assert_any_call(f"{contr_addr}MM?\r\n")
