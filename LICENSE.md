@@ -1,6 +1,9 @@
-This work is licensed under a MIT OSS licence
+Technische Universiteit Delft hereby disclaims all copyright interest in the program “QMI (Quantum Measurement Infrastructure)”, a lab instrument remote procedure call control framework written by QuTech. 
+Professor Lieven Vandersypen, Director of Research QuTech.
 
-Copyright (c) 2023 QuTech
+(c) 2023, QuTech, Delft, The Netherlands.
+
+This work is licensed under a MIT OSS licence
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
