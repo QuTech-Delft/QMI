@@ -270,26 +270,6 @@ class Santec_Tsl570(QMI_Instrument):
         return wavelength
 
     @rpc_method
-    def set_frequency(self, frequency: float) -> None:
-        """Set the output frequency in teraherz.
-
-        Parameters:
-            frequency: The target frequency in teraherz up to 10 MHz resolution.
-
-        Raises:
-            QMI_InstrumentException: If the frequency is not in the instrument range.
-        """
-        unit = "THz"
-        dec = 5  # 10 MHz resolution
-        if frequency < self._wavelength_range.min or frequency > self._wavelength_range.max:
-            raise ValueError(
-                f"frequency {frequency:.{dec}f}{unit} out of instrument range "
-                f"({self._wavelength_range.min}{unit} - {self._wavelength_range.max}{unit})"
-            )
-
-        self._write_and_check_errors(f":WAV:FREQ {frequency:.{dec}f}")
-
-    @rpc_method
     def get_minimum_wavelength(self) -> float:
         """Get the minimum wavelength.
 
@@ -308,6 +288,26 @@ class Santec_Tsl570(QMI_Instrument):
         """
         wavelength = self._ask_float(":WAV:MAX?")
         return wavelength
+
+    @rpc_method
+    def set_frequency(self, frequency: float) -> None:
+        """Set the output frequency in teraherz.
+
+        Parameters:
+            frequency: The target frequency in teraherz up to 10 MHz resolution.
+
+        Raises:
+            QMI_InstrumentException: If the frequency is not in the instrument range.
+        """
+        unit = "THz"
+        dec = 5  # 10 MHz resolution
+        if frequency < self._frequency_range.min or frequency > self._frequency_range.max:
+            raise ValueError(
+                f"frequency {frequency:.{dec}f}{unit} out of instrument range "
+                f"({self._frequency_range.min}{unit} - {self._frequency_range.max}{unit})"
+            )
+
+        self._write_and_check_errors(f":WAV:FREQ {frequency:.{dec}f}")
 
     @rpc_method
     def get_frequency(self) -> float:
