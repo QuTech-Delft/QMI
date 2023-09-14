@@ -5,6 +5,7 @@ Instrument driver for the Santec TSL 570 laser.
 import logging
 from dataclasses import dataclass
 from typing import List, Union
+from struct import unpack
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
@@ -523,6 +524,227 @@ class Santec_Tsl570(QMI_Instrument):
         """
         wl_unit = self._ask_bool(":POW:UNIT?")
         return "mW" if wl_unit else "dBm"
+
+    @rpc_method
+    def set_sweep_start_wavelength(self, wavelength: float) -> None:
+        """Set the start wavelength for a sweep.
+
+        Parameters:
+            wavelength: wavelength in nm.
+        """
+        unit = "nm"
+        dec = 4  # 0.1 pm resolution
+        if wavelength < self._wavelength_range.min or wavelength > self._wavelength_range.max:
+            raise ValueError(
+                f"Wavelength {wavelength:.{dec}f}{unit} out of instrument range "
+                f"({self._wavelength_range.min}{unit} - {self._wavelength_range.max}{unit})"
+            )
+
+        self._write_and_check_errors(f":WAV:SWE:STAR {wavelength}")
+
+    @rpc_method
+    def get_sweep_start_wavelength(self) -> float:
+        """Get the sweep start wavelength. Default unit is nm.
+
+        Returns:
+            wavelength: The instrument wavelength in nanometers.
+        """
+        wavelength = self._ask_float(":WAV:SWE:STAR?")
+        return wavelength
+
+    @rpc_method
+    def set_sweep_stop_wavelength(self, wavelength: float) -> None:
+        """Set the stop wavelength for a sweep.
+
+        Parameters:
+            wavelength: wavelength in nm.
+        """
+        unit = "nm"
+        dec = 4  # 0.1 pm resolution
+        if wavelength < self._wavelength_range.min or wavelength > self._wavelength_range.max:
+            raise ValueError(
+                f"Wavelength {wavelength:.{dec}f}{unit} out of instrument range "
+                f"({self._wavelength_range.min}{unit} - {self._wavelength_range.max}{unit})"
+            )
+
+        self._write_and_check_errors(f":WAV:SWE:STOP {wavelength}")
+
+    @rpc_method
+    def get_sweep_stop_wavelength(self) -> float:
+        """Get the sweep stop wavelength. Default unit is nm.
+
+        Returns:
+            wavelength: The instrument wavelength in nanometers.
+        """
+        wavelength = self._ask_float(":WAV:SWE:STOP?")
+        return wavelength
+
+    @rpc_method
+    def set_sweep_start_frequency(self, frequency: float) -> None:
+        """Set the start frequency for a sweep.
+
+        Parameters:
+            frequency: frequency in THz.
+        """
+        unit = "THz"
+        dec = 4  # 10 MHz resolution
+        if frequency < self._frequency_range.min or frequency > self._frequency_range.max:
+            raise ValueError(
+                f"Wavelength {frequency:.{dec}f}{unit} out of instrument range "
+                f"({self._frequency_range.min}{unit} - {self._frequency_range.max}{unit})"
+            )
+
+        self._write_and_check_errors(f":WAV:FREQ:SWE:STAR {frequency}")
+
+    @rpc_method
+    def get_sweep_start_frequency(self) -> float:
+        """Get the sweep start frequency. Default unit is THz.
+
+        Returns:
+            frequency: The instrument frequency in nanometers.
+        """
+        frequency = self._ask_float(":WAV:FREQ:SWE:STAR?")
+        return frequency
+
+    @rpc_method
+    def set_sweep_stop_frequency(self, frequency: float) -> None:
+        """Set the stop frequency for a sweep.
+
+        Parameters:
+            frequency: frequency in THz.
+        """
+        unit = "THz"
+        dec = 4  # 10 MHz resolution
+        if frequency < self._frequency_range.min or frequency > self._frequency_range.max:
+            raise ValueError(
+                f"Wavelength {frequency:.{dec}f}{unit} out of instrument range "
+                f"({self._frequency_range.min}{unit} - {self._frequency_range.max}{unit})"
+            )
+
+        self._write_and_check_errors(f":WAV:FREQ:SWE:STOP {frequency}")
+
+    @rpc_method
+    def get_sweep_stop_frequency(self) -> float:
+        """Get the sweep stop frequency. Default unit is THz.
+
+        Returns:
+            frequency: The instrument frequency in nanometers.
+        """
+        frequency = self._ask_float(":WAV:FREQ:SWE:STOP?")
+        return frequency
+
+    @rpc_method
+    def set_sweep_mode(self, mode: int) -> None:
+        """Set sweep mode. Possible modes are:
+        0 - Step sweep mode and One way
+        1 - Continuous sweep mode and One way
+        2 - Step sweep mode and Two way
+        3 - Continuous sweep mode and Two way
+
+        Parameters:
+            mode: Integer in range [0, 3].
+        """
+        if mode not in range(4):
+            raise ValueError(f"Sweep mode value {mode} not in valid modes range [0-3].")
+
+        self._write_and_check_errors(f":WAV:SWE:MOD {mode}")
+
+    @rpc_method
+    def get_sweep_mode(self) -> int:
+        """Get sweep mode.
+
+        Returns:
+            mode: Integer in range [0, 3].
+        """
+        return self._ask_int(":WAV:SWE:MOD?")
+
+    @rpc_method
+    def set_sweep_speed(self, speed: float) -> None:
+        """Set sweep speed. Possible speed range is 1-200nm/s.
+
+        Parameters:
+            speed: speed in range [1, 200]nm/s.
+        """
+        if speed < 1.0 or speed > 200.0:
+            raise ValueError(f"Sweep speed {speed} not in valid range [1-200]nm/s.")
+
+        self._write_and_check_errors(f":WAV:SWE:SPE {speed}")
+
+    @rpc_method
+    def get_sweep_speed(self) -> float:
+        """Get sweep speed.
+
+        Returns:
+            speed: Speed in range [1, 200]nm/s.
+        """
+        return self._ask_float(":WAV:SWE:SPE?")
+
+    @rpc_method
+    def set_sweep_cycles(self, cycles: int) -> None:
+        """Set sweep repetition times. Possible number of repetitions are in range [0, 999].
+
+        Parameters:
+            cycles: Integer in range [0, 999].
+        """
+        if cycles not in range(1000):
+            raise ValueError(f"Sweep cycles {cycles} not in valid cycles range [0-999].")
+
+        self._write_and_check_errors(f":WAV:SWE:CYCL {cycles}")
+
+    @rpc_method
+    def get_sweep_cycles(self) -> int:
+        """Get sweep repetition times.
+
+        Returns:
+            cycles: Integer in range [0, 999].
+        """
+        return self._ask_int(":WAV:SWE:CYCL?")
+
+    @rpc_method
+    def set_sweep_state(self, state: int) -> None:
+        """Set sweep state. Possible states are:
+        0 - Stop
+        1 - Start
+
+        Parameters:
+            state: Integer in range [0, 1].
+        """
+        if state not in [0, 1]:
+            raise ValueError(f"Sweep state value {state} not in valid states range [0-1].")
+
+        self._write_and_check_errors(f":WAV:SWE:STAT {state}")
+
+    @rpc_method
+    def get_sweep_state(self) -> int:
+        """Get sweep state. Possible states are:
+        0 - Stopped
+        1 - Running
+        3 - Standing by trigger
+        4 - Preparation for sweep start
+
+        Returns:
+            state: Integer in range [0, 4].
+        """
+        return self._ask_int(":WAV:SWE:STAT?")
+
+    @rpc_method
+    def readout_data(self) -> List[float]:
+        """Read out wavelength logging data and convert it into floating point values. According to the manual
+        the data points are returned in units of 0.1pm. Thus, value 0x0040F844 (little Endian order) = 4520000
+        corresponds to 452.0000nm.
+
+        Returns:
+            data: Data points list converted into nanometers.
+        """
+        data_binary_size = 8
+        self._scpi_protocol.write(":READout:DATa?")
+        binary_data = self._scpi_protocol.read_binary_data()
+        binary_data_size = int(chr(binary_data[1]))
+        # remove header '#nm*n' where n is number of data len digits and n*m is the data length
+        binary_data = binary_data[binary_data_size + 2:]
+        data = [unpack('<d', binary_data[p:p+8])[0] for p in range(0, len(binary_data), data_binary_size)]
+
+        return [d * 1E-4 for d in data]
 
     @rpc_method
     def shutdown(self):

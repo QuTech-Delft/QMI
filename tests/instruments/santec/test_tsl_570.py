@@ -1,7 +1,9 @@
 """Unit-tests for Santec TSL-570 driver class."""
 import logging
+import random
 import unittest
 from unittest.mock import call, patch, Mock
+from struct import pack
 
 import qmi
 from qmi.core.scpi_protocol import ScpiProtocol
@@ -158,6 +160,27 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         qmi.stop()
         logging.getLogger("qmi.instruments.santec.tsl_570").setLevel(logging.NOTSET)
 
+    def test_wrong_int_value(self):
+        """Test a call that uses _ask_int to see that it raises an error at wrong response"""
+        self._scpi_mock(self._transport_mock).ask.side_effect = ["not an int"]
+
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.get_coherence_control_status()
+
+    def test_wrong_float_value(self):
+        """Test a call that uses _ask_float to see that it raises an error at wrong response"""
+        self._scpi_mock(self._transport_mock).ask.side_effect = ["not a float"]
+
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.get_wavelength()
+
+    def test_wrong_bool_value(self):
+        """Test a call that uses _ask_bool to see that it raises an error at wrong response"""
+        self._scpi_mock(self._transport_mock).ask.side_effect = ["not a bool"]
+
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.operation_complete()
+
     def test_get_idn(self):
         """Test ident. """
         vendor = "vendor"
@@ -262,7 +285,6 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         response = self.instr.get_errors()
         # Assert
         self.assertEqual(expected_error + expected_alert, response)
-
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
     def test_set_wavelength_in_nm(self):
@@ -295,13 +317,12 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
                 self.instr.set_wavelength(inp)
 
         # Assert
-
         self._scpi_mock.assert_not_called()
 
     def test_get_wavelength_in_nm(self):
         """Test getting the wavelength in nm."""
         wl = 1450.0
-        expected_wl = round(wl, 5)  # We use 5 decimals for rounding output wl.
+        expected_wl = round(wl, 4)  # We use 4 decimals for rounding output wl.
         self._scpi_mock(self._transport_mock).ask.side_effect = [
             f"{wl}"
         ]
@@ -312,12 +333,11 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         wavelength = self.instr.get_wavelength()
         # Assert
         self.assertEqual(expected_wl, wavelength)
-
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
     def test_get_minimum_wavelength_in_nm(self):
         """Test getting the minimum wavelength in nm."""
-        expected_wl = round(self.wl_min, 5)  # We use 5 decimals for rounding output wl.
+        expected_wl = round(self.wl_min, 4)  # We use 4 decimals for rounding output wl.
         self._scpi_mock(self._transport_mock).ask.side_effect = [
             f"{self.wl_min}"
         ]
@@ -328,12 +348,11 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         wavelength = self.instr.get_minimum_wavelength()
         # Assert
         self.assertEqual(expected_wl, wavelength)
-
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
     def test_get_maximum_wavelength_in_nm(self):
         """Test getting the maximum wavelength in nm."""
-        expected_wl = round(self.wl_max, 5)  # We use 5 decimals for rounding output wl.
+        expected_wl = round(self.wl_max, 4)  # We use 4 decimals for rounding output wl.
         self._scpi_mock(self._transport_mock).ask.side_effect = [
             f"{self.wl_max}"
         ]
@@ -344,56 +363,52 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         wavelength = self.instr.get_maximum_wavelength()
         # Assert
         self.assertEqual(expected_wl, wavelength)
-
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
-    def test_get_wavelength_in_thz(self):
-        """Test getting the wavelength in THz."""
-        wl = 200.0
-        expected_wl = round(wl, 5)  # We use 5 decimals for rounding output wl.
+    def test_get_frequency_in_thz(self):
+        """Test getting the frequency in THz."""
+        freq = 200.0
+        expected_freq = round(freq, 5)  # We use 5 decimals for rounding output freq.
         self._scpi_mock(self._transport_mock).ask.side_effect = [
-            f"{wl}"
+            f"{freq}"
         ]
         expected_ask_calls = [
-            call().ask(":WAV?"),
+            call().ask(":WAV:FREQ?"),
         ]
         # Act
-        wavelength = self.instr.get_wavelength()
+        frequency = self.instr.get_frequency()
         # Assert
-        self.assertEqual(expected_wl, wavelength)
-
+        self.assertEqual(expected_freq, frequency)
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
-    def test_get_minimum_wavelength_in_thz(self):
-        """Test getting the minimum wavelength in THz."""
-        expected_wl = round(self.wl_min, 5)  # We use 5 decimals for rounding output wl.
+    def test_get_minimum_frequency_in_thz(self):
+        """Test getting the minimum frequency in THz."""
+        expected_freq = round(self.freq_min, 5)  # We use 5 decimals for rounding output freq.
         self._scpi_mock(self._transport_mock).ask.side_effect = [
-            f"{self.wl_min}"
+            f"{self.freq_min}"
         ]
         expected_ask_calls = [
-            call().ask(":WAV:MIN?"),
+            call().ask(":WAV:FREQ:MIN?"),
         ]
         # Act
-        wavelength = self.instr.get_minimum_wavelength()
+        frequency = self.instr.get_minimum_frequency()
         # Assert
-        self.assertEqual(expected_wl, wavelength)
-
+        self.assertEqual(expected_freq, frequency)
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
-    def test_get_maximum_wavelength_in_thz(self):
-        """Test getting the maximum wavelength in THz."""
-        expected_wl = round(self.wl_max, 5)  # We use 5 decimals for rounding output wl.
+    def test_get_maximum_frequency_in_thz(self):
+        """Test getting the maximum frequency in THz."""
+        expected_freq = round(self.freq_max, 5)  # We use 5 decimals for rounding output freq.
         self._scpi_mock(self._transport_mock).ask.side_effect = [
-            f"{self.wl_max}"
+            f"{self.freq_max}"
         ]
         expected_ask_calls = [
-            call().ask(":WAV:MAX?"),
+            call().ask(":WAV:FREQ:MAX?"),
         ]
         # Act
-        wavelength = self.instr.get_maximum_wavelength()
+        frequency = self.instr.get_maximum_frequency()
         # Assert
-        self.assertEqual(expected_wl, wavelength)
-
+        self.assertEqual(expected_freq, frequency)
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
     def test_set_wavelength_unit(self):
@@ -435,7 +450,6 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         unit = self.instr.get_wavelength_unit()
         # Assert
         self.assertEqual(expected_unit, unit)
-
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
     def test_get_wavelength_unit_thz(self):
@@ -449,7 +463,6 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         unit = self.instr.get_wavelength_unit()
         # Assert
         self.assertEqual(expected_unit, unit)
-
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
     def test_set_wavelength_fine(self):
@@ -498,7 +511,6 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         wavelength = self.instr.get_wavelength()
         # Assert
         self.assertEqual(expected_wl, wavelength)
-
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
     def test_set_power_level_in_dbm(self):
@@ -549,7 +561,6 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         power_level = self.instr.get_power_level()
         # Assert
         self.assertEqual(expected_pow, power_level)
-
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
     def test_get_minimum_power_level_in_dbm(self):
@@ -570,7 +581,6 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         power_level = self.instr.get_maximum_power_level()
         # Assert
         self.assertEqual(expected_pow, power_level)
-
         self._scpi_mock.assert_not_called()
 
     def test_get_power_level_in_mw(self):
@@ -652,7 +662,6 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         unit = self.instr.get_power_level_unit()
         # Assert
         self.assertEqual(expected_unit, unit)
-
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
     def test_get_power_level_unit_mw(self):
@@ -666,29 +675,400 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         unit = self.instr.get_power_level_unit()
         # Assert
         self.assertEqual(expected_unit, unit)
-
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
-    def test_wrong_int_value(self):
-        """Test a call that uses _ask_int to see that it raises an error at wrong response"""
-        self._scpi_mock(self._transport_mock).ask.side_effect = ["not an int"]
+    def test_set_sweep_start_wavelength_in_nm(self):
+        """Test setting the sweep_start_wavelength in nm."""
+        input_wl = 1450
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":WAV:SWE:STAR {input_wl}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_sweep_start_wavelength(input_wl)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
 
-        with self.assertRaises(QMI_InstrumentException):
-            self.instr.get_coherence_control_status()
+    def test_set_sweep_start_wavelength_in_nm_excepts(self):
+        """Test setting the sweep_start_wavelength in nm with values out-of-bounds."""
+        input_wl = [self.wl_min - 1, self.wl_max + 1]
+        # Act
+        for inp in input_wl:
+            with self.assertRaises(ValueError):
+                self.instr.set_sweep_start_wavelength(inp)
 
-    def test_wrong_float_value(self):
-        """Test a call that uses _ask_float to see that it raises an error at wrong response"""
-        self._scpi_mock(self._transport_mock).ask.side_effect = ["not a float"]
+        # Assert
+        self._scpi_mock.assert_not_called()
 
-        with self.assertRaises(QMI_InstrumentException):
-            self.instr.get_wavelength()
+    def test_get_sweep_start_wavelength_in_nm(self):
+        """Test getting the sweep_start_wavelength in nm."""
+        wl = 1450.0
+        expected_wl = round(wl, 4)  # We use 4 decimals for rounding output wl.
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{wl}"
+        ]
+        expected_ask_calls = [
+            call().ask(":WAV:SWE:STAR?"),
+        ]
+        # Act
+        wavelength = self.instr.get_sweep_start_wavelength()
+        # Assert
+        self.assertEqual(expected_wl, wavelength)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
 
-    def test_wrong_bool_value(self):
-        """Test a call that uses _ask_bool to see that it raises an error at wrong response"""
-        self._scpi_mock(self._transport_mock).ask.side_effect = ["not a bool"]
+    def test_set_sweep_stop_wavelength_in_nm(self):
+        """Test setting the sweep_stop_wavelength in nm."""
+        input_wl = 1450
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":WAV:SWE:STOP {input_wl}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_sweep_stop_wavelength(input_wl)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
 
-        with self.assertRaises(QMI_InstrumentException):
-            self.instr.operation_complete()
+    def test_set_sweep_stop_wavelength_in_nm_excepts(self):
+        """Test setting the sweep_stop_wavelength in nm with values out-of-bounds."""
+        input_wl = [self.wl_min - 1, self.wl_max + 1]
+        # Act
+        for inp in input_wl:
+            with self.assertRaises(ValueError):
+                self.instr.set_sweep_stop_wavelength(inp)
+
+        # Assert
+        self._scpi_mock.assert_not_called()
+
+    def test_get_sweep_stop_wavelength_in_nm(self):
+        """Test getting the sweep_stop_wavelength in nm."""
+        wl = 1450.0
+        expected_wl = round(wl, 4)  # We use 4 decimals for rounding output wl.
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{wl}"
+        ]
+        expected_ask_calls = [
+            call().ask(":WAV:SWE:STOP?"),
+        ]
+        # Act
+        wavelength = self.instr.get_sweep_stop_wavelength()
+        # Assert
+        self.assertEqual(expected_wl, wavelength)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_start_frequency_in_thz(self):
+        """Test setting the sweep_start_frequency in thz."""
+        input_freq = 201
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":WAV:FREQ:SWE:STAR {input_freq}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_sweep_start_frequency(input_freq)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_start_frequency_in_thz_excepts(self):
+        """Test setting the sweep_start_frequency in thz with values out-of-bounds."""
+        input_freq = [self.freq_min - 1, self.freq_max + 1]
+        # Act
+        for inp in input_freq:
+            with self.assertRaises(ValueError):
+                self.instr.set_sweep_start_frequency(inp)
+
+        # Assert
+
+        self._scpi_mock.assert_not_called()
+
+    def test_get_sweep_start_frequency_in_thz(self):
+        """Test getting the sweep_start_frequency in thz."""
+        freq = 1450.0
+        expected_freq = round(freq, 5)  # We use 5 decimals for rounding output freq.
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{freq}"
+        ]
+        expected_ask_calls = [
+            call().ask(":WAV:FREQ:SWE:STAR?"),
+        ]
+        # Act
+        frequency = self.instr.get_sweep_start_frequency()
+        # Assert
+        self.assertEqual(expected_freq, frequency)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_stop_frequency_in_thz(self):
+        """Test setting the sweep_stop_frequency in thz."""
+        input_freq = 201
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":WAV:FREQ:SWE:STOP {input_freq}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_sweep_stop_frequency(input_freq)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_stop_frequency_in_thz_excepts(self):
+        """Test setting the sweep_stop_frequency in thz with values out-of-bounds."""
+        input_freq = [self.freq_min - 1, self.freq_max + 1]
+        # Act
+        for inp in input_freq:
+            with self.assertRaises(ValueError):
+                self.instr.set_sweep_stop_frequency(inp)
+
+        # Assert
+        self._scpi_mock.assert_not_called()
+
+    def test_get_sweep_stop_frequency_in_thz(self):
+        """Test getting the sweep_stop_frequency in thz."""
+        freq = 1450.0
+        expected_freq = round(freq, 5)  # We use 5 decimals for rounding output freq.
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{freq}"
+        ]
+        expected_ask_calls = [
+            call().ask(":WAV:FREQ:SWE:STOP?"),
+        ]
+        # Act
+        frequency = self.instr.get_sweep_stop_frequency()
+        # Assert
+        self.assertEqual(expected_freq, frequency)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_mode(self):
+        """Test setting the sweep_mode."""
+        mode = random.randint(0, 3)
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":WAV:SWE:MOD {mode}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_sweep_mode(mode)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_mode_excepts(self):
+        """Test setting the sweep_mode in with values out-of-bounds."""
+        input_mode = [-1, 4]
+        # Act
+        for mode in input_mode:
+            with self.assertRaises(ValueError):
+                self.instr.set_sweep_mode(mode)
+
+        # Assert
+        self._scpi_mock.assert_not_called()
+
+    def test_get_sweep_mode(self):
+        """Test getting the sweep_mode."""
+        expected_mode = 2
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{expected_mode}"
+        ]
+        expected_ask_calls = [
+            call().ask(":WAV:SWE:MOD?"),
+        ]
+        # Act
+        mode = self.instr.get_sweep_mode()
+        # Assert
+        self.assertEqual(expected_mode, mode)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_speed(self):
+        """Test setting the sweep_speed."""
+        speed = random.randint(1, 200)
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":WAV:SWE:SPE {speed}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_sweep_speed(speed)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_speed_excepts(self):
+        """Test setting the sweep_speed in with values out-of-bounds."""
+        input_speed = [0.0, 200.1]
+        # Act
+        for speed in input_speed:
+            with self.assertRaises(ValueError):
+                self.instr.set_sweep_speed(speed)
+
+        # Assert
+        self._scpi_mock.assert_not_called()
+
+    def test_get_sweep_speed(self):
+        """Test getting the sweep_speed in nm/s."""
+        expected_speed = 2
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{expected_speed}"
+        ]
+        expected_ask_calls = [
+            call().ask(":WAV:SWE:SPE?"),
+        ]
+        # Act
+        speed = self.instr.get_sweep_speed()
+        # Assert
+        self.assertEqual(expected_speed, speed)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_cycles(self):
+        """Test setting the sweep_cycles."""
+        cycles = random.randint(0, 999)
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":WAV:SWE:CYCL {cycles}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_sweep_cycles(cycles)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_cycles_excepts(self):
+        """Test setting the sweep_cycles in with values out-of-bounds."""
+        input_cycles = [-1, 1000]
+        # Act
+        for cycles in input_cycles:
+            with self.assertRaises(ValueError):
+                self.instr.set_sweep_cycles(cycles)
+
+        # Assert
+        self._scpi_mock.assert_not_called()
+
+    def test_get_sweep_cycles(self):
+        """Test getting the sweep_cycles."""
+        expected_cycles = 2
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{expected_cycles}"
+        ]
+        expected_ask_calls = [
+            call().ask(":WAV:SWE:CYCL?"),
+        ]
+        # Act
+        cycles = self.instr.get_sweep_cycles()
+        # Assert
+        self.assertEqual(expected_cycles, cycles)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_state(self):
+        """Test setting the sweep_state."""
+        state = random.randint(0, 1)
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":WAV:SWE:STAT {state}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_sweep_state(state)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_state_excepts(self):
+        """Test setting the sweep_state in with values out-of-bounds."""
+        input_state = [-1, 2]
+        # Act
+        for state in input_state:
+            with self.assertRaises(ValueError):
+                self.instr.set_sweep_state(state)
+
+        # Assert
+        self._scpi_mock.assert_not_called()
+
+    def test_get_sweep_state(self):
+        """Test getting the sweep_state."""
+        expected_state = 2
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{expected_state}"
+        ]
+        expected_ask_calls = [
+            call().ask(":WAV:SWE:STAT?"),
+        ]
+        # Act
+        state = self.instr.get_sweep_state()
+        # Assert
+        self.assertEqual(expected_state, state)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_readout_data(self):
+        """Test reading out data."""
+        # Let's make 200 data point readings
+        expected_data_points = 200
+        expected_data = [round(random.uniform(self.wl_min, self.wl_max), 4) for _ in range(expected_data_points)]
+        binary_data_header = f"#{len(str(expected_data_points))}{expected_data_points}".encode()
+        binary_data = b''.join(pack('<d', d * 1E4) for d in expected_data)
+        self._scpi_mock(self._transport_mock).read_binary_data.side_effect = [
+            binary_data_header + binary_data
+        ]
+        expected_write_calls = [
+            call().write(":READout:DATa?"),
+        ]
+        # Act
+        data = self.instr.readout_data()
+        # Assert
+        # Need to round as otherwise get some float inaccuracy errors
+        self.assertListEqual(expected_data, [round(d, 4) for d in data])
+        self._scpi_mock.assert_has_calls(expected_write_calls)
 
     def test_shutdown(self):
         """Test shutdown."""
