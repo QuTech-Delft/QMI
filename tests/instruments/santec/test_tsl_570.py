@@ -513,6 +513,118 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         self.assertEqual(expected_wl, wavelength)
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
+    def test_disable_finetuning_operation(self):
+        """Test disabling the fine-tuning operation."""
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts.",
+        ]
+        expected_write_calls = [
+            call().write(":WAV:FIN:DIS"),
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.disable_finetuning_operation()
+
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls, any_order=True)
+        self._scpi_mock.assert_has_calls(expected_ask_calls, any_order=True)
+
+    def test_set_coherence_control_status(self):
+        """Test setting the coherence control_status."""
+        inputs = [True, "OFF"]
+        expected_control_status = [1, 0]  # is ["ON", "OFF"]
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts.",
+            '0,"No error"',
+            "No alerts.",
+        ]
+        expected_write_calls = [
+            call().write(f":COHC {expected_control_status[0]}"),
+            call().write(f":COHC {expected_control_status[1]}"),
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?"),
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?"),
+        ]
+        # Act
+        for e, inp in enumerate(inputs):
+            self.instr.set_coherence_control_status(inp)
+
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls, any_order=True)
+        self._scpi_mock.assert_has_calls(expected_ask_calls, any_order=True)
+
+    def test_set_coherence_control_status_excepts(self):
+        """See that the function excepts if invalid string is given as input."""
+        with self.assertRaises(AssertionError):
+            self.instr.set_coherence_control_status("AAN")
+
+    def test_get_coherence_control_status(self):
+        """Test getting the coherence control_status."""
+        expected_control_status = "OFF"
+        self._scpi_mock(self._transport_mock).ask.side_effect = ["0"]
+        expected_ask_calls = [
+            call().ask(":COHC?"),
+        ]
+        # Act
+        control_status = self.instr.get_coherence_control_status()
+        # Assert
+        self.assertEqual(expected_control_status, control_status)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_optical_output_status(self):
+        """Test setting the optical output_status."""
+        inputs = [True, "OFF"]
+        expected_output_status = [1, 0]  # is ["ON", "OFF"]
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts.",
+            '0,"No error"',
+            "No alerts.",
+        ]
+        expected_write_calls = [
+            call().write(f":POW:STAT {expected_output_status[0]}"),
+            call().write(f":POW:STAT {expected_output_status[1]}"),
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?"),
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?"),
+        ]
+        # Act
+        for e, inp in enumerate(inputs):
+            self.instr.set_optical_output_status(inp)
+
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls, any_order=True)
+        self._scpi_mock.assert_has_calls(expected_ask_calls, any_order=True)
+
+    def test_set_optical_output_status_excepts(self):
+        """See that the function excepts if invalid string is given as input."""
+        with self.assertRaises(AssertionError):
+            self.instr.set_optical_output_status("UIT")
+
+    def test_get_optical_output_status(self):
+        """Test getting the optical output_status."""
+        expected_output_status = "ON"
+        self._scpi_mock(self._transport_mock).ask.side_effect = ["1"]
+        expected_ask_calls = [
+            call().ask(":POW:STAT?"),
+        ]
+        # Act
+        output_status = self.instr.get_optical_output_status()
+        # Assert
+        self.assertEqual(expected_output_status, output_status)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
     def test_set_power_level_in_dbm(self):
         """Test setting the power_level in dbm."""
         input_pow = 2
@@ -914,7 +1026,7 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
 
     def test_set_sweep_speed(self):
         """Test setting the sweep_speed."""
-        speed = random.randint(1, 200)
+        speed = random.choice([1, 2, 5, 10, 20, 50, 100, 200])
         self._scpi_mock(self._transport_mock).ask.side_effect = [
             '0,"No error"',
             "No alerts."
@@ -934,7 +1046,7 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
 
     def test_set_sweep_speed_excepts(self):
         """Test setting the sweep_speed in with values out-of-bounds."""
-        input_speed = [0.0, 200.1]
+        input_speed = [0, 199]
         # Act
         for speed in input_speed:
             with self.assertRaises(ValueError):
@@ -1004,6 +1116,100 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         self.assertEqual(expected_cycles, cycles)
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
+    def test_set_sweep_dwell(self):
+        """Test setting the sweep_dwell."""
+        dwell = float(random.randint(0, 999))
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":WAV:SWE:DWEL {dwell}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_sweep_dwell(dwell)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_dwell_excepts(self):
+        """Test setting the sweep_dwell in with values out-of-bounds."""
+        input_dwell = [-0.1, 1000.0]
+        # Act
+        for dwell in input_dwell:
+            with self.assertRaises(ValueError):
+                self.instr.set_sweep_dwell(dwell)
+
+        # Assert
+        self._scpi_mock.assert_not_called()
+
+    def test_get_sweep_dwell(self):
+        """Test getting the sweep_dwell."""
+        expected_dec = 1  # should be 1 decimal accuracy
+        expected_dwell = 2.0
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{expected_dwell:.{expected_dec}f}"
+        ]
+        expected_ask_calls = [
+            call().ask(":WAV:SWE:DWEL?"),
+        ]
+        # Act
+        dwell = self.instr.get_sweep_dwell()
+        # Assert
+        self.assertEqual(expected_dwell, dwell)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_delay(self):
+        """Test setting the sweep_delay."""
+        delay = float(random.randint(0, 999))
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":WAV:SWE:DEL {delay}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_sweep_delay(delay)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_sweep_delay_excepts(self):
+        """Test setting the sweep_delay in with values out-of-bounds."""
+        input_delay = [-0.1, 1000.0]
+        # Act
+        for delay in input_delay:
+            with self.assertRaises(ValueError):
+                self.instr.set_sweep_delay(delay)
+
+        # Assert
+        self._scpi_mock.assert_not_called()
+
+    def test_get_sweep_delay(self):
+        """Test getting the sweep_delay."""
+        expected_dec = 1  # should be 1 decimal accuracy
+        expected_delay = 2
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{expected_delay:.{expected_dec}f}"
+        ]
+        expected_ask_calls = [
+            call().ask(":WAV:SWE:DEL?"),
+        ]
+        # Act
+        delay = self.instr.get_sweep_delay()
+        # Assert
+        self.assertEqual(expected_delay, delay)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
     def test_set_sweep_state(self):
         """Test setting the sweep_state."""
         state = random.randint(0, 1)
@@ -1049,6 +1255,183 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         # Assert
         self.assertEqual(expected_state, state)
         self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_trigger_output_timing_mode(self):
+        """Test setting the trigger_output_timing_mode."""
+        mode = random.randint(0, 3)
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":TRIG:OUTP {mode}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_trigger_output_timing_mode(mode)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_trigger_output_timing_mode_excepts(self):
+        """Test setting the trigger_output_timing_mode in with values out-of-bounds."""
+        input_mode = [-1, 4]
+        # Act
+        for mode in input_mode:
+            with self.assertRaises(ValueError):
+                self.instr.set_trigger_output_timing_mode(mode)
+
+        # Assert
+        self._scpi_mock.assert_not_called()
+
+    def test_get_trigger_output_timing_mode(self):
+        """Test getting the trigger_output_timing_mode."""
+        expected_mode = 2
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{expected_mode}"
+        ]
+        expected_ask_calls = [
+            call().ask(":TRIG:OUTP?"),
+        ]
+        # Act
+        mode = self.instr.get_trigger_output_timing_mode()
+        # Assert
+        self.assertEqual(expected_mode, mode)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_trigger_output_period_mode(self):
+        """Test setting the trigger_output_period_mode."""
+        mode = random.randint(0, 1)
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":TRIG:OUTP:SETT {mode}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_trigger_output_period_mode(mode)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_trigger_output_period_mode_excepts(self):
+        """Test setting the trigger_output_period_mode in with values out-of-bounds."""
+        input_mode = [-1, 2]
+        # Act
+        for mode in input_mode:
+            with self.assertRaises(ValueError):
+                self.instr.set_trigger_output_period_mode(mode)
+
+        # Assert
+        self._scpi_mock.assert_not_called()
+
+    def test_get_trigger_output_period_mode(self):
+        """Test getting the trigger_output_period_mode."""
+        expected_mode = 2
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{expected_mode}"
+        ]
+        expected_ask_calls = [
+            call().ask(":TRIG:OUTP:SETT?"),
+        ]
+        # Act
+        mode = self.instr.get_trigger_output_period_mode()
+        # Assert
+        self.assertEqual(expected_mode, mode)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_trigger_output_step(self):
+        """Test setting the trigger_output_step."""
+        sweep_stop_wl, sweep_start_wl = 1360.0, 1280.0
+        wl_range = sweep_stop_wl - sweep_start_wl
+        step = random.uniform(0.0001, wl_range)
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{sweep_stop_wl}",
+            f"{sweep_start_wl}",
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":TRIG:OUTP:STEP {step}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_trigger_output_step(step)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_trigger_output_step_excepts(self):
+        """Test setting the trigger_output_step in with values out-of-bounds."""
+        sweep_stop_wl, sweep_start_wl = 1360.0, 1280.0
+        wl_range = sweep_stop_wl - sweep_start_wl
+        input_step = [0.0000, wl_range + 0.0001]
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{sweep_stop_wl}",
+            f"{sweep_start_wl}",
+            f"{sweep_stop_wl}",
+            f"{sweep_start_wl}",
+        ]
+        expected_ask_calls = [
+            call().ask(":WAV:SWE:STOP?"),
+            call().ask(":WAV:SWE:STAR?"),
+            call().ask(":WAV:SWE:STOP?"),
+            call().ask(":WAV:SWE:STAR?")
+        ]
+        # Act
+        for step in input_step:
+            with self.assertRaises(ValueError):
+                self.instr.set_trigger_output_step(step)
+
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_get_trigger_output_step(self):
+        """Test getting the trigger_output_step."""
+        expected_dec = 1  # should be 1 decimal accuracy
+        expected_step = 2
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            f"{expected_step:.{expected_dec}f}"
+        ]
+        expected_ask_calls = [
+            call().ask(":TRIG:OUTP:STEP?"),
+        ]
+        # Act
+        step = self.instr.get_trigger_output_step()
+        # Assert
+        self.assertEqual(expected_step, step)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_issue_soft_trigger(self):
+        """Test issue_soft_trigger."""
+        self._scpi_mock(self._transport_mock).ask.side_effect = ['0,"No error"', "No alerts."]
+
+        self.instr.issue_soft_trigger()
+
+        self._scpi_mock.assert_has_calls([call().write(":TRIG:INP:SOFT")])
+        self._scpi_mock.assert_has_calls([call().ask(":SYST:ERR?")])
+        self._scpi_mock.assert_has_calls([call().ask(":SYST:ALER?")])
+
+    def test_readout_points(self):
+        """Test getting number of readout points."""
+        readout_points = 124
+        self._scpi_mock(self._transport_mock).ask.side_effect = [f"{readout_points}"]
+
+        points = self.instr.readout_points()
+
+        self.assertEqual(readout_points, points)
+        self._scpi_mock.assert_has_calls([call().ask(":READ:POIN?")])
 
     def test_readout_data(self):
         """Test reading out data."""

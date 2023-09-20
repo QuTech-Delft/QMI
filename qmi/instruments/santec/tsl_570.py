@@ -5,7 +5,6 @@ Instrument driver for the Santec TSL 570 laser.
 import logging
 from dataclasses import dataclass
 from typing import List, Union
-from struct import unpack
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
@@ -43,12 +42,10 @@ class _PowerLevelRange:
 
 
 class Santec_Tsl570(QMI_Instrument):
-    """
-    Instrument driver for the Santec TSL 570 laser. This driver currently supports only frequency units
-    nm and THz, and power units dBm and mW.
+    """Instrument driver for the Santec TSL 570 laser.
 
-    NOTES: Contrary to the manual, the queries seem to return frequency and power values in current set units,
-    not in m, Hz, Watts as default. Also, the frequency min/max query is not as described in the manual.
+    The driver is currently based on running at "Legacy" communication, which is also based on
+    SCPI protocol, but perhaps not fully complying to it.
     """
 
     # Default response timeout in seconds.
@@ -301,10 +298,10 @@ class Santec_Tsl570(QMI_Instrument):
         """
         unit = "THz"
         dec = 5  # 10 MHz resolution
-        if frequency < self._frequency_range.min or frequency > self._frequency_range.max:
+        if frequency < self._wavelength_range.min or frequency > self._wavelength_range.max:
             raise ValueError(
                 f"frequency {frequency:.{dec}f}{unit} out of instrument range "
-                f"({self._frequency_range.min}{unit} - {self._frequency_range.max}{unit})"
+                f"({self._wavelength_range.min}{unit} - {self._wavelength_range.max}{unit})"
             )
 
         self._write_and_check_errors(f":WAV:FREQ {frequency:.{dec}f}")
@@ -403,7 +400,7 @@ class Santec_Tsl570(QMI_Instrument):
 
         else:
             assert status.upper() in ("ON", "OFF")
-            i_status = 0 if status.upper() == "ON" else 1
+            i_status = 0 if status.upper() == "OFF" else 1
 
         self._write_and_check_errors(f":COHC {i_status}")
 
@@ -452,11 +449,11 @@ class Santec_Tsl570(QMI_Instrument):
         https://santec.imgix.net/TSL-570-Datasheet.pdf is 13dBm (~20.00mW).
 
         Parameters:
-            power_level: power level in decibel meters or milli Watts.
+            power_level: power level in decibel meters or milliwatts.
         """
         unit = self.get_power_level_unit()
         if power_level < self._power_level_range.min or power_level > self._power_level_range.max:
-            raise ValueError(
+            raise QMI_InstrumentException(
                 f"Power level {power_level:.2f}{unit} out of instrument range "
                 f"({self._power_level_range.min}{unit} - {self._power_level_range.max}{unit})"
             )
@@ -468,7 +465,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get the output power level setting. Unit depends on unit setting.
 
         Returns:
-            power_level: The instrument power level in decibel meters or milli Watts.
+            power_level: The instrument power level in decibel meters or milliwatts.
         """
         power_level = self._ask_float(":POW?")
         return round(power_level, 2)
@@ -478,7 +475,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get the monitored optical power. Unit depends on unit setting.
 
         Returns:
-            power_level: The instrument power level in decibel meters or milli Watts.
+            power_level: The instrument power level in decibel meters or milliwatts.
         """
         power_level = self._ask_float(":POW:ACT?")
         return round(power_level, 2)
@@ -488,7 +485,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get the minimum power level.
 
         Returns:
-            power level: The instrument power level minimum in decibel meters or milli Watts.
+            power level: The instrument power level minimum in decibel meters or milliwatts.
         """
         return round(self._power_level_range.min, 2)
 
@@ -497,17 +494,17 @@ class Santec_Tsl570(QMI_Instrument):
         """Get the maximum power level.
 
         Returns:
-            power level: The instrument power level maximum in decibel meters or milli Watts.
+            power level: The instrument power level maximum in decibel meters or milliwatts.
         """
         return round(self._power_level_range.max, 2)
 
     @rpc_method
     def set_power_level_unit(self, milliwatts: bool) -> None:
-        """Set the power_level unit to milli Watts or to decibel meters. Update the minimum and maximum values
+        """Set the power_level unit to milliwatts or to decibel meters. Update the minimum and maximum values
         consequently.
 
         Parameters:
-            milliwatts: Boolean to set power level unit to milli Watts (True) or to decibel meters (False)
+            milliwatts: Boolean to set power level unit to milliwatts (True) or to decibel meters (False)
         """
         self._write_and_check_errors(f":POW:UNIT {int(milliwatts)}")
         # Then update the minimum and maximum values of the instruments to apply for the changed units.
@@ -659,14 +656,14 @@ class Santec_Tsl570(QMI_Instrument):
         return self._ask_int(":WAV:SWE:MOD?")
 
     @rpc_method
-    def set_sweep_speed(self, speed: float) -> None:
-        """Set sweep speed. Possible speed range is 1-200nm/s.
+    def set_sweep_speed(self, speed: int) -> None:
+        """Set sweep speed. Possible speed values are 1,2,5,10,20,50,100,200nm/s.
 
         Parameters:
-            speed: speed in range [1, 200]nm/s.
+            speed: speed in nm/s.
         """
-        if speed < 1.0 or speed > 200.0:
-            raise ValueError(f"Sweep speed {speed} not in valid range [1-200]nm/s.")
+        if speed not in [1, 2, 5, 10, 20, 50, 100, 200]:
+            raise ValueError(f"Sweep speed {speed} not in valid values [1,2,5,10,20,50,100,200]nm/s.")
 
         self._write_and_check_errors(f":WAV:SWE:SPE {speed}")
 
@@ -678,6 +675,52 @@ class Santec_Tsl570(QMI_Instrument):
             speed: Speed in range [1, 200]nm/s.
         """
         return self._ask_float(":WAV:SWE:SPE?")
+
+    @rpc_method
+    def set_sweep_dwell(self, dwell: float) -> None:
+        """Set _stepped_ sweep dwell. Possible dwell range is 0-999.9s in 0.1nm steps. It does not take into account
+        delay in one-way sweeps to return to the start frequency.
+
+        Parameters:
+            dwell: Dwell between sweep steps in range [0, 1000[s.
+        """
+        dec = 1
+        if dwell < 0.0 or dwell >= 1000.0:
+            raise ValueError(f"Sweep dwell {dwell} not in valid range [0-1000[s.")
+
+        self._write_and_check_errors(f":WAV:SWE:DWEL {dwell:.{dec}f}")
+
+    @rpc_method
+    def get_sweep_dwell(self) -> float:
+        """Get dwell between sweep steps.
+
+        Returns:
+            dwell: dwell in range [0, 1000[s.
+        """
+        return self._ask_float(":WAV:SWE:DWEL?")
+
+    @rpc_method
+    def set_sweep_delay(self, delay: float) -> None:
+        """Set _continuous_ sweep delay. Possible delay range is 0-999.9s in 0.1nm steps. It does not take into account
+        delay in one-way sweeps to return to the start frequency.
+
+        Parameters:
+            delay: Delay between sweeps in range [0, 1000[s.
+        """
+        dec = 1
+        if delay < 0.0 or delay >= 1000.0:
+            raise ValueError(f"Sweep delay {delay} not in valid range [0-1000[s.")
+
+        self._write_and_check_errors(f":WAV:SWE:DEL {delay:.{dec}f}")
+
+    @rpc_method
+    def get_sweep_delay(self) -> float:
+        """Get delay between sweeps.
+
+        Returns:
+            delay: delay in range [0, 1000[s.
+        """
+        return self._ask_float(":WAV:SWE:DEL?")
 
     @rpc_method
     def set_sweep_cycles(self, cycles: int) -> None:
@@ -715,6 +758,11 @@ class Santec_Tsl570(QMI_Instrument):
         self._write_and_check_errors(f":WAV:SWE:STAT {state}")
 
     @rpc_method
+    def start_repeating_sweep(self) -> None:
+        """Start a repeating sweep."""
+        self._write_and_check_errors(f":WAV:SWE:STAT:REP")
+
+    @rpc_method
     def get_sweep_state(self) -> int:
         """Get sweep state. Possible states are:
         0 - Stopped
@@ -728,6 +776,92 @@ class Santec_Tsl570(QMI_Instrument):
         return self._ask_int(":WAV:SWE:STAT?")
 
     @rpc_method
+    def set_trigger_output_timing_mode(self, mode: int) -> None:
+        """Set trigger output timing mode. Possible modes are:
+        0 - None
+        1 - Stop
+        2 - Start
+        3 - Step
+
+        Parameters:
+            mode: Integer in range [0, 3].
+        """
+        if mode not in range(4):
+            raise ValueError(f"Trigger output timing mode {mode} not in valid modes range [0-3].")
+
+        self._write_and_check_errors(f":TRIG:OUTP {mode}")
+
+    @rpc_method
+    def get_trigger_output_timing_mode(self) -> int:
+        """Get trigger output timing mode.
+
+        Returns:
+            mode: Integer in range [0, 3].
+        """
+        return self._ask_int(":TRIG:OUTP?")
+
+    @rpc_method
+    def set_trigger_output_period_mode(self, mode: int) -> None:
+        """Set trigger output period mode. Possible modes are:
+        0 - Sets the output trigger to be periodic in time.
+        1 - Sets the output trigger to be periodic in wavelength.
+
+        Parameters:
+            mode: Integer in range [0, 1].
+        """
+        if mode not in [0, 1]:
+            raise ValueError(f"Trigger output period mode {mode} not in valid modes [0-1].")
+
+        self._write_and_check_errors(f":TRIG:OUTP:SETT {mode}")
+
+    @rpc_method
+    def get_trigger_output_period_mode(self) -> int:
+        """Get trigger output period mode.
+
+        Returns:
+            mode: Integer in range [0, 1].
+        """
+        return self._ask_int(":TRIG:OUTP:SETT?")
+
+    @rpc_method
+    def set_trigger_output_step(self, step: float) -> None:
+        """Set trigger output step. Possible step range is from 0.0001 to ~ maximum specified wavelength
+        range in 0.0001nm steps.
+
+        Parameters:
+            step: Interval of the trigger signal output [0.0001, max wavelength] in nm.
+        """
+        dec = 4
+        max_wl_range = self.get_sweep_stop_wavelength() - self.get_sweep_start_wavelength()
+        if step < 0.0001 or step > max_wl_range:
+            raise ValueError(f"Trigger output step {step} not in valid range [0.0001-{max_wl_range}]nm.")
+
+        self._write_and_check_errors(f":TRIG:OUTP:STEP {step:.{dec}f}")
+
+    @rpc_method
+    def get_trigger_output_step(self) -> float:
+        """Get trigger output step.
+
+        Returns:
+            step: step in range [0.0001, max wavelength]nm.
+        """
+        return self._ask_float(":TRIG:OUTP:STEP?")
+
+    @rpc_method
+    def issue_soft_trigger(self) -> None:
+        """Issues a soft trigger, executing sweep from trigger standby mode."""
+        self._write_and_check_errors(":TRIG:INP:SOFT")
+
+    @rpc_method
+    def readout_points(self) -> int:
+        """reads the number of logging data available.
+
+        Returns:
+            The number of logging data available.
+        """
+        return int(self._scpi_protocol.ask(":READ:POIN?"))
+
+    @rpc_method
     def readout_data(self) -> List[float]:
         """Read out wavelength logging data and convert it into floating point values. According to the manual
         the data points are returned in units of 0.1pm. Thus, value 0x0040F844 (little Endian order) = 4520000
@@ -736,15 +870,12 @@ class Santec_Tsl570(QMI_Instrument):
         Returns:
             data: Data points list converted into nanometers.
         """
-        data_binary_size = 8
-        self._scpi_protocol.write(":READout:DATa?")
-        binary_data = self._scpi_protocol.read_binary_data()
-        binary_data_size = int(chr(binary_data[1]))
-        # remove header '#nm*n' where n is number of data len digits and n*m is the data length
-        binary_data = binary_data[binary_data_size + 2:]
-        data = [unpack('<d', binary_data[p:p+8])[0] for p in range(0, len(binary_data), data_binary_size)]
+        data_binary_size = 4  # In Legacy mode
+        self._scpi_protocol.write(":READ:DAT?")
+        binary_data = self._scpi_protocol.read_binary_data(read_terminator_flag=False)
+        hex_data = [binary_data[p : p + data_binary_size] for p in range(0, len(binary_data), data_binary_size)]
 
-        return [d * 1E-4 for d in data]
+        return [int.from_bytes(h_d, byteorder="little") * 1e-4 for h_d in hex_data]
 
     @rpc_method
     def shutdown(self):
