@@ -429,7 +429,7 @@ class Santec_Tsl570(QMI_Instrument):
 
         else:
             assert status.upper() in ("ON", "OFF")
-            i_status = 0 if status.upper() == "ON" else 1
+            i_status = 0 if status.upper() == "OFF" else 1
 
         self._write_and_check_errors(f":POW:STAT {i_status}")
 
@@ -453,7 +453,7 @@ class Santec_Tsl570(QMI_Instrument):
         """
         unit = self.get_power_level_unit()
         if power_level < self._power_level_range.min or power_level > self._power_level_range.max:
-            raise QMI_InstrumentException(
+            raise ValueError(
                 f"Power level {power_level:.2f}{unit} out of instrument range "
                 f"({self._power_level_range.min}{unit} - {self._power_level_range.max}{unit})"
             )

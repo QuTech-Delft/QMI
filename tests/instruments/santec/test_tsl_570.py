@@ -1350,6 +1350,7 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
 
     def test_set_trigger_output_step(self):
         """Test setting the trigger_output_step."""
+        dec = 4  # Response in 4 decimal accuracy
         sweep_stop_wl, sweep_start_wl = 1360.0, 1280.0
         wl_range = sweep_stop_wl - sweep_start_wl
         step = random.uniform(0.0001, wl_range)
@@ -1360,7 +1361,7 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
             "No alerts."
         ]
         expected_write_calls = [
-            call().write(f":TRIG:OUTP:STEP {step}")
+            call().write(f":TRIG:OUTP:STEP {step:.{dec}f}")
         ]
         expected_ask_calls = [
             call().ask(":SYST:ERR?"),
@@ -1438,10 +1439,11 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         # Let's make 200 data point readings
         expected_data_points = 200
         expected_data = [round(random.uniform(self.wl_min, self.wl_max), 4) for _ in range(expected_data_points)]
-        binary_data_header = f"#{len(str(expected_data_points))}{expected_data_points}".encode()
-        binary_data = b''.join(pack('<d', d * 1E4) for d in expected_data)
+        # binary_data_header = f"#{len(str(expected_data_points))}{expected_data_points}".encode()
+        # binary_data = b''.join(pack('<f', int(d * 1e4)) for d in expected_data)
+        binary_data = b''.join([int(d*1e4).to_bytes(4, byteorder="little") for d in expected_data])
         self._scpi_mock(self._transport_mock).read_binary_data.side_effect = [
-            binary_data_header + binary_data
+            binary_data  #binary_data_header + .encode()
         ]
         expected_write_calls = [
             call().write(":READout:DATa?"),
