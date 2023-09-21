@@ -871,7 +871,7 @@ class Santec_Tsl570(QMI_Instrument):
             data: Data points list converted into nanometers.
         """
         data_binary_size = 4  # In Legacy mode
-        self._scpi_protocol.write(":READ:DAT?")
+        self._scpi_protocol.write(":READout:DATa?")
         binary_data = self._scpi_protocol.read_binary_data(read_terminator_flag=False)
         hex_data = [binary_data[p : p + data_binary_size] for p in range(0, len(binary_data), data_binary_size)]
 

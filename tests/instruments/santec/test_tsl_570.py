@@ -3,7 +3,7 @@ import logging
 import random
 import unittest
 from unittest.mock import call, patch, Mock
-from struct import pack
+import numpy as np
 
 import qmi
 from qmi.core.scpi_protocol import ScpiProtocol
@@ -1439,11 +1439,9 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         # Let's make 200 data point readings
         expected_data_points = 200
         expected_data = [round(random.uniform(self.wl_min, self.wl_max), 4) for _ in range(expected_data_points)]
-        # binary_data_header = f"#{len(str(expected_data_points))}{expected_data_points}".encode()
-        # binary_data = b''.join(pack('<f', int(d * 1e4)) for d in expected_data)
-        binary_data = b''.join([int(d*1e4).to_bytes(4, byteorder="little") for d in expected_data])
+        binary_data = b''.join([int(d * 1e4).to_bytes(4, byteorder="little") for d in expected_data])
         self._scpi_mock(self._transport_mock).read_binary_data.side_effect = [
-            binary_data  #binary_data_header + .encode()
+            binary_data
         ]
         expected_write_calls = [
             call().write(":READout:DATa?"),
@@ -1451,8 +1449,8 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         # Act
         data = self.instr.readout_data()
         # Assert
-        # Need to round as otherwise get some float inaccuracy errors
-        self.assertListEqual(expected_data, [round(d, 4) for d in data])
+        # Use numpy list assertion as otherwise some float inaccuracy errors appear
+        np.testing.assert_allclose(expected_data, data, rtol=1e-4)
         self._scpi_mock.assert_has_calls(expected_write_calls)
 
     def test_shutdown(self):
