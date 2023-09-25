@@ -413,7 +413,6 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
 
     def test_set_wavelength_unit(self):
         """Test setting the wavelength unit."""
-        inputs = [True, False]
         expected_units = [1, 0]  # is ["THz", "nm"]
         self._scpi_mock(self._transport_mock).ask.side_effect = [
             '0,"No error"',
@@ -421,23 +420,20 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
             '0,"No error"',
             "No alerts.",
         ]
-        expected_write_calls = [
+        expected_calls = [
             call().write(f":WAV:UNIT {expected_units[0]}"),
-            call().write(f":WAV:UNIT {expected_units[1]}"),
-        ]
-        expected_ask_calls = [
             call().ask(":SYST:ERR?"),
             call().ask(":SYST:ALER?"),
+            call().write(f":WAV:UNIT {expected_units[1]}"),
             call().ask(":SYST:ERR?"),
             call().ask(":SYST:ALER?"),
         ]
         # Act
-        for e, inp in enumerate(inputs):
-            self.instr.set_wavelength_unit(inp)
+        self.instr.set_wavelength_unit_to_thz()
+        self.instr.set_wavelength_unit_to_nm()
 
         # Assert
-        self._scpi_mock.assert_has_calls(expected_write_calls, any_order=True)
-        self._scpi_mock.assert_has_calls(expected_ask_calls, any_order=True)
+        self._scpi_mock.assert_has_calls(expected_calls)
 
     def test_get_wavelength_unit_nm(self):
         """Test getting the wavelength unit as nm."""
@@ -737,7 +733,6 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
 
     def test_set_power_level_unit(self):
         """Test setting the power_level unit."""
-        inputs = [True, False]
         expected_units = [1, 0]  # is ["mW", "dbm"]
         self._scpi_mock(self._transport_mock).ask.side_effect = [
             '0,"No error"',
@@ -745,23 +740,20 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
             '0,"No error"',
             "No alerts.",
         ]
-        expected_write_calls = [
+        expected_calls = [
             call().write(f":POW:UNIT {expected_units[0]}"),
-            call().write(f":POW:UNIT {expected_units[1]}"),
-        ]
-        expected_ask_calls = [
             call().ask(":SYST:ERR?"),
             call().ask(":SYST:ALER?"),
+            call().write(f":POW:UNIT {expected_units[1]}"),
             call().ask(":SYST:ERR?"),
             call().ask(":SYST:ALER?"),
         ]
         # Act
-        for e, inp in enumerate(inputs):
-            self.instr.set_power_level_unit(inp)
+        self.instr.set_power_level_unit_to_mw()
+        self.instr.set_power_level_unit_to_dbm()
 
         # Assert
-        self._scpi_mock.assert_has_calls(expected_write_calls, any_order=True)
-        self._scpi_mock.assert_has_calls(expected_ask_calls, any_order=True)
+        self._scpi_mock.assert_has_calls(expected_calls)
 
     def test_get_power_level_unit_dbm(self):
         """Test getting the power_level unit as dbm."""

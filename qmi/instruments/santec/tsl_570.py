@@ -54,6 +54,9 @@ class Santec_Tsl570(QMI_Instrument):
     # power level range in dBm and mW
     POWER_LEVEL_RANGE = {"dBm": (-15.0, 13.0), "mW": (0.04, 20.00)}
 
+    # Valid speeds
+    VALID_SPEED_VALUES = [1, 2, 5, 10, 20, 50, 100, 200]
+
     # System errors
     ERRORS_TABLE = {
         0: "No error",
@@ -90,9 +93,9 @@ class Santec_Tsl570(QMI_Instrument):
         """Initialize the instrument driver.
 
         Parameters:
-            context: The QMI context for running the driver in.
-            name: Name for this instrument instance.
-            transport: QMI transport descriptor to connect to the instrument.
+            context:    The QMI context for running the driver in.
+            name:       Name for this instrument instance.
+            transport:  QMI transport descriptor to connect to the instrument.
         """
         super().__init__(context, name)
         self._transport = create_transport(transport)
@@ -108,7 +111,11 @@ class Santec_Tsl570(QMI_Instrument):
         self._power_level_range = _PowerLevelRange
 
     def _check_error(self) -> List[str]:
-        """Read the instrument error queue and raise an exception if there is an error."""
+        """Read the instrument error queue and raise an exception if there is an error.
+
+        Returns:
+            errors + alerts: Listed error and alert response strings.
+        """
         errors = []
         # When there are no errors, the response is '0,"No error"'.
         while (error := self._scpi_protocol.ask(":SYST:ERR?")) != '0,"No error"':
@@ -121,7 +128,7 @@ class Santec_Tsl570(QMI_Instrument):
 
         return errors + alerts
 
-    def _write_and_check_errors(self, cmd: str):
+    def _write_and_check_errors(self, cmd: str) -> None:
         """Write a command to the instrument and check if any errors or alerts were raised.
 
         Parameters:
@@ -132,7 +139,7 @@ class Santec_Tsl570(QMI_Instrument):
         """
         self._scpi_protocol.write(cmd)
         errors = self._check_error()
-        if len(errors):
+        if errors:
             _logger.error("[%s] command [%s] resulted in errors: %s", self._name, cmd, errors)
             raise QMI_InstrumentException(f"Command {cmd} resulted in errors: {errors}")
 
@@ -141,16 +148,16 @@ class Santec_Tsl570(QMI_Instrument):
         resp = self._scpi_protocol.ask(cmd)
         try:
             return int(resp)
-        except ValueError:
-            raise QMI_InstrumentException("Unexpected response to command {!r}: {!r}".format(cmd, resp))
+        except ValueError as exc:
+            raise QMI_InstrumentException(f"Unexpected response to command {cmd!r}: {resp!r}") from exc
 
     def _ask_float(self, cmd: str) -> float:
         """Send a query and return a floating point response."""
         resp = self._scpi_protocol.ask(cmd)
         try:
             return float(resp)
-        except ValueError:
-            raise QMI_InstrumentException("Unexpected response to command {!r}: {!r}".format(cmd, resp))
+        except ValueError as exc:
+            raise QMI_InstrumentException(f"Unexpected response to command {cmd!r}: {resp!r}") from exc
 
     def _ask_bool(self, cmd: str) -> bool:
         """Send a query and return a boolean response."""
@@ -161,7 +168,28 @@ class Santec_Tsl570(QMI_Instrument):
         elif value in ("0", "OFF"):
             return False
         else:
-            raise QMI_InstrumentException("Unexpected response to command {!r}: {!r}".format(cmd, resp))
+            raise QMI_InstrumentException(f"Unexpected response to command {cmd!r}: {resp!r}")
+
+    def _set_wavelength_unit(self, terahertz: bool) -> None:
+        """Set the wavelength unit to terahertz or to nanometers.
+
+        Parameters:
+            terahertz: Boolean to set wavelength unit to terahertz (True) or to nanometer (False)
+        """
+        self._write_and_check_errors(f":WAV:UNIT {int(terahertz)}")
+
+    def _set_power_level_unit(self, milliwatts: bool) -> None:
+        """Set the power_level unit to milliwatts or to decibel-milliwatts. Update the minimum and maximum values
+        consequently.
+
+        Parameters:
+            milliwatts: Boolean to set power level unit to milliwatts (True) or to decibel-milliwatts (False)
+        """
+        self._write_and_check_errors(f":POW:UNIT {int(milliwatts)}")
+        # Then update the minimum and maximum values of the instruments to apply for the changed units.
+        unit = "mW" if milliwatts else "dBm"
+        self._power_level_range.min = self.POWER_LEVEL_RANGE[unit][0]
+        self._power_level_range.max = self.POWER_LEVEL_RANGE[unit][1]
 
     @rpc_method
     def open(self) -> None:
@@ -189,8 +217,9 @@ class Santec_Tsl570(QMI_Instrument):
     def get_idn(self) -> QMI_InstrumentIdentification:
         """Read instrument info and return QMI_InstrumentIdentification instance.
 
-        Returns: QMI_InstrumentIdentification with data e.g. idn.vendor = SANTEC, idn.model = TSL-570,
-                 idn.serial = 21020001, idn.version = 0001.000.0001 (firmware version).
+        Returns:
+            QMI_InstrumentIdentification: Data with e.g. idn.vendor = SANTEC, idn.model = TSL-570,
+            idn.serial = 21020001, idn.version = 0001.000.0001 (firmware version).
         """
         resp = self._scpi_protocol.ask("*IDN?")
         words = resp.rstrip().split(",")
@@ -258,7 +287,7 @@ class Santec_Tsl570(QMI_Instrument):
 
     @rpc_method
     def get_wavelength(self) -> float:
-        """Get the output wavelength. Default unit is nm.
+        """Get the output wavelength. Default unit is nanometers.
 
         Returns:
             wavelength: The instrument wavelength in nanometers.
@@ -288,10 +317,10 @@ class Santec_Tsl570(QMI_Instrument):
 
     @rpc_method
     def set_frequency(self, frequency: float) -> None:
-        """Set the output frequency in teraherz.
+        """Set the output frequency in terahertz.
 
         Parameters:
-            frequency: The target frequency in teraherz up to 10 MHz resolution.
+            frequency: The target frequency in terahertz up to 10 MHz resolution.
 
         Raises:
             QMI_InstrumentException: If the frequency is not in the instrument range.
@@ -311,7 +340,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get the output frequency. Unit depends on unit setting.
 
         Returns:
-            frequency: The instrument frequency in teraherz.
+            frequency: The instrument frequency in terahertz.
         """
         frequency = self._ask_float(":WAV:FREQ?")
         return frequency
@@ -321,7 +350,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get the minimum frequency.
 
         Returns:
-            frequency: The instrument frequency minimum in teraherz.
+            frequency: The instrument frequency minimum in terahertz.
         """
         frequency = self._ask_float(":WAV:FREQ:MIN?")
         return frequency
@@ -331,19 +360,20 @@ class Santec_Tsl570(QMI_Instrument):
         """Get the maximum frequency.
 
         Returns:
-            frequency: The instrument frequency maximum in teraherz.
+            frequency: The instrument frequency maximum in terahertz.
         """
         frequency = self._ask_float(":WAV:FREQ:MAX?")
         return frequency
 
     @rpc_method
-    def set_wavelength_unit(self, teraherz: bool) -> None:
-        """Set the wavelength unit to teraherz or to nm. Update the minimum and maximum values consequently.
+    def set_wavelength_unit_to_nm(self) -> None:
+        """Set the wavelength unit to nanometers."""
+        self._set_wavelength_unit(False)
 
-        Parameters:
-            teraherz: Boolean to set wavelength unit to teraherz (True) or to nanometer (False)
-        """
-        self._write_and_check_errors(f":WAV:UNIT {int(teraherz)}")
+    @rpc_method
+    def set_wavelength_unit_to_thz(self) -> None:
+        """Set the wavelength unit to terahertz."""
+        self._set_wavelength_unit(True)
 
     @rpc_method
     def get_wavelength_unit(self) -> str:
@@ -445,11 +475,11 @@ class Santec_Tsl570(QMI_Instrument):
 
     @rpc_method
     def set_power_level(self, power_level: float) -> None:
-        """Set optical output power level between -15dBm (~0.03mW) and peak power. Typical peak power from the datasheet
-        https://santec.imgix.net/TSL-570-Datasheet.pdf is 13dBm (~20.00mW).
+        """Set optical output power level between -15dBm (~0.03mW) and peak power. Typical peak power from the
+        datasheet https://santec.imgix.net/TSL-570-Datasheet.pdf is 13dBm (~20.00mW).
 
         Parameters:
-            power_level: power level in decibel meters or milliwatts.
+            power_level: power level in decibel-milliwatts or milliwatts.
         """
         unit = self.get_power_level_unit()
         if power_level < self._power_level_range.min or power_level > self._power_level_range.max:
@@ -465,7 +495,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get the output power level setting. Unit depends on unit setting.
 
         Returns:
-            power_level: The instrument power level in decibel meters or milliwatts.
+            power_level: The instrument power level in decibel-milliwatts or milliwatts.
         """
         power_level = self._ask_float(":POW?")
         return round(power_level, 2)
@@ -475,7 +505,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get the monitored optical power. Unit depends on unit setting.
 
         Returns:
-            power_level: The instrument power level in decibel meters or milliwatts.
+            power_level: The instrument power level in decibel-milliwatts or milliwatts.
         """
         power_level = self._ask_float(":POW:ACT?")
         return round(power_level, 2)
@@ -485,7 +515,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get the minimum power level.
 
         Returns:
-            power level: The instrument power level minimum in decibel meters or milliwatts.
+            power level: The instrument power level minimum in decibel-milliwatts or milliwatts.
         """
         return round(self._power_level_range.min, 2)
 
@@ -494,23 +524,19 @@ class Santec_Tsl570(QMI_Instrument):
         """Get the maximum power level.
 
         Returns:
-            power level: The instrument power level maximum in decibel meters or milliwatts.
+            power level: The instrument power level maximum in decibel-milliwatts or milliwatts.
         """
         return round(self._power_level_range.max, 2)
 
     @rpc_method
-    def set_power_level_unit(self, milliwatts: bool) -> None:
-        """Set the power_level unit to milliwatts or to decibel meters. Update the minimum and maximum values
-        consequently.
+    def set_power_level_unit_to_mw(self) -> None:
+        """Set the power_level unit to milliwatts."""
+        self._set_power_level_unit(True)
 
-        Parameters:
-            milliwatts: Boolean to set power level unit to milliwatts (True) or to decibel meters (False)
-        """
-        self._write_and_check_errors(f":POW:UNIT {int(milliwatts)}")
-        # Then update the minimum and maximum values of the instruments to apply for the changed units.
-        unit = "mW" if milliwatts else "dBm"
-        self._power_level_range.min = self.POWER_LEVEL_RANGE[unit][0]
-        self._power_level_range.max = self.POWER_LEVEL_RANGE[unit][1]
+    @rpc_method
+    def set_power_level_unit_to_dbm(self) -> None:
+        """Set the power_level unit to decibel-milliwatts."""
+        self._set_power_level_unit(False)
 
     @rpc_method
     def get_power_level_unit(self) -> str:
@@ -527,7 +553,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Set the start wavelength for a sweep.
 
         Parameters:
-            wavelength: wavelength in nm.
+            wavelength: wavelength in nanometers.
         """
         unit = "nm"
         dec = 4  # 0.1 pm resolution
@@ -541,7 +567,7 @@ class Santec_Tsl570(QMI_Instrument):
 
     @rpc_method
     def get_sweep_start_wavelength(self) -> float:
-        """Get the sweep start wavelength. Default unit is nm.
+        """Get the sweep start wavelength. Default unit is nanometers.
 
         Returns:
             wavelength: The instrument wavelength in nanometers.
@@ -554,7 +580,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Set the stop wavelength for a sweep.
 
         Parameters:
-            wavelength: wavelength in nm.
+            wavelength: wavelength in nanometers.
         """
         unit = "nm"
         dec = 4  # 0.1 pm resolution
@@ -568,7 +594,7 @@ class Santec_Tsl570(QMI_Instrument):
 
     @rpc_method
     def get_sweep_stop_wavelength(self) -> float:
-        """Get the sweep stop wavelength. Default unit is nm.
+        """Get the sweep stop wavelength. Default unit is nanometers.
 
         Returns:
             wavelength: The instrument wavelength in nanometers.
@@ -581,7 +607,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Set the start frequency for a sweep.
 
         Parameters:
-            frequency: frequency in THz.
+            frequency: frequency in terahertz.
         """
         unit = "THz"
         dec = 4  # 10 MHz resolution
@@ -595,7 +621,7 @@ class Santec_Tsl570(QMI_Instrument):
 
     @rpc_method
     def get_sweep_start_frequency(self) -> float:
-        """Get the sweep start frequency. Default unit is THz.
+        """Get the sweep start frequency. Default unit is terahertz.
 
         Returns:
             frequency: The instrument frequency in nanometers.
@@ -608,7 +634,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Set the stop frequency for a sweep.
 
         Parameters:
-            frequency: frequency in THz.
+            frequency: frequency in terahertz.
         """
         unit = "THz"
         dec = 4  # 10 MHz resolution
@@ -622,7 +648,7 @@ class Santec_Tsl570(QMI_Instrument):
 
     @rpc_method
     def get_sweep_stop_frequency(self) -> float:
-        """Get the sweep stop frequency. Default unit is THz.
+        """Get the sweep stop frequency. Default unit is terahertz.
 
         Returns:
             frequency: The instrument frequency in nanometers.
@@ -662,8 +688,8 @@ class Santec_Tsl570(QMI_Instrument):
         Parameters:
             speed: speed in nm/s.
         """
-        if speed not in [1, 2, 5, 10, 20, 50, 100, 200]:
-            raise ValueError(f"Sweep speed {speed} not in valid values [1,2,5,10,20,50,100,200]nm/s.")
+        if speed not in self.VALID_SPEED_VALUES:
+            raise ValueError(f"Sweep speed {speed} not in valid values {self.VALID_SPEED_VALUES}nm/s.")
 
         self._write_and_check_errors(f":WAV:SWE:SPE {speed}")
 
@@ -760,7 +786,7 @@ class Santec_Tsl570(QMI_Instrument):
     @rpc_method
     def start_repeating_sweep(self) -> None:
         """Start a repeating sweep."""
-        self._write_and_check_errors(f":WAV:SWE:STAT:REP")
+        self._write_and_check_errors(":WAV:SWE:STAT:REP")
 
     @rpc_method
     def get_sweep_state(self) -> int:
@@ -829,7 +855,7 @@ class Santec_Tsl570(QMI_Instrument):
         range in 0.0001nm steps.
 
         Parameters:
-            step: Interval of the trigger signal output [0.0001, max wavelength] in nm.
+            step: Interval of the trigger signal output [0.0001, max wavelength] in nanometers.
         """
         dec = 4
         max_wl_range = self.get_sweep_stop_wavelength() - self.get_sweep_start_wavelength()
@@ -878,12 +904,12 @@ class Santec_Tsl570(QMI_Instrument):
         return [int.from_bytes(h_d, byteorder="little") * 1e-4 for h_d in hex_data]
 
     @rpc_method
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Shut down the device. Breaks also communication with the device."""
         self._write_and_check_errors(":SPEC:SHUT")
 
     @rpc_method
-    def reboot(self):
+    def reboot(self) -> None:
         """Restarts the device. This takes about 60 seconds. Note that the communication to the
         device also resets, so continuing with the same proxy is not possible, but a new one needs
         to be made.
