@@ -67,7 +67,7 @@ class NewFocus_TLB670X(QMI_Instrument):
 
         # Prepare handle to DLL and device; set in open().
         self._handle: Any = ctypes.WinDLL(self.DLL_NAME)
-        self._device_id: int = 0
+        self._device_id: int = -1  # Initialize with non-existing device number. The real values are in range [0-31].
 
         # Generously parse serial number.
         serial_number = str(serial_number)
@@ -158,7 +158,11 @@ class NewFocus_TLB670X(QMI_Instrument):
         return response
 
     def _get_device_info(self) -> List[Tuple[int, str]]:
-        """Get the contents of the device information buffer (a list of deviceID,deviceDescription pairs)."""
+        """Get the contents of the device information buffer (a list of deviceID,deviceDescription pairs).
+
+        Raises:
+            QMI_InstrumentException: In cases where getting the device info fails for some reason.
+        """
         # Prepare buffer.
         buf_length = ctypes.c_ulong(self.MAX_BUFFER_LENGTH)
         buf = ctypes.create_string_buffer(buf_length.value)
@@ -184,9 +188,16 @@ class NewFocus_TLB670X(QMI_Instrument):
 
         return device_info
 
-    def _init_device(self) -> int:
-        """Find and initialize the device ID for the device with the given serial number."""
-        # Open all USB devices that match the USB product ID.
+    def _init_device(self) -> None:
+        """Find and initialize the device ID for the device with the given serial number. For re-initialization no
+        SN number check is done.
+
+        Attributes:
+            self._device_id: Set the device ID attribute if an instrument with matching serial number is found.
+        Raises:
+            QMI_InstrumentException: If no device with the correct serial number is found.
+        """
+        # (Re-)Open all USB devices that match the USB product ID.
         self._handle.newp_usb_init_product(self.PRODUCT_ID)
 
         # Get list of all devices found.
@@ -195,20 +206,22 @@ class NewFocus_TLB670X(QMI_Instrument):
             self._uninit_device()
             raise QMI_InstrumentException("No TLB-670X instrument present")
 
+        # Check if a device has already been found previously. If yes, no need to re-check with serial number.
+        if self._device_id in range(32):
+            return
+
         # The deviceDescription contains the serial number; find the one that matches our serial number.
         _logger.debug("Devices found: %s", device_info)
         for device_id, device_descr in device_info:
             serial_number_match = re.search(r"SN\d+", device_descr)
             if serial_number_match is not None and serial_number_match[0] == self.serial_number:
-                our_device_id = device_id
-                _logger.debug("Match: device_id=%d", our_device_id)
-                break
-        else:
-            # Device not found.
-            self._uninit_device()
-            raise QMI_InstrumentException(f"No device with serial_number={self.serial_number} was found")
+                self._device_id = device_id
+                _logger.debug("Match: device_id=%d", device_id)
+                return
 
-        return our_device_id
+        # Device not found.
+        self._uninit_device()
+        raise QMI_InstrumentException(f"No device with serial_number={self.serial_number} was found")
 
     def _uninit_device(self) -> None:
         """Uninitialize the device."""
@@ -226,7 +239,7 @@ class NewFocus_TLB670X(QMI_Instrument):
         """Open connection to the device controller."""
         super().open()
         _logger.info(f"Opening connection to {self._name}")
-        self._device_id = self._init_device()
+        self._init_device()
 
     @rpc_method
     def close(self) -> None:

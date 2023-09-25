@@ -375,6 +375,27 @@ class TestTLB670XGetSet(unittest.TestCase):
         self.assertEqual(self.ctypes_mock.ref_objs[1].value, value_str.encode("ascii"))  # response
         self.assertEqual(return_value, expected_value)
 
+    def _generic_get_test_with_extra_IDN(self, query, expected_value, getter):
+        """Helper function for testing getters, return extra "IDN" after correct answer."""
+        # Setup send/receive
+        command = CtypesMock.StringBuffer("")  # to be set by _send
+        self.ctypes_mock.string_buffer.append(command)
+        extra_idn_string = "cus TLB-6700 v2.4 31/09/23 SN12345\r\n"
+
+        value_str = str(expected_value) + "\r\n" + extra_idn_string
+        response = CtypesMock.StringBuffer(value_str)
+        self.ctypes_mock.string_buffer.append(response)
+
+        self.ctypes_mock.dllmock.newp_usb_send_ascii.return_value = 0  # success
+        self.ctypes_mock.dllmock.newp_usb_get_ascii.return_value = 0  # success
+
+        return_value = getter()
+
+        self.ctypes_mock.dllmock.newp_usb_send_ascii.assert_called_once()
+        self.assertEqual(self.ctypes_mock.ref_objs[0].value, query.encode("ascii"))  # query
+        self.assertEqual(self.ctypes_mock.ref_objs[1].value, value_str.encode("ascii"))  # response
+        self.assertEqual(return_value, expected_value)
+
     def _generic_set_test(self, cmd_str, setpoint_value, setter):
         """Helper function for testing getters."""
         # Setup send/receive
@@ -414,6 +435,10 @@ class TestTLB670XGetSet(unittest.TestCase):
     def test_get_piezo_voltage_ok(self):
         """Test get piezo voltage with one extra "OK" returned first."""
         self._generic_get_test_with_extra_OKs("SOURce:VOLTage:PIEZo?", 99.99, self.instr.get_piezo_voltage)
+
+    def test_get_piezo_voltage_idn(self):
+        """Test get piezo voltage with one extra *IDN response returned after query."""
+        self._generic_get_test_with_extra_IDN("SOURce:VOLTage:PIEZo?", 99.99, self.instr.get_piezo_voltage)
 
     def test_get_piezo_voltage_ok_nok(self):
         """Test get piezo voltage with two extra "OK"s returned first. This result in """
