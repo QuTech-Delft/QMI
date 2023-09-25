@@ -1,11 +1,10 @@
 """Unit test for Newport/NewFocus TLB670-X."""
 import logging
 import unittest
-from unittest.mock import call, patch, Mock
+from unittest.mock import patch, Mock
 
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.instruments.newport.tlb670x import NewFocus_TLB670X
-from qmi.instruments.newport.tlb670x_error_messages import ERROR_MESSAGES
 
 
 class CtypesMock:
@@ -311,8 +310,8 @@ class TestTLB670XGetSet(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
         serial_number = "SN1234"
-        device_id = 123
-        device_info_response = CtypesMock.StringBuffer(f"{device_id},{serial_number};")
+        self.device_id = 12
+        device_info_response = CtypesMock.StringBuffer(f"{self.device_id},{serial_number};")
         self.ctypes_mock.string_buffer.append(device_info_response)
         self.ctypes_mock.dllmock.newp_usb_get_device_info.return_value = 0  # success
 
@@ -411,6 +410,46 @@ class TestTLB670XGetSet(unittest.TestCase):
         self.ctypes_mock.dllmock.newp_usb_send_ascii.assert_called_once()
         self.ctypes_mock.dllmock.newp_usb_get_ascii.assert_called_once()
         self.assertEqual(self.ctypes_mock.ref_objs[0].value, cmd_str.format(setpoint_value).encode("ascii"))  # command
+
+    def test_get_available_devices_info(self):
+        """Test getting available device info."""
+        serial_number = "SN1234"
+        device_id = 12
+        expected_info = [(device_id, serial_number)]
+        device_info_response = CtypesMock.StringBuffer(f"{device_id},{serial_number};")
+        self.ctypes_mock.string_buffer.append(device_info_response)
+        self.ctypes_mock.dllmock.newp_usb_get_device_info.return_value = 0  # success
+
+        info = self.instr.get_available_devices_info()
+
+        self.assertListEqual(expected_info, info)
+
+    def test_get_available_devices_info_excepts(self):
+        """Test the exception case for getting devices info excepts at re-init."""
+        expected_exception = "Unable to load device info: Unknown error"
+        device_info_response = CtypesMock.StringBuffer("None,None;")
+        self.ctypes_mock.string_buffer.append(device_info_response)
+        device_info_response_reinit = CtypesMock.StringBuffer(f"{self.device_id},SOMESN;")
+        self.ctypes_mock.string_buffer.append(device_info_response_reinit)
+        self.ctypes_mock.dllmock.newp_usb_get_device_info.return_value = -1  # Some failure
+
+        with self.assertRaises(QMI_InstrumentException) as exc:
+            self.instr.get_available_devices_info()
+
+        self.assertEqual(expected_exception, str(exc.exception))
+
+    def test_get_available_devices_info_excepts_reinit(self):
+        """Test the exception case for getting devices info excepts at re-init."""
+        expected_exception = "No TLB-670X instrument present"
+        device_info_response = CtypesMock.StringBuffer("None,None;")
+        self.ctypes_mock.string_buffer.append(device_info_response)
+        self.ctypes_mock.string_buffer.append(CtypesMock.StringBuffer(""))
+        self.ctypes_mock.dllmock.newp_usb_get_device_info.side_effect = [-1, 0]  # Some failure, then ok
+
+        with self.assertRaises(QMI_InstrumentException) as exc:
+            self.instr.get_available_devices_info()
+
+        self.assertEqual(expected_exception, str(exc.exception))
 
     def test_get_wavelength(self):
         """Test get wavelength."""
