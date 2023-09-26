@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## \[x.y.z] - Unreleased
 
 ### Added
+- New QMI driver for Santec TSL-570 laser.
 - New QMI driver for Newport SMC100PP and new actuator UTS100PP in the `actuators.py`. 
 - New functions in the Newport_Single_Axis_Motion_controller and Newport_SMC100CC classes.
 
