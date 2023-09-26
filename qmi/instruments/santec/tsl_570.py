@@ -170,22 +170,22 @@ class Santec_Tsl570(QMI_Instrument):
         else:
             raise QMI_InstrumentException(f"Unexpected response to command {cmd!r}: {resp!r}")
 
-    def _set_wavelength_unit(self, terahertz: bool) -> None:
+    def _set_wavelength_unit(self, terahertz: int) -> None:
         """Set the wavelength unit to terahertz or to nanometers.
 
         Parameters:
-            terahertz: Boolean to set wavelength unit to terahertz (True) or to nanometer (False)
+            terahertz: Integer to set wavelength unit to terahertz (1) or to nanometer (0)
         """
-        self._write_and_check_errors(f":WAV:UNIT {int(terahertz)}")
+        self._write_and_check_errors(f":WAV:UNIT {terahertz}")
 
-    def _set_power_level_unit(self, milliwatts: bool) -> None:
+    def _set_power_level_unit(self, milliwatts: int) -> None:
         """Set the power_level unit to milliwatts or to decibel-milliwatts. Update the minimum and maximum values
         consequently.
 
         Parameters:
-            milliwatts: Boolean to set power level unit to milliwatts (True) or to decibel-milliwatts (False)
+            milliwatts: Integer to set power level unit to milliwatts (1) or to decibel-milliwatts (0)
         """
-        self._write_and_check_errors(f":POW:UNIT {int(milliwatts)}")
+        self._write_and_check_errors(f":POW:UNIT {milliwatts}")
         # Then update the minimum and maximum values of the instruments to apply for the changed units.
         unit = "mW" if milliwatts else "dBm"
         self._power_level_range.min = self.POWER_LEVEL_RANGE[unit][0]
@@ -248,7 +248,7 @@ class Santec_Tsl570(QMI_Instrument):
 
     @rpc_method
     def operation_complete(self) -> bool:
-        """Query if the previous operation is completed.
+        """Check if the previous operation is completed.
 
         Returns:
             response: True for yes, False for no.
@@ -327,10 +327,10 @@ class Santec_Tsl570(QMI_Instrument):
         """
         unit = "THz"
         dec = 5  # 10 MHz resolution
-        if frequency < self._wavelength_range.min or frequency > self._wavelength_range.max:
+        if frequency < self._frequency_range.min or frequency > self._frequency_range.max:
             raise ValueError(
                 f"frequency {frequency:.{dec}f}{unit} out of instrument range "
-                f"({self._wavelength_range.min}{unit} - {self._wavelength_range.max}{unit})"
+                f"({self._frequency_range.min}{unit} - {self._frequency_range.max}{unit})"
             )
 
         self._write_and_check_errors(f":WAV:FREQ {frequency:.{dec}f}")
@@ -368,12 +368,12 @@ class Santec_Tsl570(QMI_Instrument):
     @rpc_method
     def set_wavelength_unit_to_nm(self) -> None:
         """Set the wavelength unit to nanometers."""
-        self._set_wavelength_unit(False)
+        self._set_wavelength_unit(0)
 
     @rpc_method
     def set_wavelength_unit_to_thz(self) -> None:
         """Set the wavelength unit to terahertz."""
-        self._set_wavelength_unit(True)
+        self._set_wavelength_unit(1)
 
     @rpc_method
     def get_wavelength_unit(self) -> str:
@@ -531,12 +531,12 @@ class Santec_Tsl570(QMI_Instrument):
     @rpc_method
     def set_power_level_unit_to_mw(self) -> None:
         """Set the power_level unit to milliwatts."""
-        self._set_power_level_unit(True)
+        self._set_power_level_unit(1)
 
     @rpc_method
     def set_power_level_unit_to_dbm(self) -> None:
         """Set the power_level unit to decibel-milliwatts."""
-        self._set_power_level_unit(False)
+        self._set_power_level_unit(0)
 
     @rpc_method
     def get_power_level_unit(self) -> str:

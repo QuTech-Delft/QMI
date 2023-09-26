@@ -365,6 +365,38 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         self.assertEqual(expected_wl, wavelength)
         self._scpi_mock.assert_has_calls(expected_ask_calls)
 
+    def test_set_frequency_in_thz(self):
+        """Test setting the frequency in thz."""
+        input_freq = 231.0
+        expected_dec = 5  # resolution is 10MHz, so we should use 5 decimals
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts."
+        ]
+        expected_write_calls = [
+            call().write(f":WAV:FREQ {input_freq:.{expected_dec}f}")
+        ]
+        expected_ask_calls = [
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?")
+        ]
+        # Act
+        self.instr.set_frequency(input_freq)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+        self._scpi_mock.assert_has_calls(expected_ask_calls)
+
+    def test_set_frequency_in_thz_excepts(self):
+        """Test setting the frequency in thz with values out-of-bounds."""
+        input_freq = [self.freq_min - 1, self.freq_max + 1]
+        # Act
+        for inp in input_freq:
+            with self.assertRaises(ValueError):
+                self.instr.set_frequency(inp)
+
+        # Assert
+        self._scpi_mock.assert_not_called()
+
     def test_get_frequency_in_thz(self):
         """Test getting the frequency in THz."""
         freq = 200.0
