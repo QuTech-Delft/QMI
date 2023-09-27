@@ -162,6 +162,9 @@ class NewFocus_TLB670X(QMI_Instrument):
 
         Raises:
             QMI_InstrumentException: In cases where getting the device info fails for some reason.
+
+        Returns:
+            device_info: The found devices' info as a list of tuples (device ID#, device description string).
         """
         # Prepare buffer.
         buf_length = ctypes.c_ulong(self.MAX_BUFFER_LENGTH)
