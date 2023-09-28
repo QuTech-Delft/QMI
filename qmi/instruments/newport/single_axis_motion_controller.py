@@ -98,7 +98,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
                  name: str,
                  transport: str,
                  serial: str,
-                 actuators: Dict[int, LinearActuator],
+                 actuators: Dict[Optional[int], LinearActuator],
                  baudrate: int) -> None:
         """Initialize driver.
 
@@ -125,14 +125,14 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         self._controller_address: int = self.DEFAULT_CONTROLLER_ADDRESS
 
     @property
-    def controller_address(self) -> int:
+    def controller_address(self) -> Optional[int]:
         """Address of the controller that needs to be controlled."""
         return self._controller_address
 
     @controller_address.setter
     def controller_address(self, controller_address: Optional[int]) -> None:
         # if controller address is not given use the default one.
-        self._controller_address = controller_address if controller_address else self.DEFAULT_CONTROLLER_ADDRESS
+        self._controller_address = controller_address or self.DEFAULT_CONTROLLER_ADDRESS
         # Check that the address is valid.
         if self._controller_address not in self._actuators.keys():
             raise QMI_InstrumentException(
@@ -410,7 +410,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
     @rpc_method
     def move_absolute(self, position: float, controller_address: Optional[int] = None) -> None:
         """
-        Perform an absolute move. This command can take several seconds to finish. However it is not blocking.
+        Perform an absolute move. This command can take several seconds to finish. However, it is not blocking.
         Use other methods such as `get_positioner_error_and_state` to query the state of the controller.
 
         Parameters:
@@ -419,15 +419,12 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
                                 it is set to the initialised value of the controller address.
         """
         self.controller_address = controller_address
-        if position > self._actuators[self.controller_address].TRAVEL_RANGE:
+        if position > self._actuators[self.controller_address].TRAVEL_RANGE.max or \
+                position < self._actuators[self.controller_address].TRAVEL_RANGE.min:
             raise QMI_InstrumentException(
-                f"Provided value {position} greater than allowed maximum "
-                f"{self._actuators[self.controller_address].TRAVEL_RANGE}"
-            )
-        if position < self._actuators[self.controller_address].MIN_INCREMENTAL_MOTION:
-            raise QMI_InstrumentException(
-                f"Provided value {position} lower than minimum "
-                f"{self._actuators[self.controller_address].MIN_INCREMENTAL_MOTION}"
+                f"Provided value {position} outside valid range ["
+                f"{self._actuators[self.controller_address].TRAVEL_RANGE.min}, "
+                f"{self._actuators[self.controller_address].TRAVEL_RANGE.max}]"
             )
 
         # The move can be made only in READY state.
@@ -490,6 +487,12 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
                                 it is set to the initialised value of the controller address.
         """
         self.controller_address = controller_address
+        if displacement < self._actuators[self.controller_address].MIN_INCREMENTAL_MOTION:
+            raise QMI_InstrumentException(
+                f"Provided value {displacement} lower than minimum "
+                f"{self._actuators[self.controller_address].MIN_INCREMENTAL_MOTION}"
+            )
+
         # The move can be made only in READY state.
         state = self._state_ready_check("relative move")
         if state > int("38", 16):
@@ -615,6 +618,9 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Parameters:
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
+
+        Returns:
+            Encoder increment value.
         """
         _logger.info("Getting acceleration of instrument [%s]", self._name)
         self.controller_address = controller_address
@@ -804,7 +810,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         if persist:
             # instrument must be in CONFIGURATION state to set persistent jerk time.
             self._enter_configuration_state()
-            
+
         else:
             # instrument must be in DISABLE or READY state to set jerk time.
             self._state_ready_check("cut-off frequency")
@@ -985,9 +991,10 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if home_search_type not in iter(HomeSearchTypes):
+        hst_values = [hst.value for hst in set(HomeSearchTypes)]
+        if home_search_type not in hst_values:
             raise QMI_InstrumentException(
-                f"Provided value {home_search_type} not in valid range {[s.value for s in set(HomeSearchTypes)]}.")
+                f"Provided value {home_search_type} not in valid range {hst_values}.")
 
         _logger.info(
             "Setting the type of HOME search used with the OR command for instrument [%s] to [%s]",
@@ -1083,11 +1090,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         peak_current_limit = self._scpi_protocol.ask(
             self._build_command("QIL?"))
         self._check_error()
-        peak_current_limit = min(1.5, float(peak_current_limit[4:]))
-        if current_limit < 0.05 or current_limit > peak_current_limit:
+        peak_current_limit_f = min(1.5, float(peak_current_limit[4:]))
+        if current_limit < 0.05 or current_limit > peak_current_limit_f:
             self._exit_configuration_state()
             raise QMI_InstrumentException(
-                    f"Current limit value not in valid range 0.05 <= current_limit <= {peak_current_limit}")
+                    f"Current limit value not in valid range 0.05 <= current_limit <= {peak_current_limit_f}")
 
         _logger.info(
             "Setting RMS current limit of controller [%s] instrument [%s] to [%f]",

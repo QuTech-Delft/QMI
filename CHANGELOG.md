@@ -9,9 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - New QMI driver for Santec TSL-570 laser.
 - New QMI driver for Newport SMC100PP and new actuator UTS100PP in the `actuators.py`. 
-- New functions in the Newport_Single_Axis_Motion_controller and Newport_SMC100CC classes.
+- New functions in the Newport_SingleAxisMotionController and Newport_SMC100CC classes.
+- Unit-tests for Aviosys IPPower9850 instrument driver.
+- Unit-tests for Anapico APSIN instrument driver.
+- `qmi.data.DataFolder.write_dataset` has `overwrite` keyword argument that allows a user to overwrite the current dataset if it exists.
+- Unit-tests for RasperryPi_GPIO instrument driver.
+- Travel range for Newport's single axis motion controllers now have a travel range that can go negative.
+
+### Changed
+- Changed the product id of Thorlabs_PM10x classes to have the same name for all classes and overwrite the default value 0x0000 in base class.
 
 ### Fixed
+- Newport single axis motion controller checks minimum incremental motion on `move_relative` instead of `move_absolute` command.
+- K10C1 won't fail to open if no pending message is in the buffer.
+- Unit-testing for Hydraharp event processing with test_get_events_limit.
+- Added missing `hardware_type` input for call in `adbasic_compiler` and simplified unit-testing.
+- Made SSA300X `open()` call sleep time to come from self._TIMEOUT instead of hard-coded value 2.0. Adjusted unit-tests to be faster using this change.
 - Velocity TLB-670x QMI driver can now handle spurious instrument *IDN? returns. 
 
 ## [0.41.0] - 2023-08-11
@@ -34,13 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - responses of driver calls for `EdwardsVacuum_TIC` to return objects instead of dictionaries.
 
 ### Fixed
-- The Tektronix AWG 5014 QMI driver error checking method. It clears the transport buffer before the error query to avoid mixed response
+- The Tektronix AWG 5014 QMI driver error checking method. It clears the transport buffer before the error query to avoid mixed response.
 - The `read_until` method of VXI11 transport protocol now tries to repeatedly read until terminating character until timeout, not just once.
 - Changed the port numbers in `test_proc.py` from 511 and 512 to be > 1024, as the smaller port numbers caused permission issues.
 - In some other tests in `test_proc.py` specified explicitly `popen.pid = 0` as the latest Python 3.11 otherwise throws an error about
   comparison of a MagicMock object with an int, like in `if pid >= 0:`.
 
-# [0.40.0] - 2023-07-06
+## [0.40.0] - 2023-07-06
 
 ### Added
 - qmi/tools/proc.py: Added a new option `--locals` in the command line call. This can be used to start/stop/restart local contexts only.

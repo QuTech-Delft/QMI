@@ -11,6 +11,7 @@ for the internal USB serial port in the instrument.
 """
 
 import ctypes
+import contextlib
 import enum
 import logging
 import time
@@ -476,14 +477,15 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
     def _send_message(self, msg: _AptMessage) -> None:
         """Encode and send a binary message to the instrument."""
-
         # Before sending a new command, do a non-blocking read to consume
         # a potential old message from the instrument.
         # This prevents a buildup of unhandled notification messages from
         # the instrument after several move_XXX() commands.
-        pending_msg = self._read_message(timeout=0.0)
-        _logger.debug("[%s] Pending message %s (message_id=0x%04x)",
-                      self._name, type(pending_msg).__name__, pending_msg.message_id)
+        # Suppress the timeout exception if no old message is in the buffer.
+        with contextlib.suppress(QMI_TimeoutException):
+            pending_msg = self._read_message(timeout=0.0)
+            _logger.debug("[%s] Pending message %s (message_id=0x%04x)",
+                          self._name, type(pending_msg).__name__, pending_msg.message_id)
 
         # Now send the new command.
         self._transport.write(bytes(msg))

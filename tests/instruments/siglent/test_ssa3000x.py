@@ -1,9 +1,8 @@
 import unittest
-from unittest.mock import call, patch, ANY
-from typing import cast
+from unittest.mock import call, patch
 import numpy as np
 
-import qmi
+from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.siglent import Siglent_Ssa3000x
@@ -12,7 +11,6 @@ from qmi.instruments.siglent import Siglent_Ssa3000x
 class TestSSA3000X(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("TestSiglentSSA3000X", init_logging=False)
         # Add patches
         patcher = patch('qmi.instruments.siglent.ssa3000x.create_transport', spec=QMI_TcpTransport)
         self._transport_mock = patcher.start().return_value
@@ -21,13 +19,12 @@ class TestSSA3000X(unittest.TestCase):
         self._scpi_mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
         # Make DUT
-        self.instr: Siglent_Ssa3000x = qmi.make_instrument("SSA3000X", Siglent_Ssa3000x, "")
-        self.instr = cast(Siglent_Ssa3000x, self.instr)
+        self.instr = Siglent_Ssa3000x(QMI_Context("test_siglent"), name="siglent", transport_descr="")
+        self.instr._TIMEOUT = 0.01  # Make testing faster
         self.instr.open()
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
 
     def test_channel_exception(self):
         with self.assertRaises(QMI_UsageException):
