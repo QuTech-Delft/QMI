@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New QMI driver for Newport SMC100PP and new actuator UTS100PP in the `actuators.py`. 
 - New functions in the Newport_Single_Axis_Motion_controller and Newport_SMC100CC classes.
 
+### Fixed
+- Velocity TLB-670x QMI driver can now handle spurious instrument *IDN? returns. 
+
 ## [0.41.0] - 2023-08-11
 
 ### Added

@@ -1,11 +1,10 @@
 """Unit test for Newport/NewFocus TLB670-X."""
 import logging
 import unittest
-from unittest.mock import call, patch, Mock
+from unittest.mock import patch, Mock
 
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.instruments.newport.tlb670x import NewFocus_TLB670X
-from qmi.instruments.newport.tlb670x_error_messages import ERROR_MESSAGES
 
 
 class CtypesMock:
@@ -311,8 +310,8 @@ class TestTLB670XGetSet(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
         serial_number = "SN1234"
-        device_id = 123
-        device_info_response = CtypesMock.StringBuffer(f"{device_id},{serial_number};")
+        self.device_id = 12
+        device_info_response = CtypesMock.StringBuffer(f"{self.device_id},{serial_number};")
         self.ctypes_mock.string_buffer.append(device_info_response)
         self.ctypes_mock.dllmock.newp_usb_get_device_info.return_value = 0  # success
 
@@ -375,6 +374,27 @@ class TestTLB670XGetSet(unittest.TestCase):
         self.assertEqual(self.ctypes_mock.ref_objs[1].value, value_str.encode("ascii"))  # response
         self.assertEqual(return_value, expected_value)
 
+    def _generic_get_test_with_extra_IDN(self, query, expected_value, getter):
+        """Helper function for testing getters, return extra "IDN" after correct answer."""
+        # Setup send/receive
+        command = CtypesMock.StringBuffer("")  # to be set by _send
+        self.ctypes_mock.string_buffer.append(command)
+        extra_idn_string = "cus TLB-6700 v2.4 31/09/23 SN12345\r\n"
+
+        value_str = str(expected_value) + "\r\n" + extra_idn_string
+        response = CtypesMock.StringBuffer(value_str)
+        self.ctypes_mock.string_buffer.append(response)
+
+        self.ctypes_mock.dllmock.newp_usb_send_ascii.return_value = 0  # success
+        self.ctypes_mock.dllmock.newp_usb_get_ascii.return_value = 0  # success
+
+        return_value = getter()
+
+        self.ctypes_mock.dllmock.newp_usb_send_ascii.assert_called_once()
+        self.assertEqual(self.ctypes_mock.ref_objs[0].value, query.encode("ascii"))  # query
+        self.assertEqual(self.ctypes_mock.ref_objs[1].value, value_str.encode("ascii"))  # response
+        self.assertEqual(return_value, expected_value)
+
     def _generic_set_test(self, cmd_str, setpoint_value, setter):
         """Helper function for testing getters."""
         # Setup send/receive
@@ -390,6 +410,46 @@ class TestTLB670XGetSet(unittest.TestCase):
         self.ctypes_mock.dllmock.newp_usb_send_ascii.assert_called_once()
         self.ctypes_mock.dllmock.newp_usb_get_ascii.assert_called_once()
         self.assertEqual(self.ctypes_mock.ref_objs[0].value, cmd_str.format(setpoint_value).encode("ascii"))  # command
+
+    def test_get_available_devices_info(self):
+        """Test getting available device info."""
+        serial_number = "SN1234"
+        device_id = 12
+        expected_info = [(device_id, serial_number)]
+        device_info_response = CtypesMock.StringBuffer(f"{device_id},{serial_number};")
+        self.ctypes_mock.string_buffer.append(device_info_response)
+        self.ctypes_mock.dllmock.newp_usb_get_device_info.return_value = 0  # success
+
+        info = self.instr.get_available_devices_info()
+
+        self.assertListEqual(expected_info, info)
+
+    def test_get_available_devices_info_excepts(self):
+        """Test the exception case for getting devices info excepts at re-init."""
+        expected_exception = "Unable to load device info: Unknown error"
+        device_info_response = CtypesMock.StringBuffer("None,None;")
+        self.ctypes_mock.string_buffer.append(device_info_response)
+        device_info_response_reinit = CtypesMock.StringBuffer(f"{self.device_id},SOMESN;")
+        self.ctypes_mock.string_buffer.append(device_info_response_reinit)
+        self.ctypes_mock.dllmock.newp_usb_get_device_info.return_value = -1  # Some failure
+
+        with self.assertRaises(QMI_InstrumentException) as exc:
+            self.instr.get_available_devices_info()
+
+        self.assertEqual(expected_exception, str(exc.exception))
+
+    def test_get_available_devices_info_excepts_reinit(self):
+        """Test the exception case for getting devices info excepts at re-init."""
+        expected_exception = "No TLB-670X instrument present"
+        device_info_response = CtypesMock.StringBuffer("None,None;")
+        self.ctypes_mock.string_buffer.append(device_info_response)
+        self.ctypes_mock.string_buffer.append(CtypesMock.StringBuffer(""))
+        self.ctypes_mock.dllmock.newp_usb_get_device_info.side_effect = [-1, 0]  # Some failure, then ok
+
+        with self.assertRaises(QMI_InstrumentException) as exc:
+            self.instr.get_available_devices_info()
+
+        self.assertEqual(expected_exception, str(exc.exception))
 
     def test_get_wavelength(self):
         """Test get wavelength."""
@@ -414,6 +474,10 @@ class TestTLB670XGetSet(unittest.TestCase):
     def test_get_piezo_voltage_ok(self):
         """Test get piezo voltage with one extra "OK" returned first."""
         self._generic_get_test_with_extra_OKs("SOURce:VOLTage:PIEZo?", 99.99, self.instr.get_piezo_voltage)
+
+    def test_get_piezo_voltage_idn(self):
+        """Test get piezo voltage with one extra *IDN response returned after query."""
+        self._generic_get_test_with_extra_IDN("SOURce:VOLTage:PIEZo?", 99.99, self.instr.get_piezo_voltage)
 
     def test_get_piezo_voltage_ok_nok(self):
         """Test get piezo voltage with two extra "OK"s returned first. This result in """

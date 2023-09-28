@@ -1,3 +1,9 @@
+---
+name: New issue
+about: Open a new issue with detailed description
+
+---
+
 Description 
 =========== 
 _provide a complete description of the work to be done_
