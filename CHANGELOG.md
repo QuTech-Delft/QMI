@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+## [0.42.0] - 2023-09-29
+
 ### Added
 - New QMI driver for Santec TSL-570 laser.
 - New QMI driver for Newport SMC100PP and new actuator UTS100PP in the `actuators.py`. 
