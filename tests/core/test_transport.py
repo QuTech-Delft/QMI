@@ -1,8 +1,7 @@
 #! /usr/bin/env python3
 
 """Test QMI_Transport functionality."""
-from sys import platform
-import os
+import os, sys
 import socket
 import threading
 import time
@@ -250,7 +249,7 @@ class TestQmiTransportParsing(unittest.TestCase):
     def tearDown(self):
         self.server_sock.close()
 
-    if "linux" in platform or "darwin" in platform:
+    if "linux" in sys.platform or "darwin" in sys.platform:
         def test_parse_usbtmc(self):
             serialnr = "XYZ"
             vendorid = 0x0699
@@ -281,7 +280,11 @@ class TestQmiTransportParsing(unittest.TestCase):
             self.assertEqual(desc.productid, int(productid))
             self.assertEqual(desc.vendorid, int(vendorid))
 
-    elif platform.startswith("win") or "msys" in platform:
+    elif sys.platform.startswith("win") or "msys" in sys.platform:
+        import tests.core.pyvisa_stub
+        sys.modules["pyvisa"] = tests.core.pyvisa_stub
+        sys.modules["pyvisa.errors"] = tests.core.pyvisa_stub.errors
+
         def test_parse_usbtmc(self):
             serialnr = "XYZ"
             vendorid = 0x0699
@@ -937,8 +940,6 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.instr = QMI_Vxi11Transport("localhost")
         self.instr.open()
 
-    # TEST write
-
     def test_write(self):
         """ Test writing to VXI11 instrument
 
@@ -954,8 +955,6 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             self.instr.write(unittest.mock.sentinel.data)
 
-    # TEST read
-
     def test_read(self):
         """ Test reading from VXI11 instrument
 
@@ -965,11 +964,13 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
             Timeout is reverted
         """
         self.mock().timeout = 10.0  # default timeout
-        self.mock().read_raw.return_value = unittest.mock.sentinel.data
-        data = self.instr.read(8, 1.5)
+        expected_read = b"a1b2c3d4"
+        nbytes = len(expected_read)
+        self.mock().read_raw.side_effect = [chr(c).encode() for c in expected_read]
+        data = self.instr.read(nbytes, 1.5)
         self.assertAlmostEqual(self.mock().timeout, 10.0)
-        self.mock().read_raw.assert_called_once_with(8)
-        self.assertEqual(data, unittest.mock.sentinel.data)
+        self.assertEqual(nbytes, self.mock().read_raw.call_count)
+        self.assertEqual(expected_read, data)
 
     def test_read_timeout(self):
         """ Test timeout exception during read.
@@ -988,13 +989,11 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
             QMI_InstrumentException is raised
         """
         self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(note="Test error!")
-        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
+        with self.assertRaises(qmi.core.exceptions.QMI_EndOfInputException):
             _ = self.instr.read(8, 1.5)
 
-    # TEST read_until
-
     def test_read_until(self):
-        """ Test read_until message terminator command
+        """ Test read_until message terminator command.
 
         Expecting:
             Default timeout isn't changed after call
@@ -1003,14 +1002,31 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         """
         self.mock().timeout = 10.0  # default timeout
         test_string = "test\n".encode("utf-8")
-        self.mock().read_raw.return_value = test_string
+        self.mock().read_raw.side_effect = [chr(c).encode() for c in test_string]
         data = self.instr.read_until(message_terminator="\n".encode("utf-8"), timeout=1.5)
         self.assertAlmostEqual(self.mock().timeout, 10.0)
-        self.mock().read_raw.assert_called_once_with()
-        self.assertEqual(data, test_string)
+        self.assertEqual(len(test_string), self.mock().read_raw.call_count)
+        self.assertEqual(test_string, data)
+
+    def test_read_until_timeout(self):
+        """ Test read_until_timeout works exactly like read.
+
+        Expecting:
+            Timeout is set.
+            Bytes read from VXI11 instrument has been passed untouched.
+            Timeout is reverted
+        """
+        self.mock().timeout = 10.0  # default timeout
+        expected_read = b"a1b2c3d4"
+        nbytes = len(expected_read)
+        self.mock().read_raw.side_effect = [chr(c).encode() for c in expected_read]
+        data = self.instr.read(nbytes, 1.5)
+        self.assertAlmostEqual(self.mock().timeout, 10.0)
+        self.assertEqual(nbytes, self.mock().read_raw.call_count)
+        self.assertEqual(expected_read, data)
 
     def test_read_until_invalid_term_char(self):
-        """ Test if an too long terminator raises an error. """
+        """ Test that a too long terminator raises an error. """
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             _ = self.instr.read_until(message_terminator=bytes("error", "utf-8"), timeout=None)
 
@@ -1020,7 +1036,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             _ = self.instr.read_until(message_terminator=bytes("\n", "utf-8"), timeout=None)
 
-    def test_read_until_timeout(self):
+    def test_read_until_timeout_exception(self):
         """ Tests whether an instrument timeout raises a QMI timeout exception. """
         self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(err=15, note="Test error!")
         with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
@@ -1040,8 +1056,8 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
             Timeout shouldn't raise exception
             Data after timeout is not lost
         """
-        test_string = "test"
-        self.mock().read_raw.side_effect = list(test_string) +\
+        test_string = b"test"
+        self.mock().read_raw.side_effect = [bytearray(test_string)] +\
             [vxi11.vxi11.Vxi11Exception(err=15, note="Test error!")] + [test_string]
         self.instr.discard_read()
         data = self.instr.read(len(test_string), 1.5)
