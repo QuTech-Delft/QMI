@@ -1,8 +1,7 @@
 #! /usr/bin/env python3
 
 """Test QMI_Transport functionality."""
-from sys import platform
-import os
+import os, sys
 import socket
 import threading
 import time
@@ -250,7 +249,7 @@ class TestQmiTransportParsing(unittest.TestCase):
     def tearDown(self):
         self.server_sock.close()
 
-    if "linux" in platform or "darwin" in platform:
+    if "linux" in sys.platform or "darwin" in sys.platform:
         def test_parse_usbtmc(self):
             serialnr = "XYZ"
             vendorid = 0x0699
@@ -281,7 +280,12 @@ class TestQmiTransportParsing(unittest.TestCase):
             self.assertEqual(desc.productid, int(productid))
             self.assertEqual(desc.vendorid, int(vendorid))
 
-    elif platform.startswith("win") or "msys" in platform:
+    elif sys.platform.startswith("win") or "msys" in sys.platform:
+        # Remove the possibility of import error of pyvisa
+        import tests.core.pyvisa_stub
+        sys.modules["pyvisa"] = tests.core.pyvisa_stub
+        sys.modules["pyvisa.errors"] = tests.core.pyvisa_stub.errors
+
         def test_parse_usbtmc(self):
             serialnr = "XYZ"
             vendorid = 0x0699

@@ -33,7 +33,7 @@ class TestQmiPyUsbTmcTransport(unittest.TestCase):
 
     @unittest.mock.patch("qmi.core.usbtmc.Instrument")
     def test_read(self, mock):
-        expected = "0"
+        expected = b"0"
 
         mock().read_raw.return_value = expected
         dev = QMI_PyUsbTmcTransport(0x1234, 0x5678, "90")
@@ -46,7 +46,7 @@ class TestQmiPyUsbTmcTransport(unittest.TestCase):
 
     @unittest.mock.patch("qmi.core.usbtmc.Instrument")
     def test_write(self, mock):
-        data = bytes("data".encode())
+        data = b"data"
 
         dev = QMI_PyUsbTmcTransport(0x1234, 0x5678, "90")
         dev.open()
@@ -72,7 +72,7 @@ class TestQmiVisaUsbTmcTransport(unittest.TestCase):
 
     @unittest.mock.patch("pyvisa.ResourceManager.open_resource")
     def test_read(self, mock):
-        expected = "0"
+        expected = b"0"
 
         mock().read_raw.return_value = expected
         dev = QMI_VisaUsbTmcTransport(0x1234, 0x5678, "90")
