@@ -73,6 +73,19 @@ class TestThorlabsK10cr1(unittest.TestCase):
 
         self.assertEqual(str(exc.exception), expected_exception)
 
+    def test_open_with_no_pending_message(self):
+        """Test opening the instrument and no pending message in buffer."""
+        # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
+        expected_write = struct.pack("<l", 0x0005) + b"P\x01"  # This is 5001 == 0x1389
+        # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
+        expected_read = struct.pack("<l", 0x0006) + b"\x00" * 2 + b"CR1\0K10" * 12
+        # The request+data has to be 90 bytes long and should include string "K10CR1" at right spot.
+        self._transport_mock.read.side_effect = [qmi.core.exceptions.QMI_TimeoutException, expected_read]
+        self.instr.open()
+        self.instr.close()
+        # Assert
+        self._transport_mock.write.assert_called_with(expected_write)
+
     def test_open_excepts_with_unknown_message_id(self):
         """Test opening with unknown message ID fails"""
         expected_exception = "Received unknown message id 0x{:04x} from instrument".format(0x8080)

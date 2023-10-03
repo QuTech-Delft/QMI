@@ -166,7 +166,7 @@ class AdwinProgramLibraryTestCase(unittest.TestCase):
     def test_config_has_wrong_trigger(self):
         """Test that wrong slot number in the config file raises exception."""
         file_name = "bas.conf"
-        expected_exc = f"Invalid ADwin process trigger 'internal' for program 'bas'"
+        expected_exc = "Invalid ADwin process trigger 'internal' for program 'bas'"
         config_with_wrong_key = CONFIG_BASE.replace('"trigger": "external"', '"trigger": "internal"')
         with tempfile.TemporaryDirectory(prefix="bastest") as tempdir:
             with self.assertRaises(QMI_ConfigurationException) as exc:

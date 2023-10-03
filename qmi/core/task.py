@@ -726,7 +726,7 @@ class QMI_TaskRunner(QMI_RpcObject):
 
     @rpc_method
     def get_pending_settings(self) -> Any:
-        """Retrun pending settings stored in the task runner's fifo.
+        """Return pending settings stored in the task runner's fifo.
 
         Only once the internal task calls `update_settings()`, is the pending
         settings from the fifo assigned to the task's actual settings.

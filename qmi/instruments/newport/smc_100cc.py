@@ -30,7 +30,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
                  name: str,
                  transport: str,
                  serial: str,
-                 actuators: Dict[int, LinearActuator],
+                 actuators: Dict[Optional[int], LinearActuator],
                  baudrate: int = 57600) -> None:
         """Initialize driver.
 
@@ -43,8 +43,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
                         and the value is the actuator that it drives.
             baudrate:   The baudrate of the instrument. Defaults to 57600.
         """
-        super().__init__(context, name, transport, serial,
-                         actuators, baudrate)
+        super().__init__(context, name, transport, serial, actuators, baudrate)
 
     def _get_configuration_or_disable(self, parameter: str) -> bool:
         """Check the current state and try to enter DISABLE state. Failing that, enter CONFIGURATION state.
@@ -612,9 +611,10 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             controller_address: Optional address of the controller that needs to be controlled. By default,
                                 it is set to the initialised value of the controller address.
         """
-        if control_loop_state not in iter(ControlLoopState):
+        cls_values = [c.value for c in set(ControlLoopState)]
+        if control_loop_state not in cls_values:
             raise QMI_InstrumentException(
-                f"Provided value {control_loop_state} not in valid range {[s.value for s in set(ControlLoopState)]}.")
+                f"Provided value {control_loop_state} not in valid range {cls_values}.")
 
         self.controller_address = controller_address
         _logger.info(

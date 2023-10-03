@@ -97,8 +97,8 @@ class DataFolder:
         """
         shutil.copy2(filename, self.folder_path)
 
-    def write_dataset(self, ds: DataSet, file_format: str = "hdf5") -> None:
-        """Write the specified DataSet to a new file in the data folder.
+    def write_dataset(self, ds: DataSet, file_format: str = "hdf5", overwrite: bool = False) -> None:
+        """Write the specified DataSet to a new or existing file in the data folder.
 
         The file name will be determined from the name of the DataSet.
 
@@ -107,6 +107,7 @@ class DataFolder:
             file_format: File format specification.
                 "hdf5" - selects HDF5 format (default)
                 "text" - selects a space-separated text format
+            overwrite: Allow user to overwrite an existing dataset. Default is false.
 
         Raises:
             OSError: If the data folder already contains a file with the same name.
@@ -118,13 +119,13 @@ class DataFolder:
         if file_format == "hdf5":
             filename = ds.name + ".h5"
             file_path = os.path.join(self.folder_path, filename)
-            with h5py.File(file_path, "x") as f:
+            with h5py.File(file_path, "w" if overwrite else "x") as f:
                 qmi.data.dataset.write_dataset_to_hdf5(ds, f)
 
         elif file_format == "text":
             filename = ds.name + ".dat"
             file_path = os.path.join(self.folder_path, filename)
-            with open(file_path, "xt") as f:
+            with open(file_path, "wt" if overwrite else "xt") as f:
                 qmi.data.dataset.write_dataset_to_text(ds, f)
 
         else:

@@ -2,7 +2,6 @@
 """
 
 import enum
-import logging
 import typing
 
 # Lazy import of the GPIO module. See the function _import_modules() below.
@@ -69,12 +68,26 @@ class RaspberryPiGPIO(QMI_Instrument):
 
     @rpc_method
     def gpio_setup(self, pin_nr: int, mode: gpio_mode) -> None:
+        """Setup a GPIO pin in given mode.
+
+        Parameters:
+            pin_nr: The pin number to setup.
+            mode:   The mode the pin should be setup. Options: gpio_mode.INPUT, gpio_mode.OUTPUT.
+        """
         self._check_is_open()
         mode = GPIO.IN if mode == RaspberryPiGPIO.gpio_mode.INPUT else GPIO.OUT
         GPIO.setup(pin_nr, mode)
 
     @rpc_method
     def gpio_input(self, pin_nr: int) -> bool:
+        """Check if given pin is in high lor low state.
+
+        Parameters:
+            pin_nr: The pin number to check.
+
+        Returns:
+            value:  True if the pin state is GPIO.HIGH, False otherwise.
+        """
         self._check_is_open()
         value = GPIO.input(pin_nr)
         value = (value == GPIO.HIGH)
@@ -82,6 +95,12 @@ class RaspberryPiGPIO(QMI_Instrument):
 
     @rpc_method
     def gpio_output(self, pin_nr: int, value: bool) -> None:
+        """Set given pin output to high or low.
+
+        Parameters:
+            pin_nr: The pin number to be set.
+            value:  True to set pin to GPIO.HIGH or False to set pin to GPIO.LOW.
+        """
         self._check_is_open()
         value = GPIO.HIGH if value else GPIO.LOW
         GPIO.output(pin_nr, value)

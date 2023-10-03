@@ -226,6 +226,37 @@ class TestDataFolder(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.datafolder.open_hdf5file(name)
 
+    def test_13_write_dataset_again(self):
+        """Write a data set if already exists.
+        """
+        # Arrange
+        dataset = _create_dataset()
+        expected_file = os.path.join(os.getcwd(), dataset.name + ".h5")
+        self.datafolder.write_dataset(dataset)
+        # Act
+        try:
+            # Assert
+            with self.assertRaises(FileExistsError):
+                self.datafolder.write_dataset(dataset)
+            self.assertTrue(os.path.isfile(expected_file))
+        finally:
+            os.remove(expected_file)
+
+    def test_14_write_dataset_again(self):
+        """Write a data set if already exists, but with overwrite flag set.
+        """
+        # Arrange
+        dataset = _create_dataset()
+        expected_file = os.path.join(os.getcwd(), dataset.name + ".h5")
+        self.datafolder.write_dataset(dataset)
+        # Act
+        try:
+            self.datafolder.write_dataset(dataset, overwrite=True)
+            # Assert
+            self.assertTrue(os.path.isfile(expected_file))
+        finally:
+            os.remove(expected_file)
+
 
 class TestDataFolderNoLabel(unittest.TestCase):
 

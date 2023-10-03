@@ -281,57 +281,45 @@ class TestRunAdBasicCompiler(unittest.TestCase):
         # Arrange
         adbasic_arguments = ["/P11", "/H"]
         help_test = "adbasic compiler help text\n"
-        expected_stdout = "\x1b[32m(stdout)\x1b[0m " + help_test + "\n"
+        expected_stdout = mock.call("\x1b[32m(stdout)\x1b[0m", help_test)
         run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=0,
                          stdout=bytes(help_test.encode()), stderr=b"")
         # Act
         with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
-            with io.StringIO() as buf:
-                with contextlib.redirect_stdout(buf):
-                    print_adbasic_compiler_help(self.adwin_dir[sys.platform], "T11")
+            with mock.patch("builtins.print") as print_patch:
+                print_adbasic_compiler_help(self.adwin_dir[sys.platform], "T11")
 
-                stdout_result = buf.getvalue()
-
-        # Assert
-        self.assertEqual(stdout_result, expected_stdout)
+            print_patch.assert_has_calls([expected_stdout])
 
     def test_print_adbasic_compiler_help_T12(self):
         """Test that print_adbasic_compiler_help() works on linux and windows"""
         # Arrange
         adbasic_arguments = ["/P12", "/H"]
         help_test = "adbasic compiler help text\n"
-        expected_stdout = "\x1b[32m(stdout)\x1b[0m " + help_test + "\n"
+        expected_stdout = mock.call("\x1b[32m(stdout)\x1b[0m", help_test)
         run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=0,
                          stdout=bytes(help_test.encode()), stderr=b"")
         # Act
         with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
-            with io.StringIO() as buf:
-                with contextlib.redirect_stdout(buf):
-                    print_adbasic_compiler_help(self.adwin_dir[sys.platform], "T12")
+            with mock.patch("builtins.print") as print_patch:
+                print_adbasic_compiler_help(self.adwin_dir[sys.platform], "T12")
 
-                stdout_result = buf.getvalue()
-
-        # Assert
-        self.assertEqual(stdout_result, expected_stdout)
+            print_patch.assert_has_calls([expected_stdout])
 
     def test_print_adbasic_compiler_help_T121(self):
         """Test that print_adbasic_compiler_help() works on linux and windows"""
         # Arrange
         adbasic_arguments = ["/P121", "/H"]
         help_test = "adbasic compiler help text\n"
-        expected_stdout = "\x1b[32m(stdout)\x1b[0m " + help_test + "\n"
+        expected_stdout = mock.call("\x1b[32m(stdout)\x1b[0m", help_test)
         run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=0,
                          stdout=bytes(help_test.encode()), stderr=b"")
         # Act
         with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
-            with io.StringIO() as buf:
-                with contextlib.redirect_stdout(buf):
-                    print_adbasic_compiler_help(self.adwin_dir[sys.platform], "T12.1")
+            with mock.patch("builtins.print") as print_patch:
+                print_adbasic_compiler_help(self.adwin_dir[sys.platform], "T12.1")
 
-                stdout_result = buf.getvalue()
-
-        # Assert
-        self.assertEqual(stdout_result, expected_stdout)
+            print_patch.assert_has_calls([expected_stdout])
 
 
 class TestCompileProgram(unittest.TestCase):

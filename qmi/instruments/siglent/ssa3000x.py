@@ -26,7 +26,7 @@ class SSA3000X(QMI_Instrument):
     _TRACE_FORMATS = [_ASCii, _FLOAT]
 
     _RESP_TERMINATOR = "\n"  # Responses have this unconventional terminator
-    _TIMEOUT = 2.0  # Can't find value in datasheet. This is best guess.
+    _TIMEOUT = 2.0  # Can't find value in datasheet. This is best guess, based on testing.
 
     _CHANNEL_COUNT = 4
 
@@ -48,7 +48,7 @@ class SSA3000X(QMI_Instrument):
         _logger.info("Opening connection to instrument")
         self._transport.open()
 
-        time.sleep(2.0)  # determined based on testing
+        time.sleep(self._TIMEOUT)
         self._transport.discard_read()  # discard welcome message
 
         super().open()
