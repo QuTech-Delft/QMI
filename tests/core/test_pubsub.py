@@ -808,7 +808,7 @@ class TestRemotePubSubQmi(unittest.TestCase):
     def setUp(self):
 
         # Initialize two QMI contexts. Use random numbers to avoid conflicts on server between contexts.
-        random_port = random.randint(1000, 30000)
+        random_port = random.randint(1024, 30000)
         random_context = random.randint(3, 100)
         self.random_context_1 = f"context{random_context}"
         self.random_context_2 = f"context{random_context + 1}"
