@@ -851,19 +851,44 @@ class TestQmiSerialTransportMethods(unittest.TestCase):
 class TestQmiUsbTmcTransport(unittest.TestCase):
 
     def test_correct_construction(self):
-        QMI_UsbTmcTransport(0x0699, 0x3000, "XYZ")
-        QMI_UsbTmcTransport(1689, 12288, "XYZ")
+        vendorid = 0x0699
+        productid = 0x3000
+        serialnr = "XYZ"
+        exp_trnsprt = f"QMI_UsbTmcTransport 0x{vendorid:04x}:0x{productid:04x} ({serialnr})"
+        # Make two transports, one with hex input and other with int input
+        trnsprt_1 = QMI_UsbTmcTransport(vendorid, productid, "XYZ")
+        trnsprt_2 = QMI_UsbTmcTransport(1689, 12288, "XYZ")  # Same values but in int
+        # Assert that transport string should be always formatted with hex numbers
+        self.assertEqual(exp_trnsprt, str(trnsprt_1))
+        self.assertEqual(exp_trnsprt, str(trnsprt_2))
 
     def test_invalid_vendor_id(self):
+        """Test _validate_vendor_id method."""
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UsbTmcTransport(0xfcafe, 0xbebe, "foo")
+            QMI_UsbTmcTransport(0xfcafe, 0xbebe, "bar")
 
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
             QMI_UsbTmcTransport(-1, 0xbebe, "foo")
 
     def test_invalid_product_id(self):
+        """Test _validate_product_id method."""
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UsbTmcTransport(0xfcafe, 0xbebe, "foo")
+            QMI_UsbTmcTransport(0xbebe, 0xfcafe, "bar")
+
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            QMI_UsbTmcTransport(0xbebe, -1, "foo")
+
+    def test_not_implemented_methods(self):
+        """Test not implemented functions raise NotImplementedError"""
+        transport = QMI_UsbTmcTransport(1689, 12288, "XYZ")
+        with self.assertRaises(NotImplementedError):
+            transport.write(b"no_data")
+
+        with self.assertRaises(NotImplementedError):
+            transport._read_message(None)
+
+        with self.assertRaises(NotImplementedError):
+            transport.list_resources()
 
 
 class TestQmiVxi11TransportInit(unittest.TestCase):

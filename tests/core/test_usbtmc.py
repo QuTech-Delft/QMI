@@ -390,7 +390,7 @@ class OpenCloseMethodsTestCase(unittest.TestCase):
         self.assertEqual(expected_support_term_char, self.dev.support_term_char)
 
     def test_closing_default_mock_device(self):
-        """Test opening the default mock device."""
+        """Test closing the default mock device."""
         self.dev.reattach.append("nep")
         self.mock_instr.attach_kernel_driver = unittest.mock.MagicMock()
         # Should close immediately
@@ -1043,6 +1043,39 @@ class AdvantestTestCase(unittest.TestCase):
 
         myid = self.dev.advantest_read_myid()
         self.assertEqual(excepted, myid)
+
+
+class ListResourcesTestCase(unittest.TestCase):
+    """Test the list_resources function."""
+    def test_list_resources(self):
+        # Create mock Agilent device objects
+        agilent_vendor_id = 0x0957
+        agilent_product_id = [0x2818, 0x4218, 0x4418]
+        agilent_fw_update_mode_prod_id = [0x2918, 0x4118, 0x4318]
+        agilent_serial_nrs = ["90", "91", "92"]
+        # Agilent default U2701A
+        mock_instr_a = MockUsbtmcInstrument(serial=agilent_serial_nrs[0])
+        # Agilent U2722A
+        mock_instr_b = MockUsbtmcInstrument(product=agilent_product_id[1], serial=agilent_serial_nrs[1])
+        # Agilent U2723A
+        mock_instr_c = MockUsbtmcInstrument(product=agilent_product_id[2], serial=agilent_serial_nrs[2])
+        # Create a mock Advantest device object with no serial number
+        advantest_vendor_id = 0x1334
+        advantest_product_id = 0x0
+        mock_instr = MockUsbtmcInstrument(advantest_vendor_id, advantest_product_id, serial=None)
+        usb_core_mock.find = lambda find_all, custom_match: [
+            mock_instr_a, mock_instr_b, mock_instr_c, mock_instr
+        ]
+        # Expected resources found
+        visa_str_1 = f"USB::{agilent_vendor_id}::{agilent_fw_update_mode_prod_id[0]}::{agilent_serial_nrs[0]}::INSTR"
+        visa_str_2 = f"USB::{agilent_vendor_id}::{agilent_fw_update_mode_prod_id[1]}::{agilent_serial_nrs[1]}::INSTR"
+        visa_str_3 = f"USB::{agilent_vendor_id}::{agilent_fw_update_mode_prod_id[2]}::{agilent_serial_nrs[2]}::INSTR"
+        visa_str_4 = f"USB::{advantest_vendor_id}::{advantest_product_id}::INSTR"
+        expected_resources = [visa_str_1, visa_str_2, visa_str_3, visa_str_4]
+        # Act
+        resources = list_resources()
+        # Assert
+        self.assertListEqual(expected_resources, resources)
 
 
 if __name__ == '__main__':

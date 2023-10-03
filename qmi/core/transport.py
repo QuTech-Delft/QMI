@@ -816,7 +816,7 @@ class QMI_UsbTmcTransport(QMI_Transport):
             raise QMI_TransportDescriptorException("Missing/bad USB vendor ID {}".format(vendorid))
 
     def __str__(self) -> str:
-        return "QMI_UsbTmcTransport 0x{:04x}:0x{:04x} ({})".format(self.vendorid, self.productid, self.serialnr)
+        return f"QMI_UsbTmcTransport 0x{self.vendorid:04x}:0x{self.productid:04x} ({self.serialnr})"
 
     def close(self) -> None:
         _logger.debug("Closing USBTMC device 0x%04x:0x%04x (%s)", self.vendorid, self.productid, self.serialnr)
