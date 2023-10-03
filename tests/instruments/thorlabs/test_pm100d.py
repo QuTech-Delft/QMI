@@ -22,15 +22,16 @@ class TestThorlabsPM10x(unittest.TestCase):
         qmi_context = unittest.mock.MagicMock(spec=QMI_Context)
         qmi_context.name = "mock_context"
 
+        self.vendor_id = "0x1313"
         self.product = "PM16_120"
         self.product_id = "0x807b"
         self.serialnr = "P0024208"
-        transport_id = f"usbtmc:vendorid=0x1313:productid={self.product_id}:serialnr={self.serialnr}"
+        transport_id = f"usbtmc:vendorid={self.vendor_id}:productid={self.product_id}:serialnr={self.serialnr}"
         with unittest.mock.patch("qmi.instruments.thorlabs.pm100d.create_transport") as self._transport:
             self.thorlabs = Thorlabs_PM10x(qmi_context, "powermeter", transport_id)
 
     def test_open_close(self):
-        expected = f"USB::0x1313::{self.product_id}::{self.serialnr}" + "::INSTR"
+        expected = f"USB::{self.vendor_id}::{self.product_id}::{self.serialnr}" + "::INSTR"
         self.thorlabs.open()
         self.thorlabs.close()
         self._transport.called_once_with(expected)
@@ -38,8 +39,8 @@ class TestThorlabsPM10x(unittest.TestCase):
     @unittest.mock.patch("qmi.core.scpi_protocol.ScpiProtocol.ask")
     def test_get_idn(self, mock_read):
         """See that the get_idn method returns the expected QMI_InstrumentIdentification object"""
-        mock_read.return_value = f"vendor=0x1313,model={self.product},serial={self.serialnr},version=1.2.3"
-        expected_vendor = "vendor=0x1313"
+        mock_read.return_value = f"vendor={self.vendor_id},model={self.product},serial={self.serialnr},version=1.2.3"
+        expected_vendor = f"vendor={self.vendor_id}"
         expected_model = f"model={self.product}"
         expected_serial = f"serial={self.serialnr}"
         expected_version = "version=1.2.3"
@@ -56,7 +57,7 @@ class TestThorlabsPM10x(unittest.TestCase):
     @unittest.mock.patch("qmi.core.scpi_protocol.ScpiProtocol.ask")
     def test_get_idn_error(self, mock_read):
         """See that the get_idn method raises an exception at wrong number of returned words"""
-        mock_read.return_value = f"vendor=0x1313,model={self.product},serial={self.serialnr}"
+        mock_read.return_value = f"vendor={self.vendor_id},model={self.product},serial={self.serialnr}"
 
         with self.assertRaises(QMI_InstrumentException):
             self.thorlabs.open()

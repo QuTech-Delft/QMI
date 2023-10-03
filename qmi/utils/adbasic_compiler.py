@@ -510,6 +510,7 @@ def main():
                                      args.trigger,
                                      args.process_number,
                                      args.processor_type,
+                                     hardware_type=args.hardware_type,
                                      priority=PRIO_HIGH,
                                      working_dir=None,
                                      keep_c_files=args.keep_c_files,

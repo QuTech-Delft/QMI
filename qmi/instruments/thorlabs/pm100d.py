@@ -33,7 +33,8 @@ class Thorlabs_PM10x(QMI_Instrument):
 
     This driver is also compatible with the Thorlabs PM16-120.
     """
-    USB_VENDOR_ID = 0x1313
+    VENDOR_ID = 0x1313  # Thorlabs' vendor ID.
+    PRODUCT_ID = 0x0000  # To be overridden by deriving subclasses.
 
     # Default response timeout in seconds.
     DEFAULT_RESPONSE_TIMEOUT = 5.0
@@ -46,11 +47,11 @@ class Thorlabs_PM10x(QMI_Instrument):
         for desc_str in list_usbtmc_transports():
             if parser.match_interface(desc_str):
                 parameters = parser.parse_parameter_strings(desc_str)
-                if parameters.get("vendorid") == Thorlabs_PM100D.USB_VENDOR_ID and \
-                        parameters.get("productid") in (Thorlabs_PM100D.USB_PRODUCT_ID_PM100D,
-                                                        Thorlabs_PM100USB.USB_PRODUCT_ID_PM100USB,
-                                                        Thorlabs_PM101U.USB_PRODUCT_ID_PM101U,
-                                                        Thorlabs_PM16_120.USB_PRODUCT_ID_PM16_120):
+                if parameters.get("vendorid") == Thorlabs_PM100D.VENDOR_ID and \
+                        parameters.get("productid") in (Thorlabs_PM100D.PRODUCT_ID,
+                                                        Thorlabs_PM100USB.PRODUCT_ID,
+                                                        Thorlabs_PM101U.PRODUCT_ID,
+                                                        Thorlabs_PM16_120.PRODUCT_ID):
                     devices.append(desc_str)
         return devices
 
@@ -214,19 +215,19 @@ class Thorlabs_PM10x(QMI_Instrument):
 
 class Thorlabs_PM100D(Thorlabs_PM10x):
     """Alias class for PM100D; uses the interface of PM10x."""
-    USB_PRODUCT_ID_PM100D = 0x8078
+    PRODUCT_ID = 0x8078
 
 
 class Thorlabs_PM100USB(Thorlabs_PM10x):
     """Alias class for PM100USB; uses the interface of PM10x."""
-    USB_PRODUCT_ID_PM100USB = 0x8072
+    PRODUCT_ID = 0x8072
 
 
 class Thorlabs_PM101U(Thorlabs_PM10x):
     """Alias class for PM101U; uses the interface of PM10x."""
-    USB_PRODUCT_ID_PM101U = 0x8076
+    PRODUCT_ID = 0x8076
 
 
 class Thorlabs_PM16_120(Thorlabs_PM10x):
     """Alias class for PM16_120; uses the interface of PM10x."""
-    USB_PRODUCT_ID_PM16_120 = 0x807b
+    PRODUCT_ID = 0x807b

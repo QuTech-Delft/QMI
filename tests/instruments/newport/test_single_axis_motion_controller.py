@@ -279,7 +279,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.ask.return_value = "@"
 
         with self.assertRaises(QMI_InstrumentException):
-            self.instr.move_absolute(0.0000000001)
+            self.instr.move_absolute(-1)
 
         self._scpi_mock.write.assert_not_called()
 
@@ -365,6 +365,13 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self._scpi_mock.write.assert_not_called()
         self._scpi_mock.ask.assert_any_call("2TS\r\n")
+
+    def test_move_relative_less_than_min_throws_exception(self):
+        """Test move relative less than min."""
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.move_relative(0.0000000001)
+
+        self._scpi_mock.write.assert_not_called()
 
     def test_get_motion_time(self):
         """Test get motion time."""
@@ -953,7 +960,7 @@ class TestSingleAxisMotionController(unittest.TestCase):
         ]
 
         self.instr.set_peak_current_limit(limit)
-        
+
         self._scpi_mock.write.assert_has_calls(expected_write_calls)
         self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
 

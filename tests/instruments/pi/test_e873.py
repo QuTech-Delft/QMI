@@ -2,9 +2,7 @@ import unittest
 from unittest.mock import MagicMock, call, patch
 
 from string import punctuation
-from typing import cast
 
-import qmi
 from qmi.core.transport import QMI_TcpTransport
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.instruments.pi import PI_E873, ReferenceTarget
@@ -12,19 +10,15 @@ from qmi.instruments.pi import PI_E873, ReferenceTarget
 
 class TestE8738(unittest.TestCase):
     def setUp(self):
-        qmi.start("TestContext")
         self._transport_mock = MagicMock(spec=QMI_TcpTransport)
         with patch(
             "qmi.instruments.pi.e873.create_transport",
-            return_value=self._transport_mock,
+            MagicMock(return_value=self._transport_mock),
         ):
-            self.instr: PI_E873 = qmi.make_instrument(
-                "instr", PI_E873, "transport_descriptor"
-            )
-            self.instr = cast(PI_E873, self.instr)
+            self.instr = PI_E873(MagicMock(), "instr", "transport_descriptor")
 
     def tearDown(self):
-        qmi.stop()
+        self.instr = None
 
     def _instr_open(self):
         """Open the instrument and clear the write mocked calls."""
@@ -91,7 +85,9 @@ class TestE8738(unittest.TestCase):
         r = function()
         self.instr.close()
 
-        self._transport_mock.write.assert_called_once_with(f"{command} 1\n".encode("UTF-8"))
+        self._transport_mock.write.assert_called_once_with(
+            f"{command} 1\n".encode("UTF-8")
+        )
         self.assertEqual(r, 0.001)
 
     def _test_bool_set_cmd_function(self, function, command):
@@ -110,7 +106,9 @@ class TestE8738(unittest.TestCase):
         r = function()
         self.instr.close()
 
-        self._transport_mock.write.assert_called_once_with(f"{command} 1\n".encode("UTF-8"))
+        self._transport_mock.write.assert_called_once_with(
+            f"{command} 1\n".encode("UTF-8")
+        )
         self.assertEqual(r, 1)
 
     def _test_dig_out_invalid(self, function, *args, **kwargs):
@@ -421,7 +419,6 @@ class TestE8738(unittest.TestCase):
         ]
         r = self.instr.wait_motion_complete()
         self.instr.close()
-
         self.assertEqual(r, True)
 
     def test_wait_motion_complete_timeout(self):

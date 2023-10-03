@@ -22,6 +22,7 @@ class TestMultiHarpEventFilter(unittest.TestCase):
 
     # Reduced limit on maximum pending events to make it easier to test.
     PATCHED_MAX_PENDING_EVENTS = 100000
+    PATCHED_MAX_EVENTS_PER_CALL = 500000  # Should be less than TTREADMAX
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -129,7 +130,8 @@ class TestMultiHarpEventFilter(unittest.TestCase):
         self._ctx = QMI_Context("multiharp_eventfilter_test")
         self._ctx.start()
 
-        # Create instrument instance.
+        # Create instrument instance. Limit MAX calls to avoid problems.
+        PicoQuant_MultiHarp150.MAX_EVENTS_PER_CALL = self.PATCHED_MAX_EVENTS_PER_CALL
         if self._testMethodName == "test_pending_events_limit":
             self._multiharp = self._ctx.make_instrument("multiharp", PicoQuant_MultiHarp150, "1111111",
                                                         max_pending_events=self.PATCHED_MAX_PENDING_EVENTS)
@@ -494,7 +496,7 @@ class TestMultiHarpEventFilter(unittest.TestCase):
 
         # Check events.
         self.assertIsInstance(events, np.ndarray)
-        self.assertIs(events.dtype, EventDataType)
+        self.assertEqual(events.dtype, EventDataType)
         self.assertEqual(len(events), events_per_call)
         self.assertTrue(np.all(events == events_in[:events_per_call]))
 
@@ -511,7 +513,7 @@ class TestMultiHarpEventFilter(unittest.TestCase):
         # Check no further events.
         events = self._multiharp.get_events()
         self.assertIsInstance(events, np.ndarray)
-        self.assertIs(events.dtype, EventDataType)
+        self.assertEqual(events.dtype, EventDataType)
         self.assertEqual(len(events), 0)
 
     def test_pending_events_limit(self):
@@ -547,7 +549,7 @@ class TestMultiHarpEventFilter(unittest.TestCase):
         events_in["timestamp"] = np.cumsum(np.random.randint(1, 1000, len(events_in)))
 
         # Repatch the readFifo() function to feed the new events into the running measurement.
-        # This should will cause the pending event buffer to overflow.
+        # This should/will cause the pending event buffer to overflow.
         fifo_words_in = self.events_to_fifo(events_in)
         done_event = threading.Event()
         self._library_mock.ReadFiFo.side_effect = self.make_patched_read_fifo(fifo_words_in, done_event)
