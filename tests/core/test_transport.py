@@ -960,14 +960,16 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         Expecting:
             Bytes read from VXI11 instrument has been passed untouched.
         """
-        self.mock().timeout = 10.0  # default timeout
+        # Arrange
         expected_read = b"a1b2c3d4"
         nbytes = len(expected_read)
-        self.mock().read_raw.side_effect = [chr(c).encode() for c in expected_read]
+        # Making data to be a bytearray, it gets all read in one go, not byte-per-byte.
+        self.mock().read_raw.side_effect = [bytearray(expected_read)]
+        # Act
         data = self.instr.read(nbytes)
-        self.assertAlmostEqual(self.mock().timeout, 10.0)
-        self.assertEqual(nbytes, self.mock().read_raw.call_count)
+        # Assert
         self.assertEqual(expected_read, data)
+        self.mock().read_raw.assert_called_once_with(1)
 
     def test_read_buffer_already_filled(self):
         """Test reading from VXI11 instrument with already filled buffer.
@@ -995,23 +997,29 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.mock().timeout = 10.0  # default timeout
         self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(err=15, note="Test error!")
         with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
-            _ = self.instr.read(nbytes=8, timeout=0.5)
+            self.instr.read(nbytes=8, timeout=0.5)
 
         # Assert that the timeout is restored
         self.assertAlmostEqual(self.mock().timeout, 10.0)
         self.mock().read_raw.assert_called_once_with(1)
 
     def test_read_error(self):
-        """Test exception during read.
+        """Test exception during read. See that the _read_buffer contains data until exception.
 
         Expecting:
-            QMI_EnfOfInputException is raised
+            A few bytes are read.
+            QMI_EndOfInputException is raised.
+            The read bytes remain in the buffer and are not discarded.
         """
-        self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(note="Test error!")
+        # Arrange
+        test_string = b"test"
+        self.mock().read_raw.side_effect = [bytearray(test_string)] +\
+           [vxi11.vxi11.Vxi11Exception(note="Test error!")]
         with self.assertRaises(qmi.core.exceptions.QMI_EndOfInputException):
-            _ = self.instr.read(8)
+            self.instr.read(8, 0.1)  # Try to read 8 bytes
 
-        self.mock().read_raw.assert_called_once_with(1)
+        self.assertEqual(test_string, self.instr._read_buffer)
+        self.assertEqual(2, self.mock().read_raw.call_count)
 
     def test_read_until(self):
         """Test read_until message terminator command.

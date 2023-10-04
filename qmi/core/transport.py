@@ -1104,7 +1104,6 @@ class QMI_Vxi11Transport(QMI_Transport):
                 if err.err == 15:
                     break
                 else:
-                    _logger.debug(f"VXI-11 protocol exception with discarding data {self._read_buffer}")
                     self._safe_instr.timeout = old_timeout
                     raise QMI_InstrumentException("Error attempting to read a byte") from err
 
