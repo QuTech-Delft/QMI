@@ -20,8 +20,7 @@ from qmi.core.rpc import rpc_method
 
 
 class Dummy_USBTMCInstrument(QMI_Instrument):
-    """ Dummy Instrument driver using USBTMC transport.
-    """
+    """Dummy Instrument driver using USBTMC transport."""
 
     USB_VENDOR_ID = 0x1313
     USB_PRODUCT_ID = 0x8076
@@ -198,7 +197,7 @@ class TestQmiTransportFactory(unittest.TestCase):
 
 
 class TestTransportOpenWithDummyInstrument(unittest.TestCase):
-    """ Test various 'open' cases with a dummy instrument """
+    """Test various 'open' cases with a dummy instrument """
     def setUp(self) -> None:
         # Create TCP server socket.
         self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
@@ -237,7 +236,7 @@ class TestTransportOpenWithDummyInstrument(unittest.TestCase):
 
 
 class TestQmiTransportParsing(unittest.TestCase):
-    """ Test QMI Transport parsing on different OS."""
+    """Test QMI Transport parsing on different OS."""
 
     def setUp(self):
         # Create TCP server socket.
@@ -869,18 +868,18 @@ class TestQmiVxi11TransportInit(unittest.TestCase):
 
     @unittest.mock.patch("qmi.core.transport.vxi11.Instrument")
     def test_init(self, mock: unittest.mock.Mock):
-        """ The init of the transport only saves the arguments, the instrument is created only at open. """
+        """The init of the transport only saves the arguments, the instrument is created only at open. """
         QMI_Vxi11Transport("localhost")
         mock.assert_not_called()
 
     def test_init_invalid_host(self):
-        """ The init will raise an exception due to invalid host. """
+        """The init will raise an exception due to invalid host. """
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
             QMI_Vxi11Transport("-invalid-host")
 
     @unittest.mock.patch("qmi.core.transport.vxi11.Instrument")
     def test_open(self, mock: unittest.mock.Mock):
-        """ Test open of device.
+        """Test open of device.
 
         Expecting:
             The instrument to be made with host.
@@ -894,7 +893,7 @@ class TestQmiVxi11TransportInit(unittest.TestCase):
 
     @unittest.mock.patch("qmi.core.transport.vxi11.Instrument")
     def test_open_vxi11_error(self, mock: unittest.mock.Mock):
-        """ Test open with VXI11 error.
+        """Test open with VXI11 error.
 
         Expecting:
             QMI_InstrumentException has wrapped the internal error.
@@ -906,7 +905,7 @@ class TestQmiVxi11TransportInit(unittest.TestCase):
 
     @unittest.mock.patch("qmi.core.transport.vxi11.Instrument")
     def test_close(self, mock: unittest.mock.Mock):
-        """ Test close of the transport.
+        """Test close of the transport.
 
         Expecting:
             The underlying VXI11 instrument to be closed.
@@ -918,7 +917,7 @@ class TestQmiVxi11TransportInit(unittest.TestCase):
 
     @unittest.mock.patch("qmi.core.transport.vxi11.Instrument")
     def test_close_vxi11_error(self, mock: unittest.mock.Mock):
-        """ Test close with VXI11 error.
+        """Test close with VXI11 error.
 
         Expecting:
             QMI_InstrumentException has wrapped the internal error.
@@ -941,7 +940,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.instr.open()
 
     def test_write(self):
-        """ Test writing to VXI11 instrument
+        """Test writing to VXI11 instrument
 
         Expecting:
             Bytes has been passed untouched to vxi11 instrument.
@@ -950,50 +949,72 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.mock().write_raw.assert_called_once_with(unittest.mock.sentinel.data)
 
     def test_write_error(self):
-        """ Test exception during writing. """
+        """Test exception during writing. """
         self.mock().write_raw.side_effect = vxi11.vxi11.Vxi11Exception(note="Test error!")
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             self.instr.write(unittest.mock.sentinel.data)
 
     def test_read(self):
-        """ Test reading from VXI11 instrument
+        """Test reading from VXI11 instrument.
 
         Expecting:
-            Timeout is set.
             Bytes read from VXI11 instrument has been passed untouched.
-            Timeout is reverted
         """
         self.mock().timeout = 10.0  # default timeout
         expected_read = b"a1b2c3d4"
         nbytes = len(expected_read)
         self.mock().read_raw.side_effect = [chr(c).encode() for c in expected_read]
-        data = self.instr.read(nbytes, 1.5)
+        data = self.instr.read(nbytes)
         self.assertAlmostEqual(self.mock().timeout, 10.0)
         self.assertEqual(nbytes, self.mock().read_raw.call_count)
         self.assertEqual(expected_read, data)
 
-    def test_read_timeout(self):
-        """ Test timeout exception during read.
+    def test_read_buffer_already_filled(self):
+        """Test reading from VXI11 instrument with already filled buffer.
 
         Expecting:
-            QMI_TimeoutException is raised
+            Data is returned from the already filled buffer.
+            read_raw() is not called.
         """
+        expected_read = b"a1b2c3d4"
+        nbytes = len(expected_read)
+        self.instr._read_buffer = expected_read + b"\n"
+        data = self.instr.read(nbytes)
+        # Assert
+        self.mock().read_raw.assert_not_called()
+        self.assertEqual(expected_read, data)
+
+    def test_read_timeout(self):
+        """Test timeout exception during read.
+
+        Expecting:
+            Timeout is set.
+            QMI_TimeoutException is raised.
+            Timeout is reverted to default.
+        """
+        self.mock().timeout = 10.0  # default timeout
         self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(err=15, note="Test error!")
         with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
             _ = self.instr.read(nbytes=8, timeout=0.5)
 
+        # Assert that the timeout is restored
+        self.assertAlmostEqual(self.mock().timeout, 10.0)
+        self.mock().read_raw.assert_called_once_with(1)
+
     def test_read_error(self):
-        """ Test exception during read.
+        """Test exception during read.
 
         Expecting:
-            QMI_InstrumentException is raised
+            QMI_EnfOfInputException is raised
         """
         self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(note="Test error!")
         with self.assertRaises(qmi.core.exceptions.QMI_EndOfInputException):
-            _ = self.instr.read(8, 1.5)
+            _ = self.instr.read(8)
+
+        self.mock().read_raw.assert_called_once_with(1)
 
     def test_read_until(self):
-        """ Test read_until message terminator command.
+        """Test read_until message terminator command.
 
         Expecting:
             Default timeout isn't changed after call
@@ -1008,8 +1029,45 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.assertEqual(len(test_string), self.mock().read_raw.call_count)
         self.assertEqual(test_string, data)
 
+    def test_read_until_buffer_already_filled(self):
+        """Test read_until with buffer already filled.
+
+        Expecting:
+            Data is returned from buffer.
+            read_raw() is not called.
+        """
+        test_string = "test\n".encode("utf-8")
+        self.instr._read_buffer = test_string
+        data = self.instr.read_until(message_terminator="\n".encode("utf-8"))
+        # Assert
+        self.mock().read_raw.assert_not_called()
+        self.assertEqual(test_string.strip(), data)
+
+    def test_read_until_invalid_term_char(self):
+        """Test that a too long terminator raises an error. """
+        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
+            _ = self.instr.read_until(message_terminator=bytes("error", "utf-8"), timeout=None)
+
+    def test_read_until_error(self):
+        """Tests whether instrument error raises a QMI instrument exception. """
+        self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(note="Test error!")
+        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
+            _ = self.instr.read_until(message_terminator=bytes("\n", "utf-8"), timeout=None)
+
+    def test_read_until_timeout_exception(self):
+        """Tests whether an instrument timeout raises a QMI timeout exception. """
+        self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(err=15, note="Test error!")
+        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
+            _ = self.instr.read_until(message_terminator=bytes("\n", "utf-8"), timeout=None)
+
+    def test_read_until_missing_term_char(self):
+        """Tests whether the function catches a missing terminator from instrument. """
+        self.mock().read_raw.side_effect = [b"test", vxi11.vxi11.Vxi11Exception(err=15, note="Test error!")]
+        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
+            _ = self.instr.read_until(message_terminator=bytes("\n", "utf-8"), timeout=0.001)
+
     def test_read_until_timeout(self):
-        """ Test read_until_timeout works exactly like read.
+        """Test read_until_timeout works exactly like read.
 
         Expecting:
             Timeout is set.
@@ -1020,51 +1078,53 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         expected_read = b"a1b2c3d4"
         nbytes = len(expected_read)
         self.mock().read_raw.side_effect = [chr(c).encode() for c in expected_read]
-        data = self.instr.read(nbytes, 1.5)
+        data = self.instr.read_until_timeout(nbytes, 1.5)
         self.assertAlmostEqual(self.mock().timeout, 10.0)
         self.assertEqual(nbytes, self.mock().read_raw.call_count)
         self.assertEqual(expected_read, data)
 
-    def test_read_until_invalid_term_char(self):
-        """ Test that a too long terminator raises an error. """
-        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
-            _ = self.instr.read_until(message_terminator=bytes("error", "utf-8"), timeout=None)
-
-    def test_read_until_error(self):
-        """ Tests whether instrument error raises a QMI instrument exception. """
-        self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(note="Test error!")
-        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
-            _ = self.instr.read_until(message_terminator=bytes("\n", "utf-8"), timeout=None)
-
-    def test_read_until_timeout_exception(self):
-        """ Tests whether an instrument timeout raises a QMI timeout exception. """
-        self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(err=15, note="Test error!")
-        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
-            _ = self.instr.read_until(message_terminator=bytes("\n", "utf-8"), timeout=None)
-
-    def test_read_until_missing_term_char(self):
-        """ Tests whether the function catches a missing terminator from instrument. """
-        self.mock().read_raw.side_effect = [b"test", vxi11.vxi11.Vxi11Exception(err=15, note="Test error!")]
-        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
-            _ = self.instr.read_until(message_terminator=bytes("\n", "utf-8"), timeout=0.001)
-
-    def test_discard_read(self):
-        """ Test discard_read command.
+    def test_discard_read_vxi11exception(self):
+        """Test discard_read command.
 
         Expecting:
-            Data before timeout is discarded
-            Timeout shouldn't raise exception
-            Data after timeout is not lost
+            Data before timeout is discarded.
+            Vxi11Exception number 15 only breaks the while loop.
+            Data after timeout is not lost.
         """
+        # Arrange
+        discard_string = b"discard\r\n"
         test_string = b"test"
-        self.mock().read_raw.side_effect = [bytearray(test_string)] +\
-            [vxi11.vxi11.Vxi11Exception(err=15, note="Test error!")] + [test_string]
+        self.mock().read_raw.side_effect = [bytearray(discard_string)] +\
+            [vxi11.vxi11.Vxi11Exception(err=15, note="Test error!")] +\
+            [test_string]
+        # Act
         self.instr.discard_read()
-        data = self.instr.read(len(test_string), 1.5)
-        self.assertEqual(data, test_string)
+        data = self.instr.read(len(test_string))
+        # Assert
+        self.assertEqual(test_string, data)
 
-    def test_discard_read_error(self):
-        """ Test whether instrument exception raises a QMI exception. """
+    def test_discard_read_timeouterror(self):
+        """Test discard_read command.
+
+        Expecting:
+            Data before timeout is discarded.
+            TimeoutError only breaks the while loop.
+            Data after timeout is not lost.
+        """
+        # Arrange
+        discard_string = b"discard\r\n"
+        test_string = b"test"
+        self.mock().read_raw.side_effect = [bytearray(discard_string)] +\
+            [TimeoutError("Timeout!")] +\
+            [test_string]
+        # Act
+        self.instr.discard_read()
+        data = self.instr.read(len(test_string))
+        # Assert
+        self.assertEqual(test_string, data)
+
+    def test_discard_read_exception(self):
+        """Test discard_read raises a QMI_InstrumentException for Vxi11Exception != 15."""
         self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(note="Test error!")
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             self.instr.discard_read()

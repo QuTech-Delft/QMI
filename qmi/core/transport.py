@@ -1006,7 +1006,7 @@ class QMI_Vxi11Transport(QMI_Transport):
         except vxi11.vxi11.Vxi11Exception as err:
             raise QMI_InstrumentException() from err
 
-    def read(self, nbytes: int, timeout: Optional[float]) -> bytes:
+    def read(self, nbytes: int, timeout: Optional[float] = None) -> bytes:
         self._check_is_open()
         nbuf = len(self._read_buffer)
         if nbuf >= nbytes:
@@ -1037,7 +1037,7 @@ class QMI_Vxi11Transport(QMI_Transport):
         self._read_buffer = bytes()
         return ret
 
-    def read_until(self, message_terminator: bytes, timeout: Optional[float]) -> bytes:
+    def read_until(self, message_terminator: bytes, timeout: Optional[float] = None) -> bytes:
         self._check_is_open()
         if len(message_terminator) != 1:
             raise QMI_InstrumentException(
@@ -1093,10 +1093,12 @@ class QMI_Vxi11Transport(QMI_Transport):
     def discard_read(self) -> None:
         self._check_is_open()
         old_timeout = self._safe_instr.timeout
-        self._safe_instr.timeout = 0.0
+        self._safe_instr.timeout = 0.0  # Immediate read
+        # Clear any possible data in read buffer first
+        self._read_buffer = bytes()
         while True:
             try:
-                self._read_buffer += self._safe_instr.read_raw(1)
+                self._safe_instr.read_raw(1)
 
             except vxi11.vxi11.Vxi11Exception as err:
                 if err.err == 15:
@@ -1104,15 +1106,12 @@ class QMI_Vxi11Transport(QMI_Transport):
                 else:
                     _logger.debug(f"VXI-11 protocol exception with discarding data {self._read_buffer}")
                     self._safe_instr.timeout = old_timeout
-                    self._read_buffer = bytes()
                     raise QMI_InstrumentException("Error attempting to read a byte") from err
 
             except TimeoutError:
                 break
 
         self._safe_instr.timeout = old_timeout
-        _logger.debug(f"VXI-11 protocol discarding data {self._read_buffer}")
-        self._read_buffer = bytes()
 
 
 def list_usbtmc_transports() -> List[str]:
