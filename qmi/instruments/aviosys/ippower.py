@@ -58,12 +58,12 @@ def _parse_response(response):
     match = re.search(r"<p>(.*)</p>", payload.decode('utf-8'), re.DOTALL)
 
     if match is None:
-        raise ValueError("Invalid response")
+        raise ValueError("Invalid response.")
 
     try:
         message = match.group(1).strip()
     except IndexError as exc:
-        raise ValueError("Invalid response") from exc
+        raise ValueError("Invalid response.") from exc
 
     return message
 
@@ -73,6 +73,10 @@ def _parse_status_string(status_string):
     try:
         state_strings = re.findall(r"(p6[0-9]{1}=[01]{1})", status_string)
         states = {PowerSocket(p): PowerState(int(s)) for p, s in map(partial(str.split, sep='='), state_strings)}
+        # Also no match (empty dictionary 'states') should raise the exception
+        if len(states) == 0:
+            raise Exception
+
     except Exception as exc:
         raise QMI_InstrumentException("Instrument status string is invalid.") from exc
 
@@ -154,7 +158,7 @@ class IPPower9850(QMI_Instrument):
 
         if resp.status != 200:
             # This should not happen - exception should have been raised by urllib
-            raise QMI_InstrumentException("Unkown error in accessing device at {}".format(self._host))
+            raise QMI_InstrumentException("Unknown error in accessing device at {}".format(self._host))
 
         return super().open()
 
@@ -234,7 +238,7 @@ class IPPower9850(QMI_Instrument):
         """Turn off all channels.
 
         Returns:
-            True if all states were set to off successfully, False otherwise.
+            True if all states were set off successfully, False otherwise.
         """
         target_states = {channel: PowerState.OFF for channel in PowerSocket}
         return self.set_states(target_states)
@@ -244,7 +248,7 @@ class IPPower9850(QMI_Instrument):
         """Turn on all channels.
 
         Returns:
-            True if all states were set to off successfully, False otherwise.
+            True if all states were set on successfully, False otherwise.
         """
         target_states = {channel: PowerState.ON for channel in PowerSocket}
         return self.set_states(target_states)

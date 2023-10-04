@@ -23,8 +23,8 @@ class TestHydraHarpEventFilter(unittest.TestCase):
     # Reduced limit on maximum pending events to make it easier to test.
     PATCHED_MAX_PENDING_EVENTS = 1024
     PATCHED_MAX_EVENTS_PER_CALL = 100000  # Should be less than TTREADMAX
-    SYNC_FREQUENCY_32MHz = 32E6  # Use 32MHz sync frequency.
-    SYNC_FREQUENCY_5MHz = 5E6  # Use 5MHz sync frequency.
+    SYNC_FREQUENCY_32MHz = 32e6  # Use 32MHz sync frequency.
+    SYNC_FREQUENCY_5MHz = 5e6  # Use 5MHz sync frequency.
     RESOLUTION_LIMIT = 2**15 - 1   # Limit for 32768*R resolution limit
 
     def __init__(self, *args, **kwargs):
@@ -37,7 +37,8 @@ class TestHydraHarpEventFilter(unittest.TestCase):
             sync_rate=self.SYNC_FREQUENCY_32MHz,  # creates a sync period of 31250 < 2**15 - 1
             resolution=1,
             channels=[0, 1],
-            seed=2345)
+            seed=2345,
+        )
 
         self.events_in_4chan_resolution_1 = self.gen_random_events(
             num_events=50000,
@@ -45,7 +46,8 @@ class TestHydraHarpEventFilter(unittest.TestCase):
             sync_rate=self.SYNC_FREQUENCY_32MHz,
             resolution=1,
             channels=[0, 1, 2, 3],
-            seed=1234)
+            seed=1234,
+        )
 
     @staticmethod
     def gen_events(max_events, sync_period):
@@ -53,13 +55,15 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         events_in["type"] = 0
         events_in["timestamp"] = np.cumsum(np.random.randint(1, sync_period, max_events))
         # At each passing of a sync moment we need to add a sync signal
-        (inds,) = np.where((events_in["timestamp"] // sync_period >
-                            np.insert(events_in["timestamp"], 0, -1)[:-1] // sync_period))
+        (inds,) = np.where((
+            events_in["timestamp"] // sync_period > np.insert(events_in["timestamp"], 0, -1)[:-1] // sync_period
+        ))
         # And then insert the sync signals and cap the length
         events_in["type"] = np.insert(events_in["type"], inds - 1, np.array([64] * len(inds)))[:max_events]
-        events_in["timestamp"] = np.insert(events_in["timestamp"], inds - 1,
-                                           (events_in["timestamp"] // sync_period)[inds - 1] * sync_period
-                                           )[:max_events]
+        events_in["timestamp"] = np.insert(
+            events_in["timestamp"], inds - 1,
+            (events_in["timestamp"] // sync_period)[inds - 1] * sync_period
+        )[:max_events]
         events_in = events_in[np.lexsort((-1 * events_in["type"], events_in["timestamp"]))]
         # This can leave the last index wrong. Check.
         last_sync_index = -(events_in["type"][::-1].tolist().index(64) + 1)
@@ -80,7 +84,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         delta_times = delta_times.astype(np.uint64)
         event_timestamps = np.cumsum(delta_times)
 
-        sync_period = 1E12 / sync_rate
+        sync_period = 1e12 / sync_rate
         syncs_in_events = int(event_timestamps.max() // sync_period)
         sync_timestamps = np.linspace(0, sync_period * syncs_in_events, num=(syncs_in_events + 1))
         # Filter out only those syncs that have an event within sync range
@@ -128,7 +132,10 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         tmp_timestamps = tmp_timestamps[valid_ndx]
 
         # Insert overflow records at positions where the MSB part of the timestamp changes.
-        overflows = tmp_timestamps // sync_period // 1024 - np.insert(tmp_timestamps, 0, 0)[:-1] // sync_period // 1024
+        overflows = (
+            tmp_timestamps // sync_period // 1024
+            - np.insert(tmp_timestamps, 0, 0)[:-1] // sync_period // 1024
+        )
         (overflow_idx,) = np.where(overflows > 0)
         overflow_counts = overflows[overflow_idx]
         # Have to set counts, special bit (31 from this side) for overflow, and the channel number (63 for overflow)
@@ -170,7 +177,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
         function_names, _, _ = zip(*_hhlib_function_signatures)
-        stripped_names = [name.split('_')[1] for name in function_names]
+        stripped_names = [name.split("_")[1] for name in function_names]
         self._library_mock.mock_add_spec(stripped_names, spec_set=True)
 
         # Start QMI context.
@@ -180,16 +187,24 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         # Create instrument instance. Limit MAX calls to avoid problems.
         PicoQuant_HydraHarp400.MAX_EVENTS_PER_CALL = self.PATCHED_MAX_EVENTS_PER_CALL
         if self._testMethodName == "test_pending_events_limit":
-            self._hydraharp = self._ctx.make_instrument("hydraharp", PicoQuant_HydraHarp400, "1111111",
-                                                        max_pending_events=self.PATCHED_MAX_PENDING_EVENTS)
+            self._hydraharp = self._ctx.make_instrument(
+               "hydraharp",
+               PicoQuant_HydraHarp400,
+               "1111111",
+               max_pending_events=self.PATCHED_MAX_PENDING_EVENTS,
+            )
         else:
-            self._hydraharp = self._ctx.make_instrument("hydraharp", PicoQuant_HydraHarp400, "1111111")
+            self._hydraharp = self._ctx.make_instrument(
+                "hydraharp", PicoQuant_HydraHarp400, "1111111"
+            )
 
         self._library_mock.GetLibraryVersion.return_value = 0
         self._library_mock.OpenDevice.return_value = 0
 
-        string_buffer = ctypes.create_string_buffer(b'1111111')
-        with patch('sys.platform', 'linux1'), patch('ctypes.create_string_buffer', return_value=string_buffer):
+        string_buffer = ctypes.create_string_buffer(b"1111111")
+        with patch("sys.platform", "linux1"), patch(
+            "ctypes.create_string_buffer", return_value=string_buffer
+        ):
             self._hydraharp.open()
 
         self._hydraharp.initialize("T3", "EXTERNAL")
@@ -205,17 +220,17 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         """Simple test with default fixed sync frequency and resolution being 1ps."""
         # Events to use during this test. In T3 mode there is in principle one sync event per channel.
         # There are thus 1 sync event per sync period, which is 1/self.SYNC_FREQUENCY * 1E12 (2E5 ps at 5MHz)
-        sync_period = 1E12 / self.SYNC_FREQUENCY_5MHz
+        sync_period = 1e12 / self.SYNC_FREQUENCY_5MHz
         events_in = [
             (64, 0),
             (0, int(self.RESOLUTION_LIMIT // 3)),
             (1, int(self.RESOLUTION_LIMIT // 2)),
             (64, int(sync_period * 5000)),
-            (0,  int(sync_period * 5000 + self.RESOLUTION_LIMIT // 3)),
-            (0,  int(sync_period * 5000 + self.RESOLUTION_LIMIT // 2)),
+            (0, int(sync_period * 5000 + self.RESOLUTION_LIMIT // 3)),
+            (0, int(sync_period * 5000 + self.RESOLUTION_LIMIT // 2)),
             (64, int(sync_period * 6025)),
-            (1,  int(sync_period * 6025 + self.RESOLUTION_LIMIT // 4)),
-            (1,  int(sync_period * 6025 + self.RESOLUTION_LIMIT // 2))
+            (1, int(sync_period * 6025 + self.RESOLUTION_LIMIT // 4)),
+            (1, int(sync_period * 6025 + self.RESOLUTION_LIMIT // 2)),
         ]
 
         # Patch the readFifo() function.
@@ -226,7 +241,9 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         # Start the measurement.
         sync_rate = ctypes.c_int(int(self.SYNC_FREQUENCY_5MHz))
         resolution = ctypes.c_double(1.0)
-        with patch('ctypes.c_double', return_value=resolution), patch('ctypes.c_int', return_value=sync_rate):
+        with patch("ctypes.c_double", return_value=resolution), patch(
+            "ctypes.c_int", return_value=sync_rate
+        ):
             self._hydraharp.start_measurement(1000)
 
         # Wait to make sure all events are processed.
@@ -244,13 +261,13 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         self.assertIsInstance(events, np.ndarray)
         self.assertEqual(events.dtype, EventDataType)
         self.assertTrue(np.all(events == np.array(events_in, dtype=EventDataType)))
-    
+
     def test_resolution_simple(self):
         """Simple test with default fixed sync frequency and resolution being 1ps."""
         # Events to use during this test. In T3 mode there is in principle one sync event per channel.
         # There are thus 1 sync event per sync period, which is 1/self.SYNC_FREQUENCY * 1E12 (2E5 ps at 5MHz)
         sync_rate = ctypes.c_int(int(self.SYNC_FREQUENCY_5MHz))
-        sync_period = 1E12 / sync_rate.value
+        sync_period = 1e12 / sync_rate.value
         resolution = ctypes.c_double(2.0)
         events_in = [
             (64, 0),
@@ -261,7 +278,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
             (0, int(sync_period * 5000 + self.RESOLUTION_LIMIT // 3)),
             (64, int(sync_period * 6025)),
             (1, int(sync_period * 6025 + self.RESOLUTION_LIMIT // 5)),
-            (1, int(sync_period * 6025 + self.RESOLUTION_LIMIT // 3))
+            (1, int(sync_period * 6025 + self.RESOLUTION_LIMIT // 3)),
         ]
         expected_events = np.array(events_in, dtype=EventDataType)
         for e in (1, 4, 7):
@@ -273,7 +290,9 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         self._library_mock.ReadFiFo.side_effect = self.make_patched_read_fifo(fifo_words_in, done_event)
 
         # Start the measurement.
-        with patch('ctypes.c_double', return_value=resolution), patch('ctypes.c_int', return_value=sync_rate):
+        with patch("ctypes.c_double", return_value=resolution), patch(
+            "ctypes.c_int", return_value=sync_rate
+        ):
             self._hydraharp.start_measurement(1000)
 
         # Wait to make sure all events are processed.
@@ -299,7 +318,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         # Events to use during this test. In T3 mode there is in principle one sync event per channel.
         # There are thus 1 sync event per sync period, which is 1/self.SYNC_FREQUENCY * 1E12 (2E5 ps at 5MHz)
         sync_rate = ctypes.c_int(int(self.SYNC_FREQUENCY_5MHz))
-        sync_period = 1E12 / sync_rate.value
+        sync_period = 1e12 / sync_rate.value
         resolution = ctypes.c_double(4.0)
         events_in = [
             (64, 0),
@@ -323,7 +342,9 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         self._library_mock.ReadFiFo.side_effect = self.make_patched_read_fifo(fifo_words_in, done_event)
 
         # Start the measurement.
-        with patch('ctypes.c_double', return_value=resolution), patch('ctypes.c_int', return_value=sync_rate):
+        with patch("ctypes.c_double", return_value=resolution), patch(
+            "ctypes.c_int", return_value=sync_rate
+        ):
             self._hydraharp.start_measurement(1000)
 
         # Wait to make sure all events are processed.
@@ -341,12 +362,12 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         self.assertIsInstance(events, np.ndarray)
         self.assertEqual(events.dtype, EventDataType)
         self.assertTrue(np.all(events == expected_events))
-    
+
     def test_channel_filter(self):
         """Test filtering by setting channels 1 and 2 to be filtered out."""
         sync_rate = ctypes.c_int(int(self.SYNC_FREQUENCY_32MHz))
         resolution = ctypes.c_double(1.0)
-        sync_period = 1E12 / sync_rate.value
+        sync_period = 1e12 / sync_rate.value
         # Generate a random set of events.
         events_in = self.events_in_4chan_resolution_1
 
@@ -356,11 +377,14 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         self._library_mock.ReadFiFo.side_effect = self.make_patched_read_fifo(fifo_words_in, done_event)
 
         # Configure event filter: block events form channels 1 and 2.
-        self._hydraharp.set_event_filter(channel_filter={1: EventFilterMode.NO_EVENTS,
-                                                         2: EventFilterMode.NO_EVENTS})
+        self._hydraharp.set_event_filter(
+            channel_filter={1: EventFilterMode.NO_EVENTS, 2: EventFilterMode.NO_EVENTS}
+        )
 
         # Start the measurement.
-        with patch('ctypes.c_double', return_value=resolution), patch('ctypes.c_int', return_value=sync_rate):
+        with patch("ctypes.c_double", return_value=resolution), patch(
+            "ctypes.c_int", return_value=sync_rate
+        ):
             self._hydraharp.start_measurement(1000)
 
         # Wait to make sure all events are processed.
@@ -373,10 +397,14 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         events = self._hydraharp.get_events()
 
         # Expect only events on SYNC and channels 0 and 1. Also sort.
-        events_expected = events_in[(events_in["type"] == 64)
-                                    | (events_in["type"] == 0)
-                                    | (events_in["type"] == 3)]
-        events_expected = events_expected[np.lexsort((-1 * events_expected["type"], events_expected["timestamp"]))]
+        events_expected = events_in[
+            (events_in["type"] == 64)
+            | (events_in["type"] == 0)
+            | (events_in["type"] == 3)
+        ]
+        events_expected = events_expected[
+            np.lexsort((-1 * events_expected["type"], events_expected["timestamp"]))
+        ]
         # Check events.
         self.assertTrue(np.all(events == events_expected))
 
@@ -384,7 +412,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         """Filter out events that do not fall withing a specific 'aperture' time per channel."""
         sync_rate = ctypes.c_int(int(self.SYNC_FREQUENCY_32MHz))
         resolution = ctypes.c_double(1.0)
-        sync_period = 1E12 / sync_rate.value
+        sync_period = 1e12 / sync_rate.value
         num_events = 50000
         event_rate = 2.0e9
         # Generate a random set of events.
@@ -394,7 +422,8 @@ class TestHydraHarpEventFilter(unittest.TestCase):
             sync_rate=sync_rate.value,
             resolution=resolution.value,
             channels=[0, 1],
-            seed=2345)
+            seed=2345,
+        )
 
         # Patch the readFifo() function.
         fifo_words_in = self.events_to_fifo(events_in, sync_period, resolution.value)
@@ -404,12 +433,15 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         # Configure event filter: setup aperture filtering for channels 0 and 1.
         delta_min = int(25000 // resolution.value)
         delta_max = int(75000 // resolution.value)
-        self._hydraharp.set_event_filter(channel_filter={0: EventFilterMode.APERTURE,
-                                                         1: EventFilterMode.APERTURE},
-                                         sync_aperture=(delta_min, delta_max))
+        self._hydraharp.set_event_filter(
+            channel_filter={0: EventFilterMode.APERTURE, 1: EventFilterMode.APERTURE},
+            sync_aperture=(delta_min, delta_max),
+        )
 
         # Start the measurement.
-        with patch('ctypes.c_double', return_value=resolution), patch('ctypes.c_int', return_value=sync_rate):
+        with patch("ctypes.c_double", return_value=resolution), patch(
+            "ctypes.c_int", return_value=sync_rate
+        ):
             self._hydraharp.start_measurement(1000)
 
         # Wait to make sure all events are processed.
@@ -424,7 +456,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         # Expect only events on SYNC and events that fall in the aperture.
         events_expected = []
         last_sync = -1
-        for (evt_type, evt_timestamp) in events_in:
+        for evt_type, evt_timestamp in events_in:
             if evt_type == 64:
                 last_sync = evt_timestamp
                 events_expected.append((evt_type, evt_timestamp))
@@ -436,10 +468,9 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         self.assertTrue(np.all(events == np.array(events_expected, dtype=EventDataType)))
 
     def test_aperture_filter_sync(self):
-
         sync_rate = ctypes.c_int(int(self.SYNC_FREQUENCY_32MHz))
         resolution = ctypes.c_double(1.0)
-        sync_period = 1E12 / sync_rate.value
+        sync_period = 1e12 / sync_rate.value
         # Generate a random set of events.
         events_in = self.events_in_resolution_1
 
@@ -451,13 +482,19 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         # Configure event filter: setup aperture filtering for channels 0 and 1 and SYNC.
         delta_min = 25000
         delta_max = 75000
-        self._hydraharp.set_event_filter(channel_filter={0: EventFilterMode.APERTURE,
-                                                         1: EventFilterMode.APERTURE,
-                                                         64: EventFilterMode.APERTURE},
-                                         sync_aperture=(delta_min, delta_max))
+        self._hydraharp.set_event_filter(
+            channel_filter={
+                0: EventFilterMode.APERTURE,
+                1: EventFilterMode.APERTURE,
+                64: EventFilterMode.APERTURE,
+            },
+            sync_aperture=(delta_min, delta_max),
+        )
 
         # Start the measurement.
-        with patch('ctypes.c_double', return_value=resolution), patch('ctypes.c_int', return_value=sync_rate):
+        with patch("ctypes.c_double", return_value=resolution), patch(
+            "ctypes.c_int", return_value=sync_rate
+        ):
             self._hydraharp.start_measurement(1000)
 
         # Wait to make sure all events are processed.
@@ -473,7 +510,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         events_expected = []
         last_sync = -1
         last_is_sync = False
-        for (evt_type, evt_timestamp) in events_in:
+        for evt_type, evt_timestamp in events_in:
             if evt_type == 64:
                 if last_is_sync:
                     events_expected.pop()
@@ -497,7 +534,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         """Test that real-time histogram updates even if event filter is used. Low resolution test."""
         sync_rate = ctypes.c_int(int(self.SYNC_FREQUENCY_5MHz))
         resolution = ctypes.c_double(25.0)
-        sync_period = 1E12 / sync_rate.value
+        sync_period = 1e12 / sync_rate.value
         num_events = 50000
         event_rate = 2.0e9
         # Generate a random set of events.
@@ -507,7 +544,8 @@ class TestHydraHarpEventFilter(unittest.TestCase):
             sync_rate=sync_rate.value,
             resolution=resolution.value,
             channels=[0, 1],
-            seed=2345)
+            seed=2345,
+        )
 
         # Patch the readFifo() function.
         fifo_words_in = self.events_to_fifo(events_in, sync_period, resolution.value)
@@ -520,21 +558,27 @@ class TestHydraHarpEventFilter(unittest.TestCase):
 
         # Configure event filter to reject events on both channels.
         # This should not affect the histograms.
-        self._hydraharp.set_event_filter(channel_filter={0: EventFilterMode.NO_EVENTS,
-                                                         1: EventFilterMode.NO_EVENTS})
+        self._hydraharp.set_event_filter(
+            channel_filter={0: EventFilterMode.NO_EVENTS, 1: EventFilterMode.NO_EVENTS}
+        )
 
         # Configure real-time histograms.
         bin_resolution = int(resolution.value)
         histogram_bins = 2**15 // bin_resolution  # Max resolution in T3 mode
-        histogram_num_sync = int(event_rate // num_events // resolution.value)  # Important to be correct!
+        histogram_num_sync = int(
+            event_rate // num_events // resolution.value
+        )  # Important to be correct!
         self._hydraharp.set_realtime_histogram(
             channels=[0, 1],
             bin_resolution=bin_resolution,
             num_bins=histogram_bins,
-            num_sync=histogram_num_sync)
+            num_sync=histogram_num_sync,
+        )
 
         # Start the measurement.
-        with patch('ctypes.c_double', return_value=resolution), patch('ctypes.c_int', return_value=sync_rate):
+        with patch("ctypes.c_double", return_value=resolution), patch(
+            "ctypes.c_int", return_value=sync_rate
+        ):
             self._hydraharp.start_measurement(1000)
 
         # Wait to make sure all events are processed.
@@ -554,7 +598,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         sync_count = 0
         last_sync = -1
         start_timestamp = 0
-        for (evt_type, evt_timestamp) in events_in:
+        for evt_type, evt_timestamp in events_in:
             if evt_type == 64:
                 if sync_count % histogram_num_sync == 0:
                     if sync_count > 0:
@@ -587,7 +631,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         """Test the countrate is correct despite of event block"""
         sync_rate = ctypes.c_int(int(self.SYNC_FREQUENCY_5MHz))
         resolution = ctypes.c_double(2.0)
-        sync_period = 1E12 / sync_rate.value
+        sync_period = 1e12 / sync_rate.value
         num_events = 50000
         event_rate = 2.0e9
         # Generate a random set of events.
@@ -597,7 +641,8 @@ class TestHydraHarpEventFilter(unittest.TestCase):
             sync_rate=sync_rate.value,
             resolution=resolution.value,
             channels=[0, 1],
-            seed=2345)
+            seed=2345,
+        )
 
         # Patch the readFifo() function.
         fifo_words_in = self.events_to_fifo(events_in, sync_period, resolution.value)
@@ -620,7 +665,9 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         self._hydraharp.set_realtime_countrate(sync_aperture=(delta_min, delta_max), num_sync=countrate_num_sync)
 
         # Start the measurement.
-        with patch('ctypes.c_double', return_value=resolution), patch('ctypes.c_int', return_value=sync_rate):
+        with patch("ctypes.c_double", return_value=resolution), patch(
+            "ctypes.c_int", return_value=sync_rate
+        ):
             self._hydraharp.start_measurement(1000)
 
         # Wait to make sure all events are processed.
@@ -639,7 +686,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         sync_count = 0
         last_sync = -1
         start_timestamp = 0
-        for (evt_type, evt_timestamp) in events_in:
+        for evt_type, evt_timestamp in events_in:
             if evt_type == 64:
                 if sync_count % countrate_num_sync == 0:
                     if sync_count > 0:
@@ -666,12 +713,12 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         self.assertFalse(recv.has_signal_ready())
 
         self._hydraharp.sig_histogram.unsubscribe(recv)
-    
+
     def test_get_events_limit(self):
         """Test that the `get_events()` function returns at most MAX_EVENTS_PER_CALL events."""
         sync_rate = ctypes.c_int(int(self.SYNC_FREQUENCY_32MHz))
         resolution = ctypes.c_double(4.0)
-        sync_period = 1E12 / sync_rate.value
+        sync_period = 1e12 / sync_rate.value
         # Generate random events.
         final_block_events = 10101
         events_per_call = PicoQuant_HydraHarp400.MAX_EVENTS_PER_CALL
@@ -682,8 +729,10 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         # The events will be passed to the driver in smaller series, in blocks of TTREADMAX.
         # Calculate the sync moments and add into the expected events that should come out
         expected_events = np.array(events_in, dtype=EventDataType)
-        sync_counts = (expected_events["timestamp"] // sync_period -
-                       np.insert(expected_events["timestamp"], 0, 0)[:-1] // sync_period)
+        sync_counts = (
+            expected_events["timestamp"] // sync_period
+            - np.insert(expected_events["timestamp"], 0, 0)[:-1] // sync_period
+        )
         sync_idx = np.where(sync_counts > 0)[0]
         # The above does not take into account the first possible sync timestamp at 0. Check.
         if sync_idx[0] > 0 and expected_events["timestamp"][0] < sync_period:
@@ -699,7 +748,9 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         sync_events["type"] = 64
         sync_events["timestamp"] = cum_counts[sync_idx] * sync_period
         expected_events = np.insert(expected_events, sync_idx, sync_events)
-        expected_events = expected_events[np.lexsort((-1 * expected_events["type"], expected_events["timestamp"]))]
+        expected_events = expected_events[
+            np.lexsort((-1 * expected_events["type"], expected_events["timestamp"]))
+        ]
 
         # Patch the readFifo() function.
         fifo_words_in = self.events_to_fifo(events_in, sync_period, resolution.value)
@@ -707,7 +758,9 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         self._library_mock.ReadFiFo.side_effect = self.make_patched_read_fifo(fifo_words_in, done_event)
 
         # Start the measurement.
-        with patch('ctypes.c_double', return_value=resolution), patch('ctypes.c_int', return_value=sync_rate):
+        with patch("ctypes.c_double", return_value=resolution), patch(
+            "ctypes.c_int", return_value=sync_rate
+        ):
             self._hydraharp.start_measurement(1000)
 
         # Wait to make sure all events are processed.
@@ -725,31 +778,43 @@ class TestHydraHarpEventFilter(unittest.TestCase):
 
         # Check events.
         self.assertIsInstance(events, np.ndarray)
+        self.assertEqual(events.dtype, EventDataType)
         self.assertEqual(len(events), events_per_call)
         self.assertTrue(np.all(events == expected_events[:events_per_call]))
 
         # Now get the next MAX_EVENTS_PER_CALL events.
         (_ts, events) = self._hydraharp.get_timestamped_events()
-        self.assertEqual(len(events), events_per_call)
-        # TODO: For some reason at around index 35280 the timestamp restarts counting from 0 in events
-        # self.assertTrue(np.all(events == expected_events[events_per_call:2*events_per_call]))
+        # Find and remove any duplicates (possibly a bug of the test, but also possibly of the event fetching thread)
+        vals, inverse, count = np.unique(events, return_inverse=True, return_counts=True)
+        idx_vals_repeated = np.where(count > 1)[0]
+        if idx_vals_repeated.shape[0] > 0:
+            # duplicates[0] is an enumeration of duplicate values found and [1] the indices of the duplicates
+            duplicates = np.where(inverse == idx_vals_repeated[:, np.newaxis])
+            # As the enum repeats the same number as many times as value is found, and we want also to make sure we take
+            # into account also the cases where there are more than one duplicate, we find with np.where how many same
+            # values are present; with `+ 1` to shift the indices to remove other than the 1st (i.e. the original first)
+            # value's duplicate(s).
+            deletion_array = duplicates[1][np.where((duplicates[0][1:] - duplicates[0][:-1]) == 0)[0] + 1]
+            events = np.delete(events, deletion_array)
+
+        len_events = len(events)
+        self.assertAlmostEqual(len_events, events_per_call, delta=1)  # delta takes into account that possibly one entry
+        delta = events_per_call - len_events  # is removed.
+        self.assertTrue(np.all(events == expected_events[events_per_call:2*events_per_call-delta]))
 
         # Get the final batch of events. Reduce the added sync events from total count
         events = self._hydraharp.get_events()
-        # TODO: The length of events is one more than expected. Why? Have to add +1 in this assert now.
-        # NOTE: About 1/10 times it DOES work correctly. Very strange.
-        # self.assertEqual(len(events) - np.count_nonzero(expected_events["type"] == 64), final_block_events + 1)
-        # TODO: The earlier TODO point about timestamp restart affects this check as well.
-        # self.assertTrue(np.all(events == expected_events[2*events_per_call:]))
+        self.assertEqual(len(events) - np.count_nonzero(expected_events["type"] == 64), final_block_events + 1)
+        self.assertTrue(np.all(events == expected_events[2*events_per_call-delta:]))
 
         # Check no further events.
         events = self._hydraharp.get_events()
         self.assertIsInstance(events, np.ndarray)
         self.assertEqual(len(events), 0)
-    
+
     def test_pending_events_limit(self):
         """Test that the driver correctly handles overflow of the pending event buffer. Resolution is 1"""
-        sync_period = int(1E12 // self.SYNC_FREQUENCY_32MHz)
+        sync_period = int(1e12 // self.SYNC_FREQUENCY_32MHz)
         # Generate a bunch of events that just barely fit into the pending event buffer.
         max_events = self.PATCHED_MAX_PENDING_EVENTS - 1
         events_in = TestHydraHarpEventFilter.gen_events(max_events, sync_period)
@@ -763,7 +828,9 @@ class TestHydraHarpEventFilter(unittest.TestCase):
 
         # Start the measurement.
         sync_rate = ctypes.c_int(int(self.SYNC_FREQUENCY_32MHz))
-        with patch('ctypes.c_double', return_value=resolution), patch('ctypes.c_int', return_value=sync_rate):
+        with patch("ctypes.c_double", return_value=resolution), patch(
+            "ctypes.c_int", return_value=sync_rate
+        ):
             self._hydraharp.start_measurement(1000)
 
         # Wait to make sure all queued events are processed.
@@ -782,15 +849,13 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         self.assertTrue(np.all(events == events_in))
 
         # Generate more events than can fit into the pending event buffer.
-        more_events_in = np.empty(self.PATCHED_MAX_PENDING_EVENTS + 2, dtype=EventDataType)
-        more_events_in["type"] = 0
-        more_events_in["timestamp"] = np.cumsum(np.random.randint(1, 1000, len(more_events_in)))
+        more_events = self.PATCHED_MAX_PENDING_EVENTS + 2
+        more_events_in = TestHydraHarpEventFilter.gen_events(more_events, sync_period)
 
         # Repatch the readFifo() function to feed the new events into the running measurement.
         # This should/will cause the pending event buffer to overflow.
         more_fifo_words_in = self.events_to_fifo(more_events_in, sync_period, resolution.value)
         self._library_mock.ReadFiFo.side_effect = self.make_patched_read_fifo(more_fifo_words_in, done_event)
-
         # Wait to make sure all queued events are processed.
         done_event.wait()
 
@@ -810,7 +875,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
 
         # Start the measurement.
         sync_rate = ctypes.c_int(int(self.SYNC_FREQUENCY_32MHz))  # Redefine this as otherwise it gets corrupted
-        with patch('ctypes.c_double', return_value=resolution), patch('ctypes.c_int', return_value=sync_rate):
+        with patch("ctypes.c_double", return_value=resolution), patch("ctypes.c_int", return_value=sync_rate):
             self._hydraharp.start_measurement(1000)
 
         # Wait to make sure all queued events are processed.
@@ -834,7 +899,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         # Check no further events.
         events = self._hydraharp.get_events()
         self.assertEqual(len(events), 0)
-    
+
 
 if __name__ == "__main__":
     unittest.main()

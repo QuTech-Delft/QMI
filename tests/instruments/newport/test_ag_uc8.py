@@ -149,7 +149,7 @@ class TestNewport_AG_UC8(TestCase):
 
         mock_cmd = "DL?"
         mock_timeout = MagicMock()
-        mock_resp = f"DL INVALID"
+        mock_resp = "DL INVALID"
         self._meta.instr._ask = MagicMock(return_value=mock_resp)
 
         with self.assertRaises(QMI_InstrumentException):

@@ -23,7 +23,7 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
                  name: str,
                  transport: str,
                  serial: str,
-                 actuators: Dict[int, LinearActuator],
+                 actuators: Dict[Optional[int], LinearActuator],
                  baudrate: int = 57600) -> None:
         """Initialize driver.
 
