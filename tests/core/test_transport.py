@@ -13,10 +13,12 @@ import qmi
 import qmi.core.exceptions
 import qmi.core.transport
 from qmi.core.transport import QMI_TcpTransport, QMI_SerialTransport, QMI_Vxi11Transport, QMI_UsbTmcTransport
-from qmi.core.transport import create_transport
+from qmi.core.transport import create_transport, list_usbtmc_transports
 from qmi.core.instrument import QMI_Instrument
 from qmi.core.context import QMI_Context
 from qmi.core.rpc import rpc_method
+
+from pyvisa_stub import ResourceManager, visa_str_1, visa_str_3
 
 
 class Dummy_USBTMCInstrument(QMI_Instrument):
@@ -1039,7 +1041,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.assertEqual(data, test_string)
 
     def test_read_until_invalid_term_char(self):
-        """ Test if an too long terminator raises an error. """
+        """ Test if a too long terminator raises an error. """
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             _ = self.instr.read_until(message_terminator=bytes("error", "utf-8"), timeout=None)
 
@@ -1081,6 +1083,47 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(note="Test error!")
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             self.instr.discard_read()
+
+
+class ListUsbtmcTransportsTestCase(unittest.TestCase):
+    """Test the list_usbtmc_transports function."""
+    @unittest.mock.patch('sys.platform', 'win32')
+    def test_list_usbtmc_transports_win(self):
+        # Expected resources found
+        vendor_ids = [0x0699, 0xbebe]
+        product_ids = [0x3000, 0xcafe]
+        serial_nrs = ["XYZ", "ABC"]
+        transport_str_1 = f"usbtmc:vendorid=0x{vendor_ids[0]:04x}:productid=0x{product_ids[0]:04x}:serialnr={serial_nrs[0]}"
+        transport_str_2 = f"usbtmc:vendorid=0x{vendor_ids[1]:04x}:productid=0x{product_ids[1]:04x}:serialnr={serial_nrs[1]}"
+        expected_resources = [transport_str_1, transport_str_2]
+        # Act
+        with unittest.mock.patch(
+                "qmi.core.transport_usbtmc_visa.pyvisa.ResourceManager",
+                return_value=ResourceManager()
+        ):
+            resources = list_usbtmc_transports()
+
+        # Assert
+        self.assertListEqual(expected_resources, resources)
+
+    @unittest.mock.patch('sys.platform', 'linux1')
+    def test_list_usbtmc_transports_lin(self):
+        # Expected resources found
+        vendor_ids = [0x0699, 0xbebe]
+        product_ids = [0x3000, 0xcafe]
+        serial_nrs = ["XYZ", "ABC"]
+        transport_str_1 = f"usbtmc:vendorid=0x{vendor_ids[0]:04x}:productid=0x{product_ids[0]:04x}:serialnr={serial_nrs[0]}"
+        transport_str_2 = f"usbtmc:vendorid=0x{vendor_ids[1]:04x}:productid=0x{product_ids[1]:04x}:serialnr={serial_nrs[1]}"
+        expected_resources = [transport_str_1, transport_str_2]
+        # Act
+        with unittest.mock.patch(
+                "qmi.core.transport_usbtmc_pyusb.usbtmc.list_resources",
+                return_value=[visa_str_1, visa_str_3]
+        ):
+            resources = list_usbtmc_transports()
+
+        # Assert
+        self.assertListEqual(expected_resources, resources)
 
 
 if __name__ == "__main__":
