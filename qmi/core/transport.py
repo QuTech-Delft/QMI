@@ -932,7 +932,10 @@ class QMI_UsbTmcTransport(QMI_Transport):
         # We should empty the buffer, or if it is empty, discard the next message from the source
         if not len(self._read_buffer):
             # Read buffer is empty - read a new message from the instrument.
-            self._read_message(self.DEFAULT_READ_TIMEOUT)
+            try:
+                self._read_message(0.0)
+            except QMI_TimeoutException:
+                pass  # Nothing was in the instrument buffer, so we just continue.
 
         else:
             self._read_buffer = bytes()
@@ -943,6 +946,9 @@ class QMI_UsbTmcTransport(QMI_Transport):
 
         Parameters:
             timeout: Obligatory parameter to set the timeout for reading.
+
+        Raises:
+            QMI_TimeoutException: If the read is not done within timeout period.
         """
         raise NotImplementedError("QMI_UsbTmcTransport.read not implemented")
 
