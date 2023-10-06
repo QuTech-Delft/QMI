@@ -1,5 +1,8 @@
 import sys
 import unittest.mock
+
+import usb.core
+
 sys.modules["usb.core"] = unittest.mock.Mock()
 sys.modules["usb.core.find"] = unittest.mock.Mock()
 
@@ -88,6 +91,41 @@ class TestQmiPyUsbTmcTransport(unittest.TestCase):
 
         mock().read_raw.assert_called_once()
         self.assertEqual(ret, expected)
+
+    @unittest.mock.patch("qmi.core.usbtmc.Instrument")
+    def test_discard_read(self, mock):
+        """See that discard_read either empties the read buffer, or if it is already empty,
+        it tries to read whatever is in the incoming instrument buffer.
+        """
+        expected = b"01234"
+
+        mock().read_raw.return_value = expected
+        dev = QMI_PyUsbTmcTransport(0x1234, 0x5678, "90")
+        dev._read_buffer = b"somestuff"
+        dev.open()
+        # First read should empty the read buffer
+        dev.discard_read()
+
+        self.assertEqual(bytes(), dev._read_buffer)
+        mock().read_raw.assert_not_called()
+
+        # Second read should clear up incoming readout
+        dev.discard_read()
+        dev.close()
+
+        mock().read_raw.assert_called_once()
+        self.assertEqual(bytes(), dev._read_buffer)
+
+    @unittest.mock.patch("qmi.core.usbtmc.Instrument")
+    def test_discard_read_does_not_except(self, mock):
+        """See that discard_read passes QMI_TimeoutException if read buffer and incoming instrument buffer are empty."""
+        mock().read_raw.side_effect = [usb.core.USBError("Timeout!", errno=110)]
+        dev = QMI_PyUsbTmcTransport(0x1234, 0x5678, "90")
+        dev.open()
+        dev.discard_read()
+        dev.close()
+
+        mock().read_raw.assert_called_once()
 
 
 class TestQmiVisaUsbTmcTransport(unittest.TestCase):
@@ -178,6 +216,43 @@ class TestQmiVisaUsbTmcTransport(unittest.TestCase):
 
         mock().read_raw.assert_called_once()
         self.assertEqual(ret, expected)
+
+    @unittest.mock.patch("pyvisa.ResourceManager.open_resource")
+    def test_discard_read(self, mock):
+        """See that discard_read either empties the read buffer, or if it is already empty,
+        it tries to read whatever is in the incoming instrument buffer.
+        """
+        expected = b"01234"
+
+        mock().read_raw.return_value = expected
+        dev = QMI_VisaUsbTmcTransport(0x1234, 0x5678, "90")
+        dev._read_buffer = b"somestuff"
+        dev.open()
+        # First read should empty the read buffer
+        dev.discard_read()
+
+        self.assertEqual(bytes(), dev._read_buffer)
+        mock().read_raw.assert_not_called()
+
+        # Second read should clear up incoming readout
+        dev.discard_read()
+        dev.close()
+
+        mock().read_raw.assert_called_once()
+        self.assertEqual(bytes(), dev._read_buffer)
+
+    @unittest.mock.patch("pyvisa.ResourceManager.open_resource")
+    @unittest.mock.patch("pyvisa.errors.VisaIOError", new_callable=lambda: tests.core.pyvisa_stub.VisaIOError)
+    def test_discard_read_does_not_except(self, exc_mock, mock):
+        """See that discard_read passes QMI_TimeoutException if read buffer and incoming instrument buffer are empty."""
+        timeout_error = tests.core.pyvisa_stub.VI_ERROR_TMO
+        mock().read_raw.side_effect = exc_mock(timeout_error)
+        dev = QMI_VisaUsbTmcTransport(0x1234, 0x5678, "90")
+        dev.open()
+        dev.discard_read()
+        dev.close()
+
+        mock().read_raw.assert_called_once()
 
 
 if __name__ == "__main__":
