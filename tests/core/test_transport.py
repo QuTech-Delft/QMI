@@ -18,7 +18,7 @@ from qmi.core.instrument import QMI_Instrument
 from qmi.core.context import QMI_Context
 from qmi.core.rpc import rpc_method
 
-from pyvisa_stub import ResourceManager, visa_str_1, visa_str_3
+from tests.core.pyvisa_stub import ResourceManager, visa_str_1, visa_str_3
 
 
 class Dummy_USBTMCInstrument(QMI_Instrument):
