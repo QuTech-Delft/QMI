@@ -317,6 +317,12 @@ UsbTmcTransportDescriptorParser = TransportDescriptorParser(
      'serialnr': (str, True)}
 )
 
+GpibTransportDescriptorParser = TransportDescriptorParser(
+    "gpib",
+    [],
+    {'devicenr': (int, True),
+     'timeout': (int, False)})
+
 Vxi11TransportDescriptorParser = TransportDescriptorParser(
     "vxi11",
     [("host", (str, True))],
@@ -1133,6 +1139,7 @@ def create_transport(transport_descriptor: str,
       - TCP connection:    "tcp:host[:port][:connect_timeout=T]"
       - Serial port:       "serial:device[:baudrate=115200][:databits=8][:parity=N][:stopbits=1]"
       - USBTMC device:     "usbtmc[:vendorid=V][:productid=P]:serialnr=S"
+      - GPIB device:       "gpib:devicenr[:timeout]"
       - VXI-11 instrument: "vxi11:host"
 
     "host" (for TCP & VXI-11 transports) specifies the host name or IP address of
@@ -1178,6 +1185,18 @@ def create_transport(transport_descriptor: str,
             # On Linux, we use a copy of python-usbtmc which is integrated in QMI.
             from qmi.core.transport_usbtmc_pyusb import QMI_PyUsbTmcTransport
             return QMI_PyUsbTmcTransport(**attributes)
+
+    elif GpibTransportDescriptorParser.match_interface(transport_descriptor):
+        attributes = GpibTransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
+        if sys.platform.lower().startswith("win"):
+            from qmi.core.transport_gpib_visa import QMI_VisaGpibTransport
+            return QMI_VisaGpibTransport(**attributes)
+        else:
+            # This is a Windows-specific transport for National Instruments GPIB-USB-HS.
+            raise QMI_TransportDescriptorException(
+                "Gpib transport descriptor is for NI GPIB-USB-HS device and Windows-only."
+            )
+
     elif Vxi11TransportDescriptorParser.match_interface(transport_descriptor):
         attributes = Vxi11TransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
         return QMI_Vxi11Transport(**attributes)
