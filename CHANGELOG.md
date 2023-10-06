@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Implementation of `discard_read` on `QMI_UsbTmcTransport` class, and `read_until` now forwards to `read_until_timeout` instead of raising error.
 - New transport `QMI_VisaGpibTransport` for the need of instruments using National Instruments' GPIB-USB-HS device. Windows only.
+- Transport string in fashion of "gpib:" 
 
 ### Changed
 - Non-interface breaking changes on `QMI_UsbTmcTransport` class calls `read` and `read_until_timeout`.

@@ -1138,14 +1138,16 @@ def create_transport(transport_descriptor: str,
     String format:
       - TCP connection:    "tcp:host[:port][:connect_timeout=T]"
       - Serial port:       "serial:device[:baudrate=115200][:databits=8][:parity=N][:stopbits=1]"
-      - USBTMC device:     "usbtmc[:vendorid=V][:productid=P]:serialnr=S"
-      - GPIB device:       "gpib:devicenr[:timeout]"
+      - USBTMC device:     "usbtmc[:vendorid=V][:productid=P]:serialnr"
+      - GPIB device:       "gpib:devicenr[:timeout=40]"
       - VXI-11 instrument: "vxi11:host"
 
     "host" (for TCP & VXI-11 transports) specifies the host name or IP address of
     the TCP server. Numerical IPv6 addresses must be enclosed in square brackets.
 
     "port" (for TCP transports) specifies the TCP port number of the server.
+
+    "connect_timeout" is TCP connection timeout. Default is 10s.
 
     "device" (for serial port transports) is the name of the serial port,
     for example "COM3" or "/dev/ttyUSB0".
@@ -1169,6 +1171,9 @@ def create_transport(transport_descriptor: str,
     "vendorid" is the USB Vendor ID as a decimal number or as hexadecimal with 0x prefix.
     "productid" is the USB Product ID as a decimal number or as hexadecimal with 0x prefix.
     "serialnr" is the USB serial number string.
+
+    "devicenr" is GPIB device number (integer).
+    "timeout" is custom timeout for GPIB device, in seconds; the default is 40s.
     """
     if SerialTransportDescriptorParser.match_interface(transport_descriptor):
         attributes = SerialTransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
