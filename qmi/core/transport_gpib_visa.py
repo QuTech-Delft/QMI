@@ -25,27 +25,54 @@ _logger = logging.getLogger(__name__)
 
 
 class QMI_VisaGpibTransport(QMI_Transport):
+    """The QMI_VisaGpibTransport is developed specifically to use with National Instruments'
+    GPIB-USB-HS device under Windows. Note that the device's GPIB settings need to be correct
+    for this transport to work. Also, the presumption is that default IVI_VISA library is used.
 
-    def __init__(self, devicenr: int, timeout: Optional[int] = 40):
+    This transport was tested with the GPIB device connected to a Tektronix AWG 5014C instrument.
+    The instrument's GPIB settings were set to:
+    - GPIB interface ID: 0
+    - primary address: 1
+    - secondary address: None
+    - timeout: 30s
+    - NO sending of EOI with write nor terminating read with EOS
+    - Neither System Controller nor Autpolling were enabled.
+    """
+
+    def __init__(
+            self,
+            devicenr: int,
+            if_id: Optional[int] = None,
+            secondnr: Optional[int] = None,
+            timeout: Optional[float] = 30
+    ):
         """Initialization of the Gpib transport.
 
         Parameters:
             devicenr: The device number to initialize.
-            timeout: The device timeout for calls. Default is 40s.
-
+            if_id: Optional interface ID, "GPIBx", number?
+            secondnr: Optional Secondary device number.
+            timeout: The device timeout for calls. Default is 30s.
         """
         _logger.debug("Opening GPIB device nr (%i)", devicenr)
         super().__init__()
         self._devicenr = devicenr
+        self._if_id = if_id or ""
+        self._secondnr = secondnr
         self._timeout = timeout
         self._device: Optional[pyvisa.ResourceManager] = None
         self._read_buffer = bytes()
 
     def _open_transport(self) -> None:
-        visa_resource = f"GPIB::{self._devicenr}::INSTR"
+        visa_resource = f"GPIB{self._if_id}::{self._devicenr}::"
+        if self._secondnr:
+            visa_resource += f"{self._secondnr}::INSTR"
+        else:
+            visa_resource += "INSTR"
+
         rm = pyvisa.ResourceManager()
         try:
-            self._device = rm.open_resource(visa_resource, timeout=self._timeout, write_termination='\n',
+            self._device = rm.open_resource(visa_resource, timeout=self._timeout * 1000, write_termination='\n',
                                 read_termination='\n')
 
         except ValueError as exc:
@@ -82,7 +109,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
     def write(self, data: bytes) -> None:
         self._check_is_open()
 
-        self._safe_device.timeout = int(1000 * self._timeout)
+        self._safe_device.timeout = int(self._timeout * 1000)
         self._safe_device.write_raw(data)
 
     def read(self, nbytes: int, timeout: Optional[float]) -> bytes:
@@ -186,7 +213,10 @@ class QMI_VisaGpibTransport(QMI_Transport):
         # We should empty the buffer, or if it is empty, discard the next message from the source
         if not len(self._read_buffer):
             # Read buffer is empty - read a new message from the instrument.
-            self._read_message(self._timeout)
+            try:
+                self._read_message(0.0)
+            except QMI_TimeoutException:
+                pass  # Nothing to discard.
 
         else:
             self._read_buffer = bytes()

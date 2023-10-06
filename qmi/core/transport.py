@@ -319,9 +319,11 @@ UsbTmcTransportDescriptorParser = TransportDescriptorParser(
 
 GpibTransportDescriptorParser = TransportDescriptorParser(
     "gpib",
-    [],
-    {'devicenr': (int, True),
-     'timeout': (int, False)})
+    [('devicenr', (int, True))],
+    {'if_id': (int, False),
+     'secondnr': (int, False),
+     'timeout': (int, False)}
+)
 
 Vxi11TransportDescriptorParser = TransportDescriptorParser(
     "vxi11",
@@ -1138,8 +1140,8 @@ def create_transport(transport_descriptor: str,
     String format:
       - TCP connection:    "tcp:host[:port][:connect_timeout=T]"
       - Serial port:       "serial:device[:baudrate=115200][:databits=8][:parity=N][:stopbits=1]"
-      - USBTMC device:     "usbtmc[:vendorid=V][:productid=P]:serialnr"
-      - GPIB device:       "gpib:devicenr[:timeout=40]"
+      - USBTMC device:     "usbtmc:vendorid=0x[vid]:productid=0x[pid]:serialnr=[sn]"
+      - GPIB device:       "gpib:devicenr[:if_id=None][:secondnr=None][:timeout=40]"
       - VXI-11 instrument: "vxi11:host"
 
     "host" (for TCP & VXI-11 transports) specifies the host name or IP address of
@@ -1173,7 +1175,9 @@ def create_transport(transport_descriptor: str,
     "serialnr" is the USB serial number string.
 
     "devicenr" is GPIB device number (integer).
-    "timeout" is custom timeout for GPIB device, in seconds; the default is 40s.
+    "if_id" is optional GPIB interface number (GPIB[if_id]::...). Default is None.
+    "secondnr" is optional secondary device address number. Default is None.
+    "timeout" is custom timeout for GPIB device, in seconds; the default is 30s.
     """
     if SerialTransportDescriptorParser.match_interface(transport_descriptor):
         attributes = SerialTransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
