@@ -57,7 +57,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
         _logger.debug("Opening GPIB device nr (%i)", devicenr)
         super().__init__()
         self._devicenr = devicenr
-        self._if_id = if_id or ""
+        self._if_id = if_id if if_id is not None else ""
         self._secondnr = secondnr
         self._timeout = timeout
         self._device: Optional[pyvisa.ResourceManager] = None
