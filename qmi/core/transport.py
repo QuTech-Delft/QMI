@@ -923,8 +923,9 @@ class QMI_UsbTmcTransport(QMI_Transport):
             data += self._read_buffer
             self._read_buffer = bytes()
 
-        # Read a new message from the instrument.
-        data += self._read_message(timeout)
+        else:
+            # Read a new message from the instrument.
+            data += self._read_message(timeout)
 
         return data
 
