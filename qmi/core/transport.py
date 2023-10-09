@@ -854,6 +854,10 @@ class QMI_UsbTmcTransport(QMI_Transport):
                 is received before the requested number of bytes is reached.
         """
         self._check_is_open()
+        # USB requires a timeout
+        if timeout is None:
+            timeout = self.DEFAULT_READ_TIMEOUT
+
         nbuf = len(self._read_buffer)
         while True:
             if nbuf == nbytes:
@@ -861,10 +865,6 @@ class QMI_UsbTmcTransport(QMI_Transport):
                 ret = self._read_buffer
                 self._read_buffer = bytes()
                 return ret
-
-            # USB requires a timeout
-            if timeout is None:
-                timeout = self.DEFAULT_READ_TIMEOUT
 
             # Read buffer was of wrong length or is empty - read a new message from the instrument.
             self._read_buffer += self._read_message(timeout)
