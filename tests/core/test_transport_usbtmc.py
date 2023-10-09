@@ -119,7 +119,9 @@ class TestQmiPyUsbTmcTransport(unittest.TestCase):
     @unittest.mock.patch("qmi.core.usbtmc.Instrument")
     def test_discard_read_does_not_except(self, mock):
         """See that discard_read passes QMI_TimeoutException if read buffer and incoming instrument buffer are empty."""
-        mock().read_raw.side_effect = [usb.core.USBError("Timeout!")]
+        usberror = usb.core.USBError("Timeout!")
+        usberror.errno = 110  # Set for Timeout
+        mock().read_raw.side_effect = [usberror]
         dev = QMI_PyUsbTmcTransport(0x1234, 0x5678, "90")
         dev.open()
         dev.discard_read()
