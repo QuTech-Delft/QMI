@@ -103,13 +103,7 @@ class TestQmiPyUsbTmcTransport(unittest.TestCase):
         dev = QMI_PyUsbTmcTransport(0x1234, 0x5678, "90")
         dev._read_buffer = b"somestuff"
         dev.open()
-        # First read should empty the read buffer
-        dev.discard_read()
-
-        self.assertEqual(bytes(), dev._read_buffer)
-        mock().read_raw.assert_not_called()
-
-        # Second read should clear up incoming readout
+        # Discard read should empty the read buffer and discard instrument readout.
         dev.discard_read()
         dev.close()
 
@@ -221,7 +215,7 @@ class TestQmiVisaUsbTmcTransport(unittest.TestCase):
 
     @unittest.mock.patch("pyvisa.ResourceManager.open_resource")
     def test_discard_read(self, mock):
-        """See that discard_read either empties the read buffer, or if it is already empty,
+        """See that discard_read empties the read buffer, and
         it tries to read whatever is in the incoming instrument buffer.
         """
         expected = b"01234"
@@ -230,13 +224,7 @@ class TestQmiVisaUsbTmcTransport(unittest.TestCase):
         dev = QMI_VisaUsbTmcTransport(0x1234, 0x5678, "90")
         dev._read_buffer = b"somestuff"
         dev.open()
-        # First read should empty the read buffer
-        dev.discard_read()
-
-        self.assertEqual(bytes(), dev._read_buffer)
-        mock().read_raw.assert_not_called()
-
-        # Second read should clear up incoming readout
+        # Discard read should empty the read buffer and read instrument data
         dev.discard_read()
         dev.close()
 

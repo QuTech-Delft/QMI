@@ -917,29 +917,23 @@ class QMI_UsbTmcTransport(QMI_Transport):
         if timeout is None:
             timeout = self.DEFAULT_READ_TIMEOUT
 
-        data = bytes()
         if self._read_buffer:
             # Data already available in buffer; return it now.
-            data += self._read_buffer
+            data = self._read_buffer
             self._read_buffer = bytes()
 
         else:
             # Read a new message from the instrument.
-            data += self._read_message(timeout)
+            data = self._read_message(timeout)
 
         return data
 
     def discard_read(self) -> None:
-        # We should empty the buffer, or if it is empty, discard the next message from the source
-        if not len(self._read_buffer):
-            # Read buffer is empty - read a new message from the instrument.
-            try:
-                self._read_message(0.0)
-            except QMI_TimeoutException:
-                pass  # Nothing was in the instrument buffer, so we just continue.
-
-        else:
-            self._read_buffer = bytes()
+        self._read_buffer = bytes()
+        try:
+            self._read_message(0.0)
+        except QMI_TimeoutException:
+            return  # Nothing was in the instrument buffer, so we just continue.
 
     def _read_message(self, timeout):
         """Read one USBTMC message from the instrument.
