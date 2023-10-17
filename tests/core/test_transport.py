@@ -1,8 +1,7 @@
 #! /usr/bin/env python3
 
 """Test QMI_Transport functionality."""
-from sys import platform
-import os
+import os, sys
 import socket
 import threading
 import time
@@ -14,10 +13,12 @@ import qmi
 import qmi.core.exceptions
 import qmi.core.transport
 from qmi.core.transport import QMI_TcpTransport, QMI_SerialTransport, QMI_Vxi11Transport, QMI_UsbTmcTransport
-from qmi.core.transport import create_transport
+from qmi.core.transport import create_transport, list_usbtmc_transports
 from qmi.core.instrument import QMI_Instrument
 from qmi.core.context import QMI_Context
 from qmi.core.rpc import rpc_method
+
+from tests.core.pyvisa_stub import ResourceManager, visa_str_1, visa_str_3
 
 
 class Dummy_USBTMCInstrument(QMI_Instrument):
@@ -250,7 +251,7 @@ class TestQmiTransportParsing(unittest.TestCase):
     def tearDown(self):
         self.server_sock.close()
 
-    if "linux" in platform or "darwin" in platform:
+    if "linux" in sys.platform or "darwin" in sys.platform:
         def test_parse_usbtmc(self):
             serialnr = "XYZ"
             vendorid = 0x0699
@@ -281,7 +282,12 @@ class TestQmiTransportParsing(unittest.TestCase):
             self.assertEqual(desc.productid, int(productid))
             self.assertEqual(desc.vendorid, int(vendorid))
 
-    elif platform.startswith("win") or "msys" in platform:
+    elif sys.platform.startswith("win") or "msys" in sys.platform:
+        # Remove the possibility of import error of pyvisa
+        import tests.core.pyvisa_stub
+        sys.modules["pyvisa"] = tests.core.pyvisa_stub
+        sys.modules["pyvisa.errors"] = tests.core.pyvisa_stub.errors
+
         def test_parse_usbtmc(self):
             serialnr = "XYZ"
             vendorid = 0x0699
@@ -847,19 +853,44 @@ class TestQmiSerialTransportMethods(unittest.TestCase):
 class TestQmiUsbTmcTransport(unittest.TestCase):
 
     def test_correct_construction(self):
-        QMI_UsbTmcTransport(0x0699, 0x3000, "XYZ")
-        QMI_UsbTmcTransport(1689, 12288, "XYZ")
+        vendorid = 0x0699
+        productid = 0x3000
+        serialnr = "XYZ"
+        exp_trnsprt = f"QMI_UsbTmcTransport 0x{vendorid:04x}:0x{productid:04x} ({serialnr})"
+        # Make two transports, one with hex input and other with int input
+        trnsprt_1 = QMI_UsbTmcTransport(vendorid, productid, "XYZ")
+        trnsprt_2 = QMI_UsbTmcTransport(1689, 12288, "XYZ")  # Same values but in int
+        # Assert that transport string should be always formatted with hex numbers
+        self.assertEqual(exp_trnsprt, str(trnsprt_1))
+        self.assertEqual(exp_trnsprt, str(trnsprt_2))
 
     def test_invalid_vendor_id(self):
+        """Test _validate_vendor_id method."""
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UsbTmcTransport(0xfcafe, 0xbebe, "foo")
+            QMI_UsbTmcTransport(0xfcafe, 0xbebe, "bar")
 
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
             QMI_UsbTmcTransport(-1, 0xbebe, "foo")
 
     def test_invalid_product_id(self):
+        """Test _validate_product_id method."""
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UsbTmcTransport(0xfcafe, 0xbebe, "foo")
+            QMI_UsbTmcTransport(0xbebe, 0xfcafe, "bar")
+
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            QMI_UsbTmcTransport(0xbebe, -1, "foo")
+
+    def test_not_implemented_methods(self):
+        """Test not implemented functions raise NotImplementedError"""
+        transport = QMI_UsbTmcTransport(1689, 12288, "XYZ")
+        with self.assertRaises(NotImplementedError):
+            transport.write(b"no_data")
+
+        with self.assertRaises(NotImplementedError):
+            transport._read_message(None)
+
+        with self.assertRaises(NotImplementedError):
+            transport.list_resources()
 
 
 class TestQmiVxi11TransportInit(unittest.TestCase):
@@ -1010,7 +1041,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.assertEqual(data, test_string)
 
     def test_read_until_invalid_term_char(self):
-        """ Test if an too long terminator raises an error. """
+        """ Test if a too long terminator raises an error. """
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             _ = self.instr.read_until(message_terminator=bytes("error", "utf-8"), timeout=None)
 
@@ -1052,6 +1083,47 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(note="Test error!")
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             self.instr.discard_read()
+
+
+class ListUsbtmcTransportsTestCase(unittest.TestCase):
+    """Test the list_usbtmc_transports function."""
+    @unittest.mock.patch('sys.platform', 'win32')
+    def test_list_usbtmc_transports_win(self):
+        # Expected resources found
+        vendor_ids = [0x0699, 0xbebe]
+        product_ids = [0x3000, 0xcafe]
+        serial_nrs = ["XYZ", "ABC"]
+        transport_str_1 = f"usbtmc:vendorid=0x{vendor_ids[0]:04x}:productid=0x{product_ids[0]:04x}:serialnr={serial_nrs[0]}"
+        transport_str_2 = f"usbtmc:vendorid=0x{vendor_ids[1]:04x}:productid=0x{product_ids[1]:04x}:serialnr={serial_nrs[1]}"
+        expected_resources = [transport_str_1, transport_str_2]
+        # Act
+        with unittest.mock.patch(
+                "qmi.core.transport_usbtmc_visa.pyvisa.ResourceManager",
+                return_value=ResourceManager()
+        ):
+            resources = list_usbtmc_transports()
+
+        # Assert
+        self.assertListEqual(expected_resources, resources)
+
+    @unittest.mock.patch('sys.platform', 'linux1')
+    def test_list_usbtmc_transports_lin(self):
+        # Expected resources found
+        vendor_ids = [0x0699, 0xbebe]
+        product_ids = [0x3000, 0xcafe]
+        serial_nrs = ["XYZ", "ABC"]
+        transport_str_1 = f"usbtmc:vendorid=0x{vendor_ids[0]:04x}:productid=0x{product_ids[0]:04x}:serialnr={serial_nrs[0]}"
+        transport_str_2 = f"usbtmc:vendorid=0x{vendor_ids[1]:04x}:productid=0x{product_ids[1]:04x}:serialnr={serial_nrs[1]}"
+        expected_resources = [transport_str_1, transport_str_2]
+        # Act
+        with unittest.mock.patch(
+                "qmi.core.transport_usbtmc_pyusb.usbtmc.list_resources",
+                return_value=[visa_str_1, visa_str_3]
+        ):
+            resources = list_usbtmc_transports()
+
+        # Assert
+        self.assertListEqual(expected_resources, resources)
 
 
 if __name__ == "__main__":

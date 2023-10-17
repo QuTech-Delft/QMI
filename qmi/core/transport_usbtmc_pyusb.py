@@ -44,7 +44,6 @@ class QMI_PyUsbTmcTransport(QMI_UsbTmcTransport):
         self._safe_device.write_raw(data)
 
     def _read_message(self, timeout):
-        """Read one USBTMC message from the instrument."""
         self._safe_device.timeout = timeout
         try:
             data = self._safe_device.read_raw()
