@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Non-interface breaking changes on `QMI_UsbTmcTransport` class calls `read` and `read_until_timeout`.
 
 ### Fixed
-- 
+- Changed a regexp line in TLB-670x driver to a raw string to avoid future warnings.
 
 ## [0.42.0] - 2023-09-29
 
