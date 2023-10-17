@@ -289,7 +289,6 @@ class NewFocus_TLB670X(QMI_Instrument):
         try:
             self._send("*RST")
         except QMI_InstrumentException as exc:
-            self._reinit_device()
             raise exc
 
         time.sleep(self.RESET_SLEEP_TIME)

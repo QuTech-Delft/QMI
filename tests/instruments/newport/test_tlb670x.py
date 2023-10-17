@@ -156,7 +156,6 @@ class TestTLB670XInit(unittest.TestCase):
     def test_init_no_devices(self):
         """Test no device present."""
         serial_number = "SN1234"
-        device_id = 123
         device_info_response = CtypesMock.StringBuffer("")
         self.ctypes_mock.string_buffer.append(device_info_response)
         self.ctypes_mock.dllmock.newp_usb_get_device_info.return_value = 0  # success
@@ -295,6 +294,52 @@ class TestTLB670XTxRx(unittest.TestCase):
         self.ctypes_mock.dllmock.newp_usb_init_product.assert_called_once()
         self.ctypes_mock.dllmock.newp_usb_get_device_info.assert_called_once()
         self.ctypes_mock.dllmock.newp_usb_uninit_system.assert_called_once()
+
+    def test_reset(self):
+        """Test 'reset' RPC call."""
+        self.instr.RESET_SLEEP_TIME = 0.01
+        error_str = "NO ERROR"
+        command = CtypesMock.StringBuffer("ERRSTR?")  # to be set by _send
+        self.ctypes_mock.string_buffer.append(command)
+        error_str_response = CtypesMock.StringBuffer(error_str)
+        self.ctypes_mock.string_buffer.append(error_str_response)
+        command = CtypesMock.StringBuffer("*RST")  # to be set by _send
+        self.ctypes_mock.string_buffer.append(command)
+        ok_response = CtypesMock.StringBuffer("OK\r\n")
+        self.ctypes_mock.string_buffer.append(ok_response)
+        self.ctypes_mock.dllmock.newp_usb_send_ascii.return_value = 0  # success
+        self.ctypes_mock.dllmock.newp_usb_get_ascii.return_value = 0  # success
+
+        self.instr.reset()
+
+        self.assertEqual(2, self.ctypes_mock.dllmock.newp_usb_send_ascii.call_count)
+        self.assertEqual(2, self.ctypes_mock.dllmock.newp_usb_get_ascii.call_count)
+
+    def test_reset_excepts(self):
+        """Test 'reset' RPC call with raising QMI_InstrumentException."""
+        self.instr.RESET_SLEEP_TIME = 0.01
+        error_str = "NO ERROR"
+        command = CtypesMock.StringBuffer("ERRSTR?")  # to be set by _send
+        self.ctypes_mock.string_buffer.append(command)
+        error_str_response = CtypesMock.StringBuffer(error_str)
+        self.ctypes_mock.string_buffer.append(error_str_response)
+        command = CtypesMock.StringBuffer("*RST")  # to be set by _send
+        self.ctypes_mock.string_buffer.append(command)
+        serial_number = "SN1234"
+        device_id = 12
+        device_info_response = CtypesMock.StringBuffer(f"{device_id},{serial_number};")
+        self.ctypes_mock.string_buffer.append(device_info_response)
+        self.ctypes_mock.dllmock.newp_usb_send_ascii.side_effect = [0, 116]
+        self.ctypes_mock.dllmock.newp_usb_get_ascii.return_value = 0  # success
+
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.reset()
+
+        self.ctypes_mock.dllmock.newp_usb_uninit_system.assert_called_once()
+        self.ctypes_mock.dllmock.newp_usb_init_product.assert_called_once_with(NewFocus_TLB670X.PRODUCT_ID)
+        self.ctypes_mock.dllmock.newp_usb_get_device_info.assert_called_once()
+        self.ctypes_mock.dllmock.newp_usb_get_ascii.assert_called_once()
+        self.assertEqual(2, self.ctypes_mock.dllmock.newp_usb_send_ascii.call_count)
 
 
 class TestTLB670XGetSet(unittest.TestCase):
