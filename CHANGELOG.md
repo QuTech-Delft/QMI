@@ -6,13 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+### Added
+- Implementation of `discard_read` on `QMI_UsbTmcTransport` class, and `read_until` now forwards to `read_until_timeout` instead of raising error.
+- QMI_Vxi11Transport.read_until_timeout() implementation such that it calls self.read() with the given input.
+
 ### Changed
+- Non-interface breaking changes on `QMI_UsbTmcTransport` class calls `read` and `read_until_timeout`.
 - QMI_Vxi11Transport.read() to not discard read data buffer at exception. It also returns data immediately if requested nbytes of data is already in the read buffer.
 - QMI_Vxi11Transport.read_until() to not discard read data buffer at exception. It also returns data immediately if requested message terminator is already in the read buffer.
 - QMI_Vxi11Transport.discard_read() to also empty current read buffer, and to restore instrument timeout correctly.
-
-### Added
-- QMI_Vxi11Transport.read_until_timeout() implementation such that it calls self.read() with the given input.
 
 ## [0.42.0] - 2023-09-29
 
