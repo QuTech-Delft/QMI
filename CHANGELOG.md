@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - QMI_Vxi11Transport.read_until() to not discard read data buffer at exception. It also returns data immediately if requested message terminator is already in the read buffer.
 - QMI_Vxi11Transport.discard_read() to also empty current read buffer, and to restore instrument timeout correctly.
 
+### Fixed
+- Changed a regexp line in TLB-670x driver to a raw string to avoid future warnings.
+
 ## [0.42.0] - 2023-09-29
 
 ### Added

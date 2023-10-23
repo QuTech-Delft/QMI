@@ -4,8 +4,12 @@ version: 2
 sphinx:
   configuration: documentation/sphinx/source/conf.py
 
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.8"
+
 python:
-  version: "3.8"
   install:
     - requirements: documentation/sphinx/requirements.txt
     - method: pip

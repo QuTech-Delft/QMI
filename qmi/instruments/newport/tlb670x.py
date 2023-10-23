@@ -114,7 +114,7 @@ class NewFocus_TLB670X(QMI_Instrument):
             if len(response) > 2 and len(response[-2]) > 0 and response[-2] != "OK":
                 # The response probably is this. This presumes the last value in list is [''] due to "...\r\n" split.
                 # But check for sporadic "*IDN?" query response first.
-                idn_match = re.search("v\d.\d(.\d)? [\d/]+ SN[\d]+", response[-2])
+                idn_match = re.search(r"v\d.\d(.\d)? [\d/]+ SN[\d]+", response[-2])
                 if idn_match:  # The entry is the invalid response, delete it
                     del response[-2]
 
@@ -289,7 +289,6 @@ class NewFocus_TLB670X(QMI_Instrument):
         try:
             self._send("*RST")
         except QMI_InstrumentException as exc:
-            self._reinit_device()
             raise exc
 
         time.sleep(self.RESET_SLEEP_TIME)
