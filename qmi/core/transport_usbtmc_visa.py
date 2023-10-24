@@ -1,3 +1,5 @@
+"""Extension of the QMI_UsbTmcTransport class utilizing usb.core with libusb1 backend and pyvisa packages."""
+
 from typing import Optional
 
 import os, sys
