@@ -3,7 +3,7 @@ import unittest.mock
 sys.modules["usb.core"] = unittest.mock.Mock()
 sys.modules["usb.core.find"] = unittest.mock.Mock()
 
-from qmi.core.exceptions import QMI_TimeoutException, QMI_EndOfInputException
+from qmi.core.exceptions import QMI_TimeoutException
 # For not causing an error by missing pyvisa library in the pipeline tests, we mock also the pyvisa existence
 import tests.core.pyvisa_stub
 sys.modules["pyvisa"] = tests.core.pyvisa_stub

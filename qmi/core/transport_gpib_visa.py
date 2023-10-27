@@ -36,7 +36,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
     - secondary address: None
     - timeout: 30s
     - NO sending of EOI with write nor terminating read with EOS
-    - Neither System Controller nor Autpolling were enabled.
+    - Neither System Controller nor Autopolling were enabled.
     """
 
     def __init__(
