@@ -22,12 +22,12 @@ import pyvisa.errors
 
 class QMI_VisaUsbTmcTransport(QMI_UsbTmcTransport):
 
-    def __init__(self, vendorid: int, productid: int, serialnr: str, ):
+    def __init__(self, vendorid: int, productid: int, serialnr: str):
         super().__init__(vendorid, productid, serialnr)
         self._device: Optional[pyvisa.ResourceManager] = None
 
     def _open_transport(self) -> None:
-        visa_resource = "USB::0x{:04x}::0x{:04x}::{}::INSTR".format(self.vendorid, self.productid, self.serialnr)
+        visa_resource = f"USB::0x{self.vendorid:04x}::0x{self.productid:04x}::{self.serialnr}::INSTR"
         rm = pyvisa.ResourceManager()
         try:
             self._device = rm.open_resource(visa_resource)

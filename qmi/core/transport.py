@@ -811,7 +811,6 @@ class QMI_UsbTmcTransport(QMI_Transport):
         self.vendorid = vendorid
         self.productid = productid
         self.serialnr = serialnr
-        self._read_buffer = bytes()
 
     @staticmethod
     def _validate_product_id(productid):
@@ -862,27 +861,19 @@ class QMI_UsbTmcTransport(QMI_Transport):
                 is received before the requested number of bytes is reached.
         """
         self._check_is_open()
-        nbuf = len(self._read_buffer)
-        while True:
-            if nbuf == nbytes:
-                # The requested number of bytes are already in the buffer. Return them immediately.
-                ret = self._read_buffer
-                self._read_buffer = bytes()
-                return ret
+        # USB requires a timeout
+        if timeout is None:
+            timeout = self.DEFAULT_READ_TIMEOUT
 
-            # USB requires a timeout
-            if timeout is None:
-                timeout = self.DEFAULT_READ_TIMEOUT
+        # Read a USB message
+        ret = self._read_message(timeout)
+        if len(ret) == nbytes:
+            return ret
 
-            # Read buffer was of wrong length or is empty - read a new message from the instrument.
-            self._read_buffer += self._read_message(timeout)
-            nbuf = len(self._read_buffer)
-            if nbuf != nbytes:
-                _logger.debug("USBTMC read buffer contained data %s" % self._read_buffer.decode())
-                self._read_buffer = bytes()
-                raise QMI_EndOfInputException(
-                    f"The read buffer did not contain expected bytes of data ({nbuf} != {nbytes}."
-                )
+        _logger.debug("USBTMC read message contained data %s" % ret.decode())
+        raise QMI_EndOfInputException(
+            f"The read message did not contain expected bytes of data ({len(ret)} != {nbytes}."
+        )
 
     def read_until(self, message_terminator: bytes, timeout: Optional[float]) -> bytes:
         """The specified message_terminator is ignored. Instead, the instrument must autonomously indicate the end
@@ -925,25 +916,16 @@ class QMI_UsbTmcTransport(QMI_Transport):
         if timeout is None:
             timeout = self.DEFAULT_READ_TIMEOUT
 
-        data = bytes()
-        if self._read_buffer:
-            # Data already available in buffer; return it now.
-            data += self._read_buffer
-            self._read_buffer = bytes()
-
         # Read a new message from the instrument.
-        data += self._read_message(timeout)
+        data = self._read_message(timeout)
 
         return data
 
     def discard_read(self) -> None:
-        # We should empty the buffer, or if it is empty, discard the next message from the source
-        if not len(self._read_buffer):
-            # Read buffer is empty - read a new message from the instrument.
-            self._read_message(self.DEFAULT_READ_TIMEOUT)
-
-        else:
-            self._read_buffer = bytes()
+        try:
+            self._read_message(0.0)
+        except QMI_TimeoutException:
+            return  # Nothing was in the instrument buffer, so we just continue.
 
     def _read_message(self, timeout):
         """Read one USBTMC message from the instrument.
@@ -951,6 +933,9 @@ class QMI_UsbTmcTransport(QMI_Transport):
 
         Parameters:
             timeout: Obligatory parameter to set the timeout for reading.
+
+        Raises:
+            QMI_TimeoutException: If the read is not done within timeout period.
         """
         raise NotImplementedError("QMI_UsbTmcTransport.read not implemented")
 
