@@ -1101,8 +1101,15 @@ class QMI_Vxi11Transport(QMI_Transport):
         self._read_buffer = bytes()
         return ret
 
-    def read_until_timeout(self, nbytes: int, timeout: float):
-        return self.read(nbytes, timeout)
+    def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
+        try:
+            return self.read(nbytes, timeout)
+
+        except QMI_TimeoutException:
+            # Return whatever was read until timeout and clear the buffer.
+            ret = self._read_buffer
+            self._read_buffer = bytes()
+            return ret
 
     def discard_read(self) -> None:
         self._check_is_open()

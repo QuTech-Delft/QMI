@@ -1103,12 +1103,12 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
             _ = self.instr.read_until(message_terminator=bytes("\n", "utf-8"), timeout=0.001)
 
     def test_read_until_timeout(self):
-        """Test read_until_timeout works exactly like read.
+        """Test read_until_timeout works exactly like read if data is available.
 
         Expecting:
             Timeout is set.
             Bytes read from VXI11 instrument has been passed untouched.
-            Timeout is reverted
+            Timeout is reverted.
         """
         self.mock().timeout = 10.0  # default timeout
         expected_read = b"a1b2c3d4"
@@ -1118,6 +1118,58 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.assertAlmostEqual(self.mock().timeout, 10.0)
         self.assertEqual(nbytes, self.mock().read_raw.call_count)
         self.assertEqual(expected_read, data)
+
+    def test_read_until_timeout_partial_read_with_timeout_exception(self):
+        """Test read_until_timeout catches timeout exception and returns partial read from buffer.
+
+        Expecting:
+            Timeout is set.
+            Read times out with QMI_TimeoutException.
+            Bytes read from VXI11 instrument has been passed partially until the timeout.
+            Second read can read the remaining bytes.
+            Timeout is reverted.
+        """
+        self.mock().timeout = 10.0  # default timeout
+        expected_read = b"a1b2c3d4"
+        nbytes = len(expected_read)
+        first_read_len = nbytes // 2
+        second_read_len = nbytes - first_read_len
+        self.mock().read_raw.side_effect = [chr(c).encode() for c in expected_read[:first_read_len]] +\
+                                           [vxi11.vxi11.Vxi11Exception(err=15, note="Timeout!")] +\
+                                           [chr(c).encode() for c in expected_read[first_read_len:]]
+        # The first read should catch the timeout and return whatever was read until the timeout
+        data_first_read = self.instr.read_until_timeout(nbytes, 1.5)
+        data_second_read = self.instr.read_until_timeout(second_read_len, 1.5)
+        data = data_first_read + data_second_read
+
+        self.assertAlmostEqual(self.mock().timeout, 10.0)
+        self.assertEqual(nbytes + 1, self.mock().read_raw.call_count)  # + 1 as exception also happens at read
+        self.assertEqual(first_read_len, len(data_first_read))
+        self.assertEqual(second_read_len, len(data_second_read))
+        self.assertEqual(expected_read, data)
+
+    def test_read_until_timeout_partial_read_with_endofinput_exception(self):
+        """Test read_until_timeout excepts with QMI_EndOfInputException and read buffer remains as is.
+
+        Expecting:
+            Timeout is set.
+            Read excepts with QMI_EndOfInputException.
+            Bytes read from VXI11 instrument until exception remain in read buffer.
+            Timeout is reverted.
+        """
+        self.mock().timeout = 10.0  # default timeout
+        expected_read = b"a1b2c3d4"
+        nbytes = len(expected_read)
+        first_read_len = nbytes // 2
+        self.mock().read_raw.side_effect = [chr(c).encode() for c in expected_read[:first_read_len]] +\
+                                           [vxi11.vxi11.Vxi11Exception(note="End of input!")]
+        # The read should except and return nothing.
+        with self.assertRaises(qmi.core.exceptions.QMI_EndOfInputException):
+            self.instr.read_until_timeout(nbytes, 1.5)
+
+        self.assertAlmostEqual(self.mock().timeout, 10.0)
+        self.assertEqual(first_read_len + 1, self.mock().read_raw.call_count)   # + 1 as exception also happens at read
+        self.assertEqual(first_read_len, len(self.instr._read_buffer))
 
     def test_discard_read_vxi11exception(self):
         """Test discard_read command.
