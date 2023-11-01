@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Implementation of `discard_read` on `QMI_UsbTmcTransport` class, and `read_until` now forwards to `read_until_timeout` instead of raising error.
+- QMI driver for WL Photonics narrowband tunable filter instrument: `qmi.instruments.wl_photonics.WlPhotonics_WltfN`
 
 ### Changed
 - Non-interface breaking changes on `QMI_UsbTmcTransport` class calls `read` and `read_until_timeout`.
