@@ -8,7 +8,9 @@ from qmi.core.exceptions import QMI_TimeoutException
 import tests.core.pyvisa_stub
 sys.modules["pyvisa"] = tests.core.pyvisa_stub
 sys.modules["pyvisa.errors"] = tests.core.pyvisa_stub.errors
-from qmi.core.transport_gpib_visa import QMI_VisaGpibTransport
+with unittest.mock.patch("sys.platform", "win32"):
+    from qmi.core.transport_gpib_visa import QMI_VisaGpibTransport
+
 patcher = unittest.mock.patch("pyvisa.errors")
 
 
