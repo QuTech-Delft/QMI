@@ -147,26 +147,12 @@ class QMI_VisaGpibTransport(QMI_Transport):
         return self.read_until_timeout(0, timeout)
 
     def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
-        """Read a single GPIB message from the instrument.
-
-        If the timeout expires before the message is received, the read is
-        aborted and any data already received are discarded. In this
-        case QMI_TimeoutException is raised.
-
-        Parameters:
-            nbytes: This input is ignored.
-            timeout: Maximum time to wait (in seconds).
-
-        Returns:
-            Received bytes.
-
-        Raises:
-            ~qmi.core.exceptions.QMI_TimeoutException: If a message could not be read within the timeout.
-        """
         self._check_is_open()
-
-        # Read a new message from the instrument.
-        data = self._read_message(timeout)
+        # Read a new message from the instrument and ignore timeout.
+        try:
+            data = self._read_message(timeout)
+        except QMI_TimeoutException:
+            data = bytes()
 
         return data
 
