@@ -147,6 +147,19 @@ class QMI_VisaGpibTransport(QMI_Transport):
         return self.read_until_timeout(0, timeout)
 
     def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
+        """Read a single USBTMC message from the instrument.
+
+        If the timeout expires before the message is received, the read is
+        aborted and any data already received are discarded. In this
+        case an empty bytes string is returned.
+
+        Parameters:
+            nbytes: This input is ignored.
+            timeout: Maximum time to wait (in seconds).
+
+        Returns:
+            Received bytes.
+        """
         self._check_is_open()
         # Read a new message from the instrument and ignore timeout.
         try:

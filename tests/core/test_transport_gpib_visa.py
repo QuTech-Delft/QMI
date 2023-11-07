@@ -133,8 +133,8 @@ class TestQmiVisaGpibTransport(unittest.TestCase):
         """This tests that read_until_timeout catches timeout exception and returns empty bytes."""
         timeout_error = tests.core.pyvisa_stub.VI_ERROR_TMO
         expected = b""
-
         mock().read_raw.side_effect = exc_mock(timeout_error)
+
         dev = QMI_VisaGpibTransport(1)
         dev.open()
         ret = dev.read_until_timeout(10, timeout=0.001)

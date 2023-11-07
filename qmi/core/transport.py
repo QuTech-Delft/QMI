@@ -893,11 +893,9 @@ class QMI_UsbTmcTransport(QMI_Transport):
     def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
         """Read a single USBTMC message from the instrument.
 
-        If there is already data in the buffer, return it.
-
         If the timeout expires before the message is received, the read is
         aborted and any data already received are discarded. In this
-        case QMI_TimeoutException is raised.
+        case an empty bytes string is returned.
 
         Parameters:
             nbytes: This input is ignored.
@@ -905,10 +903,6 @@ class QMI_UsbTmcTransport(QMI_Transport):
 
         Returns:
             Received bytes.
-
-        Raises:
-            ~qmi.core.exceptions.QMI_TimeoutException: If the timeout expires before the
-            requested number of bytes are available.
         """
         self._check_is_open()
 
@@ -917,7 +911,10 @@ class QMI_UsbTmcTransport(QMI_Transport):
             timeout = self.DEFAULT_READ_TIMEOUT
 
         # Read a new message from the instrument.
-        data = self._read_message(timeout)
+        try:
+            data = self._read_message(timeout)
+        except QMI_TimeoutException:
+            data = bytes()
 
         return data
 
