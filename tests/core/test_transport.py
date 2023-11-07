@@ -282,6 +282,15 @@ class TestQmiTransportParsing(unittest.TestCase):
             self.assertEqual(desc.productid, int(productid))
             self.assertEqual(desc.vendorid, int(vendorid))
 
+        def test_parse_gpib_not_for_linux(self):
+            primary_addr = 1
+            expected_text = "Gpib transport descriptor is for NI GPIB-USB-HS device and Windows-only."
+
+            with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException) as exc:
+                create_transport(f"gpib:{primary_addr}")
+
+            self.assertEqual(expected_text, str(exc.exception))
+
     elif sys.platform.startswith("win") or "msys" in sys.platform:
         # Remove the possibility of import error of pyvisa
         import tests.core.pyvisa_stub
@@ -292,12 +301,13 @@ class TestQmiTransportParsing(unittest.TestCase):
             serialnr = "XYZ"
             vendorid = 0x0699
             productid = 0x3000
+            transport_str = f"usbtmc:vendorid={vendorid}:productid={productid}:serialnr={serialnr}"
             if os.getenv("LIBUSBPATH"):
-                desc = create_transport(f"usbtmc:vendorid={vendorid}:productid={productid}:serialnr={serialnr}")
+                desc = create_transport(transport_str)
 
             else:
                 with unittest.mock.patch("usb.core.find"):
-                    desc = create_transport(f"usbtmc:vendorid={vendorid}:productid={productid}:serialnr={serialnr}")
+                    desc = create_transport(transport_str)
 
             self.assertEqual(desc.serialnr, serialnr)
             self.assertEqual(desc.productid, int(productid))
@@ -307,12 +317,13 @@ class TestQmiTransportParsing(unittest.TestCase):
             serialnr = "XYZ"
             vendorid = 1689
             productid = 12288
+            transport_str = f"usbtmc:vendorid={vendorid}:productid={productid}:serialnr={serialnr}"
             if os.getenv("LIBUSBPATH"):
-                desc = create_transport(f"usbtmc:vendorid={vendorid}:productid={productid}:serialnr={serialnr}")
+                desc = create_transport(transport_str)
 
             else:
                 with unittest.mock.patch("usb.core.find"):
-                    desc = create_transport(f"usbtmc:vendorid={vendorid}:productid={productid}:serialnr={serialnr}")
+                    desc = create_transport(transport_str)
 
             self.assertEqual(desc.serialnr, serialnr)
             self.assertEqual(desc.productid, productid)
@@ -322,16 +333,53 @@ class TestQmiTransportParsing(unittest.TestCase):
             serialnr = "XYZ"
             vendorid = 0xa1
             productid = 0xb2
+            transport_str = f"usbtmc:vendorid={vendorid}:productid={productid}:serialnr={serialnr}"
             if os.getenv("LIBUSBPATH"):
-                desc = create_transport(f"usbtmc:vendorid={vendorid}:productid={productid}:serialnr={serialnr}")
+                desc = create_transport(transport_str)
 
             else:
                 with unittest.mock.patch("usb.core.find"):
-                    desc = create_transport(f"usbtmc:vendorid={vendorid}:productid={productid}:serialnr={serialnr}")
+                    desc = create_transport(transport_str)
 
             self.assertEqual(desc.serialnr, serialnr)
             self.assertEqual(desc.productid, int(productid))
             self.assertEqual(desc.vendorid, int(vendorid))
+
+        def test_parse_gpib(self):
+            board = 0
+            primary_addr = 1
+            secondary_addr = 2
+            timeout = 3.0
+            transport_str = f"gpib:board={board}:{primary_addr}:secondary_addr={secondary_addr}:timeout={timeout}"
+
+            if os.getenv("LIBUSBPATH"):
+                desc = create_transport(transport_str)
+
+            else:
+                with unittest.mock.patch("usb.core.find"):
+                    desc = create_transport(transport_str)
+
+            self.assertEqual(desc._board, board)
+            self.assertEqual(desc._primary_addr, primary_addr)
+            self.assertEqual(desc._secondary_addr, secondary_addr)
+            self.assertEqual(desc._timeout, timeout)
+
+        def test_parse_gpib_defaults(self):
+            primary_addr = 1
+            transport_str = f"gpib:{primary_addr}"
+            default_timeout = 30.0
+
+            if os.getenv("LIBUSBPATH"):
+                desc = create_transport(transport_str)
+
+            else:
+                with unittest.mock.patch("usb.core.find"):
+                    desc = create_transport(transport_str)
+
+            self.assertIsNone(desc._board)
+            self.assertEqual(primary_addr, desc._primary_addr)
+            self.assertIsNone(desc._secondary_addr)
+            self.assertEqual(default_timeout, desc._timeout)
 
     @unittest.mock.patch("qmi.core.transport.QMI_Vxi11Transport")
     def test_parse_vxi11(self, mock):

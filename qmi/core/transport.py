@@ -319,10 +319,10 @@ UsbTmcTransportDescriptorParser = TransportDescriptorParser(
 
 GpibTransportDescriptorParser = TransportDescriptorParser(
     "gpib",
-    [('devicenr', (int, True))],
-    {'if_id': (int, False),
-     'secondnr': (int, False),
-     'timeout': (int, False)}
+    [('primary_addr', (int, True))],
+    {'board': (int, False),
+     'secondary_addr': (int, False),
+     'timeout': (float, False)}
 )
 
 Vxi11TransportDescriptorParser = TransportDescriptorParser(
@@ -1125,8 +1125,8 @@ def create_transport(transport_descriptor: str,
     String format:
       - TCP connection:    "tcp:host[:port][:connect_timeout=T]"
       - Serial port:       "serial:device[:baudrate=115200][:databits=8][:parity=N][:stopbits=1]"
-      - USBTMC device:     "usbtmc:vendorid=0x[vid]:productid=0x[pid]:serialnr=[sn]"
-      - GPIB device:       "gpib:devicenr[:if_id=None][:secondnr=None][:timeout=40]"
+      - USBTMC device:     "usbtmc[:vendorid=0xvid][:productid=0xpid]:serialnr=sn"
+      - GPIB device:       "gpib:[board=0]:primary_addr[:secondary_addr=2][:timeout=30.0]"
       - VXI-11 instrument: "vxi11:host"
 
     "host" (for TCP & VXI-11 transports) specifies the host name or IP address of
