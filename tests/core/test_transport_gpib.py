@@ -17,41 +17,57 @@ class TestQmiVisaGpibTransport(unittest.TestCase):
 
     def test_create_default_object(self):
         """Test instantiating the class with default values."""
-        devicenr = 1
-        default_if_id = ""
+        primary_addr = 1
+        default_secondary_addr = None
+        default_board = None
         default_timeout = 30
+        expected_dev_str = f"QMI_VisaGpibTransport GPIB::{primary_addr}::INSTR"
 
-        dev = QMI_VisaGpibTransport(devicenr)
+        dev = QMI_VisaGpibTransport(primary_addr)
+        dev_str = str(dev)
 
         self.assertIsNotNone(dev)
-        self.assertEqual(devicenr, dev._devicenr)
-        self.assertEqual(default_if_id, dev._if_id)
-        self.assertIsNone(dev._secondnr)
+        self.assertEqual(expected_dev_str, dev_str)
+        self.assertEqual(primary_addr, dev._primary_addr)
+        self.assertEqual(default_board, dev._board)
+        self.assertEqual(default_secondary_addr, dev._secondary_addr)
         self.assertEqual(default_timeout, dev._timeout)
 
     def test_create_object(self):
         """Test instantiating the class with custom values."""
-        devicenr = 1
-        if_id = 0
+        primary_addr = 1
+        board = 0
         secondnr = 2
         timeout = 0.1
+        expected_dev_str = f"QMI_VisaGpibTransport GPIB{board}::{primary_addr}::{secondnr}::INSTR"
 
-        dev = QMI_VisaGpibTransport(devicenr, if_id=if_id, secondnr=secondnr, timeout=timeout)
+        dev = QMI_VisaGpibTransport(primary_addr, board=board, secondary_addr=secondnr, timeout=timeout)
+        dev_str = str(dev)
 
         self.assertIsNotNone(dev)
-        self.assertEqual(devicenr, dev._devicenr)
-        self.assertEqual(if_id, dev._if_id)
-        self.assertEqual(secondnr, dev._secondnr)
+        self.assertEqual(expected_dev_str, dev_str)
+        self.assertEqual(primary_addr, dev._primary_addr)
+        self.assertEqual(board, dev._board)
+        self.assertEqual(secondnr, dev._secondary_addr)
         self.assertEqual(timeout, dev._timeout)
 
     @unittest.mock.patch("pyvisa.ResourceManager.open_resource")
     def test_open_close(self, mock):
         """Test opening and closing the instrument."""
-        dev = QMI_VisaGpibTransport(1)
+        primary_nr = 1
+        default_timeout = 30 * 1000
+        terminations = '\n'
+        dev = QMI_VisaGpibTransport(primary_nr)
         dev.open()
         dev.close()
 
         mock.assert_called_once()
+        tests.core.pyvisa_stub.ResourceManager.open_resource.assert_called_once_with(
+            f"GPIB::{primary_nr}::INSTR",
+            timeout=default_timeout,
+            write_termination=terminations,
+            read_termination=terminations
+        )
 
     @unittest.mock.patch("pyvisa.ResourceManager.open_resource")
     def test_write(self, mock):
@@ -113,27 +129,19 @@ class TestQmiVisaGpibTransport(unittest.TestCase):
 
     @unittest.mock.patch("pyvisa.ResourceManager.open_resource")
     def test_discard_read(self, mock):
-        """See that discard_read either empties the read buffer, or if it is already empty,
-        it tries to read whatever is in the incoming instrument buffer.
+        """See that discard_read tries to read whatever is in the incoming instrument buffer.
         """
         expected = b"01234"
 
         mock().read_raw.return_value = expected
         dev = QMI_VisaGpibTransport(1)
-        dev._read_buffer = b"somestuff"
         dev.open()
-        # First read should empty the read buffer
+        # Read should empty the read buffer
         dev.discard_read()
 
-        self.assertEqual(bytes(), dev._read_buffer)
-        mock().read_raw.assert_not_called()
-
-        # Second read should clear up incoming readout
-        dev.discard_read()
         dev.close()
 
         mock().read_raw.assert_called_once()
-        self.assertEqual(bytes(), dev._read_buffer)
 
     @unittest.mock.patch("pyvisa.ResourceManager.open_resource")
     @unittest.mock.patch("pyvisa.errors.VisaIOError", new_callable=lambda: tests.core.pyvisa_stub.VisaIOError)

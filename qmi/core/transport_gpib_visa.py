@@ -6,16 +6,18 @@ from qmi.core.exceptions import QMI_TimeoutException, QMI_TransportDescriptorExc
     QMI_RuntimeException, QMI_EndOfInputException, QMI_Exception
 from qmi.core.transport import QMI_Transport
 
-if sys.platform == "win32":
-    import usb
-    import usb.core
-    from usb.backend import libusb1
-    try:
-        backend = libusb1.get_backend(find_library=lambda x: os.getenv("LIBUSBPATH"))
-        usb.core.find(backend=backend)
+if sys.platform != "win32":
+    raise QMI_RuntimeException("The GPIB transport supports only Windows platforms.")
 
-    except usb.core.NoBackendError as exc:
-        raise QMI_RuntimeException("LIBUSBPATH environment variable must be set for libusb") from exc
+import usb
+import usb.core
+from usb.backend import libusb1
+try:
+    backend = libusb1.get_backend(find_library=lambda x: os.getenv("LIBUSBPATH"))
+    usb.core.find(backend=backend)
+
+except usb.core.NoBackendError as exc:
+    raise QMI_RuntimeException("LIBUSBPATH environment variable must be set for libusb") from exc
 
 import pyvisa
 import pyvisa.errors
@@ -41,39 +43,39 @@ class QMI_VisaGpibTransport(QMI_Transport):
 
     def __init__(
             self,
-            devicenr: int,
-            if_id: Optional[int] = None,
-            secondnr: Optional[int] = None,
-            timeout: Optional[float] = 30
+            primary_addr: int,
+            board: Optional[int] = None,
+            secondary_addr: Optional[int] = None,
+            timeout: Optional[float] = 30.0
     ):
         """Initialization of the Gpib transport.
 
         Parameters:
-            devicenr: The device number to initialize.
-            if_id: Optional interface ID, "GPIBx", number?
-            secondnr: Optional Secondary device number.
-            timeout: The device timeout for calls. Default is 30s.
+            primary_addr: The device number to initialize.
+            board: Optional interface ID, "GPIBx", number?
+            secondary_addr: Optional Secondary device number.
+            timeout: The device timeout for read, in seconds. Default is 30s.
         """
-        _logger.debug("Opening GPIB device nr (%i)", devicenr)
+        _logger.debug("Opening GPIB device nr (%i)", primary_addr)
         super().__init__()
-        self._devicenr = devicenr
-        self._if_id = if_id if if_id is not None else ""
-        self._secondnr = secondnr
+        self._primary_addr = primary_addr
+        self._board = board
+        self._secondary_addr = secondary_addr
         self._timeout = timeout
         self._device: Optional[pyvisa.ResourceManager] = None
         self._read_buffer = bytes()
 
     def _open_transport(self) -> None:
-        visa_resource = f"GPIB{self._if_id}::{self._devicenr}::"
-        if self._secondnr:
-            visa_resource += f"{self._secondnr}::INSTR"
-        else:
-            visa_resource += "INSTR"
+        visa_resource = f"GPIB{self._board}::{self._primary_addr}::" if self._board else f"GPIB::{self._primary_addr}::"
+        if self._secondary_addr:
+            visa_resource = visa_resource + f"{self._secondary_addr}::"
+
+        visa_resource = visa_resource + "INSTR"
 
         rm = pyvisa.ResourceManager()
         try:
-            self._device = rm.open_resource(visa_resource, timeout=self._timeout * 1000, write_termination='\n',
-                                read_termination='\n')
+            self._device = rm.open_resource(visa_resource, timeout=int(self._timeout * 1000), write_termination='\n',
+                                            read_termination='\n')
 
         except ValueError as exc:
             if "install a suitable backend" in str(exc):
@@ -100,62 +102,34 @@ class QMI_VisaGpibTransport(QMI_Transport):
         return self._device
 
     def __str__(self) -> str:
-        return f"QMI_VisaGpibTransport GPIB::{self._devicenr}::INSTR"
+        if self._board is not None:
+            descriptor = f"QMI_VisaGpibTransport GPIB{self._board}::{self._primary_addr}::"
+        else:
+            descriptor = f"QMI_VisaGpibTransport GPIB::{self._primary_addr}::"
+        descriptor = descriptor + f"{self._secondary_addr}::INSTR" if self._secondary_addr else descriptor + "INSTR"
+        return descriptor
 
     def close(self) -> None:
-        _logger.debug("Closing GPIB device nr %i", self._devicenr)
+        _logger.debug("Closing GPIB device nr %i", self._primary_addr)
         super().close()
 
     def write(self, data: bytes) -> None:
         self._check_is_open()
-
-        self._safe_device.timeout = int(self._timeout * 1000)
+        self._safe_device.timeout = self._timeout
         self._safe_device.write_raw(data)
 
     def read(self, nbytes: int, timeout: Optional[float]) -> bytes:
-        """Read a specified number of bytes from the transport.
-
-        All bytes must belong to the same GPIB message.
-
-        This method blocks until the specified number of bytes are available,
-        then returns the received bytes. If timeout occurs, any partial read
-        data is discarded and QMI_TimeoutException is raised.
-
-        Parameters:
-            nbytes: Expected number of bytes to read.
-            timeout: Maximum time to wait in seconds (default: 60 seconds).
-
-        Returns:
-            Received bytes.
-
-        Raises:
-            ~qmi.core.exceptions.QMI_TimeoutException: If the timeout expires before the
-                requested number of bytes are available.
-            ~qmi.core.exceptions.QMI_EndOfInputException: If an end-of-message indicator
-                is received before the requested number of bytes is reached.
-        """
         self._check_is_open()
-        nbuf = len(self._read_buffer)
-        while True:
-            if nbuf == nbytes:
-                # The requested number of bytes are already in the buffer. Return them immediately.
-                ret = self._read_buffer
-                self._read_buffer = bytes()
-                return ret
 
-            # GPIB requires a timeout
-            if timeout is None:
-                timeout = self._timeout
+        # Read a GPIB message
+        ret = self._read_message(timeout)
+        if len(ret) == nbytes:
+            return ret
 
-            # Read buffer was of wrong length or is empty - read a new message from the instrument.
-            self._read_buffer += self._read_message(timeout)
-            nbuf = len(self._read_buffer)
-            if nbuf != nbytes:
-                _logger.debug("GPIB read buffer contained data %s" % self._read_buffer.decode())
-                self._read_buffer = bytes()
-                raise QMI_EndOfInputException(
-                    f"The read buffer did not contain expected bytes of data ({nbuf} != {nbytes}."
-                )
+        _logger.debug("GPIB read message contained data %s" % self._read_buffer.decode())
+        raise QMI_EndOfInputException(
+            f"The read message did not contain expected bytes of data ({len(ret)} != {nbytes}."
+        )
 
     def read_until(self, message_terminator: bytes, timeout: Optional[float]) -> bytes:
         """The specified message_terminator is ignored. Instead, the instrument must autonomously indicate the end
@@ -175,8 +149,6 @@ class QMI_VisaGpibTransport(QMI_Transport):
     def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
         """Read a single GPIB message from the instrument.
 
-        If there is already data in the buffer, return it.
-
         If the timeout expires before the message is received, the read is
         aborted and any data already received are discarded. In this
         case QMI_TimeoutException is raised.
@@ -189,40 +161,31 @@ class QMI_VisaGpibTransport(QMI_Transport):
             Received bytes.
 
         Raises:
-            ~qmi.core.exceptions.QMI_TimeoutException: If the timeout expires before the
-            requested number of bytes are available.
+            ~qmi.core.exceptions.QMI_TimeoutException: If a message could not be read within the timeout.
         """
         self._check_is_open()
 
-        # USB requires a timeout
-        if timeout is None:
-            timeout = self._timeout
-
-        data = bytes()
-        if self._read_buffer:
-            # Data already available in buffer; return it now.
-            data += self._read_buffer
-            self._read_buffer = bytes()
-
         # Read a new message from the instrument.
-        data += self._read_message(timeout)
+        data = self._read_message(timeout)
 
         return data
 
     def discard_read(self) -> None:
-        # We should empty the buffer, or if it is empty, discard the next message from the source
-        if not len(self._read_buffer):
-            # Read buffer is empty - read a new message from the instrument.
-            try:
-                self._read_message(0.0)
-            except QMI_TimeoutException:
-                pass  # Nothing to discard.
-
-        else:
-            self._read_buffer = bytes()
+        try:
+            self._read_message(0.0)
+        except QMI_TimeoutException:
+            return  # Nothing to discard.
 
     def _read_message(self, timeout):
-        self._safe_device.timeout = 1 + int(timeout * 1000)
+        if timeout is not None:
+            if timeout < 1:
+                self._safe_device.timeout = 0  # immediate read
+
+            self._safe_device.timeout = int(timeout * 1000)  # in milliseconds
+
+        else:
+            self._safe_device.timeout = timeout  # infinite
+
         try:
             data = self._safe_device.read_raw()
         except pyvisa.errors.VisaIOError as exc:

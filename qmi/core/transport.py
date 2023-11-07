@@ -774,7 +774,7 @@ class QMI_UsbTmcTransport(QMI_Transport):
 
     This class does not implement the full functionality of QMI_Transport.
     The issue is that USBTMC is fundamentally a message-oriented protocol,
-    while QMI_Transport assumes an byte stream without message delimiters.
+    while QMI_Transport assumes a byte stream without message delimiters.
 
     Only the following operations are supported:
       * write() writes the specified bytes as a single USBTMC message.
