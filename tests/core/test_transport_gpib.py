@@ -128,6 +128,22 @@ class TestQmiVisaGpibTransport(unittest.TestCase):
         self.assertEqual(ret, expected)
 
     @unittest.mock.patch("pyvisa.ResourceManager.open_resource")
+    @unittest.mock.patch("pyvisa.errors.VisaIOError", new_callable=lambda: tests.core.pyvisa_stub.VisaIOError)
+    def test_read_until_timeout_does_not_raise_timeout_exception(self, exc_mock, mock):
+        """This tests that read_until_timeout catches timeout exception and returns empty bytes."""
+        timeout_error = tests.core.pyvisa_stub.VI_ERROR_TMO
+        expected = b""
+
+        mock().read_raw.side_effect = exc_mock(timeout_error)
+        dev = QMI_VisaGpibTransport(1)
+        dev.open()
+        ret = dev.read_until_timeout(10, timeout=0.001)
+        dev.close()
+
+        mock().read_raw.assert_called_once()
+        self.assertEqual(ret, expected)
+
+    @unittest.mock.patch("pyvisa.ResourceManager.open_resource")
     def test_discard_read(self, mock):
         """See that discard_read tries to read whatever is in the incoming instrument buffer.
         """
