@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Non-interface breaking changes on `QMI_UsbTmcTransport` class calls `read` and `read_until_timeout`.
 - QMI_Vxi11Transport.read() to not discard read data buffer at exception. It also returns data immediately if requested nbytes of data is already in the read buffer.
 - QMI_Vxi11Transport.read_until() to not discard read data buffer at exception. It also returns data immediately if requested message terminator is already in the read buffer.
+- Above methods now also apply the maximum read size of 512 bytes at a time, repeated in `while` loop until finish.
 - QMI_Vxi11Transport.discard_read() to also empty current read buffer, and to restore instrument timeout correctly.
 
 ### Fixed

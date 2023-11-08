@@ -1035,7 +1035,8 @@ class QMI_Vxi11Transport(QMI_Transport):
 
         try:
             while len(self._read_buffer) < nbytes:
-                self._read_buffer += self._safe_instr.read_raw(512)
+                nbytes_batch = min(512, nbytes - len(self._read_buffer))
+                self._read_buffer += self._safe_instr.read_raw(nbytes_batch)
 
         except vxi11.vxi11.Vxi11Exception as err:
             if err.err == 15:
