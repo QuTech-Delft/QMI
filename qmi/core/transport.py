@@ -322,7 +322,7 @@ GpibTransportDescriptorParser = TransportDescriptorParser(
     [('primary_addr', (int, True))],
     {'board': (int, False),
      'secondary_addr': (int, False),
-     'timeout': (float, False)}
+     'connect_timeout': (float, False)}
 )
 
 Vxi11TransportDescriptorParser = TransportDescriptorParser(
@@ -1123,7 +1123,7 @@ def create_transport(transport_descriptor: str,
       - TCP connection:    "tcp:host[:port][:connect_timeout=T]"
       - Serial port:       "serial:device[:baudrate=115200][:databits=8][:parity=N][:stopbits=1]"
       - USBTMC device:     "usbtmc[:vendorid=0xvid][:productid=0xpid]:serialnr=sn"
-      - GPIB device:       "gpib:[board=0]:primary_addr[:secondary_addr=2][:timeout=30.0]"
+      - GPIB device:       "gpib:[board=0]:primary_addr[:secondary_addr=2][:connect_timeout=30.0]"
       - VXI-11 instrument: "vxi11:host"
 
     "host" (for TCP & VXI-11 transports) specifies the host name or IP address of
@@ -1159,7 +1159,7 @@ def create_transport(transport_descriptor: str,
     "devicenr" is GPIB device number (integer).
     "if_id" is optional GPIB interface number (GPIB[if_id]::...). Default is None.
     "secondnr" is optional secondary device address number. Default is None.
-    "timeout" is custom timeout for GPIB device, in seconds; the default is 30s.
+    "connect_timeout" is for opening resource for GPIB device, in seconds; the default is 30s.
     """
     if SerialTransportDescriptorParser.match_interface(transport_descriptor):
         attributes = SerialTransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)

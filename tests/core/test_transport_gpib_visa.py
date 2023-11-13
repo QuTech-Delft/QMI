@@ -33,7 +33,7 @@ class TestQmiVisaGpibTransport(unittest.TestCase):
         self.assertEqual(primary_addr, dev._primary_addr)
         self.assertEqual(default_board, dev._board)
         self.assertEqual(default_secondary_addr, dev._secondary_addr)
-        self.assertEqual(default_timeout, dev._timeout)
+        self.assertEqual(default_timeout, dev._connect_timeout)
 
     def test_create_object(self):
         """Test instantiating the class with custom values."""
@@ -43,7 +43,7 @@ class TestQmiVisaGpibTransport(unittest.TestCase):
         timeout = 0.1
         expected_dev_str = f"QMI_VisaGpibTransport GPIB{board}::{primary_addr}::{secondnr}::INSTR"
 
-        dev = QMI_VisaGpibTransport(primary_addr, board=board, secondary_addr=secondnr, timeout=timeout)
+        dev = QMI_VisaGpibTransport(primary_addr, board=board, secondary_addr=secondnr, connect_timeout=timeout)
         dev_str = str(dev)
 
         self.assertIsNotNone(dev)
@@ -51,7 +51,7 @@ class TestQmiVisaGpibTransport(unittest.TestCase):
         self.assertEqual(primary_addr, dev._primary_addr)
         self.assertEqual(board, dev._board)
         self.assertEqual(secondnr, dev._secondary_addr)
-        self.assertEqual(timeout, dev._timeout)
+        self.assertEqual(timeout, dev._connect_timeout)
 
     @unittest.mock.patch("pyvisa.ResourceManager.open_resource")
     def test_open_close(self, mock):
@@ -66,7 +66,7 @@ class TestQmiVisaGpibTransport(unittest.TestCase):
         mock.assert_called_once()
         tests.core.pyvisa_stub.ResourceManager.open_resource.assert_called_once_with(
             f"GPIB::{primary_nr}::INSTR",
-            timeout=default_timeout,
+            open_timeout=default_timeout,
             write_termination=terminations,
             read_termination=terminations
         )

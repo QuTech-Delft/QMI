@@ -46,7 +46,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
             primary_addr: int,
             board: Optional[int] = None,
             secondary_addr: Optional[int] = None,
-            timeout: Optional[float] = 30.0
+            connect_timeout: Optional[float] = 30.0
     ):
         """Initialization of the Gpib transport.
 
@@ -54,14 +54,14 @@ class QMI_VisaGpibTransport(QMI_Transport):
             primary_addr: The device number to initialize.
             board: Optional interface ID, "GPIBx", number?
             secondary_addr: Optional Secondary device number.
-            timeout: The device timeout for read, in seconds. Default is 30s.
+            connect_timeout: The device timeout to open resource, in seconds. Default is 30s.
         """
         _logger.debug("Opening GPIB device nr (%i)", primary_addr)
         super().__init__()
         self._primary_addr = primary_addr
         self._board = board
         self._secondary_addr = secondary_addr
-        self._timeout = timeout
+        self._connect_timeout = connect_timeout
         self._device: Optional[pyvisa.ResourceManager] = None
         self._read_buffer = bytes()
 
@@ -74,8 +74,12 @@ class QMI_VisaGpibTransport(QMI_Transport):
 
         rm = pyvisa.ResourceManager()
         try:
-            self._device = rm.open_resource(visa_resource, timeout=int(self._timeout * 1000), write_termination='\n',
-                                            read_termination='\n')
+            self._device = rm.open_resource(
+                visa_resource,
+                open_timeout=int(self._connect_timeout * 1000),
+                write_termination='\n',
+                read_termination='\n'
+            )
 
         except ValueError as exc:
             if "install a suitable backend" in str(exc):
@@ -115,7 +119,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
 
     def write(self, data: bytes) -> None:
         self._check_is_open()
-        self._safe_device.timeout = self._timeout
+        self._safe_device.timeout = self._connect_timeout
         self._safe_device.write_raw(data)
 
     def read(self, nbytes: int, timeout: Optional[float]) -> bytes:

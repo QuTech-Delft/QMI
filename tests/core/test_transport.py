@@ -350,7 +350,7 @@ class TestQmiTransportParsing(unittest.TestCase):
             primary_addr = 1
             secondary_addr = 2
             timeout = 3.0
-            transport_str = f"gpib:board={board}:{primary_addr}:secondary_addr={secondary_addr}:timeout={timeout}"
+            transport_str = f"gpib:board={board}:{primary_addr}:secondary_addr={secondary_addr}:connect_timeout={timeout}"
 
             if os.getenv("LIBUSBPATH"):
                 desc = create_transport(transport_str)
@@ -362,7 +362,7 @@ class TestQmiTransportParsing(unittest.TestCase):
             self.assertEqual(desc._board, board)
             self.assertEqual(desc._primary_addr, primary_addr)
             self.assertEqual(desc._secondary_addr, secondary_addr)
-            self.assertEqual(desc._timeout, timeout)
+            self.assertEqual(desc._connect_timeout, timeout)
 
         def test_parse_gpib_defaults(self):
             primary_addr = 1
@@ -379,7 +379,7 @@ class TestQmiTransportParsing(unittest.TestCase):
             self.assertIsNone(desc._board)
             self.assertEqual(primary_addr, desc._primary_addr)
             self.assertIsNone(desc._secondary_addr)
-            self.assertEqual(default_timeout, desc._timeout)
+            self.assertEqual(default_timeout, desc._connect_timeout)
 
     @unittest.mock.patch("qmi.core.transport.QMI_Vxi11Transport")
     def test_parse_vxi11(self, mock):
