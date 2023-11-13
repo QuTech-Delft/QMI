@@ -317,6 +317,14 @@ UsbTmcTransportDescriptorParser = TransportDescriptorParser(
      'serialnr': (str, True)}
 )
 
+GpibTransportDescriptorParser = TransportDescriptorParser(
+    "gpib",
+    [('primary_addr', (int, True))],
+    {'board': (int, False),
+     'secondary_addr': (int, False),
+     'connect_timeout': (float, False)}
+)
+
 Vxi11TransportDescriptorParser = TransportDescriptorParser(
     "vxi11",
     [("host", (str, True))],
@@ -766,7 +774,7 @@ class QMI_UsbTmcTransport(QMI_Transport):
 
     This class does not implement the full functionality of QMI_Transport.
     The issue is that USBTMC is fundamentally a message-oriented protocol,
-    while QMI_Transport assumes an byte stream without message delimiters.
+    while QMI_Transport assumes a byte stream without message delimiters.
 
     Only the following operations are supported:
       * write() writes the specified bytes as a single USBTMC message.
@@ -882,14 +890,12 @@ class QMI_UsbTmcTransport(QMI_Transport):
         """
         return self.read_until_timeout(0, timeout)
 
-    def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
+    def read_until_timeout(self, nbytes: int, timeout: Optional[float]) -> bytes:
         """Read a single USBTMC message from the instrument.
-
-        If there is already data in the buffer, return it.
 
         If the timeout expires before the message is received, the read is
         aborted and any data already received are discarded. In this
-        case QMI_TimeoutException is raised.
+        case an empty bytes string is returned.
 
         Parameters:
             nbytes: This input is ignored.
@@ -897,10 +903,6 @@ class QMI_UsbTmcTransport(QMI_Transport):
 
         Returns:
             Received bytes.
-
-        Raises:
-            ~qmi.core.exceptions.QMI_TimeoutException: If the timeout expires before the
-            requested number of bytes are available.
         """
         self._check_is_open()
 
@@ -909,7 +911,10 @@ class QMI_UsbTmcTransport(QMI_Transport):
             timeout = self.DEFAULT_READ_TIMEOUT
 
         # Read a new message from the instrument.
-        data = self._read_message(timeout)
+        try:
+            data = self._read_message(timeout)
+        except QMI_TimeoutException:
+            data = bytes()
 
         return data
 
@@ -1155,13 +1160,16 @@ def create_transport(transport_descriptor: str,
     String format:
       - TCP connection:    "tcp:host[:port][:connect_timeout=T]"
       - Serial port:       "serial:device[:baudrate=115200][:databits=8][:parity=N][:stopbits=1]"
-      - USBTMC device:     "usbtmc[:vendorid=V][:productid=P]:serialnr=S"
+      - USBTMC device:     "usbtmc[:vendorid=0xvid][:productid=0xpid]:serialnr=sn"
+      - GPIB device:       "gpib:[board=0]:primary_addr[:secondary_addr=2][:connect_timeout=30.0]"
       - VXI-11 instrument: "vxi11:host"
 
     "host" (for TCP & VXI-11 transports) specifies the host name or IP address of
     the TCP server. Numerical IPv6 addresses must be enclosed in square brackets.
 
     "port" (for TCP transports) specifies the TCP port number of the server.
+
+    "connect_timeout" is TCP connection timeout. Default is 10s.
 
     "device" (for serial port transports) is the name of the serial port,
     for example "COM3" or "/dev/ttyUSB0".
@@ -1185,6 +1193,11 @@ def create_transport(transport_descriptor: str,
     "vendorid" is the USB Vendor ID as a decimal number or as hexadecimal with 0x prefix.
     "productid" is the USB Product ID as a decimal number or as hexadecimal with 0x prefix.
     "serialnr" is the USB serial number string.
+
+    "primary_addr" is GPIB device number (integer).
+    "board" is optional GPIB interface number (GPIB[if_id]::...). Default is None.
+    "secondary_addr" is optional secondary device address number. Default is None.
+    "connect_timeout" is for opening resource for GPIB device, in seconds; the default is 30s.
     """
     if SerialTransportDescriptorParser.match_interface(transport_descriptor):
         attributes = SerialTransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
@@ -1201,6 +1214,18 @@ def create_transport(transport_descriptor: str,
             # On Linux, we use a copy of python-usbtmc which is integrated in QMI.
             from qmi.core.transport_usbtmc_pyusb import QMI_PyUsbTmcTransport
             return QMI_PyUsbTmcTransport(**attributes)
+
+    elif GpibTransportDescriptorParser.match_interface(transport_descriptor):
+        attributes = GpibTransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
+        if sys.platform.lower().startswith("win"):
+            from qmi.core.transport_gpib_visa import QMI_VisaGpibTransport
+            return QMI_VisaGpibTransport(**attributes)
+        else:
+            # This is a Windows-specific transport for National Instruments GPIB-USB-HS.
+            raise QMI_TransportDescriptorException(
+                "Gpib transport descriptor is for NI GPIB-USB-HS device and Windows-only."
+            )
+
     elif Vxi11TransportDescriptorParser.match_interface(transport_descriptor):
         attributes = Vxi11TransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
         return QMI_Vxi11Transport(**attributes)

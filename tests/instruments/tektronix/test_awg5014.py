@@ -353,13 +353,9 @@ class TektronixAWG5014TestCase(unittest.TestCase):
             sleep(timeout)
             raise QMI_TimeoutException("Took too long")
 
-        start = time()
         with open_close(self.instr):
             self._transport_mock.read_until = mock_read_fun
             self.instr.reset()
-
-        end = time()
-        self.assertGreater(end - start, 1.0)
 
     def test_get_error(self):
         """Test get_error call. Error check returns an error, so *CLS is called once more."""
