@@ -46,7 +46,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
             primary_addr: int,
             board: Optional[int] = None,
             secondary_addr: Optional[int] = None,
-            connect_timeout: Optional[float] = 30.0
+            connect_timeout: float = 30.0
     ):
         """Initialization of the Gpib transport.
 
@@ -119,7 +119,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
 
     def write(self, data: bytes) -> None:
         self._check_is_open()
-        self._safe_device.timeout = self._connect_timeout
+        self._safe_device.timeout = 0.0
         self._safe_device.write_raw(data)
 
     def read(self, nbytes: int, timeout: Optional[float]) -> bytes:
@@ -150,7 +150,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
         """
         return self.read_until_timeout(0, timeout)
 
-    def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
+    def read_until_timeout(self, nbytes: int, timeout: Optional[float]) -> bytes:
         """Read a single USBTMC message from the instrument.
 
         If the timeout expires before the message is received, the read is
@@ -179,11 +179,13 @@ class QMI_VisaGpibTransport(QMI_Transport):
         except QMI_TimeoutException:
             return  # Nothing to discard.
 
-    def _read_message(self, timeout):
-        if timeout is not None:
-            if timeout < 1:
-                self._safe_device.timeout = 0  # immediate read
+    def _read_message(self, timeout: Optional[float]) -> bytes:
+        """Read a GPIB message. A whole message is read from the device in bytes.
 
+        Parameters:
+            timeout: Timeout for reading
+        """
+        if timeout is not None:
             self._safe_device.timeout = int(timeout * 1000)  # in milliseconds
 
         else:

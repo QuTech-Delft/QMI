@@ -890,7 +890,7 @@ class QMI_UsbTmcTransport(QMI_Transport):
         """
         return self.read_until_timeout(0, timeout)
 
-    def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
+    def read_until_timeout(self, nbytes: int, timeout: Optional[float]) -> bytes:
         """Read a single USBTMC message from the instrument.
 
         If the timeout expires before the message is received, the read is
@@ -1156,9 +1156,9 @@ def create_transport(transport_descriptor: str,
     "productid" is the USB Product ID as a decimal number or as hexadecimal with 0x prefix.
     "serialnr" is the USB serial number string.
 
-    "devicenr" is GPIB device number (integer).
-    "if_id" is optional GPIB interface number (GPIB[if_id]::...). Default is None.
-    "secondnr" is optional secondary device address number. Default is None.
+    "primary_addr" is GPIB device number (integer).
+    "board" is optional GPIB interface number (GPIB[if_id]::...). Default is None.
+    "secondary_addr" is optional secondary device address number. Default is None.
     "connect_timeout" is for opening resource for GPIB device, in seconds; the default is 30s.
     """
     if SerialTransportDescriptorParser.match_interface(transport_descriptor):
