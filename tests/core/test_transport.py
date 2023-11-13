@@ -997,7 +997,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         data = self.instr.read(nbytes)
         # Assert
         self.assertEqual(expected_read, data)
-        self.mock().read_raw.assert_called_once_with(1)
+        self.mock().read_raw.assert_called_once_with(self.instr._instr.max_recv_size)
 
     def test_read_buffer_already_filled(self):
         """Test reading from VXI11 instrument with already filled buffer.
@@ -1029,7 +1029,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
 
         # Assert that the timeout is restored
         self.assertAlmostEqual(self.mock().timeout, 10.0)
-        self.mock().read_raw.assert_called_once_with(1)
+        self.mock().read_raw.assert_called_once_with(self.instr._instr.max_recv_size)
 
     def test_read_error(self):
         """Test exception during read. See that the _read_buffer contains data until exception.
