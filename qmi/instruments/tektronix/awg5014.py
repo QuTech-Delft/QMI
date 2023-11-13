@@ -139,7 +139,8 @@ class Tektronix_Awg5014(QMI_Instrument):
         # Re-enable OPC
         self._scpi_transport.write("*OPC")
         try:
-            self._scpi_transport.ask("*CLS", timeout=1.0, discard=True)
+            self._scpi_transport.write("*CLS")
+            self._transport.discard_read()
 
         except (QMI_TimeoutException, socket.timeout):
             # In case no hanging responses were present
