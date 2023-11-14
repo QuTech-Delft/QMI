@@ -982,6 +982,7 @@ class QMI_Vxi11Transport(QMI_Transport):
 
         self._host = host
         self._instr: Optional[vxi11.Instrument] = None
+        self._read_buffer = bytes()
 
     @property
     def _safe_instr(self) -> vxi11.Instrument:
@@ -1024,30 +1025,51 @@ class QMI_Vxi11Transport(QMI_Transport):
         except vxi11.vxi11.Vxi11Exception as err:
             raise QMI_InstrumentException() from err
 
-    def read(self, nbytes: int, timeout: Optional[float]) -> bytes:
+    def read(self, nbytes: int, timeout: Optional[float] = None) -> bytes:
         self._check_is_open()
+        nbuf = len(self._read_buffer)
+        if nbuf >= nbytes:
+            # The requested number of bytes are already in the buffer. Return them immediately.
+            ret = self._read_buffer[:nbytes]
+            self._read_buffer = self._read_buffer[nbytes:]
+            return ret
+
         old_timeout = self._safe_instr.timeout
         if timeout:
             self._safe_instr.timeout = timeout
+
         try:
-            data = self._safe_instr.read_raw(nbytes)
+            while len(self._read_buffer) < nbytes:
+                self._read_buffer += self._safe_instr.read_raw(self._instr.max_recv_size)
+
         except vxi11.vxi11.Vxi11Exception as err:
             if err.err == 15:
                 # Raise timeout exception separately to provide opportunity for upper layer to handle it.
-                raise QMI_TimeoutException("Timeout error attempting to read {} bytes".format(nbytes)) from err
+                raise QMI_TimeoutException(f"Timeout error attempting to read {nbytes} bytes") from err
             else:
-                raise QMI_InstrumentException("Error attempting to read {} bytes.".format(nbytes)) from err
+                raise QMI_EndOfInputException(f"Error attempting to read {nbytes} bytes.") from err
+
         finally:
             self._safe_instr.timeout = old_timeout
 
-        return data
+        ret = self._read_buffer
+        self._read_buffer = bytes()
+        return ret
 
-    def read_until(self, message_terminator: bytes, timeout: Optional[float]) -> bytes:
+    def read_until(self, message_terminator: bytes, timeout: Optional[float] = None) -> bytes:
         self._check_is_open()
         if len(message_terminator) != 1:
             raise QMI_InstrumentException(
                 "VXI11 instrument only support 1 byte terminating character, received {!r}.".format(message_terminator)
             )
+
+        nbuf = len(self._read_buffer)
+        if nbuf > 0 and message_terminator in self._read_buffer:
+            # The requested response is already in the buffer. Return it immediately.
+            terminator_index = self._read_buffer.index(message_terminator)
+            ret = self._read_buffer[:terminator_index]
+            self._read_buffer = self._read_buffer[terminator_index:]
+            return ret
 
         # Set terminator, but keep old value.
         old_term_char = self._safe_instr.term_char
@@ -1058,13 +1080,11 @@ class QMI_Vxi11Transport(QMI_Transport):
         if timeout:
             self._safe_instr.timeout = timeout
 
-        # Attempt to read the data.
         try:
-            data = b''
             while True:
-                data += self._safe_instr.read_raw()
+                self._read_buffer += self._safe_instr.read_raw(self._instr.max_recv_size)
                 # Validate terminator.
-                data_term_char = data[-1:]  # use slice rather than index to get back bytes()
+                data_term_char = self._read_buffer[-1:]  # use slice rather than index to get back bytes()
                 if data_term_char == message_terminator:
                     break
 
@@ -1076,29 +1096,47 @@ class QMI_Vxi11Transport(QMI_Transport):
             else:
                 raise QMI_InstrumentException("Error attempting to read bytes until {!r} char received".format(
                     message_terminator)) from err
+
         finally:
             # Revert terminator and timeout to previous value
             self._safe_instr.term_char = old_term_char
             self._safe_instr.timeout = old_timeout
 
-        return data
+        ret = self._read_buffer
+        self._read_buffer = bytes()
+        return ret
+
+    def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
+        try:
+            return self.read(nbytes, timeout)
+
+        except QMI_TimeoutException:
+            # Return whatever was read until timeout and clear the buffer.
+            ret = self._read_buffer
+            self._read_buffer = bytes()
+            return ret
 
     def discard_read(self) -> None:
         self._check_is_open()
         old_timeout = self._safe_instr.timeout
-        self._safe_instr.timeout = 0.0
+        self._safe_instr.timeout = 0.0  # Immediate read
+        # Clear any possible data in read buffer first
+        self._read_buffer = bytes()
         while True:
             try:
-                _ = self._safe_instr.read_raw(1)
+                self._safe_instr.read_raw(1)
+
             except vxi11.vxi11.Vxi11Exception as err:
                 if err.err == 15:
                     break
                 else:
+                    self._safe_instr.timeout = old_timeout
                     raise QMI_InstrumentException("Error attempting to read a byte") from err
+
             except TimeoutError:
                 break
-            finally:
-                self._safe_instr.timeout = old_timeout
+
+        self._safe_instr.timeout = old_timeout
 
 
 def list_usbtmc_transports() -> List[str]:
