@@ -8,10 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Implementation of `discard_read` on `QMI_UsbTmcTransport` class, and `read_until` now forwards to `read_until_timeout` instead of raising error.
+- QMI_Vxi11Transport.read_until_timeout() implementation such that it calls self.read() with the given input.
+- Tektronix AWG5014 driver now utilizes the `discard_read` in `reset()` instead of work-around `ask` call for `*CLS`.
+- New transport `QMI_VisaGpibTransport` for the need of instruments using National Instruments' GPIB-USB-HS device. Windows only.
+- New Transport string in fashion of "gpib:..." 
 - QMI driver for WL Photonics narrowband tunable filter instrument: `qmi.instruments.wl_photonics.WlPhotonics_WltfN`
 
 ### Changed
 - Non-interface breaking changes on `QMI_UsbTmcTransport` class calls `read` and `read_until_timeout`.
+- QMI_Vxi11Transport.read() to not discard read data buffer at exception. It also returns data immediately if requested nbytes of data is already in the read buffer.
+- QMI_Vxi11Transport.read_until() to not discard read data buffer at exception. It also returns data immediately if requested message terminator is already in the read buffer.
+- Above methods now also apply the maximum read size of 512 bytes at a time, repeated in `while` loop until finish.
+- QMI_Vxi11Transport.discard_read() to also empty current read buffer, and to restore instrument timeout correctly.
 
 ### Fixed
 - Changed a regexp line in TLB-670x driver to a raw string to avoid future warnings.

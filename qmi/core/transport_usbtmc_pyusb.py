@@ -1,3 +1,5 @@
+"""Extension of the QMI_UsbTmcTransport class utilizing usb.core and qmi.core.usbtmc packages."""
+
 from typing import Optional
 
 import usb.core
