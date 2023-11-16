@@ -45,10 +45,10 @@ class WlPhotonics_WltfN(QMI_Instrument):
     The default baudrate is 115200 for serial connections.
 
     Attributes:
-        DEFAULT_RESPONSE_TIMEOUT: Timeout value for waiting responses.
-        ZEROING_WAIT: Time to wait for the motor to go to zero.
-        CMD_TERMINATOR: The terminator added for sending commands.
-        RESPONSE_TERMINATOR: The terminator expected for end of one response.
+        DEFAULT_RESPONSE_TIMEOUT:   Timeout value for waiting responses.
+        ZEROING_WAIT:               Time to wait for the motor to go to zero.
+        CMD_TERMINATOR:             The terminator added for sending commands.
+        RESPONSE_TERMINATOR:        The terminator expected for end of one response.
     """
     # Default response timeout in seconds.
     DEFAULT_RESPONSE_TIMEOUT = 5.0
@@ -57,6 +57,7 @@ class WlPhotonics_WltfN(QMI_Instrument):
     # Command and response terminator characters
     CMD_TERMINATOR = "\r\n"
     RESPONSE_TERMINATOR = b"OK\r\n"
+    ENCODING = "ascii"
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize the instrument driver.
@@ -77,8 +78,7 @@ class WlPhotonics_WltfN(QMI_Instrument):
         self._motor_position = 0
 
         # For convenience
-        self.encoding = "ascii"
-        self.response_terminator = self.RESPONSE_TERMINATOR.decode(self.encoding)
+        self.response_terminator = self.RESPONSE_TERMINATOR.decode(self.ENCODING)
 
     def _write(self, cmd: str) -> None:
         """Write a command to the instrument and check if any errors or alerts were raised.
@@ -88,13 +88,17 @@ class WlPhotonics_WltfN(QMI_Instrument):
         """
         self._check_is_open()
         cmd = cmd + self.CMD_TERMINATOR
-        self._transport.write(cmd.encode(self.encoding))
+        self._transport.write(cmd.encode(self.ENCODING))
 
     def _read(self) -> str:
-        """Read data from the instrument buffer."""
+        """Read data from the instrument buffer.
+
+        Returns:
+            response: Decoded response string.
+        """
         self._check_is_open()
         response = self._transport.read_until(self.RESPONSE_TERMINATOR, timeout=self.DEFAULT_RESPONSE_TIMEOUT)
-        return response.decode(self.encoding)
+        return response.decode(self.ENCODING)
 
     def _clear_ok(self, cmd: str) -> None:
         """Clear response 'OK' from the instrument buffer. If the returned value was something else than "OK",
@@ -105,18 +109,27 @@ class WlPhotonics_WltfN(QMI_Instrument):
 
         Raises:
             QMI_InstrumentException: If the instrument returned another response than "OK".
-
         """
         response = self._read()
         # Check that we got 'OK' as second item in response. The first is the echo of the command sent.
         if response.split(self.response_terminator)[1] == "":
             return
 
-        # Else try to check what went wrong
         raise QMI_InstrumentException(f"Command {cmd} returned {response} instead of OK")
 
     def _ask_int(self, cmd: str) -> int:
-        """Send a query and return an integer number response."""
+        """Send a query and return an integer number response.
+
+        Parameters:
+            cmd:    The query command string.
+
+        Raises:
+            ValueError: If the response string was not an integer value or an empty string.
+            TypeError: If there was no match for the response string to find numbers, giving `None`.
+
+        Returns:
+            response: The query response as integer.
+        """
         self._write(cmd)
         full_response = self._read().split("\n")  # First item should be the response, the second "OK".
         try:
@@ -127,11 +140,23 @@ class WlPhotonics_WltfN(QMI_Instrument):
             raise QMI_InstrumentException(f"Unexpected response to command {cmd!r}: {full_response!r}") from exc
 
     def _ask_float(self, cmd: str) -> float:
-        """Send a query and return a floating point response."""
+        """Send a query and return a floating point response.
+
+        Parameters:
+            cmd:    The query command string.
+
+        Raises:
+            ValueError: If the response string was not a floating point value or an empty string.
+            TypeError: If there was no match for the response string to find numbers, giving `None`.
+
+        Returns:
+            response: The query response as a floating point.
+        """
         self._write(cmd)
         full_response = self._read().split("\n")  # First item should be the response, the second "OK".
         if "Unknown" in full_response[0]:
             # The wavelength has not been set or calibrated yet
+            _logger.warning(f"Trying to set a value with command {cmd}, but the parameter is not yet set or calibrated")
             return 0.0
         try:
             return float(search(r"[\d.]+", full_response[0])[0])  # type: ignore
@@ -180,7 +205,7 @@ class WlPhotonics_WltfN(QMI_Instrument):
         resp = self._read()
         words = resp.rstrip().split("\r\n")
         if len(words) != 3:
-            raise QMI_InstrumentException("Unexpected response to dev?, got {!r}".format(resp))
+            raise QMI_InstrumentException(f"Unexpected response to dev?, got {resp!r}")
 
         model = words[0].split(":")[0]
         serial = search(r"SN\([\d]+\)", words[0])[0].strip("SN()")  # type: ignore
@@ -250,7 +275,7 @@ class WlPhotonics_WltfN(QMI_Instrument):
         """Reverse the motor by input steps. This can be used to fine-tune the center wavelength.
 
         Parameters:
-            steps: How many steps the motor should reverse.
+            steps: Number of steps the motor should reverse.
 
         Raises:
             ValueError: If calculated new motor position is not in the correct range.
@@ -271,7 +296,7 @@ class WlPhotonics_WltfN(QMI_Instrument):
         """Move the motor forward by input steps. This can be used to fine-tune the center wavelength.
 
         Parameters:
-            steps: How many steps the motor should move forward.
+            steps: Number of steps the motor should move forward.
 
         Raises:
             ValueError: If calculated new motor position is not in the correct range.

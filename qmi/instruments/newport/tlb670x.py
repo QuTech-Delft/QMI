@@ -248,10 +248,9 @@ class NewFocus_TLB670X(QMI_Instrument):
     @rpc_method
     def close(self) -> None:
         """Close connection to the device controller."""
-        self._check_is_open()
+        super().close()
         _logger.info(f"Closing connection to {self._name}")
         self._uninit_device()
-        super().close()
 
     @rpc_method
     def get_available_devices_info(self) -> List[Tuple[int, str]]:
