@@ -191,11 +191,9 @@ class WlPhotonics_WltfN(QMI_Instrument):
         'WL Range: 1021.509~1072.505nm(Step: 4654~556)\r\n',
         'OK\r\n'.
         This is processed to create the QMI_InstrumentIdentification object and also to update the wavelength and
-        step range class attributes.
-
-        Attributes:
-            self._wavelength_range: Updates the instrument wavelength range min and max.
-            self._steps_range: Updates the instrument step range min and max.
+        step range class attributes:
+        - self._wavelength_range: Updates the instrument wavelength range min and max.
+        - self._steps_range: Updates the instrument step range min and max.
 
         Returns:
             QMI_InstrumentIdentification: Data with e.g. idn.vendor = WL Photonics, idn.model = WL200,
