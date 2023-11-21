@@ -562,7 +562,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if awg_index not in (0, 1, 2, 3):
             raise ValueError("AWG index must be in 0 .. 3")
 
-        # Create the command table from the provide entries.
+        # Create the command table from the provided entries.
         command_table = {
             "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
             "header": {

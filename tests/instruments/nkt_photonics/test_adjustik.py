@@ -28,7 +28,7 @@ class TestTransportOperations(unittest.TestCase):
 
     def test_open(self):
         # arrange
-        expected_calls = [ call.open(), call.discard_read() ]
+        expected_calls = [call.open(), call.discard_read()]
         # act
         self.laser.open()
         # assert
@@ -36,7 +36,7 @@ class TestTransportOperations(unittest.TestCase):
 
     def test_close(self):
         # arrange
-        expected_calls = [ call.close ]
+        expected_calls = [call.close]
         # act
         self.laser.open()
         self.transport.reset_mock()
@@ -87,10 +87,10 @@ class TestMethods(unittest.TestCase):
             TestDescr("get_basik_module_temperature",                   0x1c,       (1000), b"\x10'"),
             TestDescr("get_basik_module_supply_voltage",                0x1e,         (10), b"\x10'"),
             TestDescr("get_basik_module_wavelength_modulation_enabled", 0xb5,          (1), b"\x01"),
-            TestDescr("get_basik_wavelength_modulation_frequency",      0xb8,    (2.0,1.0), b'\x00\x00\x00\x40\x00\x00\x80\x3f'),
+            TestDescr("get_basik_wavelength_modulation_frequency",      0xb8,    (2.0, 1.0), b'\x00\x00\x00\x40\x00\x00\x80\x3f'),
             TestDescr("get_basik_wavelength_modulation_level",          0x2b,       (1000), b"\x10'"),
             TestDescr("get_basik_wavelength_modulation_offset",         0x2f,       (1000), b"\x10'"),
-            TestDescr("get_basik_amplitude_modulation_frequency",       0xba,    (2.0,1.0), b'\x00\x00\x00\x40\x00\x00\x80\x3f'),
+            TestDescr("get_basik_amplitude_modulation_frequency",       0xba,    (2.0, 1.0), b'\x00\x00\x00\x40\x00\x00\x80\x3f'),
             TestDescr("get_basik_amplitude_modulation_depth",           0x2c,       (1000), b"\x10'"),
             TestDescr("get_basik_modulation_setup_bits",                0xb7,     (0xFFFF), b"\xff\xff"),
             TestDescr("get_adjustik_module_type",                       0x61,       (0x34), b"\x34"),
@@ -108,13 +108,13 @@ class TestMethods(unittest.TestCase):
                 self.interbus.get_register.assert_called_once_with(expected_dest, test.register)
 
     def test_setters(self):
-        TestDescr = namedtuple("TestDescriptor",["method_name","register","value","value_bytes"])
+        TestDescr = namedtuple("TestDescriptor", ["method_name", "register", "value", "value_bytes"])
         test_list = [
             TestDescr("set_basik_setup_bits",                      0x31,  (0xFFFF,), b"\xff\xff"),
             TestDescr("set_basik_output_power_setpoint_mW",        0x22,     (3.0,), b',\x01'),
             TestDescr("set_basik_output_power_setpoint_dBm",       0xa0,     (3.0,), b',\x01'),
             TestDescr("set_basik_wavelength_offset_setpoint",      0x2a,  (1000.0,), b"\x10'"),
-            TestDescr("set_basik_wavelength_modulation_frequency", 0xb8,  (2.0,1.0), b'\x00\x00\x00\x40\x00\x00\x80\x3f'),
+            TestDescr("set_basik_wavelength_modulation_frequency", 0xb8,  (2.0, 1.0), b'\x00\x00\x00\x40\x00\x00\x80\x3f'),
             TestDescr("set_basik_wavelength_modulation_level",     0x2b,  (1000.0,), b"\x10'"),
             TestDescr("set_basik_wavelength_modulation_offset",    0x2f,  (1000.0,), b"\x10'"),
             TestDescr("set_basik_modulation_setup_bits",           0xb7,  (0xFFFF,), b"\xff\xff"),
@@ -128,6 +128,24 @@ class TestMethods(unittest.TestCase):
                 getattr(self.laser, test.method_name)(*test.value)
                 # assert
                 self.interbus.set_register.assert_called_once_with(expected_dest, test.register, test.value_bytes)
+
+    def test_enable_basik_emission_enables_emission(self):
+        self.interbus.reset_mock()
+        # arrange
+        expected_dest = 0x01
+        # act
+        getattr(self.laser, "enable_basik_emission")()
+        # assert
+        self.interbus.set_register.assert_called_once_with(expected_dest, 0x30, b"\x01")
+
+    def test_disable_basik_emission_disables_emission(self):
+        self.interbus.reset_mock()
+        # arrange
+        expected_dest = 0x01
+        # act
+        getattr(self.laser, "disable_basik_emission")()
+        # assert
+        self.interbus.set_register.assert_called_once_with(expected_dest, 0x30, b"\x00")
 
 
 class TestInterbus(unittest.TestCase):

@@ -1195,7 +1195,7 @@ def create_transport(transport_descriptor: str,
     "serialnr" is the USB serial number string.
 
     "primary_addr" is GPIB device number (integer).
-    "board" is optional GPIB interface number (GPIB[if_id]::...). Default is None.
+    "board" is optional GPIB interface number (GPIB[board]::...). Default is None.
     "secondary_addr" is optional secondary device address number. Default is None.
     "connect_timeout" is for opening resource for GPIB device, in seconds; the default is 30s.
     """

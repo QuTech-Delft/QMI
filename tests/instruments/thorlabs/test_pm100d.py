@@ -26,15 +26,16 @@ class TestThorlabsPM10x(unittest.TestCase):
         self.product = "PM16_120"
         self.product_id = "0x807b"
         self.serialnr = "P0024208"
-        transport_id = f"usbtmc:vendorid={self.vendor_id}:productid={self.product_id}:serialnr={self.serialnr}"
+        self.transport_id = f"usbtmc:vendorid={self.vendor_id}:productid={self.product_id}:serialnr={self.serialnr}"
         with unittest.mock.patch("qmi.instruments.thorlabs.pm100d.create_transport") as self._transport:
-            self.thorlabs = Thorlabs_PM10x(qmi_context, "powermeter", transport_id)
+            self.thorlabs = Thorlabs_PM10x(qmi_context, "powermeter", self.transport_id)
 
     def test_open_close(self):
-        expected = f"USB::{self.vendor_id}::{self.product_id}::{self.serialnr}" + "::INSTR"
         self.thorlabs.open()
         self.thorlabs.close()
-        self._transport.called_once_with(expected)
+        self._transport.assert_called_once_with(self.transport_id)
+        self.thorlabs._transport.open.assert_called_once_with()
+        self.thorlabs._transport.close.assert_called_once_with()
 
     @unittest.mock.patch("qmi.core.scpi_protocol.ScpiProtocol.ask")
     def test_get_idn(self, mock_read):
