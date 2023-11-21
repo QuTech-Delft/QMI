@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tektronix AWG5014 driver now utilizes the `discard_read` in `reset()` instead of work-around `ask` call for `*CLS`.
 - New transport `QMI_VisaGpibTransport` for the need of instruments using National Instruments' GPIB-USB-HS device. Windows only.
 - New Transport string in fashion of "gpib:..." 
+- QMI driver for WL Photonics narrowband tunable filter instrument: `qmi.instruments.wl_photonics.WlPhotonics_WltfN`
 
 ### Changed
 - Non-interface breaking changes on `QMI_UsbTmcTransport` class calls `read` and `read_until_timeout`.
@@ -21,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - QMI_Vxi11Transport.discard_read() to also empty current read buffer, and to restore instrument timeout correctly.
 
 ### Fixed
-- Changed a regexp line in TLB-670x driver to a raw string to avoid future warnings.
+- Fixed a regexp line in TLB-670x driver to a raw string to avoid future warnings.
+- Fixed TLB-670x driver to remove empty response strings that sometimes appear.
 
 ## [0.42.0] - 2023-09-29
 

@@ -388,7 +388,7 @@ class TestTLB670XGetSet(unittest.TestCase):
     def _generic_get_test_with_extra_OKs(self, query, expected_value, getter, extra_oks=1, after_oks=0, second_read=""):
         """Helper function for testing getters, return extra "OK" before correct answer."""
         # Setup send/receive
-        command = CtypesMock.StringBuffer("")  # to be set by _send
+        command = CtypesMock.StringBuffer("4\r\n;4\r\n")  # to be set by _send
         self.ctypes_mock.string_buffer.append(command)
         extra_oks_string = ""
         for _ in range(extra_oks):
@@ -445,7 +445,7 @@ class TestTLB670XGetSet(unittest.TestCase):
         # Setup send/receive
         command = CtypesMock.StringBuffer("")  # to be set by _send
         self.ctypes_mock.string_buffer.append(command)
-        response = CtypesMock.StringBuffer("")
+        response = CtypesMock.StringBuffer("OK\r\n")
         self.ctypes_mock.string_buffer.append(response)
         self.ctypes_mock.dllmock.newp_usb_send_ascii.return_value = 0  # success
         self.ctypes_mock.dllmock.newp_usb_get_ascii.return_value = 0  # success

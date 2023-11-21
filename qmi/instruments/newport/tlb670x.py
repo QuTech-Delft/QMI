@@ -111,16 +111,15 @@ class NewFocus_TLB670X(QMI_Instrument):
         response = self._receive()
         if "?" in command_string:
             # Check if response string consists of multiple responses, separated by "\r\n".
-            if len(response) > 2 and len(response[-2]) > 0 and response[-2] != "OK":
-                # The response probably is this. This presumes the last value in list is [''] due to "...\r\n" split.
-                # But check for sporadic "*IDN?" query response first.
-                idn_match = re.search(r"v\d.\d(.\d)? [\d/]+ SN[\d]+", response[-2])
+            if len(response) > 1 and response[-1] != "OK":
+                # The response probably is this. But check for sporadic "*IDN?" query response first.
+                idn_match = re.search(r"v\d.\d(.\d)? [\d/]+ SN[\d]+", response[-1])
                 if idn_match:  # The entry is the invalid response, delete it
-                    del response[-2]
+                    del response[-1]
 
                 # OK check. Otherwise checks response[0].
-                if response[-2] != "OK":
-                    return response[-2]
+                if response[-1] != "OK" and response[-1] != "+00":
+                    return response[-1]
 
             if response[0] == "OK":
                 # Otherwise, we did not get the correct response to our query, try to re-read once
@@ -140,7 +139,7 @@ class NewFocus_TLB670X(QMI_Instrument):
         # Prepare buffer.
         buf_length = ctypes.c_ulong(self.MAX_BUFFER_LENGTH)
         buf = ctypes.create_string_buffer(buf_length.value)
-        bytes_read = ctypes.c_ulong(8)
+        bytes_read = ctypes.c_ulong(64)
 
         # Query controller and check for any errors.
         result = self._handle.newp_usb_get_ascii(
@@ -155,6 +154,8 @@ class NewFocus_TLB670X(QMI_Instrument):
         # Decode response.
         response = buf.value.decode().split("\r\n")
         _logger.debug("Response from device: %s", response)
+        # Pop out empty strings
+        response = [r for r in response if r != ""]
         return response
 
     def _get_device_info(self) -> List[Tuple[int, str]]:
@@ -247,10 +248,9 @@ class NewFocus_TLB670X(QMI_Instrument):
     @rpc_method
     def close(self) -> None:
         """Close connection to the device controller."""
-        self._check_is_open()
+        super().close()
         _logger.info(f"Closing connection to {self._name}")
         self._uninit_device()
-        super().close()
 
     @rpc_method
     def get_available_devices_info(self) -> List[Tuple[int, str]]:
