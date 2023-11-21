@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - QMI_Vxi11Transport.discard_read() to also empty current read buffer, and to restore instrument timeout correctly.
 
 ### Fixed
-- Changed a regexp line in TLB-670x driver to a raw string to avoid future warnings.
+- Fixed a regexp line in TLB-670x driver to a raw string to avoid future warnings.
+- Fixed TLB-670x driver to remove empty response strings that sometimes appear.
 
 ## [0.42.0] - 2023-09-29
 
