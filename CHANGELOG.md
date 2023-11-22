@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+## [0.43.0] - 2023-11-22
+
 ### Added
 - Calls to enable and disable basik emission for `KoherasAdjustikLaser`.
 - Implementation of `discard_read` on `QMI_UsbTmcTransport` class, and `read_until` now forwards to `read_until_timeout` instead of raising error.
