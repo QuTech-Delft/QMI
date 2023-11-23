@@ -4,7 +4,7 @@ Instrument driver for the Edwards Turbo Instrument Controller.
 from enum import Enum
 import logging
 import re
-from typing import NamedTuple
+from typing import Dict, NamedTuple, Tuple
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
@@ -110,9 +110,9 @@ class EdwardsVacuum_TIC_AlertId(Enum):
     SERVICE_DUE = 47
 
 
-class EdwardsVacuum_TIC_RelayState(Enum):
+class EdwardsVacuum_TIC_State(Enum):
     """
-    State of the relay.
+    State of a device in the instrument.
     """
     OFF = 0
     OFF_GOING_ON = 1
@@ -169,6 +169,7 @@ TURBO_POWER = 906
 BACKING_PUMP = 910
 BACKING_SPEED = 911
 BACKING_POWER = 912
+SYSTEM = 933
 
 PRESSURE_GAUGE_MAP = {
     1: 913,
@@ -188,9 +189,9 @@ class EdwardsVacuum_TIC_PumpStateResponse(NamedTuple):
     State of the pump.
 
     Attributes:
-        state:      state of the pump.
-        alert:      alert given by the system.
-        priority:   priority level of the system.
+        state:      State of the pump.
+        alert:      Alert given by the system.
+        priority:   Priority level of the system.
     """
     state: EdwardsVacuum_TIC_PumpState
     alert: EdwardsVacuum_TIC_AlertId
@@ -202,9 +203,9 @@ class EdwardsVacuum_TIC_PumpSpeedResponse(NamedTuple):
     Speed of the pump.
 
     Attributes:
-        speed:      speed as a percentage of the maximum value [0-100%].
-        alert:      alert given by the system.
-        priority:   priority level of the system.
+        speed:      Speed as a percentage of the maximum value [0-100%].
+        alert:      Alert given by the system.
+        priority:   Priority level of the system.
     """
     speed: float
     alert: EdwardsVacuum_TIC_AlertId
@@ -216,9 +217,9 @@ class EdwardsVacuum_TIC_PumpPowerResponse(NamedTuple):
     Speed of the pump.
 
     Attributes:
-        power:      power of the pump in Watts.
-        alert:      alert given by the system.
-        priority:   priority level of the system.
+        power:      Power of the pump in Watts.
+        alert:      Alert given by the system.
+        priority:   Priority level of the system.
     """
     power: float
     alert: EdwardsVacuum_TIC_AlertId
@@ -230,11 +231,11 @@ class EdwardsVacuum_TIC_GaugePressureResponse(NamedTuple):
     Pressure read by the gauge.
 
     Attributes:
-        pressure:   pressure.
-        unit:       unit of the value.
-        state:      state of the gauge.
-        alert:      alert given by the system.
-        priority:   priority level of the system.
+        pressure:   Pressure.
+        unit:       Unit of the value.
+        state:      State of the gauge.
+        alert:      Alert given by the system.
+        priority:   Priority level of the system.
     """
     pressure: float
     unit: str
@@ -243,16 +244,16 @@ class EdwardsVacuum_TIC_GaugePressureResponse(NamedTuple):
     priority: EdwardsVacuum_TIC_Priority
 
 
-class EdwardsVacuum_TIC_RelayStateResponse(NamedTuple):
+class EdwardsVacuum_TIC_StateResponse(NamedTuple):
     """
-    State of the relay.
+    State of a device of the instrument.
 
     Attributes:
-        state:      state of the relay.
-        alert:      alert given by the system.
-        priority:   priority level of the system.
+        state:      State of the device.
+        alert:      Alert given by the system.
+        priority:   Priority level of the system.
     """
-    state: EdwardsVacuum_TIC_RelayState
+    state: EdwardsVacuum_TIC_State
     alert: EdwardsVacuum_TIC_AlertId
     priority: EdwardsVacuum_TIC_Priority
 
@@ -262,27 +263,59 @@ class EdwardsVacuum_TIC_StatusResponse(NamedTuple):
     Status of the instument.
 
     Attributes:
-        turbo_pump_state:   state of the turbo pump.
-        backing_pump_state: state of the backing pump.
-        gauge_1_state:      state of gauge 1.
-        gauge_2_state:      state of gauge 2.
-        gauge_3_state:      state of gauge 3.
-        relay_1_state:      state of relay 1.
-        relay_2_state:      state of relay 2.
-        relay_3_state:      state of relay 3.
-        alert:              alert given by the system.
-        priority:           priority level of the system.
+        turbo_pump_state:   State of the turbo pump.
+        backing_pump_state: State of the backing pump.
+        gauge_1_state:      State of gauge 1.
+        gauge_2_state:      State of gauge 2.
+        gauge_3_state:      State of gauge 3.
+        relay_1_state:      State of relay 1.
+        relay_2_state:      State of relay 2.
+        relay_3_state:      State of relay 3.
+        alert:              Alert given by the system.
+        priority:           Priority level of the system.
     """
     turbo_pump_state: EdwardsVacuum_TIC_PumpState
     backing_pump_state: EdwardsVacuum_TIC_PumpState
     gauge_1_state: EdwardsVacuum_TIC_GaugeState
     gauge_2_state: EdwardsVacuum_TIC_GaugeState
     gauge_3_state: EdwardsVacuum_TIC_GaugeState
-    relay_1_state: EdwardsVacuum_TIC_RelayState
-    relay_2_state: EdwardsVacuum_TIC_RelayState
-    relay_3_state: EdwardsVacuum_TIC_RelayState
+    relay_1_state: EdwardsVacuum_TIC_State
+    relay_2_state: EdwardsVacuum_TIC_State
+    relay_3_state: EdwardsVacuum_TIC_State
     alert: EdwardsVacuum_TIC_AlertId
     priority: EdwardsVacuum_TIC_Priority
+
+
+class EdwardsVacuum_TIC_SystemOnOffSetupConfigResponse(NamedTuple):
+    """
+    System on/off setup config of the instrument.
+
+    Attributes:
+        turbo_pump_setup:   On/off setup config of the turbo pump. First entry of tuple is the on config and
+                            second is the off config.
+        backing_pump_setup: On/off setup config of the backing pump. First entry of tuple is the on config and
+                            second is the off config.
+        gauge_1_setup:      On/off setup config of gauge 1. First entry of tuple is the on config and
+                            second is the off config.
+        gauge_2_setup:      On/off setup config of gauge 2. First entry of tuple is the on config and
+                            second is the off config.
+        gauge_3_setup:      On/off setup config of gauge 3. First entry of tuple is the on config and
+                            second is the off config.
+        relay_1_setup:      On/off setup config of relay 1. First entry of tuple is the on config and
+                            second is the off config.
+        relay_2_setup:      On/off setup config of relay 2. First entry of tuple is the on config and
+                            second is the off config.
+        relay_3_setup:      On/off setup config of relay 3. First entry of tuple is the on config and
+                            second is the off config.
+    """
+    turbo_pump_setup: Tuple[bool, bool]
+    backing_pump_setup: Tuple[bool, bool]
+    gauge_1_setup: Tuple[bool, bool]
+    gauge_2_setup: Tuple[bool, bool]
+    gauge_3_setup: Tuple[bool, bool]
+    relay_1_setup: Tuple[bool, bool]
+    relay_2_setup: Tuple[bool, bool]
+    relay_3_setup: Tuple[bool, bool]
 
 
 class Edwards_TurboInstrumentController(QMI_Instrument):
@@ -315,10 +348,10 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Parse the received response by doing a pattern check and extracting the message string
 
         Parameters:
-            raw_response: the raw response received from the instrument.
+            raw_response: The raw response received from the instrument.
 
         Returns:
-            the message sent by the instrument
+            Message sent by the instrument.
         """
         resp, response_data = raw_response.split(" ", 1)
         # match the first 2 characters of the string to find what type of response it is
@@ -340,10 +373,10 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Get the state of the pump.
 
         Parameters:
-            obj_id: the object id to send the message to.
+            obj_id: The object id to send the message to.
 
         Returns:
-            dictionary containing the state, alert and priority
+            An instance of EdwardsVacuum_TIC_PumpStateResponse.
         """
         _logger.info("Getting pump status for instrument [%s]", self._name)
         cmd = QUERY_VALUE_CMD_FORMAT.format(obj_id=obj_id)
@@ -359,10 +392,10 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Get the speed of the pump as a percentage of the maximum speed.
 
         Parameters:
-            obj_id: the object id to send the message to.
+            obj_id: The object id to send the message to.
 
         Returns:
-            relative value of speed compared to maximum speed.
+            An instance of EdwardsVacuum_TIC_PumpSpeedResponse.
         """
         _logger.info("Getting the pump speed for instrument [%s]", self._name)
         cmd = QUERY_VALUE_CMD_FORMAT.format(obj_id=obj_id)
@@ -378,7 +411,7 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Turn on or off an object.
 
         Parameters:
-            obj_id: the object id to send the message to.
+            obj_id: The object id to send the message to.
             on_off: False means off and True means on.
         """
         cmd = GENERAL_CMD_FORMAT.format(obj_id=obj_id, msg=int(on_off))
@@ -389,10 +422,10 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Get the power of the pump.
 
         Parameters:
-            obj_id: the object to send the message to.
+            obj_id: The object to send the message to.
 
         Returns:
-            pump power in Watts.
+            An instance of EdwardsVacuum_TIC_PumpPowerResponse.
         """
         _logger.info("Getting pump power for instrument [%s]", self._name)
         cmd = QUERY_VALUE_CMD_FORMAT.format(obj_id=obj_id)
@@ -408,10 +441,10 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Get the pressure from a gauge.
 
         Parameters:
-            obj_id: the object to send the message to.
+            obj_id: The object to send the message to.
 
         Returns:
-            dictionary with pressure, units type, alert, priority and state.
+            An instance of EdwardsVacuum_TIC_GaugePressureResponse.
         """
         cmd = QUERY_VALUE_CMD_FORMAT.format(obj_id=obj_id)
         resp = self._parse_response(self._scpi_protocol.ask(cmd)).split(";")
@@ -423,20 +456,20 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
             priority=EdwardsVacuum_TIC_Priority(int(resp[4]))
         )
 
-    def _get_relay_state(self, obj_id: int) -> EdwardsVacuum_TIC_RelayStateResponse:
+    def _get_state(self, obj_id: int) -> EdwardsVacuum_TIC_StateResponse:
         """
-        Get the state of the provided relay.
+        Get the state of the provided object id.
 
         Parameters:
-            obj_id: the object of the relay.
+            obj_id: The object id.
 
         Returns:
-            dictionary with state, alert and priority.
+            An instance of EdwardsVacuum_TIC_StateResponse.
         """
         cmd = QUERY_VALUE_CMD_FORMAT.format(obj_id=obj_id)
         resp = self._parse_response(self._scpi_protocol.ask(cmd)).split(";")
-        return EdwardsVacuum_TIC_RelayStateResponse(
-            state=EdwardsVacuum_TIC_RelayState(int(resp[0])),
+        return EdwardsVacuum_TIC_StateResponse(
+            state=EdwardsVacuum_TIC_State(int(resp[0])),
             alert=EdwardsVacuum_TIC_AlertId(int(resp[1])),
             priority=EdwardsVacuum_TIC_Priority(int(resp[2]))
         )
@@ -461,7 +494,7 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Read instrument type and version and return QMI_InstrumentIdentification instance.
 
         Returns:
-            instrument identification
+            Instrument identification.
         """
         _logger.info("Getting info for instrument [%s]", self._name)
         cmd = QUERY_SETUP_CMD_FORMAT.format(obj_id=TIC_STATUS)
@@ -478,7 +511,7 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         attached to the TIC.
 
         Returns:
-            dictionary where the key is the equipment and the value is its state
+            An instance of EdwardsVacuum_TIC_StatusResponse.
         """
         _logger.info("Getting status for instrument [%s]", self._name)
         cmd = QUERY_VALUE_CMD_FORMAT.format(obj_id=TIC_STATUS)
@@ -489,9 +522,9 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
             gauge_1_state=EdwardsVacuum_TIC_GaugeState(resp[2]),
             gauge_2_state=EdwardsVacuum_TIC_GaugeState(resp[3]),
             gauge_3_state=EdwardsVacuum_TIC_GaugeState(resp[4]),
-            relay_1_state=EdwardsVacuum_TIC_RelayState(resp[5]),
-            relay_2_state=EdwardsVacuum_TIC_RelayState(resp[6]),
-            relay_3_state=EdwardsVacuum_TIC_RelayState(resp[7]),
+            relay_1_state=EdwardsVacuum_TIC_State(resp[5]),
+            relay_2_state=EdwardsVacuum_TIC_State(resp[6]),
+            relay_3_state=EdwardsVacuum_TIC_State(resp[7]),
             alert=EdwardsVacuum_TIC_AlertId(resp[8]),
             priority=EdwardsVacuum_TIC_Priority(resp[9])
         )
@@ -502,7 +535,7 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Get the state of the turbo pump.
 
         Returns:
-            an instance of EdwardsVacuum_TIC_PumpState.
+            An instance of EdwardsVacuum_TIC_PumpStateResponse.
         """
         return self._get_pump_state(TURBO_PUMP)
 
@@ -512,7 +545,7 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Get the state of the backing pump.
 
         Returns:
-            an instance of EdwardsVacuum_TIC_PumpState.
+            An instance of EdwardsVacuum_TIC_PumpStateResponse.
         """
         return self._get_pump_state(BACKING_PUMP)
 
@@ -554,7 +587,7 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Get the speed of the turbo pump as a percentage of the maximum speed.
 
         Returns:
-            an instance of EdwardsVacuum_TIC_PumpSpeed.
+            An instance of EdwardsVacuum_TIC_PumpSpeedResponse.
         """
         return self._get_pump_speed(TURBO_SPEED)
 
@@ -564,7 +597,7 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Get the speed of the backing pump as a percentage of the maximum speed.
 
         Returns:
-            an instance of EdwardsVacuum_TIC_PumpState.
+            An instance of EdwardsVacuum_TIC_PumpStateResponse.
         """
         return self._get_pump_speed(BACKING_SPEED)
 
@@ -574,7 +607,7 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Get the power of the turbo pump.
 
         Returns:
-            an instance of EdwardsVacuum_TIC_PumpPower.
+            An instance of EdwardsVacuum_TIC_PumpPowerResponse.
         """
         return self._get_pump_power(TURBO_POWER)
 
@@ -584,7 +617,7 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Get the power of the backing pump.
 
         Returns:
-            an instance of EdwardsVacuum_TIC_PumpPower.
+            An instance of EdwardsVacuum_TIC_PumpPowerResponse.
         """
         return self._get_pump_power(BACKING_POWER)
 
@@ -594,27 +627,27 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Get the pressure from the pressure gauge.
 
         Parameters:
-            gauge_num:  gauge to address.
+            gauge_num:  Gauge to address.
 
         Returns:
-            an instance of EdwardsVacuum_TIC_GaugePressure.
+            An instance of EdwardsVacuum_TIC_GaugePressureResponse.
         """
         _logger.info("Getting pressure from gauge %s for instrument [%s]", gauge_num, self._name)
         return self._get_pressure(PRESSURE_GAUGE_MAP[gauge_num])
 
     @rpc_method
-    def get_relay_state(self, relay_num: int) -> EdwardsVacuum_TIC_RelayStateResponse:
+    def get_relay_state(self, relay_num: int) -> EdwardsVacuum_TIC_StateResponse:
         """
         Get the state of the relay.
 
         Parameters:
-            relay_num:  relay to address.
+            relay_num:  Relay to address.
 
         Returns:
-            an instance of EdwardsVacuum_TIC_RelayState.
+            An instance of EdwardsVacuum_TIC_StateResponse.
         """
         _logger.info("Getting state of relay %s for instrument [%s]", relay_num, self._name)
-        return self._get_relay_state(RELAY_MAP[relay_num])
+        return self._get_state(RELAY_MAP[relay_num])
 
     @rpc_method
     def turn_on_relay(self, relay_num: int) -> None:
@@ -622,7 +655,7 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         Turn on the relay.
 
         Parameters:
-            relay_num:  relay to address.
+            relay_num:  Relay to address.
         """
         _logger.info("Turning on relay %s for instrument [%s]", relay_num, self._name)
         self._turn_on_off(RELAY_MAP[relay_num], True)
@@ -634,3 +667,69 @@ class Edwards_TurboInstrumentController(QMI_Instrument):
         """
         _logger.info("Turning off relay %s for instrument [%s]", relay_num, self._name)
         self._turn_on_off(RELAY_MAP[relay_num], False)
+
+    @rpc_method
+    def get_system_on_off_setup_config(self) -> EdwardsVacuum_TIC_SystemOnOffSetupConfigResponse:
+        """
+        Get the on/off setup config of the system.
+
+        Returns:
+            An instance of EdwardsVacuum_TIC_SystemOnOffSetupConfigResponse.
+        """
+        _logger.info("Getting on/off setup config of system for instrument [%s]", self._name)
+        cmd = QUERY_SETUP_CMD_FORMAT.format(obj_id=SYSTEM)
+        resp = self._parse_response(self._scpi_protocol.ask(cmd)).split(";")
+        bool_resp = [bool(int(i)) for i in resp]
+        return EdwardsVacuum_TIC_SystemOnOffSetupConfigResponse(
+            turbo_pump_setup=(bool_resp[1], bool_resp[2]),
+            backing_pump_setup=(bool_resp[4], bool_resp[5]),
+            gauge_1_setup=(bool_resp[7], bool_resp[8]),
+            gauge_2_setup=(bool_resp[10], bool_resp[11]),
+            gauge_3_setup=(bool_resp[13], bool_resp[14]),
+            relay_1_setup=(bool_resp[16], bool_resp[17]),
+            relay_2_setup=(bool_resp[19], bool_resp[20]),
+            relay_3_setup=(bool_resp[22], bool_resp[23]))
+
+    @rpc_method
+    def set_system_on_off_setup_config(self, config: Dict[int, Tuple[bool, bool]]) -> None:
+        """
+        Set the on/off setup config of the system.
+
+        Parameters:
+            config: The object to setup. The first entry in the tuple is the object id.
+                    the second is a tuple for the on off setup.
+        """
+        _logger.info("Setting on/off setup config of system for instrument [%s]", self._name)
+        data = ""
+        for obj_id, setup in config.items():
+            data += f"{obj_id};{int(setup[0])};{int(setup[1])};"
+        cmd = SETUP_CMD_FORMAT.format(obj_id=SYSTEM, data=data)
+        # remove the last ";"" from the string and send that as the command
+        self._scpi_protocol.ask(cmd[:-1])
+
+    @rpc_method
+    def get_system_state(self) -> EdwardsVacuum_TIC_StateResponse:
+        """
+        Get the state of the system.
+
+        Returns:
+            An instance of EdwardsVacuum_TIC_StateResponse.
+        """
+        _logger.info("Getting state of system for instrument [%s]", self._name)
+        return self._get_state(SYSTEM)
+
+    @rpc_method
+    def turn_on_system(self) -> None:
+        """
+        Turn on the system.
+        """
+        _logger.info("Turning on system for instrument [%s]", self._name)
+        self._turn_on_off(SYSTEM, True)
+
+    @rpc_method
+    def turn_off_system(self) -> None:
+        """
+        Turn off the system.
+        """
+        _logger.info("Turning off system for instrument [%s]", self._name)
+        self._turn_on_off(SYSTEM, False)

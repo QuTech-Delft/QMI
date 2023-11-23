@@ -282,7 +282,7 @@ class ADwinTestBaseClass(unittest.TestCase):
         self._adwin._adwin.Set_Par = Mock()
         self._adwin.set_par(par_idx, value)
 
-        self._adwin._adwin.Set_Par.called_once_with(par_idx, value)
+        self._adwin._adwin.Set_Par.assert_called_once_with(par_idx, value)
 
     def test_set_par_index_out_of_range(self):
         """ test set_par raises exception when parameter index is out of range """
@@ -306,7 +306,7 @@ class ADwinTestBaseClass(unittest.TestCase):
         self._adwin._adwin.Set_FPar_Double = Mock()
         self._adwin.set_fpar(par_idx, value)
 
-        self._adwin._adwin.Set_FPar_Double.called_once_with(par_idx, value)
+        self._adwin._adwin.Set_FPar_Double.assert_called_once_with(par_idx, value)
 
     def test_set_fpar_index_out_of_range(self):
         """ test set_fpar raises exception when parameter index is out of range """

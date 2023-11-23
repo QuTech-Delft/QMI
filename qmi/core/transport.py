@@ -1040,7 +1040,7 @@ class QMI_Vxi11Transport(QMI_Transport):
 
         try:
             while len(self._read_buffer) < nbytes:
-                self._read_buffer += self._safe_instr.read_raw(self._instr.max_recv_size)
+                self._read_buffer += self._safe_instr.read_raw(self._safe_instr.max_recv_size)
 
         except vxi11.vxi11.Vxi11Exception as err:
             if err.err == 15:
@@ -1082,7 +1082,7 @@ class QMI_Vxi11Transport(QMI_Transport):
 
         try:
             while True:
-                self._read_buffer += self._safe_instr.read_raw(self._instr.max_recv_size)
+                self._read_buffer += self._safe_instr.read_raw(self._safe_instr.max_recv_size)
                 # Validate terminator.
                 data_term_char = self._read_buffer[-1:]  # use slice rather than index to get back bytes()
                 if data_term_char == message_terminator:
@@ -1195,7 +1195,7 @@ def create_transport(transport_descriptor: str,
     "serialnr" is the USB serial number string.
 
     "primary_addr" is GPIB device number (integer).
-    "board" is optional GPIB interface number (GPIB[if_id]::...). Default is None.
+    "board" is optional GPIB interface number (GPIB[board]::...). Default is None.
     "secondary_addr" is optional secondary device address number. Default is None.
     "connect_timeout" is for opening resource for GPIB device, in seconds; the default is 30s.
     """

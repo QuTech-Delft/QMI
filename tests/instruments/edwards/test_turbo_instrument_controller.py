@@ -9,7 +9,7 @@ from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.edwards import EdwardsVacuum_TIC, EdwardsVacuum_TIC_AlertId,\
     EdwardsVacuum_TIC_GaugeState, EdwardsVacuum_TIC_Priority,\
-    EdwardsVacuum_TIC_PumpState, EdwardsVacuum_TIC_RelayState
+    EdwardsVacuum_TIC_PumpState, EdwardsVacuum_TIC_State
 
 
 class TestTurboInstrumentControllerOpenClose(unittest.TestCase):
@@ -106,7 +106,7 @@ class TestTurboInstrumentController(unittest.TestCase):
         actual_turbo_pump_state = EdwardsVacuum_TIC_PumpState.STOPPED
         actual_backing_pump_state = EdwardsVacuum_TIC_PumpState.ACCELERATING
         actual_gauge1_state = EdwardsVacuum_TIC_GaugeState.ZEROING
-        actual_relay1_state = EdwardsVacuum_TIC_RelayState.ON
+        actual_relay1_state = EdwardsVacuum_TIC_State.ON
         actual_alert = EdwardsVacuum_TIC_AlertId.FILAMENT_FAIL
         actual_priority = EdwardsVacuum_TIC_Priority.WARNING
 
@@ -343,7 +343,7 @@ class TestTurboInstrumentController(unittest.TestCase):
     def test_get_relay_state_3_gets_state(self):
         """Get state of 3."""
         # Arrange
-        actual_state = EdwardsVacuum_TIC_RelayState.OFF_GOING_ON
+        actual_state = EdwardsVacuum_TIC_State.OFF_GOING_ON
         actual_alert = EdwardsVacuum_TIC_AlertId.ADC_FAULT
         actual_priority = EdwardsVacuum_TIC_Priority.OK
 

@@ -245,12 +245,6 @@ class TestHDAWG(unittest.TestCase):
         ]
         self._daq_server.assert_has_calls(expected_calls)
 
-    def _check_get_value_int(self, node_path):
-        expected_calls = [
-            call.getInt("/{}/{}".format(_DEVICE_NAME, node_path))
-        ]
-        self._daq_server.assert_has_calls(expected_calls)
-
     def _check_set_value_int(self, node_path, value):
         expected_calls = [
             call.setInt("/{}/{}".format(_DEVICE_NAME, node_path), value)
@@ -646,8 +640,20 @@ class TestHDAWG(unittest.TestCase):
 
     def test_upload_empty_command_table(self):
         """Test command table upload."""
-        self._hdawg.upload_command_table(1, [])
-        self.assertTrue(self._daq_server.setVector.called_once)
+        table = []
+        awg_index = 1
+        # Create the command table from the provided entries.
+        command_table = {
+            "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
+            "header": {
+                "version": "0.2"
+            },
+            "table": table
+        }
+        set_vector = "/{}/awgs/{}/commandtable/data".format(_DEVICE_NAME, awg_index)
+
+        self._hdawg.upload_command_table(awg_index, table)
+        self._daq_server.setVector.assert_called_once_with(set_vector, json.dumps(command_table, allow_nan=False))
 
     def test_upload_invalid_command_table(self):
         """Test invalid command table upload."""

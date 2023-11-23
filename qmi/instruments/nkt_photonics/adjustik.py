@@ -85,6 +85,30 @@ class KoherasAdjustikLaser(QMI_Instrument):
         unpacked_response = struct.unpack("<B", response)[0]
         return unpacked_response
 
+    def _set_basik_emission(self, status: bool) -> None:
+        """
+        Set emission status.
+
+        Parameters:
+            status: the status of the laser to be set. True for on and False for off.
+        """
+        value = struct.pack("<B", int(status))
+        self._interbus.set_register(self.BASIK_ADDRESS, 0x30, value)
+
+    @rpc_method
+    def enable_basik_emission(self) -> None:
+        """
+        Enable basik emission.
+        """
+        self._set_basik_emission(True)
+
+    @rpc_method
+    def disable_basik_emission(self) -> None:
+        """
+        Disable basik emission.
+        """
+        self._set_basik_emission(False)
+
     @rpc_method
     def get_basik_setup_bits(self) -> int:
         """Return the setup bits.

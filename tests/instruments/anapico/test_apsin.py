@@ -60,9 +60,9 @@ class AnapicoApsinTestCase(unittest.TestCase):
         # Act
         self.apsin.reset()
         # Assert
-        self.apsin._transport.discard_read.called_once_with()
         self.apsin._scpi_protocol.ask.assert_called_with(expected_ask_call)
         self.assertEqual(2, self.apsin._scpi_protocol.ask.call_count)
+        self.assertEqual(2, self.apsin._transport.discard_read.call_count)
         for call in expected_write_calls:
             self.apsin._scpi_protocol.write.assert_any_call(call)
 
@@ -384,7 +384,6 @@ class AnapicoApsinTestCase(unittest.TestCase):
 
         # Assert
         self.apsin._scpi_protocol.ask.assert_called_once_with(expected_call)
-
 
     def test_set_pulsemod_polarity_to_inv(self):
         """Test set_pulsemod_polarity function with setting to "INV"."""

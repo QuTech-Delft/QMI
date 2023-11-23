@@ -6,7 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+## [0.43.0] - 2023-11-22
+
 ### Added
+- Calls to enable and disable basik emission for `KoherasAdjustikLaser`.
 - Implementation of `discard_read` on `QMI_UsbTmcTransport` class, and `read_until` now forwards to `read_until_timeout` instead of raising error.
 - QMI_Vxi11Transport.read_until_timeout() implementation such that it calls self.read() with the given input.
 - Tektronix AWG5014 driver now utilizes the `discard_read` in `reset()` instead of work-around `ask` call for `*CLS`.
@@ -36,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `qmi.data.DataFolder.write_dataset` has `overwrite` keyword argument that allows a user to overwrite the current dataset if it exists.
 - Unit-tests for RasperryPi_GPIO instrument driver.
 - Travel range for Newport's single axis motion controllers now have a travel range that can go negative.
+- Function to turn on/off system and to specify which parts of the system to turn off for Edwards TIC.
 
 ### Changed
 - Changed the product id of Thorlabs_PM10x classes to have the same name for all classes and overwrite the default value 0x0000 in base class.
