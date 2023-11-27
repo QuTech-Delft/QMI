@@ -287,13 +287,21 @@ class ProcessManagementClientTestCase(unittest.TestCase):
                 with self.assertRaises(proc.ProcessException):
                     manager.stop_process(123)
 
-    def _build_mock_config(self):
+    def _build_mock_config(self, extra=False):
         qmi.context = MagicMock(return_value=(context := MagicMock(spec=QMI_Context)))
         context.get_config = MagicMock(return_value=(config := MagicMock()))
         config.contexts = {
-            "ContextName1": (ctxcfg := MagicMock()),
+            "ContextName1": (ctxcfg1 := MagicMock()),
+            "ContextName0": (ctxcfg0 := MagicMock()),
         }
-        return context, config, ctxcfg
+        if extra:
+            # Add an extra config
+            config.contexts.update({"ContextName2": (ctxcfg2 := MagicMock())})
+            ctxcfg2.host = "nonlocal"
+
+        ctxcfg1.host = MagicMock()
+        ctxcfg0.host = MagicMock()
+        return context, config, ctxcfg1
 
     def test_is_local_host(self):
         """Test is_local_host, happy flow."""
@@ -921,7 +929,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             proc.print.assert_called_with("ERR Unknown context")
 
     def test_proc_server_start_not_local_host(self):
-        """Test proc_server_start when context is not localhost."""
+        """Test proc_server_start when context is not on a local host."""
         with patch(
             "qmi.tools.proc.start_local_process", MagicMock(return_value=123)
         ), patch("qmi.tools.proc.is_local_host", MagicMock(return_value=False)), patch(
@@ -1016,6 +1024,58 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             rt_val = proc.proc_start(config, "ContextName1", False)
             self.assertEqual(rt_val, 0)
 
+    def test_proc_start_all(self):
+        """Test proc_start starts multiple contexts when 'context_name = None' and 'local = False'."""
+        expected_calls = [
+            call("ContextName1"),
+            call("ContextName0"),
+            call("ContextName2")
+        ]
+        with patch(
+            "qmi.tools.proc.get_context_status",
+            MagicMock(
+                side_effect=[
+                    (-1, "SomeVersion"),
+                    (123, "SomeVersion"),
+                    (-1, "SomeVersion"),
+                    (123, "SomeVersion"),
+                    (-1, "SomeVersion"),
+                    (123, "SomeVersion"),
+                ]
+            ),
+        ), patch("qmi.tools.proc.start_process", MagicMock(return_value=123)) as start_mock:
+            _, config, _ = self._build_mock_config(extra=True)
+            rt_val = proc.proc_start(config, None, False)
+            # Assert
+            self.assertEqual(rt_val, 0)
+            start_mock.assert_has_calls(expected_calls)
+
+    def test_proc_start_local(self):
+        """Test proc_start start only local contexts with 'context_name = None' and 'local = True'."""
+        expected_calls = [
+            call("ContextName1"),
+            call("ContextName0")
+        ]
+        with patch(
+            "qmi.tools.proc.get_context_status",
+            MagicMock(
+                side_effect=[
+                    (-1, "SomeVersion"),
+                    (123, "SomeVersion"),
+                    (-1, "SomeVersion"),
+                    (123, "SomeVersion"),
+                ]
+            ),
+        ), patch("qmi.tools.proc.start_process", MagicMock(return_value=123)) as start_mock:
+            _, config, _ = self._build_mock_config()
+            # Make sure 'ContextName0' and 'ContextName1' are locals
+            config.contexts["ContextName1"].host = "127.0.0.1"
+            config.contexts["ContextName0"].host = "127.0.0.1"
+            rt_val = proc.proc_start(config, None, True)
+            # Assert
+            self.assertEqual(rt_val, 0)
+            start_mock.assert_has_calls(expected_calls)
+
     def test_proc_start_already_running(self):
         """Test proc_start flow when invalid pid."""
         with patch(
@@ -1062,6 +1122,44 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         ):
             rt_val = proc.proc_stop(config, "ContextName1", False)
             self.assertEqual(rt_val, 0)
+
+    def test_proc_stop_all(self):
+        """Test proc_stop stops all contexts. It should stop both local and non-local contexts in reverse order."""
+        _, config, _ = self._build_mock_config(extra=True)
+        expected_order_shutdowns = [
+            call("ContextName2", proc.show_progress_msg),
+            call("ContextName0", proc.show_progress_msg),
+            call("ContextName1", proc.show_progress_msg)
+        ]
+        with patch(
+            "qmi.tools.proc.shutdown_context",
+            MagicMock(return_value=proc.ShutdownResult(True, 123, True)),
+        ) as shutdown_patch:
+            config.contexts["ContextName1"].host = "127.0.0.1"  # Make one context local
+            rt_val = proc.proc_stop(config, None, False)
+            # Assert. Make sure the order is as expected for shutdown.
+            self.assertEqual(rt_val, 0)
+            shutdown_patch.assert_has_calls(expected_order_shutdowns, any_order=False)
+
+    def test_proc_stop_locals(self):
+        """Test proc_stop stopping all local contexts. Check that it is done in 'reverse' order. In _build_mock_config
+        the contexts are added in order 'ContextName1', 'ContextName' and since Python 3.7 the dict order is guaranteed
+        to be preserved as the input order, so we can test the reversion easily."""
+        _, config, _ = self._build_mock_config(extra=True)  # We have 3 contexts, but 'ContextName2' is not local
+        expected_order_shutdowns = [
+            call("ContextName0", proc.show_progress_msg), call("ContextName1", proc.show_progress_msg)
+        ]
+        with patch(
+            "qmi.tools.proc.shutdown_context",
+            MagicMock(return_value=proc.ShutdownResult(True, 123, True)),
+        ) as shutdown_patch:
+            # Make sure 'ContextName0' and 'ContextName1' are locals
+            config.contexts["ContextName1"].host = "127.0.0.1"
+            config.contexts["ContextName0"].host = "127.0.0.1"
+            rt_val = proc.proc_stop(config, None, True)
+            # Assert. Make sure the order is as expected for shutdown.
+            self.assertEqual(rt_val, 0)
+            shutdown_patch.assert_has_calls(expected_order_shutdowns, any_order=False)
 
     def test_proc_stop_not_responding(self):
         """Test proc_stop context not responding."""

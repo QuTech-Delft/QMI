@@ -950,8 +950,8 @@ def proc_stop(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
 
     print("Stopping QMI processes:")
 
-    # Process each applicable context.
-    for context_name in context_names:
+    # Process each applicable context. Stop should happen in inverse order to start, in case of dependencies.
+    for context_name in reversed(context_names):
 
         # Show process name.
         print("    {:30s}:".format(context_name), end=" ")
