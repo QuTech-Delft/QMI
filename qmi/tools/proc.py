@@ -538,7 +538,7 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
     :raises ProcessException: If an error occurs.
     """
     def wait_disappear() -> bool:
-        """Wait a context to disappear.
+        """Wait for a context to disappear.
 
         :return: Boolean to tell if context disappeared (True) or not (False).
         """
