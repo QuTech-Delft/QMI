@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+### Changed
+- Changed the stopping of contexts in `qmi_proc.proc_stop()` to happen in reverse order to `proc_start()`.
+
 ## [0.43.0] - 2023-11-22
 
 ### Added
