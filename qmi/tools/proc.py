@@ -537,6 +537,21 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
     :return: Tuple (responding, pid, success).
     :raises ProcessException: If an error occurs.
     """
+    def wait_disappear() -> bool:
+        """Wait for a context to disappear.
+
+        :return: Boolean to tell if context disappeared (True) or not (False).
+        """
+        t = 0.0
+        while t < CONTEXT_SHUTDOWN_TIMEOUT:
+            time.sleep(0.5)
+            t += 0.5
+            progressfn("")
+            if not qmi.context().has_peer_context(context_name):
+                # Peer context disappeared.
+                return True
+
+        return False
 
     # Get context info from QMI configuration.
     cfg = qmi.context().get_config()
@@ -564,7 +579,6 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
         raise ProcessException("Protocol error from context {}".format(context_name))
 
     try:
-
         # Successfully connected to peer context and received handshake.
         # Get a proxy for the remote ContextInfo object.
         proxy = qmi.context().make_peer_context_proxy(context_name)
@@ -595,14 +609,8 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
             raise ProcessException("Error in soft shutdown to context {}".format(context_name))
 
         # Wait until context disappears.
-        t = 0.0
-        while t < CONTEXT_SHUTDOWN_TIMEOUT:
-            time.sleep(0.5)
-            t += 0.5
-            progressfn("")
-            if not qmi.context().has_peer_context(context_name):
-                # Peer context disappeared.
-                return ShutdownResult(responding=True, pid=pid, success=True)
+        if wait_disappear():
+            return ShutdownResult(responding=True, pid=pid, success=True)
 
         # Soft shutdown failed.
         # Send hard shutdown request.
@@ -617,20 +625,13 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
             pass  # ignore timeout
 
         # Wait until context disappears.
-        t = 0.0
-        while t < CONTEXT_SHUTDOWN_TIMEOUT:
-            time.sleep(0.5)
-            t += 0.5
-            progressfn("")
-            if not qmi.context().has_peer_context(context_name):
-                # Peer context disappeared.
-                return ShutdownResult(responding=True, pid=pid, success=True)
+        if wait_disappear():
+            return ShutdownResult(responding=True, pid=pid, success=True)
 
         # Hard shutdown failed.
         return ShutdownResult(responding=True, pid=pid, success=False)
 
     finally:
-
         # Disconnect from peer context.
         try:
             qmi.context().disconnect_from_peer(context_name)
@@ -673,7 +674,6 @@ def select_contexts(cfg: CfgQmi) -> List[str]:
     Returns:
         All context names as a list.
     """
-
     context_names = []
 
     # Return all enabled contexts.
@@ -705,7 +705,6 @@ def select_local_contexts(cfg: CfgQmi) -> List[str]:
     Returns:
         Local context names as a list.
     """
-
     context_names = []
 
     # Return all enabled local contexts.
@@ -755,7 +754,6 @@ def proc_server(cfg: CfgQmi) -> int:
 
     # Serve remote requests via stdin/stdout until EOF on stdin.
     while True:
-
         # Get next request via stdin.
         sys.stdout.flush()
         req = sys.stdin.readline()
@@ -765,7 +763,6 @@ def proc_server(cfg: CfgQmi) -> int:
             break
 
         try:
-
             # Parse request.
             words = req.strip().split()
 
@@ -849,7 +846,6 @@ def proc_start(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
     Returns:
         Exit status (0 = success).
     """
-
     colorama.init()
     started_str = "[" + colorama.Fore.GREEN + "STARTED" + colorama.Fore.RESET + "]"
     failed_str = "[" + colorama.Fore.RED + "FAILED" + colorama.Fore.RESET + "]"
@@ -868,7 +864,6 @@ def proc_start(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
 
     # Process each applicable context.
     for context_name in context_names:
-
         # Show process name.
         print("    {:30s}:".format(context_name), end=" ")
         sys.stdout.flush()
@@ -933,7 +928,6 @@ def proc_stop(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
     Returns:
         Exit status (0 = success).
     """
-
     colorama.init()
     stopped_str = "[" + colorama.Fore.GREEN + "STOPPED" + colorama.Fore.RESET + "]"
     failed_str = "[" + colorama.Fore.RED + "FAILED" + colorama.Fore.RESET + "]"
@@ -950,15 +944,13 @@ def proc_stop(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
 
     print("Stopping QMI processes:")
 
-    # Process each applicable context.
-    for context_name in context_names:
-
+    # Process each applicable context. Stop should happen in inverse order to start, in case of dependencies.
+    for context_name in reversed(context_names):
         # Show process name.
         print("    {:30s}:".format(context_name), end=" ")
         sys.stdout.flush()
 
         try:
-
             # Try to shut down context via TCP.
             result = shutdown_context(context_name, show_progress_msg)
             if result.success:
@@ -967,7 +959,6 @@ def proc_stop(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
                 print("not responding via TCP")
             else:
                 print(failed_str)
-
                 # Failed to stop via TCP.
                 # Try to stop process via local process management.
                 print("    {:30s} ".format(""), end=" ")
