@@ -563,8 +563,9 @@ class TestQmiUdpTransport(unittest.TestCase):
 
         # Send some bytes from server to transport.
         server_conn.sendall(s.encode())
+        time.sleep(0.1)
 
-        # Try to receive the bytes (triggers exception).
+        # Try to receive only a part of the bytes (triggers exception).
         with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
             trans.read(100, timeout=1.0)
 

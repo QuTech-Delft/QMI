@@ -744,7 +744,7 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
                 # no more bytes available
                 break
             except OSError:
-                # More than 4096 bytes in socekt buffer, and UDP protocol was used. This discard the whole buffer.
+                # UDP protocol was used and > 4096 bytes in socket buffer. This discards also the rest of the packet.
                 break
             if self._assert_addr and addr != self._address:
                 _logger.warning(f"Received data from address %s while expected data only from %s!", addr, self._address)
