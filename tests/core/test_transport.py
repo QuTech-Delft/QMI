@@ -982,7 +982,7 @@ class TestQmiTcpTransport(unittest.TestCase):
 
         # Try to connect to closed TCP port.
         # This may trigger connection refused, or timeout if the port is firewalled.
-        with self.assertRaises(OSError, qmi.core.exceptions.QMI_TimeoutException):
+        with self.assertRaises((OSError, qmi.core.exceptions.QMI_TimeoutException)):
             trans = QMI_TcpTransport("localhost", self.dummy_port, connect_timeout=1)
             trans.open()
 
