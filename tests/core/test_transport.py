@@ -3,6 +3,7 @@
 """Test QMI_Transport functionality."""
 import os, sys
 import socket
+import asyncio
 import threading
 import time
 import unittest.mock
@@ -26,13 +27,6 @@ from qmi.core.context import QMI_Context
 from qmi.core.rpc import rpc_method
 
 from tests.core.pyvisa_stub import ResourceManager, visa_str_1, visa_str_3
-
-import threading
-
-
-def read_until(self, trans):
-    data = trans.read_until(b"\n", timeout=1.0)
-    self.assertEqual(data, b"aap noot\n")
 
 
 class Dummy_USBTMCInstrument(QMI_Instrument):
@@ -120,13 +114,20 @@ class TestQmiTransportFactory(unittest.TestCase):
         self.server_sock.connect((self.server_host, self.server_port + 1))
         self.server_sock.settimeout(1.0)
 
-        # Send some bytes from server to transport.
-        self.server_sock.sendall(b"aap noot\n")
+        async def the_call():
+            time.sleep(0.1)
+            self.server_sock.sendall(b"aap noot\n")
+            l = asyncio.get_running_loop()
+            l.stop()
 
+        # Send some bytes from server to transport.
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(the_call())
         # Receive message through transport.
         data = trans.read_until(b"\n", timeout=1.0)
         self.assertEqual(data, b"aap noot\n")
 
+        loop.close()
         # Close transport. This closes only the UDP transport server.
         trans.close()
 
@@ -493,6 +494,7 @@ class TestQmiUdpTransport(unittest.TestCase):
             trans.read(10, timeout=1.0)
 
         # Send more bytes back from server to transport.
+        server_conn.setsockopt(socket.IPPROTO_UDP, socket.SO_SNDBUF, 5)
         server_conn.sendall(b"more bytes")
 
         # Receive the first bunch of bytes.
