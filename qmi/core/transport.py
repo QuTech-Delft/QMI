@@ -13,7 +13,7 @@ import serial
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import (
     QMI_InvalidOperationException, QMI_TimeoutException, QMI_EndOfInputException,
-    QMI_TransportDescriptorException, QMI_InstrumentException
+    QMI_TransportDescriptorException, QMI_InstrumentException, QMI_RuntimeException
 )
 from qmi.core.util import format_address_and_port
 
@@ -579,7 +579,7 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
         self._validate_host(host)
         self._validate_port(port)
         self._address = (host, port)
-        self._assert_addr = True if assert_address else False
+        self._assert_addr = True if assert_address else False  # For UDP, as it accepts data from any client.
         self._socket: Optional[socket.socket] = None
         self._read_buffer = bytearray()
 
@@ -630,13 +630,28 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
         while nbuf < nbytes:
             self._safe_socket.settimeout(tremain)
             try:
-                b, addr = self._safe_socket.recvfrom(nbytes - nbuf)
+                if self._assert_addr:
+                    # For UDP, reading data fails if the arriving packet size is larger than the given nbytes (- nbuf)
+                    # to read. To avoid this happening, read at least 4096 standard that is larger than regular MTU.
+                    udp_packet_size = max(nbytes - nbuf, 4096)
+                    try:
+                        b, addr = self._safe_socket.recvfrom(udp_packet_size)
+                    except (BlockingIOError, socket.timeout) as err:
+                        raise err  # Re-raise this for handling in the upper try-except.
+                    except OSError:
+                        raise QMI_RuntimeException(f"UDP packet size was larger than {udp_packet_size}. Data is lost.")
+
+                    if addr != self._address:
+                        _logger.warning(f"Received data from address %s while expected data only from %s!", addr,
+                                        self._address)
+                        del b
+                        continue
+
+                else:
+                    b, addr = self._safe_socket.recvfrom(nbytes - nbuf)
+
             except (BlockingIOError, socket.timeout):
                 raise QMI_TimeoutException(f"Timeout after {nbuf} bytes while expecting {nbytes}")
-            if self._assert_addr and addr != self._address:
-                _logger.warning(f"Received data from address %s while expected data only from %s!", addr, self._address)
-                del b
-                continue
             if not b:
                 raise QMI_EndOfInputException(
                     f"Reached end of input from socket {format_address_and_port(self._address)}")
@@ -678,14 +693,20 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
                 self._safe_socket.settimeout(tremain)
             # Read from socket.
             try:
-                # NOTE: Reading up to 4096 bytes here.
+                # NOTE: Reading up to 512 bytes here for TCP, as larger packet size
+                #       causes issues with Tektronix 5014 AWG. For UDP read 4096.
                 #       Exact amount does not matter but a small power of 2 is recommended, e.g. 4096
                 #       by socket.recv() documentation.
-                b, addr = self._safe_socket.recvfrom(512)
+                if self._assert_addr:
+                    b, addr = self._safe_socket.recvfrom(4096)
+                else:
+                    b, addr = self._safe_socket.recvfrom(512)
             except (BlockingIOError, socket.timeout):
                 # timeout in socket.recv()
                 nbuf = len(self._read_buffer)
                 raise QMI_TimeoutException(f"Socket timeout after {nbuf} bytes without message terminator")
+            except OSError:
+                raise QMI_RuntimeException(f"UDP packet size was larger than 4096. Data is lost.")
             if self._assert_addr and addr != self._address:
                 _logger.warning(f"Received data from address %s while expected data only from %s!", addr, self._address)
                 del b
@@ -764,8 +785,12 @@ class QMI_UdpTransport(QMI_UdpTcpTransportBase):
 
     def _open_transport(self) -> None:
         super()._open_transport()
+        # Validate the host exists before trying to create a socket
+        socket.gethostbyname(self._address[0])
         # Create socket
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # To set the local address to point to our client, we need to bind it. To avoid OSError, we use port number + 1
+        self._socket.bind((self._address[0], self._address[1] + 1))
 
     def close(self) -> None:
         _logger.debug("Closing UDP transport %s", self)
@@ -776,54 +801,6 @@ class QMI_UdpTransport(QMI_UdpTcpTransportBase):
         # NOTE: We explicitly adjust the socket timeout before each send/recv call.
         self._safe_socket.settimeout(None)
         self._safe_socket.sendto(data, self._address)
-
-    def read_until(self, message_terminator: bytes, timeout: Optional[float]) -> bytes:
-        self._check_is_open()
-        tstart = time.monotonic()
-        first_pass = True
-        print("self._address", self._address)
-        print("self._safe_socket.getsockname", self._safe_socket.getsockname())
-        while True:
-            # Check if message already received.
-            p = self._read_buffer.find(message_terminator)
-            if p >= 0:
-                # Found "message_terminator" - return data.
-                nbytes = p + len(message_terminator)
-                ret = bytes(self._read_buffer[:nbytes])
-                self._read_buffer = self._read_buffer[nbytes:]
-                return ret
-            # Determine timeout.
-            if first_pass:
-                # Try to read at least once, even if timeout is zero.
-                self._safe_socket.settimeout(timeout)
-                first_pass = False
-            elif timeout is not None:
-                # Calculate remaining time.
-                tremain = tstart + timeout - time.monotonic()
-                if tremain < 0:
-                    nbuf = len(self._read_buffer)
-                    raise QMI_TimeoutException(f"Function timeout after {nbuf} bytes without message terminator")
-                self._safe_socket.settimeout(tremain)
-            # Read from socket.
-            try:
-                # NOTE: Reading up to 4096 bytes here.
-                #       Exact amount does not matter but a small power of 2 is recommended, e.g. 4096
-                #       by socket.recv() documentation.
-                b, addr = self._safe_socket.recvfrom(512)
-                print("addr", addr)
-            except (BlockingIOError, socket.timeout):
-                # timeout in socket.recv()
-                nbuf = len(self._read_buffer)
-                raise QMI_TimeoutException(f"Socket timeout after {nbuf} bytes without message terminator")
-            if self._assert_addr and addr != self._address:
-                _logger.warning(f"Received data from address %s while expected data only from %s!", addr, self._address)
-                del b
-                continue
-            if not b:
-                # end of stream
-                raise QMI_EndOfInputException(
-                    f"Reached end of input from socket {format_address_and_port(self._address)}")
-            self._read_buffer.extend(b)
 
 
 class QMI_TcpTransport(QMI_UdpTcpTransportBase):

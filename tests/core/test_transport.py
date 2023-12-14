@@ -7,8 +7,11 @@ import asyncio
 import threading
 import time
 import unittest.mock
-import vxi11
 import warnings
+import random
+import string
+
+import vxi11
 
 import qmi
 import qmi.core.exceptions
@@ -105,7 +108,7 @@ class TestQmiTransportFactory(unittest.TestCase):
         trans = create_transport("udp:localhost:%d" % self.server_port)
         trans.open()
 
-        # Send data to server through transport
+        # Send data to server through transport.
         trans.write(b"aap noot\n")
         data = self.server_sock.recv(10)
         self.assertEqual(data, b"aap noot\n")
@@ -464,7 +467,6 @@ class TestQmiUdpTransport(unittest.TestCase):
         trans.open()
 
         # Accept the connection on server side.
-        # (server_conn, peer_address) = self.server_sock.accept()
         self.server_sock.connect((self.server_host, self.server_port + 1))
         server_conn = self.server_sock
         server_conn.settimeout(1.0)
@@ -494,7 +496,6 @@ class TestQmiUdpTransport(unittest.TestCase):
             trans.read(10, timeout=1.0)
 
         # Send more bytes back from server to transport.
-        server_conn.setsockopt(socket.IPPROTO_UDP, socket.SO_SNDBUF, 5)
         server_conn.sendall(b"more bytes")
 
         # Receive the first bunch of bytes.
@@ -542,12 +543,45 @@ class TestQmiUdpTransport(unittest.TestCase):
         # Close transport.
         trans.close()
 
-        # Check upstream channel closed.
-        data = server_conn.recv(100)
-        self.assertEqual(data, b"")
-
         # Close server-side socket.
         server_conn.close()
+
+    def test_udp_large_packages(self):
+
+        # Create UDP transport connected to local server.
+        trans = QMI_UdpTransport("127.0.0.1", self.server_port)
+        trans.open()
+
+        # Accept the connection on server side.
+        self.server_sock.connect((self.server_host, self.server_port + 1))
+        server_conn = self.server_sock
+        server_conn.settimeout(1.0)
+
+        # The transport should fail if sent package is > 4kB, as UDP is not set to handle larger packages.
+        bs_size = 5000  # Normal max 2**12 bytes
+        s = ''.join(random.choices(string.ascii_uppercase + string.digits, k=bs_size))
+
+        # Send some bytes from server to transport.
+        server_conn.sendall(s.encode())
+
+        # Try to receive the bytes (triggers exception).
+        with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
+            trans.read(100, timeout=1.0)
+
+        # Send some bytes from server to transport.
+        server_conn.sendall(s.encode())
+
+        # The same should happen with read_until (triggers exception).
+        with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
+            trans.read_until(b"\n", timeout=1.0)
+
+        # Send some bytes from server to transport.
+        server_conn.sendall(s.encode())
+
+        # With 'read' it is possible to set to read even larger packets. See that it works.
+        # The caller does need to know the exact packet size in this case, though.
+        data = trans.read(bs_size, timeout=1.0)
+        self.assertEqual(data.decode(), s)
 
     def test_remote_close(self):
 
@@ -556,7 +590,8 @@ class TestQmiUdpTransport(unittest.TestCase):
         trans.open()
 
         # Accept the connection on server side.
-        (server_conn, peer_address) = self.server_sock.accept()
+        self.server_sock.connect((self.server_host, self.server_port + 1))
+        server_conn = self.server_sock
         server_conn.settimeout(1.0)
 
         # Send some bytes from server to transport.
@@ -570,20 +605,20 @@ class TestQmiUdpTransport(unittest.TestCase):
         self.assertEqual(data, b"some")
 
         # Try to receive more bytes than are available (triggers exception).
-        with self.assertRaises(qmi.core.exceptions.QMI_EndOfInputException):
+        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
             trans.read(100, timeout=1.0)
 
         # Try to receive a line (also triggers exception).
-        with self.assertRaises(qmi.core.exceptions.QMI_EndOfInputException):
-            trans.read_until(b"\n", timeout=None)
+        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
+            trans.read_until(b"\n", timeout=0)
 
         # Receive the remaining bytes.
         data = trans.read(6, timeout=None)
         self.assertEqual(data, b" bytes")
 
         # Try to read another byte. Should raise exception.
-        with self.assertRaises(qmi.core.exceptions.QMI_EndOfInputException):
-            trans.read(1, timeout=None)
+        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
+            trans.read(1, timeout=0.0)
 
         # Close transport.
         trans.close()
@@ -595,7 +630,8 @@ class TestQmiUdpTransport(unittest.TestCase):
         trans.open()
 
         # Accept the connection on server side.
-        (server_conn, peer_address) = self.server_sock.accept()
+        self.server_sock.connect((self.server_host, self.server_port + 1))
+        server_conn = self.server_sock
         server_conn.settimeout(1.0)
 
         # Send some bytes from server to transport.
@@ -636,30 +672,29 @@ class TestQmiUdpTransport(unittest.TestCase):
         data = trans.read_until_timeout(100, timeout=1.0)
         self.assertEqual(data, b" data")
 
-        # Try to read more bytes. Should raise exception.
-        with self.assertRaises(qmi.core.exceptions.QMI_EndOfInputException):
+        # Try to read more bytes. Should raise timeout exception in UDP.
+        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
             trans.read(100, timeout=1.0)
 
         # Close transport.
         trans.close()
 
-    def test_connect_failure(self):
+    def test_client_non_existing(self):
 
-        # Try to connect to non-existing host name.
+        # Try to create a server for non-existing client host name.
+        trans = QMI_UdpTransport("imaginary-host", 5123)
         with self.assertRaises(OSError):
-            trans = QMI_UdpTransport("imaginary-host", 5123)
             trans.open()
 
-        # Try to connect to closed UDP port.
-        # This may trigger connection refused, or timeout if the port is firewalled.
-        with self.assertRaises((OSError, qmi.core.exceptions.QMI_TimeoutException)):
-            trans = QMI_UdpTransport("localhost", self.dummy_port)
-            trans.open()
+    def test_opening_twice_error(self):
 
-        # Try to connect to unroutable IP address.
-        with self.assertRaises(Exception):
-            trans = QMI_UdpTransport("192.168.231.11", 5123)
-            trans.open()
+        # Create UDP transport connected to local server.
+        trans = QMI_UdpTransport("localhost", self.server_port)
+        trans.open()
+        # Try to create a second one with same number. Should raise an error.
+        trans2 = QMI_UdpTransport("localhost", self.server_port)
+        with self.assertRaises((OSError, PermissionError)):
+            trans2.open()
 
     def test_udp_async(self):
 
@@ -668,7 +703,8 @@ class TestQmiUdpTransport(unittest.TestCase):
         trans.open()
 
         # Accept the connection on server side.
-        (server_conn, peer_address) = self.server_sock.accept()
+        self.server_sock.connect((self.server_host, self.server_port + 1))
+        server_conn = self.server_sock
         server_conn.settimeout(1.0)
 
         # Create a separate thread which sends data from the server side.
@@ -946,7 +982,7 @@ class TestQmiTcpTransport(unittest.TestCase):
 
         # Try to connect to closed TCP port.
         # This may trigger connection refused, or timeout if the port is firewalled.
-        with self.assertRaises((OSError, qmi.core.exceptions.QMI_TimeoutException)):
+        with self.assertRaises(OSError, qmi.core.exceptions.QMI_TimeoutException):
             trans = QMI_TcpTransport("localhost", self.dummy_port, connect_timeout=1)
             trans.open()
 
