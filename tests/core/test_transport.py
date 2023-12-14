@@ -561,13 +561,21 @@ class TestQmiUdpTransport(unittest.TestCase):
         bs_size = 5000  # Normal max 2**12 bytes
         s = ''.join(random.choices(string.ascii_uppercase + string.digits, k=bs_size))
 
+        async def the_call():
+            time.sleep(0.1)
+            self.server_sock.sendall(s.encode())
+            l = asyncio.get_running_loop()
+            l.stop()
+
         # Send some bytes from server to transport.
-        server_conn.sendall(s.encode())
-        time.sleep(0.1)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(the_call())
 
         # Try to receive only a part of the bytes (triggers exception).
         with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
             trans.read(100, timeout=1.0)
+
+        loop.close()
 
         # Send some bytes from server to transport.
         server_conn.sendall(s.encode())
