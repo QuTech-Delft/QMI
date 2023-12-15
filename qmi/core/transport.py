@@ -656,7 +656,7 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
                 raise QMI_EndOfInputException(
                     f"Reached end of input from socket {format_address_and_port(self._address)}")
             if len(b) > 99:
-                print(addr, b)
+                print(addr, len(b))
             self._read_buffer.extend(b)
             nbuf = len(self._read_buffer)
             if timeout is not None:
