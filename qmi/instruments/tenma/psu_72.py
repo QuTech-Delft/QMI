@@ -178,10 +178,15 @@ class Tenma72_Base(QMI_Instrument):
 class Tenma72_2550(Tenma72_Base):
     """Instrument driver for the Tenma 72-2550. The driver is tested with this model, but the respective
     manual is also for models 72-2535, 72-2540, 72-2545, 72-2925, 72-2930, 72-2935, 72-2940 & 72-10480.
+
+    Attributes:
+        DEFAULT_BAUDRATE: The default baudrate in case of serial connection is used (Baud).
+        MAX_VOLTAGE:      The maximum voltage that can be set with the PSU (Volts).
+        MAX_CURRENT:      The maximum current that can be set with the PSU (Amperes).
     """
     DEFAULT_BAUDRATE = 9600
-    MAX_VOLTAGE = 30  # V
-    MAX_CURRENT = 5  # A
+    MAX_VOLTAGE = 60
+    MAX_CURRENT = 3
 
     def get_status(self) -> Dict[str, Any]:
         """Get the power supply status as a dictionary of status values.
@@ -221,12 +226,53 @@ class Tenma72_2550(Tenma72_Base):
         }
 
 
+class Tenma72_2535(Tenma72_2550):
+    MAX_VOLTAGE = 30
+    MAX_CURRENT = 3
+
+
+class Tenma72_2540(Tenma72_2550):
+    MAX_VOLTAGE = 30
+    MAX_CURRENT = 5
+
+
+class Tenma72_2545(Tenma72_2550):
+    MAX_VOLTAGE = 60
+    MAX_CURRENT = 2
+
+
+class Tenma72_2925(Tenma72_2550):
+    MAX_VOLTAGE = 30
+    MAX_CURRENT = 5
+
+
+class Tenma72_2930(Tenma72_2550):
+    MAX_VOLTAGE = 30
+    MAX_CURRENT = 10
+
+
+class Tenma72_2935(Tenma72_2550):
+    MAX_VOLTAGE = 60
+    MAX_CURRENT = 5
+
+
+class Tenma72_2940(Tenma72_2550):
+    DEFAULT_BAUDRATE = 9600
+    MAX_VOLTAGE = 60
+    MAX_CURRENT = 5
+
+
+class Tenma72_10480(Tenma72_2550):
+    MAX_VOLTAGE = 30
+    MAX_CURRENT = 3
+
+
 class Tenma72_13350(Tenma72_Base):
     """Instrument driver for the Tenma 72-13350. The driver is tested with this model, but manual is
     also for the model 72-13360.
     """
     MAX_VOLTAGE = 30
-    MAX_CURRENT = 5
+    MAX_CURRENT = 30
     DEFAULT_BAUDRATE = 115200
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
@@ -247,7 +293,7 @@ class Tenma72_13350(Tenma72_Base):
         """
         self._send("STATUS?")
         statusBytes = self._transport.read(2, 2)  # Read response byte
-        # 72-13360 sends two bytes back, the second being '\n'
+        # 72-13350 sends two bytes back, the second being '\n'
         status = statusBytes[0]
 
         ch1mode = (status & 0b00000001)
@@ -263,3 +309,8 @@ class Tenma72_13350(Tenma72_Base):
             "Beep": beep,
             "Lock": lock,
         }
+
+
+class Tenma72_13360(Tenma72_13350):
+    MAX_VOLTAGE = 60
+    MAX_CURRENT = 15
