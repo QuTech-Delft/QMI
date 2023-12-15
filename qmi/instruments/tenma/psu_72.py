@@ -77,7 +77,7 @@ class Tenma72_Base(QMI_Instrument):
         """
         self._send("*IDN?")  # TODO: For 13350-13360 models it reads: MTTTH*DIN? Test!
         idn = self._read()
-        # Find all relevant info from response. Should be of format TENMA 72‐2535 SN:1231345 V2.0
+        # Find all relevant info from response. Should be of format TENMA 72-2535 SN:1231345 V2.0
         pattern = re.compile(r"(\A[^\W\d_]+) ([0-9-]+) SN:([\d]+) V([0-9.]+)")
         vendor, model, serial, version = pattern.findall(idn)[0]
         return QMI_InstrumentIdentification(

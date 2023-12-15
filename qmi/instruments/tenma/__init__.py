@@ -9,7 +9,7 @@ The qmi.instruments.tenma package provides support for:
 import importlib
 
 tenma_module = importlib.import_module("qmi.instruments.tenma.psu_72")
-psu_classes = {name: cls for name, cls in dict(vars(tenma_module.items())) if name.startswith("Tenma")}
+psu_classes = {name: cls for name, cls in dict(vars(tenma_module)).items() if name.startswith("Tenma")}
 for k, v in psu_classes.items():
     if "Base" not in k:
         globals()[k] = v
