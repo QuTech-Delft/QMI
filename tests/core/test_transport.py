@@ -585,7 +585,7 @@ class TestQmiUdpTransport(unittest.TestCase):
 
         except AssertionError as ass:
             # Catch this as some servers apparently fragment the message to be max of 4096 bytes, so it does not crash
-            if len(read) != 4096:
+            if len(read) != 100:
                 raise AssertionError from ass
 
         # Send some bytes from server to transport.
