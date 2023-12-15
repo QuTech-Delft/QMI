@@ -118,19 +118,25 @@ class TestQmiTransportFactory(unittest.TestCase):
         self.server_sock.settimeout(1.0)
 
         async def the_call():
-            time.sleep(0.1)
+            # Async function for not sending the message "too early" so that it won't get lost
+            time.sleep(0.01)
             self.server_sock.sendall(b"aap noot\n")
             l = asyncio.get_running_loop()
             l.stop()
 
         # Send some bytes from server to transport.
         loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            asyncio.set_event_loop(loop)
+
         loop.run_until_complete(the_call())
         # Receive message through transport.
         data = trans.read_until(b"\n", timeout=1.0)
         self.assertEqual(data, b"aap noot\n")
 
-        loop.close()
+        if loop.is_running():
+            loop.close()
+
         # Close transport. This closes only the UDP transport server.
         trans.close()
 
@@ -562,20 +568,25 @@ class TestQmiUdpTransport(unittest.TestCase):
         s = ''.join(random.choices(string.ascii_uppercase + string.digits, k=bs_size))
 
         async def the_call():
-            time.sleep(0.1)
+            # Async function for not sending the message "too early" so that it won't get lost
+            time.sleep(0.01)
             self.server_sock.sendall(s.encode())
             l = asyncio.get_running_loop()
             l.stop()
 
         # Send some bytes from server to transport.
         loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            asyncio.set_event_loop(loop)
+
         loop.run_until_complete(the_call())
 
         # Try to receive only a part of the bytes (triggers exception).
         with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
             trans.read(100, timeout=1.0)
 
-        loop.close()
+        if loop.is_running():
+            loop.close()
 
         # Send some bytes from server to transport.
         server_conn.sendall(s.encode())
