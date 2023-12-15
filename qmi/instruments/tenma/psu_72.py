@@ -19,10 +19,12 @@ class Tenma72_Base(QMI_Instrument):
     """The base class for all Tenma model 72 power supplies.
 
     Attributes:
+        BUFFER_SIZE:      The default buffer size for 'read'
         DEFAULT_BAUDRATE: The default baudrate in case of serial connection is used (Baud).
         MAX_VOLTAGE:      The maximum voltage that can be set with the PSU (Volts).
         MAX_CURRENT:      The maximum current that can be set with the PSU (Amperes).
     """
+    BUFFER_SIZE = 50
     DEFAULT_BAUDRATE = 0
     MAX_VOLTAGE = 0
     MAX_CURRENT = 0
@@ -51,7 +53,7 @@ class Tenma72_Base(QMI_Instrument):
         Returns:
             response: Decoded response string.
         """
-        response = self._transport.read_until_timeout(50, timeout)
+        response = self._transport.read_until_timeout(self.BUFFER_SIZE, timeout)
         return response.decode('ascii')
 
     @rpc_method

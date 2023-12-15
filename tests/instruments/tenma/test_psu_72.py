@@ -9,7 +9,7 @@ from qmi.instruments.tenma import Tenma72_2550
 
 
 class TestTenma72_2550(unittest.TestCase):
-    """ Testcase of the TestTenma72_2550 oscillopsu """
+    """ Testcase of the TestTenma72_2550 psu """
 
     def setUp(self):
         qmi.start("TestSiglentTenma72_2550")
@@ -33,7 +33,7 @@ class TestTenma72_2550(unittest.TestCase):
         expected_serial = "1231345"
         expected_version = "2.0"
         self._transport_mock.read_until_timeout.return_value = "TENMA 72-2535 SN:1231345 V2.0".encode("ascii")
-        expected_calls = [call.read_until_timeout(50, 0.2)]
+        expected_calls = [call.read_until_timeout(Tenma72_2550.BUFFER_SIZE, 0.2)]  # 0.2 = default timeout
         # act
         idn = self.psu.get_idn()
         # assert
