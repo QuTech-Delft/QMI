@@ -119,7 +119,7 @@ class TestQmiTransportFactory(unittest.TestCase):
 
         async def the_call():
             # Async function for not sending the message "too early" so that it won't get lost
-            time.sleep(0.01)
+            time.sleep(0.1)
             self.server_sock.sendall(b"aap noot\n")
             l = asyncio.get_running_loop()
             l.stop()
@@ -569,7 +569,7 @@ class TestQmiUdpTransport(unittest.TestCase):
 
         async def the_call():
             # Async function for not sending the message "too early" so that it won't get lost
-            time.sleep(0.01)
+            time.sleep(0.1)
             self.server_sock.sendall(s.encode())
             l = asyncio.get_running_loop()
             l.stop()
