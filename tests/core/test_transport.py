@@ -564,7 +564,7 @@ class TestQmiUdpTransport(unittest.TestCase):
         server_conn.settimeout(1.0)
 
         # The transport should fail if sent package is > 4kB, as UDP is not set to handle larger packages.
-        bs_size = 5000  # Normal max 2**12 bytes
+        bs_size = 5000  # Normal max 2**12 bytes (- headers)
         s = ''.join(random.choices(string.ascii_uppercase + string.digits, k=bs_size))
 
         async def the_call():
@@ -583,7 +583,8 @@ class TestQmiUdpTransport(unittest.TestCase):
 
         # Try to receive only a part of the bytes (triggers exception).
         with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
-            trans.read(100, timeout=1.0)
+            read = trans.read(100, timeout=1.0)  # The `read` will set the size to 4096 in any case
+            print("read:", read)
 
         if loop.is_running():
             loop.close()
