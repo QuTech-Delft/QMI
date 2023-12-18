@@ -691,6 +691,7 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
                     nbuf = len(self._read_buffer)
                     raise QMI_TimeoutException(f"Function timeout after {nbuf} bytes without message terminator")
                 self._safe_socket.settimeout(tremain)
+
             # Read from socket.
             try:
                 # NOTE: Reading up to 512 bytes here for TCP, as larger packet size
@@ -701,12 +702,13 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
                     b, addr = self._safe_socket.recvfrom(4096)
                 else:
                     b, addr = self._safe_socket.recvfrom(512)
-            except (BlockingIOError, socket.timeout):
+            except (BlockingIOError, socket.timeout, TimeoutError):
                 # timeout in socket.recv()
                 nbuf = len(self._read_buffer)
                 raise QMI_TimeoutException(f"Socket timeout after {nbuf} bytes without message terminator")
             except OSError:
                 raise QMI_RuntimeException(f"UDP packet size was larger than 4096. Data is lost.")
+
             if self._assert_addr and addr != self._address:
                 _logger.warning(f"Received data from address %s while expected data only from %s!", addr, self._address)
                 del b
