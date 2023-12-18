@@ -600,6 +600,7 @@ class TestQmiUdpTransport(unittest.TestCase):
 
         except qmi.core.exceptions.QMI_TimeoutException as tim:
             # Catch this as some servers apparently fragment the message to be max of 4096 bytes, so it does not crash
+            print(len(trans._read_buffer))
             if len(trans._read_buffer) != 8096:
                 raise AssertionError from tim
 
