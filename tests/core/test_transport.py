@@ -581,7 +581,6 @@ class TestQmiUdpTransport(unittest.TestCase):
             # Try to receive only a part of the bytes (triggers exception).
             with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
                 read = trans.read(100, timeout=1.0)  # The `read` will set the size to 4096 in any case
-                print("read:", read)
 
         except AssertionError as ass:
             # Catch this as some servers apparently fragment the message to be max of 4096 bytes, so it does not crash
@@ -594,9 +593,15 @@ class TestQmiUdpTransport(unittest.TestCase):
             asyncio.set_event_loop(loop)
 
         loop.run_until_complete(the_call())
-        # The same should happen with read_until (triggers exception).
-        with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
-            trans.read_until(b"\n", timeout=1.0)
+        try:
+            # The same should happen with read_until (triggers exception).
+            with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
+                read = trans.read_until(b"\n", timeout=1.0)
+
+        except TimeoutError as tim:
+            # Catch this as some servers apparently fragment the message to be max of 4096 bytes, so it does not crash
+            if len(trans._read_buffer) != 8096:
+                raise AssertionError from tim
 
         if loop.is_running():
             loop.close()
