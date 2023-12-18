@@ -89,19 +89,6 @@ class TestTenma72_Base(unittest.TestCase):
         self.assertEqual(expected_voltage, voltage)
         self._transport_mock.write.assert_called_once_with(bytes(cmd_2, "ascii"))
 
-    def test_set_commands_fail_with_default_base_values(self):
-        """Check the default attributes are as expected and fail"""
-        max_voltage = Tenma72_Base.MAX_VOLTAGE
-        max_current = Tenma72_Base.MAX_CURRENT
-
-        # Set commands should fail with the base class default values
-        with self.assertRaises(ValueError):
-            self.psu.set_voltage(max_voltage)
-
-        # Set commands should fail with the base class default values
-        with self.assertRaises(ValueError):
-            self.psu.set_current(max_current)
-
     def test_enable_disable_output(self):
         """Test enabling and disabling output. At base class sending works but receiving excepts"""
         # Arrange
@@ -144,10 +131,10 @@ class TestTenma72_2550(unittest.TestCase):
         """ Test case for `get_idn()` function. """
         # arrange
         expected_vendor = "TENMA"
-        expected_model = "72-2535"
+        expected_model = "72-2550"
         expected_serial = "1231345"
         expected_version = "2.0"
-        self._transport_mock.read_until_timeout.return_value = "TENMA 72-2535 SN:1231345 V2.0".encode("ascii")
+        self._transport_mock.read_until_timeout.return_value = "TENMA 72-2550 SN:1231345 V2.0".encode("ascii")
         expected_calls = [call.read_until_timeout(Tenma72_2550.BUFFER_SIZE, 0.2)]  # 0.2 = default timeout
         # act
         idn = self.psu.get_idn()
@@ -180,7 +167,85 @@ class TestTenma72_2550(unittest.TestCase):
             self._transport_mock.read.assert_called_once_with(1, 1)
             self._transport_mock.reset_mock()
 
+    def test_set_current(self):
+        """Set current within allowed range."""
+        # Arrange
+        allowed_currents = [Tenma72_2550.MAX_CURRENT, 0]
+        channels = [None, 2]
+        expected_calls = [
+            call.write(f"ISET:{allowed_currents[0]:.3f}".encode("ascii")),
+            call.write(f"ISET{channels[1]}:{allowed_currents[1]:.3f}".encode("ascii"))
+        ]
+        # Act
+        for e, current in enumerate(allowed_currents):
+            self.psu.set_current(current, channels[e])
 
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_calls)
+
+    def test_set_current_excepts(self):
+        """See that values out-of-range cause an exception."""
+        # Arrange
+        disallowed_currents = [Tenma72_2550.MAX_CURRENT + 0.1, -0.1]
+        # Act
+        for current in disallowed_currents:
+            with self.assertRaises(ValueError):
+                self.psu.set_current(current)
+
+        self._transport_mock.write.assert_not_called()
+
+    def test_set_voltage(self):
+        """Set voltage within allowed range."""
+        # Arrange
+        allowed_voltages = [Tenma72_2550.MAX_VOLTAGE, 0]
+        channels = [None, 2]
+        expected_calls = [
+            call.write(f"VSET:{allowed_voltages[0]:.3f}".encode("ascii")),
+            call.write(f"VSET{channels[1]}:{allowed_voltages[1]:.3f}".encode("ascii"))
+        ]
+        # Act
+        for e, voltage in enumerate(allowed_voltages):
+            self.psu.set_voltage(voltage, channels[e])
+
+        self._transport_mock.write.assert_has_calls(expected_calls)
+
+    def test_set_voltage_excepts(self):
+        """See that values out-of-range cause an exception."""
+        # Arrange
+        disallowed_voltages = [Tenma72_2550.MAX_VOLTAGE + 0.1, -0.1]
+        # Act
+        for voltage in disallowed_voltages:
+            with self.assertRaises(ValueError):
+                self.psu.set_voltage(voltage)
+
+        self._transport_mock.write.assert_not_called()
+
+    def test_enable_disable_output(self):
+        """Test enabling and disabling output. At implemented class this should work."""
+        # Arrange
+        enable_cmd = "OUT:1"
+        disable_cmd = "OUT:0"
+        self._transport_mock.read.side_effect = [chr(0x40), chr(0x00)]
+        expected_enable_calls = [
+            call(enable_cmd.encode("ascii")),
+            call(b"STATUS?")
+        ]
+        expected_disable_calls = [
+            call(disable_cmd.encode("ascii")),
+            call(b"STATUS?")
+        ]
+        # Act
+        self.psu.enable_output(True)
+
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_enable_calls)
+        self._transport_mock.write.reset_mock()
+
+        # Act
+        self.psu.enable_output(False)
+
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_disable_calls)
 
 
 if __name__ == '__main__':

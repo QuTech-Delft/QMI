@@ -3,7 +3,7 @@
 import logging
 import re
 from time import sleep
-from typing import Any, Dict, List, Optional, Union, Tuple
+from typing import Any, Dict, Optional
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
@@ -121,8 +121,8 @@ class Tenma72_Base(QMI_Instrument):
         Raises:
             ValueError: If the current setting is not between 0 and self.MAX_CURRENT.
         """
-        if not 0 < current < self.MAX_CURRENT:
-            raise ValueError(f"Invalid current setting {current}, not between 0 and 5 A")
+        if not 0 <= current <= self.MAX_CURRENT:
+            raise ValueError(f"Invalid current setting {current}, not between 0 and {self.MAX_CURRENT} A")
 
         ch = output_channel or ""
         command = f"ISET{ch}:{current:.3f}"
@@ -154,7 +154,7 @@ class Tenma72_Base(QMI_Instrument):
         Raises:
             ValueError: If the input voltage setting is not between 0 and self.MAX_VOLTAGE
         """
-        if not 0 < voltage < self.MAX_VOLTAGE:
+        if not 0 <= voltage <= self.MAX_VOLTAGE:
             raise ValueError(f"Invalid current setting {voltage}, not between 0 and {self.MAX_VOLTAGE} V")
 
         ch = output_channel or ""
