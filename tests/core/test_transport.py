@@ -596,9 +596,9 @@ class TestQmiUdpTransport(unittest.TestCase):
         try:
             # The same should happen with read_until (triggers exception).
             with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
-                read = trans.read_until(b"\n", timeout=1.0)
+                trans.read_until(b"\n", timeout=1.0)
 
-        except TimeoutError as tim:
+        except qmi.core.exceptions.QMI_TimeoutException as tim:
             # Catch this as some servers apparently fragment the message to be max of 4096 bytes, so it does not crash
             if len(trans._read_buffer) != 8096:
                 raise AssertionError from tim
