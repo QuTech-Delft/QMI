@@ -297,18 +297,18 @@ class Tenma72_13350(Tenma72_Base):
         self._send("STATUS?")
         statusBytes = self._transport.read(2, 2)  # Read response byte
         # 72-13350 sends two bytes back, the second being '\n'
-        status = statusBytes[0]
+        status = ord(statusBytes[0])
 
-        ch1mode = (status & 0b00000001)
-        output_enabled = bool(status & 0b00000010)
-        current_priority = (status & 0b00000100)
-        beep = bool(status & 0b00010000)
-        lock = bool(status & 0b00100000)
+        ch1mode = (status & 0x01)
+        output_enabled = bool(status & 0x02)
+        current_priority = (status & 0x04)
+        beep = bool(status & 0x10)
+        lock = bool(status & 0x20)
 
         return {
             "ChannelMode": "C.V" if ch1mode else "C.C",
             "OutputEnabled": output_enabled,
-            "V/C priority ": "Current priority" if current_priority else "Voltage priority",
+            "V/C priority": "Current priority" if current_priority else "Voltage priority",
             "Beep": beep,
             "Lock": lock,
         }

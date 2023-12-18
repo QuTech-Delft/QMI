@@ -4,7 +4,6 @@ from unittest.mock import call, patch
 
 import qmi
 from qmi.core.transport import QMI_UdpTransport
-from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
 from qmi.instruments.tenma import Tenma72_2550, Tenma72_13350
 from qmi.instruments.tenma.psu_72 import Tenma72_Base
 
@@ -226,6 +225,147 @@ class TestTenma72_2550(unittest.TestCase):
         enable_cmd = "OUT:1"
         disable_cmd = "OUT:0"
         self._transport_mock.read.side_effect = [chr(0x40), chr(0x00)]
+        expected_enable_calls = [
+            call(enable_cmd.encode("ascii")),
+            call(b"STATUS?")
+        ]
+        expected_disable_calls = [
+            call(disable_cmd.encode("ascii")),
+            call(b"STATUS?")
+        ]
+        # Act
+        self.psu.enable_output(True)
+
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_enable_calls)
+        self._transport_mock.write.reset_mock()
+
+        # Act
+        self.psu.enable_output(False)
+
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_disable_calls)
+
+
+class TestTenma72_13350(unittest.TestCase):
+    """ Testcase of the TestTenma72_13350 psu """
+
+    def setUp(self):
+        qmi.start("TestSiglentTenma72_13350")
+        # Add patches
+        patcher = patch('qmi.instruments.tenma.psu_72.create_transport', spec=QMI_UdpTransport)
+        self._transport_mock = patcher.start().return_value
+        self.addCleanup(patcher.stop)
+        # Make DUT
+        self.psu: Tenma72_13350 = qmi.make_instrument("Tenma72_13350", Tenma72_13350, "")
+        self.psu.open()
+
+    def tearDown(self):
+        self.psu.close()
+        qmi.stop()
+
+    def test_get_idn(self):
+        """ Test case for `get_idn()` function. """
+        # arrange
+        expected_vendor = "TENMA"
+        expected_model = "72-13350"
+        expected_serial = "1231345"
+        expected_version = "2.0"
+        self._transport_mock.read_until_timeout.return_value = "TENMA 72-13350 SN:1231345 V2.0".encode("ascii")
+        expected_calls = [call.read_until_timeout(Tenma72_13350.BUFFER_SIZE, 0.2)]  # 0.2 = default timeout
+        # act
+        idn = self.psu.get_idn()
+        # assert
+        self.assertEqual(expected_calls, self._transport_mock.read_until_timeout.call_args_list)
+        self.assertEqual(expected_vendor, idn.vendor)
+        self.assertEqual(expected_model, idn.model)
+        self.assertEqual(expected_serial, idn.serial)
+        self.assertEqual(expected_version, idn.version)
+
+    def test_get_status(self):
+        """Test case for get_status() function."""
+        # arrange
+        responses = [chr(0x01), chr(0x02), chr(0x04), chr(0x10), chr(0x20)]
+        self._transport_mock.read.side_effect = responses
+        expected_statuses = [
+            {"ChannelMode": "C.V", "OutputEnabled": False, "V/C priority": "Voltage priority", "Beep": False,
+             "Lock": False},
+            {"ChannelMode": "C.C", "OutputEnabled": True, "V/C priority": "Voltage priority", "Beep": False,
+             "Lock": False},
+            {"ChannelMode": "C.C", "OutputEnabled": False, "V/C priority": "Current priority", "Beep": False,
+             "Lock": False},
+            {"ChannelMode": "C.C", "OutputEnabled": False, "V/C priority": "Voltage priority", "Beep": True,
+             "Lock": False},
+            {"ChannelMode": "C.C", "OutputEnabled": False, "V/C priority": "Voltage priority", "Beep": False,
+             "Lock": True}
+        ]
+        # Act
+        for expected in expected_statuses:
+            status = self.psu.get_status()
+            # Assert
+            self.assertDictEqual(expected, status)
+            self._transport_mock.read.assert_called_once_with(2, 2)
+            self._transport_mock.reset_mock()
+
+    def test_set_current(self):
+        """Set current within allowed range."""
+        # Arrange
+        allowed_currents = [Tenma72_13350.MAX_CURRENT, 0]
+        channels = [None, 2]
+        expected_calls = [
+            call.write(f"ISET:{allowed_currents[0]:.3f}".encode("ascii")),
+            call.write(f"ISET{channels[1]}:{allowed_currents[1]:.3f}".encode("ascii"))
+        ]
+        # Act
+        for e, current in enumerate(allowed_currents):
+            self.psu.set_current(current, channels[e])
+
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_calls)
+
+    def test_set_current_excepts(self):
+        """See that values out-of-range cause an exception."""
+        # Arrange
+        disallowed_currents = [Tenma72_13350.MAX_CURRENT + 0.1, -0.1]
+        # Act
+        for current in disallowed_currents:
+            with self.assertRaises(ValueError):
+                self.psu.set_current(current)
+
+        self._transport_mock.write.assert_not_called()
+
+    def test_set_voltage(self):
+        """Set voltage within allowed range."""
+        # Arrange
+        allowed_voltages = [Tenma72_13350.MAX_VOLTAGE, 0]
+        channels = [None, 2]
+        expected_calls = [
+            call.write(f"VSET:{allowed_voltages[0]:.3f}".encode("ascii")),
+            call.write(f"VSET{channels[1]}:{allowed_voltages[1]:.3f}".encode("ascii"))
+        ]
+        # Act
+        for e, voltage in enumerate(allowed_voltages):
+            self.psu.set_voltage(voltage, channels[e])
+
+        self._transport_mock.write.assert_has_calls(expected_calls)
+
+    def test_set_voltage_excepts(self):
+        """See that values out-of-range cause an exception."""
+        # Arrange
+        disallowed_voltages = [Tenma72_13350.MAX_VOLTAGE + 0.1, -0.1]
+        # Act
+        for voltage in disallowed_voltages:
+            with self.assertRaises(ValueError):
+                self.psu.set_voltage(voltage)
+
+        self._transport_mock.write.assert_not_called()
+
+    def test_enable_disable_output(self):
+        """Test enabling and disabling output. At implemented class this should work."""
+        # Arrange
+        enable_cmd = "OUT:1"
+        disable_cmd = "OUT:0"
+        self._transport_mock.read.side_effect = [chr(0x02), chr(0x00)]
         expected_enable_calls = [
             call(enable_cmd.encode("ascii")),
             call(b"STATUS?")

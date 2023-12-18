@@ -7,7 +7,7 @@ from contextlib import nullcontext, AbstractContextManager
 import sys
 
 import qmi
-from qmi.instruments.tenma import *
+from qmi.instruments.tenma import *  # This may look like unused in IDE but will import all PSU classes.
 from qmi.utils.context_managers import start_stop, open_close
 
 
