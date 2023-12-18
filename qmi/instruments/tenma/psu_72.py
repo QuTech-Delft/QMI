@@ -163,11 +163,10 @@ class Tenma72_Base(QMI_Instrument):
 
     @rpc_method
     def enable_output(self, output: bool) -> None:
-        """
-        Parameters:
-            output_channel: The channel to send the inquiry to.
+        """Enable or disable output from the PSU.
 
-                current: Current for the channel in Amps as a float
+        Parameters:
+            output: Boolean value to either set output ON (True) or OFF (False).
         """
         val = 1 if output else 0
         command = f"OUT:{val}"
@@ -190,6 +189,7 @@ class Tenma72_2550(Tenma72_Base):
     MAX_VOLTAGE = 60
     MAX_CURRENT = 3
 
+    @rpc_method
     def get_status(self) -> Dict[str, Any]:
         """Get the power supply status as a dictionary of status values.
 
@@ -280,6 +280,7 @@ class Tenma72_13350(Tenma72_Base):
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         super().__init__(context, name, transport)
 
+    @rpc_method
     def get_status(self) -> Dict[str, Any]:
         """Get the power supply status as a dictionary of status values.
 
