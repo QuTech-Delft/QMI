@@ -587,6 +587,8 @@ class TestQmiUdpTransport(unittest.TestCase):
             if len(read) != 100:
                 raise AssertionError from ass
 
+            trans.discard_read()
+
         # Send some bytes from server to transport.
         loop = asyncio.get_event_loop()
         if loop.is_closed():
@@ -596,12 +598,14 @@ class TestQmiUdpTransport(unittest.TestCase):
         try:
             # The same should happen with read_until (triggers exception).
             with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
-                read = trans.read_until(b"\n", timeout=1.0)
+                trans.read_until(b"\n", timeout=1.0)
 
-        except TimeoutError as tim:
+        except qmi.core.exceptions.QMI_TimeoutException as tim:
             # Catch this as some servers apparently fragment the message to be max of 4096 bytes, so it does not crash
-            if len(trans._read_buffer) != 8096:
+            if len(trans._read_buffer) != 4096:
                 raise AssertionError from tim
+
+            trans.discard_read()
 
         if loop.is_running():
             loop.close()
@@ -709,6 +713,27 @@ class TestQmiUdpTransport(unittest.TestCase):
 
         # Close transport.
         trans.close()
+
+    def test_discard_read(self):
+        """Test discarding read data."""
+        # Create UDP transport connected to local server.
+        trans = QMI_UdpTransport("localhost", self.server_port)
+        trans.open()
+
+        # Accept the connection on server side.
+        self.server_sock.connect((self.server_host, self.server_port + 1))
+        server_conn = self.server_sock
+        server_conn.settimeout(1.0)
+
+        # Send some bytes from server to transport.
+        testmsg = b"hello there"
+        server_conn.sendall(testmsg)
+
+        # Discard bytes through the transport.
+        trans.discard_read()
+        # Try to read, which should now except as the input buffer was discarded
+        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
+            trans.read(1, 0.0)
 
     def test_client_non_existing(self):
 

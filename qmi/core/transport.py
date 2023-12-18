@@ -739,10 +739,7 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
         while True:
             try:
                 b, addr = self._safe_socket.recvfrom(4096)
-            except socket.timeout:
-                # no more bytes available
-                break
-            except BlockingIOError:
+            except (BlockingIOError, socket.timeout):
                 # no more bytes available
                 break
             except OSError:
