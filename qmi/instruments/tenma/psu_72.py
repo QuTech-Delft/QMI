@@ -41,6 +41,7 @@ class Tenma72_Base(QMI_Instrument):
         Parameters:
             cmd:    The command to write to the device.
         """
+        _logger.info("[%s] Sending message %s", self._name, cmd)
         self._transport.write(bytes(cmd, "ascii"))
         sleep(.02)  # Sleep some bits to let the message arrive
 
@@ -54,7 +55,23 @@ class Tenma72_Base(QMI_Instrument):
             response: Decoded response string.
         """
         response = self._transport.read_until_timeout(self.BUFFER_SIZE, timeout)
+        _logger.info("[%s] Read message %s", self._name, response)
         return response.decode('ascii')
+
+    def _enable_output(self, output: bool, command: str) -> None:
+        """Internal function to further communicate the output state to instrument.
+
+        Parameters:
+            output: The expected output state.
+            command: The enable command string.
+        """
+        self._send(command)
+        status = self.get_status()
+        if status["OutputEnabled"] is not output:
+            _logger.exception(
+                "[%s] Tried to set output with %s but got %s", self._name, command, status["OutputEnabled"]
+            )
+            raise QMI_InstrumentException("Setting output failed for an unknown reason")
 
     @rpc_method
     def open(self) -> None:
@@ -77,15 +94,24 @@ class Tenma72_Base(QMI_Instrument):
         Returns:
             QMI_InstrumentIdentification: NamedTuple with vendor, model, serial number and SW version info.
         """
-        self._send("*IDN?")  # TODO: For 13350-13360 models it reads: MTTTH*DIN? Test!
+        self._send("*IDN?")
         idn = self._read()
         # Find all relevant info from response. Should be of format TENMA 72-2535 SN:1231345 V2.0
-        pattern = re.compile(r"(\A[^\W\d_]+) ([0-9-]+) SN:([\d]+) V([0-9.]+)")
-        vendor, model, serial, version = pattern.findall(idn)[0]
+        pattern = re.compile(r'(\b\w+\b[^ ]*|\b72[^ ]*|V[^ ]*|SN:[^ ]*)')
+
+        # Find all matches in the input string
+        matches = pattern.findall(idn)
+
+        # Extract the relevant parts from the matches
+        vendor = matches[0] if matches else None
+        model = next((match for match in matches[1:] if match.startswith('72')), None)
+        version = next((match for match in matches[1:] if match.startswith('V')), None)
+        serial = next((match for match in matches[1:] if match.startswith('SN:')), None)
+
         return QMI_InstrumentIdentification(
             vendor=vendor,
             model=model,
-            serial=serial,
+            serial=serial.strip()[3:],
             version=version
         )
 
@@ -168,12 +194,7 @@ class Tenma72_Base(QMI_Instrument):
         Parameters:
             output: Boolean value to either set output ON (True) or OFF (False).
         """
-        val = 1 if output else 0
-        command = f"OUT:{val}"
-        self._send(command)
-        status = self.get_status()
-        if status["OutputEnabled"] is not output:
-            raise QMI_InstrumentException("Setting output failed for an unknown reason")
+        NotImplementedError()
 
 
 class Tenma72_2550(Tenma72_Base):
@@ -227,6 +248,11 @@ class Tenma72_2550(Tenma72_Base):
             "OutputEnabled": bool(output_enabled),
         }
 
+    @rpc_method
+    def enable_output(self, output: bool) -> None:
+        command = f"OUT{int(output)}"
+        self._enable_output(output, command)
+
 
 class Tenma72_2535(Tenma72_2550):
     MAX_VOLTAGE = 30
@@ -279,6 +305,11 @@ class Tenma72_13350(Tenma72_Base):
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         super().__init__(context, name, transport)
+        self.eol = "\n"
+
+    def _send(self, cmd: str) -> None:
+        cmd = cmd + self.eol
+        return super(Tenma72_13350, self)._send(cmd)
 
     @rpc_method
     def get_status(self) -> Dict[str, Any]:
@@ -297,7 +328,7 @@ class Tenma72_13350(Tenma72_Base):
         self._send("STATUS?")
         statusBytes = self._transport.read(2, 2)  # Read response byte
         # 72-13350 sends two bytes back, the second being '\n'
-        status = ord(statusBytes[0])
+        status = statusBytes[0]
 
         ch1mode = (status & 0x01)
         output_enabled = bool(status & 0x02)
@@ -312,6 +343,11 @@ class Tenma72_13350(Tenma72_Base):
             "Beep": beep,
             "Lock": lock,
         }
+
+    @rpc_method
+    def enable_output(self, output: bool) -> None:
+        command = f"OUT:{int(output)}"
+        self._enable_output(output, command)
 
 
 class Tenma72_13360(Tenma72_13350):

@@ -285,7 +285,7 @@ class TestTenma72_13350(unittest.TestCase):
     def test_get_status(self):
         """Test case for get_status() function."""
         # arrange
-        responses = [chr(0x01), chr(0x02), chr(0x04), chr(0x10), chr(0x20)]
+        responses = [0x01, 0x02, 0x04, 0x10, 0x20]
         self._transport_mock.read.side_effect = responses
         expected_statuses = [
             {"ChannelMode": "C.V", "OutputEnabled": False, "V/C priority": "Voltage priority", "Beep": False,

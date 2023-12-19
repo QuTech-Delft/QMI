@@ -26,13 +26,13 @@ def main() -> int:
     parser.add_argument("--idn", action="store_true", help="Get instrument identification")
     parser.add_argument("--status", action="store_true", help="Get instrument status")
     # setters/getters
-    parser.add_argument("--current", type=float, help="Set current in Amperes", nargs='?', const='get',)
-    parser.add_argument("--voltage", type=float, help="Set voltage in Volts", nargs='?', const='get',)
-    parser.add_argument("--output", type=bool, help="Enable/disable output")
-    parser.add_argument("--no-output", dest="output", action="store_false")
+    parser.add_argument("--current", type=str, help="Set current in Amperes", nargs='?', const='get',)
+    parser.add_argument("--voltage", type=str, help="Set voltage in Volts", nargs='?', const='get',)
+    parser.add_argument("--output", action="store_true", help="Enable output", default=None)
+    parser.add_argument("--no-output", dest="output", action="store_false", help="Disable output")
     args = parser.parse_args()
 
-    instr: globals()[args.model]
+    instr: globals()[f"Tenma72_{args.model}"]
     with start_stop(qmi, "tenma72_psu_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
         if args.idn:
             idn = instr.get_idn()
@@ -45,19 +45,21 @@ def main() -> int:
         channel = args.channel
         if args.current is not None:
             if args.current == "get":
-                print(instr.read_current(channel))
+                print("Current is", instr.read_current(channel), "A")
 
             else:
-                print("Setting current to {:.3f} A".format(args.current))
-                instr.set_current(args.current, channel)
+                current = float(args.current)
+                print("Setting current to {:.3f} A".format(current))
+                instr.set_current(current, channel)
 
         if args.voltage is not None:
             if args.voltage == "get":
-                print(instr.read_voltage(channel))
+                print("Voltage is", instr.read_voltage(channel), "V")
 
             else:
-                print("Setting voltage to {:.3f} A".format(args.voltage))
-                instr.set_voltage(args.voltage, channel)
+                voltage = float(args.voltage)
+                print("Setting voltage to {:.3f} A".format(voltage))
+                instr.set_voltage(voltage, channel)
 
         if args.output is not None:
             if args.output:
@@ -72,11 +74,11 @@ def main() -> int:
 
 def parse_instrument_source(args) -> AbstractContextManager:
     # make the instrument
-    instr: globals()[args.model]
+    instr = globals()[f"Tenma72_{args.model}"]
     if args.tcp is not None:
         return open_close(
             qmi.make_instrument(
-                instrument_name=f"Tenma 72-{args.model}",
+                instrument_name=f"tenma72_{args.model}",
                 instrument_class=instr,
                 transport=f"tcp:{args.tcp}"
             )
@@ -84,7 +86,7 @@ def parse_instrument_source(args) -> AbstractContextManager:
     elif args.serial is not None:
         return open_close(
             qmi.make_instrument(
-                instrument_name=f"Tenma 72-{args.model}",
+                instrument_name=f"tenma72_{args.model}",
                 instrument_class=instr,
                 transport=f"serial:{args.serial}"
             )
