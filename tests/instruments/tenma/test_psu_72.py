@@ -31,7 +31,7 @@ class TestTenma72_Base(unittest.TestCase):
         expected_vendor = "TENMA"
         expected_model = "72-2345"
         expected_serial = "1231345"
-        expected_version = "2.0"
+        expected_version = "V2.0"
         self._transport_mock.read_until_timeout.return_value = "TENMA 72-2345 SN:1231345 V2.0".encode("ascii")
         expected_calls = [call.read_until_timeout(Tenma72_Base.BUFFER_SIZE, 0.2)]  # 0.2 = default timeout
         # act
@@ -90,23 +90,12 @@ class TestTenma72_Base(unittest.TestCase):
 
     def test_enable_disable_output(self):
         """Test enabling and disabling output. At base class sending works but receiving excepts"""
-        # Arrange
-        enable_cmd = "OUT:1"
-        disable_cmd = "OUT:0"
         # Act
         with self.assertRaises(NotImplementedError):
             self.psu.enable_output(True)
 
-        # Assert
-        self._transport_mock.write.assert_called_once_with(bytes(enable_cmd, "ascii"))
-        self._transport_mock.write.reset_mock()
-
-        # Act
         with self.assertRaises(NotImplementedError):
             self.psu.enable_output(False)
-
-        # Assert
-        self._transport_mock.write.assert_called_once_with(bytes(disable_cmd, "ascii"))
 
 
 class TestTenma72_2550(unittest.TestCase):
@@ -132,7 +121,7 @@ class TestTenma72_2550(unittest.TestCase):
         expected_vendor = "TENMA"
         expected_model = "72-2550"
         expected_serial = "1231345"
-        expected_version = "2.0"
+        expected_version = "V2.0"
         self._transport_mock.read_until_timeout.return_value = "TENMA 72-2550 SN:1231345 V2.0".encode("ascii")
         expected_calls = [call.read_until_timeout(Tenma72_2550.BUFFER_SIZE, 0.2)]  # 0.2 = default timeout
         # act
@@ -222,8 +211,8 @@ class TestTenma72_2550(unittest.TestCase):
     def test_enable_disable_output(self):
         """Test enabling and disabling output. At implemented class this should work."""
         # Arrange
-        enable_cmd = "OUT:1"
-        disable_cmd = "OUT:0"
+        enable_cmd = "OUT1"
+        disable_cmd = "OUT0"
         self._transport_mock.read.side_effect = [chr(0x40), chr(0x00)]
         expected_enable_calls = [
             call(enable_cmd.encode("ascii")),
@@ -270,7 +259,7 @@ class TestTenma72_13350(unittest.TestCase):
         expected_vendor = "TENMA"
         expected_model = "72-13350"
         expected_serial = "1231345"
-        expected_version = "2.0"
+        expected_version = "V2.0"
         self._transport_mock.read_until_timeout.return_value = "TENMA 72-13350 SN:1231345 V2.0".encode("ascii")
         expected_calls = [call.read_until_timeout(Tenma72_13350.BUFFER_SIZE, 0.2)]  # 0.2 = default timeout
         # act
@@ -285,7 +274,7 @@ class TestTenma72_13350(unittest.TestCase):
     def test_get_status(self):
         """Test case for get_status() function."""
         # arrange
-        responses = [0x01, 0x02, 0x04, 0x10, 0x20]
+        responses = [b"\x01\n", b"\x02\n", b"\x04\n", b"\x10\n", b" \n"]  # last is chr(0x20)
         self._transport_mock.read.side_effect = responses
         expected_statuses = [
             {"ChannelMode": "C.V", "OutputEnabled": False, "V/C priority": "Voltage priority", "Beep": False,
@@ -313,8 +302,8 @@ class TestTenma72_13350(unittest.TestCase):
         allowed_currents = [Tenma72_13350.MAX_CURRENT, 0]
         channels = [None, 2]
         expected_calls = [
-            call.write(f"ISET:{allowed_currents[0]:.3f}".encode("ascii")),
-            call.write(f"ISET{channels[1]}:{allowed_currents[1]:.3f}".encode("ascii"))
+            call.write(f"ISET:{allowed_currents[0]:.3f}\n".encode("ascii")),
+            call.write(f"ISET{channels[1]}:{allowed_currents[1]:.3f}\n".encode("ascii"))
         ]
         # Act
         for e, current in enumerate(allowed_currents):
@@ -340,8 +329,8 @@ class TestTenma72_13350(unittest.TestCase):
         allowed_voltages = [Tenma72_13350.MAX_VOLTAGE, 0]
         channels = [None, 2]
         expected_calls = [
-            call.write(f"VSET:{allowed_voltages[0]:.3f}".encode("ascii")),
-            call.write(f"VSET{channels[1]}:{allowed_voltages[1]:.3f}".encode("ascii"))
+            call.write(f"VSET:{allowed_voltages[0]:.3f}\n".encode("ascii")),
+            call.write(f"VSET{channels[1]}:{allowed_voltages[1]:.3f}\n".encode("ascii"))
         ]
         # Act
         for e, voltage in enumerate(allowed_voltages):
@@ -363,16 +352,16 @@ class TestTenma72_13350(unittest.TestCase):
     def test_enable_disable_output(self):
         """Test enabling and disabling output. At implemented class this should work."""
         # Arrange
-        enable_cmd = "OUT:1"
-        disable_cmd = "OUT:0"
-        self._transport_mock.read.side_effect = [chr(0x02), chr(0x00)]
+        enable_cmd = "OUT:1\n"
+        disable_cmd = "OUT:0\n"
+        self._transport_mock.read.side_effect = [b"\x02\n", b"\x00\n"]
         expected_enable_calls = [
             call(enable_cmd.encode("ascii")),
-            call(b"STATUS?")
+            call(b"STATUS?\n")
         ]
         expected_disable_calls = [
             call(disable_cmd.encode("ascii")),
-            call(b"STATUS?")
+            call(b"STATUS?\n")
         ]
         # Act
         self.psu.enable_output(True)

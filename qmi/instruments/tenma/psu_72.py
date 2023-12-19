@@ -194,7 +194,7 @@ class Tenma72_Base(QMI_Instrument):
         Parameters:
             output: Boolean value to either set output ON (True) or OFF (False).
         """
-        NotImplementedError()
+        raise NotImplementedError()
 
 
 class Tenma72_2550(Tenma72_Base):
