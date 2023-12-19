@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-"""Command line client for the Thorlabs K10CR1 rotation mount."""
+"""Command line client for the Tenma 72-series power supplies."""
 
 import argparse
 from contextlib import nullcontext, AbstractContextManager
@@ -20,9 +20,10 @@ def main() -> int:
     parser.add_argument("--channel", type=int, help="Channel or memory slot of instrument", const=None)
 
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--tcp", type=str, help="IP address of device.")
+    group.add_argument("--udp", type=str, help="IP address of device.")
     group.add_argument("--serial", type=str, help="Serial address of device (COMx, /dev/ttySx).")
 
+    parser.add_argument("--port", type=int, help="Port number for the UDP connection")
     parser.add_argument("--idn", action="store_true", help="Get instrument identification")
     parser.add_argument("--status", action="store_true", help="Get instrument status")
     # setters/getters
@@ -75,12 +76,13 @@ def main() -> int:
 def parse_instrument_source(args) -> AbstractContextManager:
     # make the instrument
     instr = globals()[f"Tenma72_{args.model}"]
-    if args.tcp is not None:
+    if args.udp is not None:
+        port = args.port or 0
         return open_close(
             qmi.make_instrument(
                 instrument_name=f"tenma72_{args.model}",
                 instrument_class=instr,
-                transport=f"tcp:{args.tcp}"
+                transport=f"udp:{args.udp}:{port}"
             )
         )
     elif args.serial is not None:
