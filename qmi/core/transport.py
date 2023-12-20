@@ -568,8 +568,8 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
         """Initialize the UDP or TCP transport by connecting to the specified address.
 
         Parameters:
-            host: The server/client IP address.
-            port: The port for the address.
+            host:           The server/client IP address.
+            port:           The port for the address.
             assert_address: Boolean to indicate if the address where data was received from should be asserted.
         """
         super().__init__()
@@ -579,7 +579,7 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
         self._validate_host(host)
         self._validate_port(port)
         self._address = (host, port)
-        self._assert_addr = True if assert_address else False  # For UDP, as it accepts data from any client.
+        self._assert_addr = assert_address  # For UDP, as it accepts data from any client.
         self._socket: Optional[socket.socket] = None
         self._read_buffer = bytearray()
 
@@ -638,8 +638,10 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
                         b, addr = self._safe_socket.recvfrom(udp_packet_size)
                     except (BlockingIOError, socket.timeout) as err:
                         raise err  # Re-raise this for handling in the upper try-except.
-                    except OSError:
-                        raise QMI_RuntimeException(f"UDP packet size was larger than {udp_packet_size}. Data is lost.")
+                    except OSError as err:
+                        raise QMI_RuntimeException(
+                            f"UDP packet size was larger than {udp_packet_size}. Data is lost."
+                        ) from err
 
                     if addr != self._address:
                         _logger.warning("Received data from address %s while expected data only from %s!", addr,
@@ -650,11 +652,14 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
                 else:
                     b, addr = self._safe_socket.recvfrom(nbytes - nbuf)
 
-            except (BlockingIOError, socket.timeout):
-                raise QMI_TimeoutException(f"Timeout after {nbuf} bytes while expecting {nbytes}")
+            except (BlockingIOError, socket.timeout) as err:
+                raise QMI_TimeoutException(
+                    f"Timeout after {nbuf} bytes while expecting {nbytes}"
+                ) from err
             if not b:
                 raise QMI_EndOfInputException(
-                    f"Reached end of input from socket {format_address_and_port(self._address)}")
+                    f"Reached end of input from socket {format_address_and_port(self._address)}"
+                )
             self._read_buffer.extend(b)
             nbuf = len(self._read_buffer)
             if timeout is not None:
@@ -702,12 +707,16 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
                     b, addr = self._safe_socket.recvfrom(4096)
                 else:
                     b, addr = self._safe_socket.recvfrom(512)
-            except (BlockingIOError, socket.timeout, TimeoutError):
+            except (BlockingIOError, socket.timeout, TimeoutError) as err:
                 # timeout in socket.recv()
                 nbuf = len(self._read_buffer)
-                raise QMI_TimeoutException(f"Socket timeout after {nbuf} bytes without message terminator")
-            except OSError:
-                raise QMI_RuntimeException(f"UDP packet size was larger than 4096. Data is lost.")
+                raise QMI_TimeoutException(
+                    f"Socket timeout after {nbuf} bytes without message terminator"
+                ) from err
+            except OSError as err:
+                raise QMI_RuntimeException(
+                    f"UDP packet size was larger than 4096. Data is lost."
+                ) from err
 
             if self._assert_addr and addr != self._address:
                 _logger.warning("Received data from address %s while expected data only from %s!", addr, self._address)
