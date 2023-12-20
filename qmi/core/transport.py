@@ -776,7 +776,7 @@ class QMI_UdpTransport(QMI_UdpTcpTransportBase):
     """
 
     def __init__(self, host: str, port: int) -> None:
-        """Initialize the TCP transport by connecting to the specified address.
+        """Initialize the UDP transport by connecting to the specified address.
 
         Parameters:
             host: The server IP address.
