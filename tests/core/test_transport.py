@@ -69,7 +69,7 @@ class TestQmiTransportFactory(unittest.TestCase):
         # Create UDP server socket.
         self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         self.server_sock.settimeout(10)
-        self.server_sock.bind(("127.0.0.1", 0))
+        self.server_sock.bind(("127.0.0.1", 65000))
         (self.server_host, self.server_port) = self.server_sock.getsockname()
 
         # Create TCP client socket.
@@ -105,7 +105,8 @@ class TestQmiTransportFactory(unittest.TestCase):
 
     def test_factory_udp(self):
         # Create UDP transport.
-        trans = create_transport("udp:localhost:%d" % self.server_port)
+        trans = create_transport(f"udp:localhost:{int(self.server_port)}")
+        # trans = create_transport(f"udp:192.168.1.2:{int(self.server_port)}")
         trans.open()
 
         # Send data to server through transport.
@@ -114,13 +115,16 @@ class TestQmiTransportFactory(unittest.TestCase):
         self.assertEqual(data, b"aap noot\n")
 
         # Connect the server side.
-        self.server_sock.connect((self.server_host, self.server_port + 1))
+        # self.server_sock.connect(("localhost", int(self.server_port)))
+        self.server_sock.connect((self.server_host, int(self.server_port)))
         self.server_sock.settimeout(1.0)
 
         async def the_call():
             # Async function for not sending the message "too early" so that it won't get lost
             time.sleep(0.1)
-            self.server_sock.sendall(b"aap noot\n")
+            # self.server_sock.sendall(b"aap noot\n")
+            self.server_sock.sendto(b"aap noot\n", trans._address)
+            # self.server_sock.sendto(b"aap noot\n", (self.server_host, int(self.server_port)))
             l = asyncio.get_running_loop()
             l.stop()
 

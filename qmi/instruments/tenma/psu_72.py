@@ -1,4 +1,17 @@
-"""Instrument driver for the Alice Pulse generator"""
+"""Instrument driver for the Tenma 72-series power supply units.
+
+Two main model groups in this series are the models similar to 2550 (selected as one base class) and
+models similar to 13350 (selected also as a base class). Both groups work with USB-to-serial communication
+but the second group has also possibility to use UDP communication. For that IP LAN communication protocol
+with related functionalities is present, which can be used either through USB or UDP connection.
+
+Some differences are present, even though the basis is the same, as implemented in the Tenma72_Base class:
+- The group based on 13350 model require an EOL character (`\n`, `\r`) to finish the commands while group
+  based on 2550 model doesn't.
+- The group based on 13350 model does not work when providing the channel number to the serial command, while
+  the commands in group based on 2550 model they do.
+- For example, a command "ISET1:3.0" works for 2550 group, while "ISET:3.0\n" works for 13350 group.
+"""
 
 import logging
 import re
@@ -16,7 +29,7 @@ _logger = logging.getLogger(__name__)
 
 
 class Tenma72_Base(QMI_Instrument):
-    """The base class for all Tenma model 72 power supplies.
+    """The base class for all Tenma model 72 power supply units.
 
     Attributes:
         BUFFER_SIZE:      The default buffer size for 'read'
@@ -31,9 +44,14 @@ class Tenma72_Base(QMI_Instrument):
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         super().__init__(context, name)
-        self._transport = create_transport(
-            transport, default_attributes={"baudrate": self.DEFAULT_BAUDRATE}
-        )
+        if transport.startswith("serial"):
+            self._transport = create_transport(
+                transport, default_attributes={"baudrate": self.DEFAULT_BAUDRATE}
+            )
+        elif transport.startswith("udp"):
+            self._transport = create_transport(transport)
+        else:
+            raise QMI_InstrumentException(f"Transport type {transport} not valid!")
 
     def _send(self, cmd: str) -> None:
         """Writes a command to the Tenma, just an ascii string
@@ -201,6 +219,8 @@ class Tenma72_2550(Tenma72_Base):
     """Instrument driver for the Tenma 72-2550. The driver is tested with this model, but the respective
     manual is also for models 72-2535, 72-2540, 72-2545, 72-2925, 72-2930, 72-2935, 72-2940 & 72-10480.
 
+    This driver can be used only with (USB-to-)serial communications.
+
     Attributes:
         DEFAULT_BAUDRATE: The default baudrate in case of serial connection is used (Baud).
         MAX_VOLTAGE:      The maximum voltage that can be set with the PSU (Volts).
@@ -298,6 +318,11 @@ class Tenma72_10480(Tenma72_2550):
 class Tenma72_13350(Tenma72_Base):
     """Instrument driver for the Tenma 72-13350. The driver is tested with this model, but manual is
     also for the model 72-13360.
+
+    This driver can be used with (USB-to-)serial and UDP communications.
+
+    Note that this model has extra functionalities related to the IP LAN Communication Protocol.
+    Also note that this model does not work with channel number input, like 2550 model-based PSUs.
     """
     MAX_VOLTAGE = 30
     MAX_CURRENT = 30
@@ -305,10 +330,10 @@ class Tenma72_13350(Tenma72_Base):
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         super().__init__(context, name, transport)
-        self.eol = "\n"
+        self.serial_eol = "\n"
 
     def _send(self, cmd: str) -> None:
-        cmd = cmd + self.eol
+        cmd = cmd + self.serial_eol
         return super(Tenma72_13350, self)._send(cmd)
 
     @rpc_method
@@ -348,6 +373,116 @@ class Tenma72_13350(Tenma72_Base):
     def enable_output(self, output: bool) -> None:
         command = f"OUT:{int(output)}"
         self._enable_output(output, command)
+
+    @rpc_method
+    def get_dhcp(self) -> str:
+        """Use the IP LAN command to get the current IP address of the device.
+
+        Returns:
+            dhcp: The current static IP address of the device.
+        """
+        cmd = ":SYST:DHCP?" + self.serial_eol
+        super(Tenma72_13350, self)._send(cmd)
+        dhcp = self._read(0.2)
+        return dhcp
+
+    @rpc_method
+    def set_dhcp(self, dhcp: int) -> None:
+        """Use the IP LAN command to set a new IP address for the device.
+
+        Parameters:
+            dhcp: A new static IP address for the device.
+        """
+        cmd = f":SYST:DHCP {dhcp}" + self.serial_eol
+        super(Tenma72_13350, self)._send(cmd)
+
+    @rpc_method
+    def get_ip_address(self) -> str:
+        """Use the IP LAN command to get the current IP address of the device.
+
+        Returns:
+            ip_address: The current static IP address of the device.
+        """
+        cmd = ":SYST:IPAD?" + self.serial_eol
+        super(Tenma72_13350, self)._send(cmd)
+        ip_address = self._read(0.2)
+        return ip_address
+
+    @rpc_method
+    def set_ip_address(self, ip_address) -> None:
+        """Use the IP LAN command to set a new IP address for the device.
+
+        Parameters:
+            ip_address: A new static IP address for the device.
+        """
+        cmd = f":SYST:IPAD {ip_address}" + self.serial_eol
+        super(Tenma72_13350, self)._send(cmd)
+
+    @rpc_method
+    def get_subnet_mask(self) -> str:
+        """Use the IP LAN command to get the current IP address of the device.
+
+        Returns:
+            subnet_mask: The current static IP address of the device.
+        """
+        cmd = ":SYST:SMASK?" + self.serial_eol
+        super(Tenma72_13350, self)._send(cmd)
+        subnet_mask = self._read(0.2)
+        return subnet_mask
+
+    @rpc_method
+    def set_subnet_mask(self, subnet_mask) -> None:
+        """Use the IP LAN command to set a new IP address for the device.
+
+        Parameters:
+            subnet_mask: A new static IP address for the device.
+        """
+        cmd = f":SYST:SMASK {subnet_mask}" + self.serial_eol
+        super(Tenma72_13350, self)._send(cmd)
+
+    @rpc_method
+    def get_gateway_address(self) -> str:
+        """Use the IP LAN command to get the current IP address of the device.
+
+        Returns:
+            gateway: The current static IP address of the device.
+        """
+        cmd = ":SYST:GATE?" + self.serial_eol
+        super(Tenma72_13350, self)._send(cmd)
+        gateway = self._read(0.2)
+        return gateway
+
+    @rpc_method
+    def set_gateway_address(self, gateway) -> None:
+        """Use the IP LAN command to set a new IP address for the device.
+
+        Parameters:
+            gateway: A new static IP address for the device.
+        """
+        cmd = f":SYST:GATE {gateway}" + self.serial_eol
+        super(Tenma72_13350, self)._send(cmd)
+
+    @rpc_method
+    def get_ip_port(self) -> str:
+        """Use the IP LAN command to get the current IP address of the device.
+
+        Returns:
+            gateway: The current static IP address of the device.
+        """
+        cmd = ":SYST:PORT?" + self.serial_eol
+        super(Tenma72_13350, self)._send(cmd)
+        ip_port = self._read(0.2)
+        return ip_port
+
+    @rpc_method
+    def set_ip_port(self, ip_port) -> None:
+        """Use the IP LAN command to set a new IP address for the device.
+
+        Parameters:
+            ip_port: A new static IP address for the device.
+        """
+        cmd = f":SYST:PORT {ip_port}" + self.serial_eol
+        super(Tenma72_13350, self)._send(cmd)
 
 
 class Tenma72_13360(Tenma72_13350):

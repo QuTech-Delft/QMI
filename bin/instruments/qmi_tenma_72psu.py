@@ -23,14 +23,18 @@ def main() -> int:
     group.add_argument("--udp", type=str, help="IP address of device.")
     group.add_argument("--serial", type=str, help="Serial address of device (COMx, /dev/ttySx).")
 
-    parser.add_argument("--port", type=int, help="Port number for the UDP connection")
     parser.add_argument("--idn", action="store_true", help="Get instrument identification")
     parser.add_argument("--status", action="store_true", help="Get instrument status")
     # setters/getters
-    parser.add_argument("--current", type=str, help="Set current in Amperes", nargs='?', const='get',)
-    parser.add_argument("--voltage", type=str, help="Set voltage in Volts", nargs='?', const='get',)
+    parser.add_argument("--current", type=str, help="Get/Set current in Amperes", nargs='?', const='get',)
+    parser.add_argument("--voltage", type=str, help="Get/Set voltage in Volts", nargs='?', const='get',)
     parser.add_argument("--output", action="store_true", help="Enable output", default=None)
     parser.add_argument("--no-output", dest="output", action="store_false", help="Disable output")
+    parser.add_argument("--ip", type=str, help="Get/Set IP address", nargs='?', const='get')
+    parser.add_argument("--dhcp", type=str, help="Get/Set IP address", nargs='?', const='get')
+    parser.add_argument("--port", type=str, help="Get/Set IP port number", nargs='?', const='get')
+    parser.add_argument("--mask", type=str, help="Get/Set IP subnet mask", nargs='?', const='get')
+    parser.add_argument("--gateway", type=str, help="Get/Set IP gateway", nargs='?', const='get')
     args = parser.parse_args()
 
     instr: globals()[f"Tenma72_{args.model}"]
@@ -50,7 +54,7 @@ def main() -> int:
 
             else:
                 current = float(args.current)
-                print("Setting current to {:.3f} A".format(current))
+                print(f"Setting current to {current:.3f} A")
                 instr.set_current(current, channel)
 
         if args.voltage is not None:
@@ -59,7 +63,7 @@ def main() -> int:
 
             else:
                 voltage = float(args.voltage)
-                print("Setting voltage to {:.3f} A".format(voltage))
+                print(f"Setting voltage to {voltage:.3f} A")
                 instr.set_voltage(voltage, channel)
 
         if args.output is not None:
@@ -69,6 +73,46 @@ def main() -> int:
                 print("Disabling output.")
 
             instr.enable_output(args.output)
+
+        if args.dhcp is not None:
+            if args.dhcp == "get":
+                print("DHCP state is", instr.get_dhcp())
+
+            else:
+                print(f"Setting DHCP state to {args.dhcp}")
+                instr.set_dhcp(args.dhcp)
+
+        if args.ip is not None:
+            if args.ip == "get":
+                print("IP address is", instr.get_ip_address())
+
+            else:
+                print(f"Setting IP address to {args.ip}")
+                instr.set_ip_address(args.ip)
+
+        if args.port is not None:
+            if args.port == "get":
+                print("IP port number is", instr.get_ip_port())
+
+            else:
+                print(f"Setting IP port number to {args.port}")
+                instr.set_ip_port(args.port)
+
+        if args.mask is not None:
+            if args.mask == "get":
+                print("IP subnet mask is", instr.get_subnet_mask())
+
+            else:
+                print(f"Setting IP subnet mask to {args.mask}")
+                instr.set_subnet_mask(args.mask)
+
+        if args.gateway is not None:
+            if args.gateway == "get":
+                print("IP gateway is", instr.get_gateway_address())
+
+            else:
+                print(f"Setting IP gateway to {args.gateway}")
+                instr.set_gateway_address(args.gateway)
 
     return 0
 
