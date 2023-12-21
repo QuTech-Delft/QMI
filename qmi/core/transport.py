@@ -787,8 +787,8 @@ class QMI_UdpTransport(QMI_UdpTcpTransportBase):
         socket.gethostbyname(self._address[0])
         # Create socket
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # To set the local address to point to our client, we need to bind it. To avoid OSError, we use port number + 1
-        self._socket.bind((self._address[0], self._address[1] + 1))
+        # To set the local address to point to our client, we need to bind it.
+        self._socket.bind(("", self._address[1]))
 
     def close(self) -> None:
         _logger.debug("Closing UDP transport %s", self)
