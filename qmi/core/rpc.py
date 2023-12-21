@@ -134,6 +134,7 @@ Reference
 #########
 """
 
+from abc import ABCMeta
 import inspect
 import logging
 import threading
@@ -779,7 +780,7 @@ def is_rpc_method(object: Any) -> bool:
     return inspect.isfunction(object) and getattr(object, "_rpc_method", False)
 
 
-class _RpcObjectMetaClass(type):
+class _RpcObjectMetaClass(ABCMeta):
     """Meta-class used to create `QMI_RpcObject` and its subclasses.
 
     This meta-class extracts a list of signals published by the class.

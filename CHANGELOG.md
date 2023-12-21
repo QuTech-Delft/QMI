@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Changed the stopping of contexts in `qmi_proc.proc_stop()` to happen in reverse order to `proc_start()`.
+- `_RpcObjectMetaClass` inherits from ABCMeta instead of type. This allows it to be used as a mixin with other ABCs.
 
 ## [0.43.0] - 2023-11-22
 
