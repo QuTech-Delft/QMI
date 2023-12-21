@@ -450,6 +450,38 @@ class TestQmiTransportParsing(unittest.TestCase):
         mock.assert_called_with(host="localhost")
 
 
+class TestQmiUdpTcpTransportBase(unittest.TestCase):
+    """Test QMI_UdpTcpTransportBase class."""
+
+    def setUp(self):
+        # Filter out warnings about unclosed sockets
+        warnings.filterwarnings("ignore", "unclosed", ResourceWarning)
+
+    def test_host_validation(self):
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            QMI_UdpTcpTransportBase("invalid_hostname", 22, True)
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            QMI_UdpTcpTransportBase("192.168.1.300", 22, True)
+
+    def test_port_validation(self):
+        # Try to create a base transport with invalid port number.
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            QMI_UdpTcpTransportBase("localhost", 0, True)
+
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            QMI_UdpTcpTransportBase("localhost", 100000, True)
+
+    def test_write_not_implemented_error(self):
+
+        # Create UDP transport connected to local server.
+        trans = QMI_UdpTcpTransportBase("localhost", 64500, False)
+        trans.open()
+
+        # Try to send something through the transport.
+        with self.assertRaises(NotImplementedError):
+            trans.write(b"")
+
+
 class TestQmiUdpTransport(unittest.TestCase):
     """Test QMI_UdpTransport class."""
 
@@ -464,6 +496,11 @@ class TestQmiUdpTransport(unittest.TestCase):
 
     def tearDown(self):
         self.server_sock.close()
+
+    def test_cannot_use_qmi_transmission_udp_port(self):
+        # Test that port number 35999 is reserved for QMI packets.
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            QMI_UdpTransport("localhost", QMI_Context.DEFAULT_UDP_RESPONDER_PORT)
 
     def test_udp_basic(self):
 
@@ -562,13 +599,6 @@ class TestQmiUdpTransport(unittest.TestCase):
         bs_size = 5000  # Normal max 2**12 bytes (- headers)
         s = ''.join(random.choices(string.ascii_uppercase + string.digits, k=bs_size))
 
-        async def the_call():
-            # Async function for not sending the message "too early" so that it won't get lost
-            time.sleep(0.1)
-            self.server_sock.sendto(s.encode(), trans._address)
-            l = asyncio.get_running_loop()
-            l.stop()
-
         # Send some bytes from server to transport.
         self.server_sock.sendto(s.encode(), trans._address)
 
@@ -583,6 +613,13 @@ class TestQmiUdpTransport(unittest.TestCase):
                 raise AssertionError from ass
 
             trans.discard_read()
+
+        async def the_call():
+            # Async function for not sending the message "too early" so that it won't get lost
+            time.sleep(0.1)
+            self.server_sock.sendto(s.encode(), trans._address)
+            l = asyncio.get_running_loop()
+            l.stop()
 
         # Send some bytes from server to transport.
         loop = asyncio.get_event_loop()
@@ -644,6 +681,37 @@ class TestQmiUdpTransport(unittest.TestCase):
         # Try to read another byte. Should raise exception.
         with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
             trans.read(1, timeout=0.0)
+
+        # Close transport.
+        trans.close()
+
+    def test_read_until_exceptions(self):
+
+        # Create UDP transport connected to local server.
+        trans = QMI_UdpTransport("localhost", self.server_port - 1)
+        trans.open()
+
+        # Send some bytes from server to transport.
+        testmsg = b"hello there"
+        self.server_sock.sendto(testmsg, trans._address)
+
+        # Receive bytes through the transport. But no end character inputted -> get timeout error.
+        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
+            trans.read_until(b"\0", timeout=0.1)
+
+        # See that the data read until timeout remains in the read buffer.
+        self.assertEqual(testmsg, trans._read_buffer)
+
+        # The transport should fail if sent package is > 4kB, as UDP is not set to handle larger packages.
+        bs_size = 5000  # Normal max 2**12 bytes (- headers)
+        s = ''.join(random.choices(string.ascii_uppercase + string.digits, k=bs_size))
+
+        # Send some bytes from server to transport.
+        self.server_sock.sendto(s.encode(), trans._address)
+
+        # Receive bytes through the transport. But packet too large.
+        with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
+            trans.read_until(b"\0", timeout=0.1)
 
         # Close transport.
         trans.close()
@@ -711,6 +779,20 @@ class TestQmiUdpTransport(unittest.TestCase):
 
         # Discard bytes through the transport.
         trans.discard_read()
+        # Try to read, which should now except as the input buffer was discarded
+        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
+            trans.read(1, 0.0)
+
+        # The transport should fail if sent package is > 4kB, as UDP is not set to handle larger packages.
+        bs_size = 5000  # Normal max 2**12 bytes (- headers)
+        s = ''.join(random.choices(string.ascii_uppercase + string.digits, k=bs_size))
+
+        # Send some bytes from server to transport.
+        self.server_sock.sendto(s.encode(), trans._address)
+
+        # Try to discard. This should activate the OSError except catch.
+        trans.discard_read()
+
         # Try to read, which should now except as the input buffer was discarded
         with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
             trans.read(1, 0.0)
@@ -791,12 +873,6 @@ class TestQmiUdpTransport(unittest.TestCase):
 
         # Close server side.
         self.server_sock.close()
-
-    def test_invalid_host(self):
-        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UdpTransport("invalid_hostname", 22)
-        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UdpTransport("192.168.1.300", 22)
 
 
 class TestQmiTcpTransport(unittest.TestCase):
