@@ -69,8 +69,8 @@ class TestQmiTransportFactory(unittest.TestCase):
         # Create UDP server socket.
         self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         self.server_sock.settimeout(10)
-        self.server_sock.bind(("127.0.0.1", 65000))
-        (self.server_host, self.server_port) = self.server_sock.getsockname()
+        self.server_host, self.server_port = "localhost", 65000
+        self.server_sock.bind((self.server_host, self.server_port))
 
         # Create TCP client socket.
         self.client_sock = socket.socket()
@@ -106,25 +106,25 @@ class TestQmiTransportFactory(unittest.TestCase):
     def test_factory_udp(self):
         # Create UDP transport.
         trans = create_transport(f"udp:localhost:{int(self.server_port)}")
-        # trans = create_transport(f"udp:192.168.1.2:{int(self.server_port)}")
         trans.open()
 
-        # Send data to server through transport.
-        trans.write(b"aap noot\n")
-        data = self.server_sock.recv(10)
-        self.assertEqual(data, b"aap noot\n")
-
-        # Connect the server side.
-        # self.server_sock.connect(("localhost", int(self.server_port)))
-        self.server_sock.connect((self.server_host, int(self.server_port)))
         self.server_sock.settimeout(1.0)
+        # Send data to server through transport. Receive and assert.
+        w_data = b"aap noot\n"
+        trans.write(w_data)
+        data = self.server_sock.recv(len(w_data))
+        self.assertEqual(data, w_data)
+
+        # Close and re-open with different port number for being able to receive.
+        trans.close()
+        trans = QMI_UdpTransport("localhost", int(self.server_port) - 1)
+        trans.open()
 
         async def the_call():
             # Async function for not sending the message "too early" so that it won't get lost
             time.sleep(0.1)
-            # self.server_sock.sendall(b"aap noot\n")
+            self.server_sock.settimeout(None)
             self.server_sock.sendto(b"aap noot\n", trans._address)
-            # self.server_sock.sendto(b"aap noot\n", (self.server_host, int(self.server_port)))
             l = asyncio.get_running_loop()
             l.stop()
 
@@ -457,29 +457,24 @@ class TestQmiUdpTransport(unittest.TestCase):
         # Filter out warnings about unclosed sockets
         warnings.filterwarnings("ignore", "unclosed", ResourceWarning)
         # Create dummy non-listening UDP port.
-        self.dummy_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-        self.dummy_sock.bind(("127.0.0.1", 0))
-        (dummy_host, self.dummy_port) = self.dummy_sock.getsockname()
+        # self.dummy_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+        # self.dummy_sock.bind(("", 64000))
+        # (dummy_host, self.dummy_port) = self.dummy_sock.getsockname()
 
         # Create UDP server socket.
-        self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-        self.server_sock.bind(("127.0.0.1", 0))
-        (self.server_host, self.server_port) = self.server_sock.getsockname()
+        self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.server_host, self.server_port = "localhost", 65000
+        self.server_sock.bind((self.server_host, self.server_port))
 
     def tearDown(self):
-        self.dummy_sock.close()
+        # self.dummy_sock.close()
         self.server_sock.close()
 
     def test_udp_basic(self):
 
         # Create UDP transport connected to local server.
-        trans = QMI_UdpTransport("localhost", self.server_port)
+        trans = QMI_UdpTransport("localhost", int(self.server_port))
         trans.open()
-
-        # Accept the connection on server side.
-        self.server_sock.connect((self.server_host, self.server_port + 1))
-        server_conn = self.server_sock
-        server_conn.settimeout(1.0)
 
         # Send some bytes through the transport.
         testmsg = b"aap noot"
@@ -488,25 +483,31 @@ class TestQmiUdpTransport(unittest.TestCase):
         # Receive bytes at the server side.
         buf = bytearray()
         while len(buf) < len(testmsg):
-            data = server_conn.recv(100)
+            self.server_sock.settimeout(1)
+            data = self.server_sock.recv(100)
             self.assertNotEqual(data, b"")
             buf.extend(data)
         self.assertEqual(buf, testmsg)
 
+        # Close and re-open with different port number for being able to receive.
+        trans.close()
+        trans = QMI_UdpTransport("localhost", int(self.server_port) - 1)
+        trans.open()
+
         # Send some bytes back from server to transport.
         testmsg = b"answer"
-        server_conn.sendall(testmsg)
+        self.server_sock.sendto(testmsg, trans._address)
 
         # Receive bytes through the transport.
         data = trans.read(len(testmsg), timeout=1.0)
-        self.assertEqual(data, testmsg)
+        self.assertEqual(testmsg, data)
 
         # Try to receive more bytes; wait for timeout.
         with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
             trans.read(10, timeout=1.0)
 
         # Send more bytes back from server to transport.
-        server_conn.sendall(b"more bytes")
+        self.server_sock.sendto(b"more bytes", trans._address)
 
         # Receive the first bunch of bytes.
         data = trans.read(5, timeout=1.0)
@@ -523,7 +524,7 @@ class TestQmiUdpTransport(unittest.TestCase):
         self.assertEqual(data, b"byt")
 
         # Send more bytes from server to transport.
-        server_conn.sendall(b"first line\nsecond line")
+        self.server_sock.sendto(b"first line\nsecond line", trans._address)
 
         # Receive the first line.
         # It starts with remaining bytes from the previous send.
@@ -539,14 +540,14 @@ class TestQmiUdpTransport(unittest.TestCase):
             trans.read_until(b"\n", timeout=1.0)
 
         # Send message terminator for the second line.
-        server_conn.sendall(b"\n")
+        self.server_sock.sendto(b"\n", trans._address)
 
         # Receive second line (note first word was already received).
         data = trans.read_until(b"\n", timeout=1.0)
         self.assertEqual(data, b"line\n")
 
         # Test with a 2-character terminator.
-        server_conn.sendall(b"the;last\nline;\n")
+        self.server_sock.sendto(b"the;last\nline;\n", trans._address)
         data = trans.read_until(b";\n", timeout=1.0)
         self.assertEqual(data, b"the;last\nline;\n")
 
@@ -554,18 +555,13 @@ class TestQmiUdpTransport(unittest.TestCase):
         trans.close()
 
         # Close server-side socket.
-        server_conn.close()
+        self.server_sock.close()
 
     def test_udp_large_packages(self):
 
         # Create UDP transport connected to local server.
-        trans = QMI_UdpTransport("127.0.0.1", self.server_port)
+        trans = QMI_UdpTransport("127.0.0.1", self.server_port - 1)
         trans.open()
-
-        # Accept the connection on server side.
-        self.server_sock.connect((self.server_host, self.server_port + 1))
-        server_conn = self.server_sock
-        server_conn.settimeout(1.0)
 
         # The transport should fail if sent package is > 4kB, as UDP is not set to handle larger packages.
         bs_size = 5000  # Normal max 2**12 bytes (- headers)
@@ -574,12 +570,12 @@ class TestQmiUdpTransport(unittest.TestCase):
         async def the_call():
             # Async function for not sending the message "too early" so that it won't get lost
             time.sleep(0.1)
-            self.server_sock.sendall(s.encode())
+            self.server_sock.sendto(s.encode(), trans._address)
             l = asyncio.get_running_loop()
             l.stop()
 
         # Send some bytes from server to transport.
-        server_conn.sendall(s.encode())
+        self.server_sock.sendto(s.encode(), trans._address)
 
         try:
             # Try to receive only a part of the bytes (triggers exception).
@@ -615,7 +611,7 @@ class TestQmiUdpTransport(unittest.TestCase):
             loop.close()
 
         # Send some bytes from server to transport.
-        server_conn.sendall(s.encode())
+        self.server_sock.sendto(s.encode(), trans._address)
 
         # With 'read' it is possible to set to read even larger packets. See that it works.
         # The caller does need to know the exact packet size in this case, though.
@@ -625,19 +621,14 @@ class TestQmiUdpTransport(unittest.TestCase):
     def test_remote_close(self):
 
         # Create UDP transport connected to local server.
-        trans = QMI_UdpTransport("127.0.0.1", self.server_port)
+        trans = QMI_UdpTransport("127.0.0.1", self.server_port - 1)
         trans.open()
 
-        # Accept the connection on server side.
-        self.server_sock.connect((self.server_host, self.server_port + 1))
-        server_conn = self.server_sock
-        server_conn.settimeout(1.0)
-
         # Send some bytes from server to transport.
-        server_conn.sendall(b"some bytes")
+        self.server_sock.sendto(b"some bytes", trans._address)
 
         # Close connection on server side.
-        server_conn.close()
+        self.server_sock.close()
 
         # Receive bytes through transport.
         data = trans.read(4, timeout=1.0)
@@ -665,17 +656,12 @@ class TestQmiUdpTransport(unittest.TestCase):
     def test_read_until_timeout(self):
 
         # Create UDP transport connected to local server.
-        trans = QMI_UdpTransport("localhost", self.server_port)
+        trans = QMI_UdpTransport("localhost", self.server_port - 1)
         trans.open()
-
-        # Accept the connection on server side.
-        self.server_sock.connect((self.server_host, self.server_port + 1))
-        server_conn = self.server_sock
-        server_conn.settimeout(1.0)
 
         # Send some bytes from server to transport.
         testmsg = b"hello there"
-        server_conn.sendall(testmsg)
+        self.server_sock.sendto(testmsg, trans._address)
 
         # Receive bytes through the transport.
         data = trans.read_until_timeout(len(testmsg), timeout=1.0)
@@ -686,7 +672,7 @@ class TestQmiUdpTransport(unittest.TestCase):
         self.assertEqual(data, b"")
 
         # Send more bytes back from server to transport.
-        server_conn.sendall(b"more bytes")
+        self.server_sock.sendto(b"more bytes", trans._address)
 
         # Receive the first bunch of bytes.
         data = trans.read_until_timeout(5, timeout=1.0)
@@ -698,10 +684,10 @@ class TestQmiUdpTransport(unittest.TestCase):
         self.assertEqual(data, b"bytes")
 
         # Send more bytes from server to transport.
-        server_conn.sendall(b"last data")
+        self.server_sock.sendto(b"last data", trans._address)
 
         # Close connection on server side.
-        server_conn.close()
+        self.server_sock.close()
 
         # Receive bytes through transport.
         data = trans.read_until_timeout(4, timeout=1.0)
@@ -724,14 +710,9 @@ class TestQmiUdpTransport(unittest.TestCase):
         trans = QMI_UdpTransport("localhost", self.server_port)
         trans.open()
 
-        # Accept the connection on server side.
-        self.server_sock.connect((self.server_host, self.server_port + 1))
-        server_conn = self.server_sock
-        server_conn.settimeout(1.0)
-
         # Send some bytes from server to transport.
         testmsg = b"hello there"
-        server_conn.sendall(testmsg)
+        self.server_sock.sendto(testmsg, trans._address)
 
         # Discard bytes through the transport.
         trans.discard_read()
@@ -759,27 +740,21 @@ class TestQmiUdpTransport(unittest.TestCase):
     def test_udp_async(self):
 
         # Create UDP transport connected to local server.
-        trans = QMI_UdpTransport("localhost", self.server_port)
+        trans = QMI_UdpTransport("localhost", self.server_port - 1)
         trans.open()
-
-        # Accept the connection on server side.
-        self.server_sock.connect((self.server_host, self.server_port + 1))
-        server_conn = self.server_sock
-        server_conn.settimeout(1.0)
 
         # Create a separate thread which sends data from the server side.
         def thread_main():
             for i in range(4):
                 time.sleep(0.5)
-                server_conn.sendall("tick {}".format(i).encode("ascii"))
+                self.server_sock.sendto("tick {}".format(i).encode("ascii"), trans._address)
                 time.sleep(0.5)
-                server_conn.sendall("tock {}\n".format(i).encode("ascii"))
+                self.server_sock.sendto("tock {}\n".format(i).encode("ascii"), trans._address)
 
         thread = threading.Thread(target=thread_main, name="test_transport_thread")
         thread.start()
 
         try:
-
             # Receive data through the transport (after ~ 0.5 second delay).
             data = trans.read(6, timeout=1.0)
             self.assertEqual(data, b"tick 0")
@@ -820,7 +795,7 @@ class TestQmiUdpTransport(unittest.TestCase):
         trans.close()
 
         # Close server side.
-        server_conn.close()
+        self.server_sock.close()
 
     def test_invalid_host(self):
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
