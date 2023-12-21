@@ -643,12 +643,6 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
                             f"UDP packet size was larger than {udp_packet_size}. Data is lost."
                         ) from err
 
-                    if addr != self._address:
-                        _logger.warning("Received data from address %s while expected data only from %s!", addr,
-                                        self._address)
-                        del b
-                        continue
-
                 else:
                     b, addr = self._safe_socket.recvfrom(nbytes - nbuf)
 
@@ -718,10 +712,6 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
                     f"UDP packet size was larger than 4096. Data is lost."
                 ) from err
 
-            if self._assert_addr and addr != self._address:
-                _logger.warning("Received data from address %s while expected data only from %s!", addr, self._address)
-                del b
-                continue
             if not b:
                 # end of stream
                 raise QMI_EndOfInputException(
@@ -754,10 +744,7 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
             except OSError:
                 # UDP protocol was used and > 4096 bytes in socket buffer. This discards also the rest of the packet.
                 break
-            if self._assert_addr and addr != self._address:
-                _logger.warning("Received data from address %s while expected data only from %s!", addr, self._address)
-                del b
-                continue
+
             if not b:
                 # end of stream
                 break
