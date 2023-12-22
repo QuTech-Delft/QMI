@@ -129,17 +129,12 @@ class TestQmiTransportFactory(unittest.TestCase):
             if loop.is_running():
                 loop.close()
 
-        self.server_sock.close()
-        # Close and re-open with different port number for being able to receive.
-        with open_close(create_transport(f"udp:localhost:{self.server_port}")) as trans:
-            self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP)
-            self.server_sock.bind(("localhost", self.server_port))
-            self.server_sock.settimeout(1.0)
-            # Send data to server through transport. Receive and assert.
             w_data = b"aap noot\n"
             trans.write(w_data)
-            data = self.server_sock.recv(len(w_data))
+            data = trans.read(len(w_data))
             self.assertEqual(data, w_data)
+
+        self.server_sock.close()
 
     def test_factory_tcp(self):
         # Create TCP transport.
@@ -564,23 +559,17 @@ class TestQmiUdpTransport(unittest.TestCase):
             data = trans.read_until(b";\n", timeout=1.0)
             self.assertEqual(data, b"the;last\nline;\n")
 
-        # Close and re-open with different port number for being able to receive.
-        self.server_sock.close()
-        with open_close(create_transport(f"udp:localhost:{self.server_port}")) as trans:
-            self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.server_sock.bind(("localhost", self.server_port))
-            self.server_sock.settimeout(1.0)
             # Send some bytes through the transport.
             testmsg = b"aap noot"
             trans.write(testmsg)
 
-            # Receive bytes at the server side.
+            # Receive bytes one-by-one.
             buf = bytearray()
             while len(buf) < len(testmsg):
-                self.server_sock.settimeout(1)
-                data = self.server_sock.recv(100)
+                data = trans.read(1, timeout=0)
                 self.assertNotEqual(data, b"")
                 buf.extend(data)
+
             self.assertEqual(buf, testmsg)
 
     def test_udp_large_packages(self):
