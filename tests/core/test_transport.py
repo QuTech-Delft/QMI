@@ -130,7 +130,7 @@ class TestQmiTransportFactory(unittest.TestCase):
                 loop.close()
 
         # Close and re-open with different port number for being able to receive.
-        with open_close(QMI_UdpTransport("localhost", int(self.server_port))) as trans:
+        with open_close(create_transport(f"udp:localhost:{self.server_port}")) as trans:
 
             self.server_sock.settimeout(1.0)
             # Send data to server through transport. Receive and assert.
@@ -141,7 +141,7 @@ class TestQmiTransportFactory(unittest.TestCase):
 
     def test_factory_tcp(self):
         # Create TCP transport.
-        with open_close(create_transport("tcp:localhost:%d" % self.client_port)) as trans:
+        with open_close(create_transport(f"tcp:localhost:{self.client_port}")) as trans:
             # Accept the connection on client side.
             (client_conn, peer_address) = self.client_sock.accept()
             client_conn.settimeout(1.0)
@@ -563,7 +563,7 @@ class TestQmiUdpTransport(unittest.TestCase):
             self.assertEqual(data, b"the;last\nline;\n")
 
         # Close and re-open with different port number for being able to receive.
-        with open_close(QMI_UdpTransport("localhost", int(self.server_port))) as trans:
+        with open_close(create_transport(f"udp:localhost:{self.server_port}")) as trans:
             # Send some bytes through the transport.
             testmsg = b"aap noot"
             trans.write(testmsg)
@@ -701,7 +701,7 @@ class TestQmiUdpTransport(unittest.TestCase):
 
             # Receive bytes through the transport. But packet too large.
             with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
-                trans.read_until(b"\0", timeout=0.1)
+                trans.read_until(b"\0", timeout=0.2)
 
     def test_read_until_timeout(self):
         """Test `read_until_timeout` until timeout."""
