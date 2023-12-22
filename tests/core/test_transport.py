@@ -566,7 +566,7 @@ class TestQmiUdpTransport(unittest.TestCase):
             # Receive bytes one-by-one.
             buf = bytearray()
             while len(buf) < len(testmsg):
-                data = trans.read(1, timeout=0)
+                data = trans.read_until_timeout(1, timeout=1.0)
                 self.assertNotEqual(data, b"")
                 buf.extend(data)
 
