@@ -453,27 +453,31 @@ class TestQmiUdpTcpTransportBase(unittest.TestCase):
     def test_host_validation(self):
         """Try to create a base transport with invalid hosts. See that exceptions are raised."""
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UdpTcpTransportBase("invalid_hostname", 22, True)
+            QMI_UdpTcpTransportBase("invalid_hostname", 22)
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UdpTcpTransportBase("192.168.1.300", 22, True)
+            QMI_UdpTcpTransportBase("192.168.1.300", 22)
 
     def test_port_validation(self):
         """Try to create a base transport with invalid port numbers. See that exceptions are raised."""
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UdpTcpTransportBase("localhost", 0, True)
+            QMI_UdpTcpTransportBase("localhost", 0)
 
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UdpTcpTransportBase("localhost", 100000, True)
+            QMI_UdpTcpTransportBase("localhost", 100000)
 
-    def test_write_not_implemented_error(self):
+    def test_write_and_read_not_implemented_error(self):
         """Test QMI_UdpTcpTransportBase.write() is not implemented in the base class."""
         # Create UDP transport connected to local server.
-        trans = QMI_UdpTcpTransportBase("localhost", 64500, False)
+        trans = QMI_UdpTcpTransportBase("localhost", 64500)
         trans.open()
 
         # Try to send something through the transport.
         with self.assertRaises(NotImplementedError):
             trans.write(b"")
+
+        # Try to receive something through the transport.
+        with self.assertRaises(NotImplementedError):
+            trans.read(1)
 
 
 class TestQmiUdpTransport(unittest.TestCase):
@@ -661,6 +665,17 @@ class TestQmiUdpTransport(unittest.TestCase):
             # Try to read another byte. Should raise exception.
             with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
                 trans.read(1, timeout=0.0)
+
+    def test_read_until_buffer_already_filled(self):
+        """Test that `read_until()` returns immediately if message terminator is already in read buffer."""
+        # Create UDP transport bound to local server.
+        with open_close(QMI_UdpTransport("localhost", self.server_port - 1)) as trans:
+            # Set some bytes with message terminator into read buffer.
+            testmsg = b"hello\n"
+            trans._read_buffer = testmsg
+            # Read and assert
+            data = trans.read_until(b"\n", timeout=0.2)
+            self.assertEqual(testmsg, data)
 
     def test_read_until_exceptions(self):
         """Test for exceptions raised with `read_until()` with missing terminal character and too large packet."""
@@ -971,6 +986,17 @@ class TestQmiTcpTransport(unittest.TestCase):
             # Try to read another byte. Should raise exception.
             with self.assertRaises(qmi.core.exceptions.QMI_EndOfInputException):
                 trans.read(1, timeout=None)
+
+    def test_read_until_buffer_already_filled(self):
+        """Test that `read_until()` returns immediately if message terminator is already in read buffer."""
+        # Create TCP transport connected to local server.
+        with open_close(QMI_TcpTransport("localhost", self.server_port, connect_timeout=1)) as trans:
+            # Set some bytes with message terminator into read buffer.
+            testmsg = b"hello\n"
+            trans._read_buffer = testmsg
+            # Read and assert
+            data = trans.read_until(b"\n", timeout=0.2)
+            self.assertEqual(testmsg, data)
 
     def test_read_until_timeout(self):
         """Test `read_until_timeout` until timeout."""
