@@ -132,7 +132,7 @@ class TestQmiTransportFactory(unittest.TestCase):
         self.server_sock.close()
         # Close and re-open with different port number for being able to receive.
         with open_close(create_transport(f"udp:localhost:{self.server_port}")) as trans:
-            self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+            self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP)
             self.server_sock.bind(("localhost", self.server_port))
             self.server_sock.settimeout(1.0)
             # Send data to server through transport. Receive and assert.
