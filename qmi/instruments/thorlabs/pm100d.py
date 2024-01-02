@@ -13,6 +13,7 @@ from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.scpi_protocol import ScpiProtocol
 from qmi.core.transport import create_transport, list_usbtmc_transports, UsbTmcTransportDescriptorParser
+from qmi.experimental.power_meter import QMI_PowerMeter_Mixin
 
 # Global variable holding the logger for this module.
 
@@ -28,7 +29,7 @@ SensorInfo = NamedTuple('SensorInfo',
                          ('flags', int)])
 
 
-class Thorlabs_PM10x(QMI_Instrument):
+class Thorlabs_PM10x(QMI_Instrument, QMI_PowerMeter_Mixin):
     """General instrument driver for the Thorlabs PM10x optical power meters.
 
     This driver is also compatible with the Thorlabs PM16-120.
