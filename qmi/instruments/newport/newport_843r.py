@@ -14,8 +14,9 @@ from typing import List, Optional, Tuple
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
-from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
+from qmi.core.instrument import QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
+from qmi.experimental.power_meter import QMI_PowerMeter_Single_Inheritance
 
 if sys.platform.startswith("linux") or typing.TYPE_CHECKING:
     # Newport USB access is only supported on Linux.
@@ -26,7 +27,7 @@ if sys.platform.startswith("linux") or typing.TYPE_CHECKING:
 _logger = logging.getLogger(__name__)
 
 
-class Newport_843R(QMI_Instrument):
+class Newport_843R(QMI_PowerMeter_Single_Inheritance):
     """Instrument driver for the Newport 843-R optical power meter."""
 
     _rpc_constants = ["SENSOR_TYPES"]
