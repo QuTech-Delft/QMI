@@ -29,6 +29,7 @@ from qmi.core.task import QMI_Task, QMI_TaskRunner
 from qmi.core.udp_responder_packets import unpack_qmi_udp_packet, QMI_UdpResponderContextInfoRequestPacket, \
                                            QMI_UdpResponderContextInfoResponsePacket
 from qmi.core.util import is_valid_object_name, format_address_and_port, AtomicCounter
+from qmi.experimental.power_meter import QMI_PowerMeter_Single_Inheritance
 
 
 # Global variable holding the logger for this module.
@@ -1051,6 +1052,10 @@ class QMI_Context:
     def show_instruments(self) -> None:
         """Show a list of instruments in the local context and peer contexts."""
         self.show_rpc_objects(QMI_Instrument.get_category())
+
+    def show_power_meters(self) -> None:
+        """Show a list of power meters in the local context and peer contexts."""
+        self.show_rpc_objects(QMI_PowerMeter_Single_Inheritance.get_category())
 
     def show_contexts(self) -> None:
         """Show a list of currently connected contexts (including the local context)."""
