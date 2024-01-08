@@ -588,7 +588,7 @@ def _is_valid_ipaddress(address: str) -> bool:
     return False
 
 
-class QMI_UdpTcpTransportBase(QMI_Transport):
+class QMI_SocketTransport(QMI_Transport):
     """Base class for bidirectional data streams via UDP or TCP network connection."""
 
     def __init__(self, host: str, port: int) -> None:
@@ -715,7 +715,7 @@ class QMI_UdpTcpTransportBase(QMI_Transport):
                 break
 
 
-class QMI_UdpTransport(QMI_UdpTcpTransportBase):
+class QMI_UdpTransport(QMI_SocketTransport):
     """
     An instance of QMI_UdpTransport represents a server-side UDP connection with
     a listening port to an instrument. Client-side UDP connections are not supported.
@@ -734,11 +734,10 @@ class QMI_UdpTransport(QMI_UdpTcpTransportBase):
             host: The server IP address.
             port: The port for the address.
         """
-        self._validate_udp_port(port)
         super().__init__(host, port)
 
-    @staticmethod
-    def _validate_udp_port(port):
+    def _validate_port(self, port):
+        super()._validate_port(port)
         if port == QMI_Context.DEFAULT_UDP_RESPONDER_PORT:
             raise QMI_TransportDescriptorException(f"UDP port number {port} not allowed")
 
@@ -829,7 +828,7 @@ class QMI_UdpTransport(QMI_UdpTcpTransportBase):
                 self._safe_socket.settimeout(tremain)
 
 
-class QMI_TcpTransport(QMI_UdpTcpTransportBase):
+class QMI_TcpTransport(QMI_SocketTransport):
     """Bidirectional byte stream via TCP network connection.
 
     An instance of QMI_TcpTransport represents a client-side TCP connection

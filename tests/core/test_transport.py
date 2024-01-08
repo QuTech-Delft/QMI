@@ -17,7 +17,7 @@ import qmi
 import qmi.core.exceptions
 import qmi.core.transport
 from qmi.core.transport import (
-    QMI_UdpTcpTransportBase,
+    QMI_SocketTransport,
     QMI_UdpTransport,
     QMI_TcpTransport,
     QMI_SerialTransport,
@@ -450,22 +450,23 @@ class TestQmiUdpTcpTransportBase(unittest.TestCase):
     def test_host_validation(self):
         """Try to create a base transport with invalid hosts. See that exceptions are raised."""
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UdpTcpTransportBase("invalid_hostname", 22)
+            QMI_SocketTransport("invalid_hostname", 22)
+
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UdpTcpTransportBase("192.168.1.300", 22)
+            QMI_SocketTransport("192.168.1.300", 22)
 
     def test_port_validation(self):
         """Try to create a base transport with invalid port numbers. See that exceptions are raised."""
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UdpTcpTransportBase("localhost", 0)
+            QMI_SocketTransport("localhost", 0)
 
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
-            QMI_UdpTcpTransportBase("localhost", 100000)
+            QMI_SocketTransport("localhost", 100000)
 
     def test_write_and_read_not_implemented_error(self):
         """Test QMI_UdpTcpTransportBase.write() is not implemented in the base class."""
         # Create UDP transport connected to local server.
-        trans = QMI_UdpTcpTransportBase("localhost", 64500)
+        trans = QMI_SocketTransport("localhost", 64500)
         trans.open()
 
         # Try to send something through the transport.
@@ -499,8 +500,12 @@ class TestQmiUdpTransport(unittest.TestCase):
 
     def test_udp_basic(self):
         """Test basic functionalities of the UDP transport."""
+        address = "127.0.0.1" + ':' + str(self.server_port - 1)
+        expected_transport_string = f"QMI_UdpTransport(remote={address})"
         # Create UDP transport bound to local server.
         with open_close(QMI_UdpTransport("localhost", int(self.server_port) - 1)) as trans:
+            # Check the string name of the instance
+            self.assertEqual(expected_transport_string, str(trans))
 
             # Send some bytes back from server to transport.
             testmsg = b"answer"
@@ -872,8 +877,13 @@ class TestQmiTcpTransport(unittest.TestCase):
 
     def test_tcp_basic(self):
         """Test basic functionalities of TCP transport work."""
+        address = "127.0.0.1" + ':' + str(self.server_port)
+        expected_transport_string = f"QMI_TcpTransport(remote={address})"
         # Create TCP transport connected to local server.
         with open_close(QMI_TcpTransport("localhost", self.server_port, connect_timeout=1)) as trans:
+            # Check the string name of the instance
+            self.assertEqual(expected_transport_string, str(trans))
+
             # Accept the connection on server side.
             (server_conn, peer_address) = self.server_sock.accept()
             server_conn.settimeout(1.0)
