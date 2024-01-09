@@ -121,7 +121,7 @@ def parse_instrument_source(args) -> AbstractContextManager:
     # make the instrument
     instr = globals()[f"Tenma72_{args.model}"]
     if args.udp is not None:
-        port = args.port or 0
+        port = args.port if args.port != "get" and args.port is not None else 18190  # 18190 is the default in the manual
         return open_close(
             qmi.make_instrument(
                 instrument_name=f"tenma72_{args.model}",
