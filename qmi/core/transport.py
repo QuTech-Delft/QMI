@@ -762,7 +762,7 @@ class QMI_SocketTransport(QMI_Transport):
         self._safe_socket.settimeout(0)
         while True:
             try:
-                b, addr = self._safe_socket.recvfrom(4096)
+                b = self._safe_socket.recv(self.MAX_PACKET_SIZE)
             except (BlockingIOError, socket.timeout):
                 # no more bytes available
                 break
