@@ -440,8 +440,8 @@ class TestQmiTransportParsing(unittest.TestCase):
         mock.assert_called_with(host="localhost")
 
 
-class TestQmiUdpTcpTransportBase(unittest.TestCase):
-    """Test QMI_UdpTcpTransportBase class."""
+class TestQmiSocketTransportBase(unittest.TestCase):
+    """Test QMI_SocketTransportBase class."""
 
     def setUp(self):
         # Filter out warnings about unclosed sockets
@@ -463,8 +463,8 @@ class TestQmiUdpTcpTransportBase(unittest.TestCase):
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
             QMI_SocketTransport("localhost", 100000)
 
-    def test_write_and_read_not_implemented_error(self):
-        """Test QMI_UdpTcpTransportBase.write() is not implemented in the base class."""
+    def test_write_not_implemented_error(self):
+        """Test QMI_SocketTransportBase.write() is not implemented in the base class."""
         # Create UDP transport connected to local server.
         trans = QMI_SocketTransport("localhost", 64500)
         trans.open()
@@ -472,10 +472,6 @@ class TestQmiUdpTcpTransportBase(unittest.TestCase):
         # Try to send something through the transport.
         with self.assertRaises(NotImplementedError):
             trans.write(b"")
-
-        # Try to receive something through the transport.
-        with self.assertRaises(NotImplementedError):
-            trans.read(1)
 
 
 class TestQmiUdpTransport(unittest.TestCase):

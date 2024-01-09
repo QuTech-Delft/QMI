@@ -589,7 +589,14 @@ def _is_valid_ipaddress(address: str) -> bool:
 
 
 class QMI_SocketTransport(QMI_Transport):
-    """Base class for bidirectional data streams via UDP or TCP network connection."""
+    """Base class for bidirectional data streams via socket network connection.
+
+    Attributes:
+        MIN_PACKET_SIZE: The minimum packet size to read with `read_until` method.
+        MAX_PACKET_SIZE: The maximum packet size to read with `read` method.
+    """
+    MIN_PACKET_SIZE = 0
+    MAX_PACKET_SIZE = 0
 
     def __init__(self, host: str, port: int) -> None:
         """Initialize the UDP or TCP transport with validation of host and port.
@@ -638,13 +645,13 @@ class QMI_SocketTransport(QMI_Transport):
         _logger.debug("Opening %s with address %s", self, self._address)
         self._read_buffer = bytearray()
 
-    def _read_from_socket(self, packet_size: int = 4096) -> Tuple[bytes, Any]:
+    def _read_from_socket(self, packet_size: int) -> Tuple[bytes, Any]:
         """Helper function to read from a socket with specific packet size.
         Exact amount does not matter but a small power of 2 is recommended, e.g. 4096
         by socket.recv() documentation.
 
         Parameters:
-            packet_size: The packet size to read, default is 4096.
+            packet_size: The packet size to read.
         """
         try:
             b, addr = self._safe_socket.recvfrom(packet_size)
@@ -666,10 +673,32 @@ class QMI_SocketTransport(QMI_Transport):
         self._safe_socket.close()
 
     def write(self, data: bytes) -> None:
-        raise NotImplementedError("QMI_UdpTcpTransportBase.write not implemented")
+        raise NotImplementedError("QMI_SocketTransportBase.write not implemented")
 
     def read(self, nbytes: int, timeout: Optional[float] = None) -> bytes:
-        raise NotImplementedError("QMI_UdpTcpTransportBase.read not implemented")
+        self._check_is_open()
+        tstart = time.monotonic()
+        tremain = timeout
+        nbuf = len(self._read_buffer)
+        while nbuf < nbytes:
+            self._safe_socket.settimeout(tremain)
+            try:
+                b, addr = self._read_from_socket(max(nbytes - nbuf, self.MIN_PACKET_SIZE))
+
+            except (BlockingIOError, socket.timeout) as err:
+                raise QMI_TimeoutException(
+                    f"Timeout after {nbuf} bytes while expecting {nbytes}"
+                ) from err
+            self._read_buffer.extend(b)
+            nbuf = len(self._read_buffer)
+            if timeout is not None:
+                tremain = tstart + timeout - time.monotonic()
+                if tremain < 0:
+                    raise QMI_TimeoutException(f"Timeout after {nbuf} bytes while expecting {nbytes}")
+
+        ret = bytes(self._read_buffer[:nbytes])
+        self._read_buffer = self._read_buffer[nbytes:]
+        return ret
 
     def read_until(self, message_terminator: bytes, timeout: Optional[float] = None) -> bytes:
         # Check if message terminator already received. To be further handled in subclass implementation.
@@ -681,7 +710,38 @@ class QMI_SocketTransport(QMI_Transport):
             self._read_buffer = self._read_buffer[nbytes:]
             return ret
 
-        return b""
+        self._check_is_open()
+        self._safe_socket.settimeout(timeout)
+        tstart = time.monotonic()
+        while True:
+            try:
+                # Read from socket.
+                b, addr = self._read_from_socket(self.MAX_PACKET_SIZE)
+                self._read_buffer.extend(b)
+            except (BlockingIOError, socket.timeout, TimeoutError) as err:
+                nbuf = len(self._read_buffer)
+                raise QMI_TimeoutException(
+                    f"Socket timeout after {nbuf} bytes without message terminator"
+                ) from err
+
+            # Check if message terminator received.
+            p = self._read_buffer.find(message_terminator)
+            if p >= 0:
+                # Found "message_terminator" - return data.
+                nbytes = p + len(message_terminator)
+                ret = bytes(self._read_buffer[:nbytes])
+                self._read_buffer = self._read_buffer[nbytes:]
+                return ret
+
+            # Determine remaining time if message terminator is not yet received.
+            if timeout is not None:
+                # Calculate remaining time.
+                tremain = tstart + timeout - time.monotonic()
+                if tremain < 0:
+                    nbuf = len(self._read_buffer)
+                    raise QMI_TimeoutException(f"Function timeout after {nbuf} bytes without message terminator.")
+
+                self._safe_socket.settimeout(tremain)
 
     def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
         try:
@@ -702,7 +762,7 @@ class QMI_SocketTransport(QMI_Transport):
         self._safe_socket.settimeout(0)
         while True:
             try:
-                b, addr = self._safe_socket.recvfrom(4096)
+                b = self._safe_socket.recv(self.MAX_PACKET_SIZE)
             except (BlockingIOError, socket.timeout):
                 # no more bytes available
                 break
@@ -725,7 +785,13 @@ class QMI_UdpTransport(QMI_SocketTransport):
     multiple messages. For `read` functions this is not possible and the client must limit the
     data size as necessary. If for `read` functions the receivable data size is larger than
     the size defined in `recvfrom(<size>)`, an exception is raised.
+
+    Attributes:
+        MIN_PACKET_SIZE: The minimum packet size to read with `read` method.
+        MAX_PACKET_SIZE: The maximum packet size to read with `read_until` method.
     """
+    MIN_PACKET_SIZE = 4096
+    MAX_PACKET_SIZE = 4096
 
     def __init__(self, host: str, port: int) -> None:
         """Initialize the UDP transport by validating the UDP host and port.
@@ -764,69 +830,6 @@ class QMI_UdpTransport(QMI_SocketTransport):
         self._safe_socket.settimeout(None)
         self._safe_socket.sendto(data, self._address)
 
-    def read(self, nbytes: int, timeout: Optional[float] = None) -> bytes:
-        self._check_is_open()
-        tstart = time.monotonic()
-        tremain = timeout
-        nbuf = len(self._read_buffer)
-        while nbuf < nbytes:
-            self._safe_socket.settimeout(tremain)
-            try:
-                b, addr = self._read_from_socket(max(nbytes - nbuf, 4096))
-
-            except (BlockingIOError, socket.timeout) as err:
-                raise QMI_TimeoutException(
-                    f"Timeout after {nbuf} bytes while expecting {nbytes}"
-                ) from err
-            self._read_buffer.extend(b)
-            nbuf = len(self._read_buffer)
-            if timeout is not None:
-                tremain = tstart + timeout - time.monotonic()
-                if tremain < 0:
-                    raise QMI_TimeoutException(f"Timeout after {nbuf} bytes while expecting {nbytes}")
-
-        ret = bytes(self._read_buffer[:nbytes])
-        self._read_buffer = self._read_buffer[nbytes:]
-        return ret
-
-    def read_until(self, message_terminator: bytes, timeout: Optional[float] = None) -> bytes:
-        ret = super().read_until(message_terminator, timeout)
-        if len(ret):
-            return ret
-
-        self._check_is_open()
-        self._safe_socket.settimeout(timeout)
-        tstart = time.monotonic()
-        while True:
-            try:
-                # Read from socket.
-                b, addr = self._read_from_socket()
-                self._read_buffer.extend(b)
-            except (BlockingIOError, socket.timeout, TimeoutError) as err:
-                nbuf = len(self._read_buffer)
-                raise QMI_TimeoutException(
-                    f"Socket timeout after {nbuf} bytes without message terminator"
-                ) from err
-
-            # Check if message terminator received.
-            p = self._read_buffer.find(message_terminator)
-            if p >= 0:
-                # Found "message_terminator" - return data.
-                nbytes = p + len(message_terminator)
-                ret = bytes(self._read_buffer[:nbytes])
-                self._read_buffer = self._read_buffer[nbytes:]
-                return ret
-
-            # Determine remaining time if message terminator is not yet received.
-            if timeout is not None:
-                # Calculate remaining time.
-                tremain = tstart + timeout - time.monotonic()
-                if tremain < 0:
-                    nbuf = len(self._read_buffer)
-                    raise QMI_TimeoutException(f"Function timeout after {nbuf} bytes without message terminator.")
-
-                self._safe_socket.settimeout(tremain)
-
 
 class QMI_TcpTransport(QMI_SocketTransport):
     """Bidirectional byte stream via TCP network connection.
@@ -836,9 +839,13 @@ class QMI_TcpTransport(QMI_SocketTransport):
 
     Attributes:
         DEFAULT_CONNECT_TIMEOUT: A default timeout period for connecting to TCP client. Default is 10 seconds.
+        MIN_PACKET_SIZE: The minimum packet size to read with `read` method.
+        MAX_PACKET_SIZE: The maximum packet size to read with `read_until` method.
     """
 
     DEFAULT_CONNECT_TIMEOUT = 10
+    MIN_PACKET_SIZE = 0
+    MAX_PACKET_SIZE = 512
 
     def __init__(self, host: str, port: int, connect_timeout: Optional[float] = DEFAULT_CONNECT_TIMEOUT) -> None:
         """Initialize the TCP transport by connecting to the specified address.
@@ -879,69 +886,6 @@ class QMI_TcpTransport(QMI_SocketTransport):
         # NOTE: We explicitly adjust the socket timeout before each send/recv call.
         self._safe_socket.settimeout(None)
         self._safe_socket.sendall(data)
-
-    def read(self, nbytes: int, timeout: Optional[float] = None) -> bytes:
-        self._check_is_open()
-        tstart = time.monotonic()
-        tremain = timeout
-        nbuf = len(self._read_buffer)
-        while nbuf < nbytes:
-            self._safe_socket.settimeout(tremain)
-            try:
-                b, addr = self._read_from_socket(nbytes - nbuf)
-
-            except (BlockingIOError, socket.timeout) as err:
-                raise QMI_TimeoutException(
-                    f"Timeout after {nbuf} bytes while expecting {nbytes}"
-                ) from err
-            self._read_buffer.extend(b)
-            nbuf = len(self._read_buffer)
-            if timeout is not None:
-                tremain = tstart + timeout - time.monotonic()
-                if tremain < 0:
-                    raise QMI_TimeoutException(f"Timeout after {nbuf} bytes while expecting {nbytes}")
-
-        ret = bytes(self._read_buffer[:nbytes])
-        self._read_buffer = self._read_buffer[nbytes:]
-        return ret
-
-    def read_until(self, message_terminator: bytes, timeout: Optional[float] = None) -> bytes:
-        ret = super().read_until(message_terminator, timeout)
-        if len(ret):
-            return ret
-
-        self._check_is_open()
-        self._safe_socket.settimeout(timeout)
-        tstart = time.monotonic()
-        while True:
-            try:
-                # Read from socket. NOTE: Reading up to 512 bytes here for TCP,
-                # as larger packet size causes issues with Tektronix 5014 AWG.
-                b, addr = self._read_from_socket(512)
-                self._read_buffer.extend(b)
-            except (BlockingIOError, socket.timeout, TimeoutError) as err:
-                # timeout in socket.recv()
-                nbuf = len(self._read_buffer)
-                raise QMI_TimeoutException(
-                    f"Socket timeout after {nbuf} bytes without message terminator"
-                ) from err
-
-            # Check if message terminator received.
-            p = self._read_buffer.find(message_terminator)
-            if p >= 0:
-                # Found "message_terminator" - return data.
-                nbytes = p + len(message_terminator)
-                ret = bytes(self._read_buffer[:nbytes])
-                self._read_buffer = self._read_buffer[nbytes:]
-                return ret
-
-            # Determine remaining time if no message terminator received.
-            if timeout is not None:
-                tremain = tstart + timeout - time.monotonic()
-                if tremain < 0:
-                    nbuf = len(self._read_buffer)
-                    raise QMI_TimeoutException(f"Function timeout after {nbuf} bytes without message terminator")
-                self._safe_socket.settimeout(tremain)
 
 
 class QMI_UsbTmcTransport(QMI_Transport):
