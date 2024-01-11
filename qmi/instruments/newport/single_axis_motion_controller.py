@@ -487,7 +487,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
                                 it is set to the initialised value of the controller address.
         """
         self.controller_address = controller_address
-        if displacement < self._actuators[self.controller_address].MIN_INCREMENTAL_MOTION:
+        if abs(displacement) < self._actuators[self.controller_address].MIN_INCREMENTAL_MOTION:
             raise QMI_InstrumentException(
                 f"Provided value {displacement} lower than minimum "
                 f"{self._actuators[self.controller_address].MIN_INCREMENTAL_MOTION}"

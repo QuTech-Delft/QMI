@@ -345,6 +345,16 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self._scpi_mock.ask.assert_has_calls(expected_calls)
 
+    def test_move_relative_with_negative_displacement_moves(self):
+        """Test move relative with negative displacement and controller address."""
+        state = "34"  # READY
+        pos = -0.1
+        self._scpi_mock.ask.side_effect = [f"3TS0000{state}", "@"]
+        self.instr.move_relative(pos, 3)
+
+        self._scpi_mock.write.assert_called_once_with(f"3PR{pos}\r\n")
+        self._scpi_mock.ask.assert_any_call("3TE\r\n")
+
     def test_move_relative_moves(self):
         """Test move relative with controller address."""
         state = "34"  # READY
