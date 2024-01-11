@@ -401,6 +401,126 @@ class TestTenma72_13350(unittest.TestCase):
         # Assert
         self._transport_mock.write.assert_has_calls(expected_disable_calls)
 
+    def test_get_dhcp(self):
+        """Get the DHCP state."""
+        # Arrange
+        cmd = ":SYST:DHCP?\n"
+        expected_dhcp = 1
+        self._transport_mock.read_until_timeout.return_value = f"{expected_dhcp}".encode("ascii")
+        # Act
+        state = self.psu.get_dhcp()
+        # Assert
+        self.assertEqual(expected_dhcp, state)
+        self._transport_mock.write.assert_called_once_with(bytes(cmd, "ascii"))
+
+    def test_set_dhcp(self):
+        """Set DHCP on/off."""
+        # Arrange
+        dhcp = 0
+        expected_calls = [
+            call.write(f":SYST:DHCP {dhcp}\n".encode("ascii")),
+        ]
+        # Act
+        self.psu.set_dhcp(dhcp)
+
+        self._transport_mock.write.assert_has_calls(expected_calls)
+
+    def test_get_ip_address(self):
+        """Get the IP address."""
+        # Arrange
+        cmd = ":SYST:IPAD?\n"
+        expected_ipad = "192.168.1.90"
+        self._transport_mock.read_until_timeout.return_value = f"{expected_ipad}".encode("ascii")
+        # Act
+        ipad = self.psu.get_ip_address()
+        # Assert
+        self.assertEqual(expected_ipad, ipad)
+        self._transport_mock.write.assert_called_once_with(bytes(cmd, "ascii"))
+
+    def test_set_ip_address(self):
+        """Set an IP address."""
+        # Arrange
+        ip_address = "192.168.1.90"
+        expected_calls = [
+            call.write(f":SYST:IPAD {ip_address}\n".encode("ascii")),
+        ]
+        # Act
+        self.psu.set_ip_address(ip_address)
+
+        self._transport_mock.write.assert_has_calls(expected_calls)
+
+    def test_get_subnet_mask(self):
+        """Get the subnet mask."""
+        # Arrange
+        cmd = ":SYST:SMASK?\n"
+        expected_ipad = "255.255.255.0"
+        self._transport_mock.read_until_timeout.return_value = f"{expected_ipad}".encode("ascii")
+        # Act
+        ipad = self.psu.get_subnet_mask()
+        # Assert
+        self.assertEqual(expected_ipad, ipad)
+        self._transport_mock.write.assert_called_once_with(bytes(cmd, "ascii"))
+
+    def test_set_subnet_mask(self):
+        """Set a subnet mask."""
+        # Arrange
+        subnet_mask = "255.255.255.0"
+        expected_calls = [
+            call.write(f":SYST:SMASK {subnet_mask}\n".encode("ascii")),
+        ]
+        # Act
+        self.psu.set_subnet_mask(subnet_mask)
+
+        self._transport_mock.write.assert_has_calls(expected_calls)
+
+    def test_get_gateway_address(self):
+        """Get the gateway address."""
+        # Arrange
+        cmd = ":SYST:GATE?\n"
+        expected_gateway = "192.168.0.1"
+        self._transport_mock.read_until_timeout.return_value = f"{expected_gateway}".encode("ascii")
+        # Act
+        gateway = self.psu.get_gateway_address()
+        # Assert
+        self.assertEqual(expected_gateway, gateway)
+        self._transport_mock.write.assert_called_once_with(bytes(cmd, "ascii"))
+
+    def test_set_gateway_address(self):
+        """Set a gateway address."""
+        # Arrange
+        gateway_address = "192.168.0.1"
+        expected_calls = [
+            call.write(f":SYST:GATE {gateway_address}\n".encode("ascii")),
+        ]
+        # Act
+        self.psu.set_gateway_address(gateway_address)
+
+        self._transport_mock.write.assert_has_calls(expected_calls)
+
+    def test_get_ip_port(self):
+        """Get the IP port."""
+        # Arrange
+        cmd = ":SYST:PORT?\n"
+        expected_port = 5990
+        self._transport_mock.read_until_timeout.return_value = f"{expected_port}".encode("ascii")
+        # Act
+        port = self.psu.get_ip_port()
+        # Assert
+        self.assertEqual(expected_port, port)
+        self._transport_mock.write.assert_called_once_with(bytes(cmd, "ascii"))
+
+    def test_set_ip_port(self):
+        """Set an IP port."""
+        # Arrange
+        port = 5990
+        expected_calls = [
+            call.write(f":SYST:PORT {port}\n".encode("ascii")),
+        ]
+        # Act
+        self.psu.set_ip_port(port)
+
+        self._transport_mock.write.assert_has_calls(expected_calls)
+
 
 if __name__ == '__main__':
     unittest.main()

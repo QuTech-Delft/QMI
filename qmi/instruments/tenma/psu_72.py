@@ -375,23 +375,23 @@ class Tenma72_13350(Tenma72_Base):
         self._enable_output(output, command)
 
     @rpc_method
-    def get_dhcp(self) -> str:
-        """Use the IP LAN command to get the current IP address of the device.
+    def get_dhcp(self) -> int:
+        """Use the IP LAN command to see if DHCP is enabled.
 
         Returns:
-            dhcp: The current static IP address of the device.
+            dhcp: The current DHCP enabled state.
         """
         cmd = ":SYST:DHCP?" + self.serial_eol
         super(Tenma72_13350, self)._send(cmd)
         dhcp = self._read(0.2)
-        return dhcp
+        return int(dhcp)
 
     @rpc_method
     def set_dhcp(self, dhcp: int) -> None:
-        """Use the IP LAN command to set a new IP address for the device.
+        """Use the IP LAN command to set a DHCP enabled state.
 
         Parameters:
-            dhcp: A new static IP address for the device.
+            dhcp: New DHCP state. 0 is disabled, 1 is enabled.
         """
         cmd = f":SYST:DHCP {dhcp}" + self.serial_eol
         super(Tenma72_13350, self)._send(cmd)
@@ -401,7 +401,7 @@ class Tenma72_13350(Tenma72_Base):
         """Use the IP LAN command to get the current IP address of the device.
 
         Returns:
-            ip_address: The current static IP address of the device.
+            ip_address: The current IP address of the device.
         """
         cmd = ":SYST:IPAD?" + self.serial_eol
         super(Tenma72_13350, self)._send(cmd)
@@ -420,10 +420,10 @@ class Tenma72_13350(Tenma72_Base):
 
     @rpc_method
     def get_subnet_mask(self) -> str:
-        """Use the IP LAN command to get the current IP address of the device.
+        """Use the IP LAN command to get the current subnet mask address of the device.
 
         Returns:
-            subnet_mask: The current static IP address of the device.
+            subnet_mask: The current subnet mask address of the device.
         """
         cmd = ":SYST:SMASK?" + self.serial_eol
         super(Tenma72_13350, self)._send(cmd)
@@ -432,20 +432,20 @@ class Tenma72_13350(Tenma72_Base):
 
     @rpc_method
     def set_subnet_mask(self, subnet_mask) -> None:
-        """Use the IP LAN command to set a new IP address for the device.
+        """Use the IP LAN command to set a new subnet mask address for the device.
 
         Parameters:
-            subnet_mask: A new static IP address for the device.
+            subnet_mask: A new subnet mask address for the device.
         """
         cmd = f":SYST:SMASK {subnet_mask}" + self.serial_eol
         super(Tenma72_13350, self)._send(cmd)
 
     @rpc_method
     def get_gateway_address(self) -> str:
-        """Use the IP LAN command to get the current IP address of the device.
+        """Use the IP LAN command to get the current gateway address of the device.
 
         Returns:
-            gateway: The current static IP address of the device.
+            gateway: The current static gateway address of the device.
         """
         cmd = ":SYST:GATE?" + self.serial_eol
         super(Tenma72_13350, self)._send(cmd)
@@ -454,32 +454,32 @@ class Tenma72_13350(Tenma72_Base):
 
     @rpc_method
     def set_gateway_address(self, gateway) -> None:
-        """Use the IP LAN command to set a new IP address for the device.
+        """Use the IP LAN command to set a new gateway address for the device.
 
         Parameters:
-            gateway: A new static IP address for the device.
+            gateway: A new static gateway address for the device.
         """
         cmd = f":SYST:GATE {gateway}" + self.serial_eol
         super(Tenma72_13350, self)._send(cmd)
 
     @rpc_method
-    def get_ip_port(self) -> str:
-        """Use the IP LAN command to get the current IP address of the device.
+    def get_ip_port(self) -> int:
+        """Use the IP LAN command to get the current IP port number of the device.
 
         Returns:
-            gateway: The current static IP address of the device.
+            ip_port: The current IP port number of the device.
         """
         cmd = ":SYST:PORT?" + self.serial_eol
         super(Tenma72_13350, self)._send(cmd)
         ip_port = self._read(0.2)
-        return ip_port
+        return int(ip_port)
 
     @rpc_method
-    def set_ip_port(self, ip_port) -> None:
-        """Use the IP LAN command to set a new IP address for the device.
+    def set_ip_port(self, ip_port: int) -> None:
+        """Use the IP LAN command to set a new IP port number for the device.
 
         Parameters:
-            ip_port: A new static IP address for the device.
+            ip_port: A new static IP port number for the device.
         """
         cmd = f":SYST:PORT {ip_port}" + self.serial_eol
         super(Tenma72_13350, self)._send(cmd)
