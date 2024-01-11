@@ -595,8 +595,8 @@ class QMI_SocketTransport(QMI_Transport):
         MIN_PACKET_SIZE: The minimum packet size to read with `read_until` method.
         MAX_PACKET_SIZE: The maximum packet size to read with `read` method.
     """
-    MIN_PACKET_SIZE = 0
-    MAX_PACKET_SIZE = 0
+    MIN_PACKET_SIZE: int
+    MAX_PACKET_SIZE: int
 
     def __init__(self, host: str, port: int) -> None:
         """Initialize the UDP or TCP transport with validation of host and port.
@@ -711,9 +711,10 @@ class QMI_SocketTransport(QMI_Transport):
             return ret
 
         self._check_is_open()
-        self._safe_socket.settimeout(timeout)
         tstart = time.monotonic()
+        tremain = timeout
         while True:
+            self._safe_socket.settimeout(tremain)
             try:
                 # Read from socket.
                 b, addr = self._read_from_socket(self.MAX_PACKET_SIZE)
@@ -740,8 +741,6 @@ class QMI_SocketTransport(QMI_Transport):
                 if tremain < 0:
                     nbuf = len(self._read_buffer)
                     raise QMI_TimeoutException(f"Function timeout after {nbuf} bytes without message terminator.")
-
-                self._safe_socket.settimeout(tremain)
 
     def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
         try:
