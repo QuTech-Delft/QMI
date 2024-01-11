@@ -2,28 +2,57 @@
 import unittest
 from unittest.mock import call, patch
 
-import qmi
+from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_UdpTransport
 from qmi.instruments.tenma import Tenma72_2550, Tenma72_13350
 from qmi.instruments.tenma.psu_72 import Tenma72_Base
+
+from tests.patcher import PatcherQmiContext as QMI_Context
+
+
+class TestTenma72_BaseInit(unittest.TestCase):
+    """ Testcase of the Tenma72_Base class initialization"""
+
+    def setUp(self):
+        # Add patches
+        patcher = patch('qmi.instruments.tenma.psu_72.create_transport', spec=QMI_UdpTransport)
+        self._transport_mock = patcher.start().return_value
+        self.addCleanup(patcher.stop)
+
+    def test_init(self):
+        """See that __init__ excepts when invalid type of transport is given."""
+        # Arrange
+        ok_transport = "serial:/dev/ttyS0"
+        ok_transport_2 = "udp:123.45.67.8"
+        nok_transport = "tcp:123.45.67.8:1234"  # TCP cannot be used
+        # Act
+        Tenma72_Base(
+            QMI_Context("Test_tenma_base_init"), "tenma_base_ok", ok_transport
+        )
+        Tenma72_Base(
+            QMI_Context("Test_tenma_base_init2"), "tenma_base_ok2", ok_transport_2
+        )
+        # Assert
+        with self.assertRaises(QMI_InstrumentException):
+            Tenma72_Base(
+                QMI_Context("Test_tenma_base_init_nok"), "tenma_base_nok", nok_transport
+            )
 
 
 class TestTenma72_Base(unittest.TestCase):
     """ Testcase of the Tenma72_Base class """
 
     def setUp(self):
-        qmi.start("TestSiglentTenma72_Base")
         # Add patches
         patcher = patch('qmi.instruments.tenma.psu_72.create_transport', spec=QMI_UdpTransport)
         self._transport_mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
         # Make DUT
-        self.psu: Tenma72_Base = qmi.make_instrument("Tenma72_Base", Tenma72_Base, "patched")
+        self.psu: Tenma72_Base = Tenma72_Base(QMI_Context("TestSiglentTenma72_Base"), Tenma72_Base, "udp:123.45.67.8")
         self.psu.open()
 
     def tearDown(self):
         self.psu.close()
-        qmi.stop()
 
     def test_get_idn(self):
         """ Test case for `get_idn()` function. """
@@ -102,18 +131,16 @@ class TestTenma72_2550(unittest.TestCase):
     """ Testcase of the TestTenma72_2550 psu """
 
     def setUp(self):
-        qmi.start("TestSiglentTenma72_2550")
         # Add patches
         patcher = patch('qmi.instruments.tenma.psu_72.create_transport', spec=QMI_UdpTransport)
         self._transport_mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
         # Make DUT
-        self.psu: Tenma72_2550 = qmi.make_instrument("Tenma72_2550", Tenma72_2550, "")
+        self.psu: Tenma72_2550 = Tenma72_2550(QMI_Context("TestSiglentTenma72_2550"), Tenma72_2550, "serial:COM0")
         self.psu.open()
 
     def tearDown(self):
         self.psu.close()
-        qmi.stop()
 
     def test_get_idn(self):
         """ Test case for `get_idn()` function. """
@@ -240,18 +267,16 @@ class TestTenma72_13350(unittest.TestCase):
     """ Testcase of the TestTenma72_13350 psu """
 
     def setUp(self):
-        qmi.start("TestSiglentTenma72_13350")
         # Add patches
         patcher = patch('qmi.instruments.tenma.psu_72.create_transport', spec=QMI_UdpTransport)
         self._transport_mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
         # Make DUT
-        self.psu: Tenma72_13350 = qmi.make_instrument("Tenma72_13350", Tenma72_13350, "")
+        self.psu: Tenma72_13350 = Tenma72_13350(QMI_Context("TestSiglentTenma72_13350"), Tenma72_13350, "udp:not_parsed")
         self.psu.open()
 
     def tearDown(self):
         self.psu.close()
-        qmi.stop()
 
     def test_get_idn(self):
         """ Test case for `get_idn()` function. """
