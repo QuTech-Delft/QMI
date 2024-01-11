@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+### Added
+- Added a new transport for communicating with instruments over UDP protocol. This works with transport string "udp:host:port".
+- The `transport.py` was introduced with common base class for TCP and UDP protocols, where several implementations are present
+  for functions that work the same for both protocols. Some modifications, especially for `read` functions, were required for doing this.
+  Other functions were implemented separately.
+
 ### Changed
 - Changed the stopping of contexts in `qmi_proc.proc_stop()` to happen in reverse order to `proc_start()`.
 - `_RpcObjectMetaClass` inherits from ABCMeta instead of type. This allows it to be used as a mixin with other ABCs.

@@ -140,6 +140,7 @@ import logging
 import threading
 import time
 import enum
+from abc import ABCMeta
 from collections import deque
 
 import typing

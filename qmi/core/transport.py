@@ -10,9 +10,10 @@ from typing import Any, Mapping, Optional, List, Tuple, Type
 
 import serial
 
+from qmi.core.context import QMI_Context
 from qmi.core.exceptions import (
     QMI_InvalidOperationException, QMI_TimeoutException, QMI_EndOfInputException,
-    QMI_TransportDescriptorException, QMI_InstrumentException
+    QMI_TransportDescriptorException, QMI_InstrumentException, QMI_RuntimeException
 )
 from qmi.core.util import format_address_and_port
 
@@ -309,6 +310,13 @@ TcpTransportDescriptorParser = TransportDescriptorParser(
     {'connect_timeout': (float, False)}
 )
 
+UdpTransportDescriptorParser = TransportDescriptorParser(
+    "udp",
+    [("host", (str, True)),
+     ('port', (int, True))],
+    {'connect_timeout': (float, False)}
+)
+
 UsbTmcTransportDescriptorParser = TransportDescriptorParser(
     "usbtmc",
     [],
@@ -552,189 +560,6 @@ class QMI_SerialTransport(QMI_Transport):
         self._read_buffer = bytearray()
 
 
-class QMI_TcpTransport(QMI_Transport):
-    """Bidirectional byte stream via TCP network connection.
-
-    An instance of QMI_TcpTransport represents a client-side TCP connection
-    to an instrument. Server-side TCP connections are not supported.
-    """
-
-    DEFAULT_CONNECT_TIMEOUT = 10
-
-    def __init__(self, host: str, port: int, connect_timeout: Optional[float] = DEFAULT_CONNECT_TIMEOUT) -> None:
-        """Initialize the TCP transport by connecting to the specified address.
-
-        Parameters:
-            connect_timeout: Maximum time to connect in seconds.
-
-        Raises:
-            ~qmi.core.exceptions.QMI_TimeoutException: If connecting takes longer than the specified connection
-            timeout.
-        """
-        super().__init__()
-
-        self._validate_host(host)
-        self._validate_tcp_port(port)
-
-        self._address = (host, port)
-        self._connect_timeout = connect_timeout
-        self._socket: Optional[socket.socket] = None
-        self._read_buffer = bytearray()
-
-    @staticmethod
-    def _validate_host(host):
-        if (not _is_valid_hostname(host)) and (not _is_valid_ipaddress(host)):
-            raise QMI_TransportDescriptorException("Invalid host name {}".format(host))
-
-    @staticmethod
-    def _validate_tcp_port(port):
-        if port < 1 or port > 65535:
-            raise QMI_TransportDescriptorException("Invalid TCP port number {}".format(port))
-
-    def __str__(self) -> str:
-        remote_addr = format_address_and_port(self._address)
-        return "QMI_TcpTransport(remote={})".format(remote_addr)
-
-    @property
-    def _safe_socket(self) -> socket.socket:
-        """ The _safe_socket property should be used inside the QMI_Transport code if-and-only-if we are 100% sure that
-        the _socket attribute is not None.
-
-        This aids in static typechecking, since whereas the type of _socket is Optional[T], the result of this method
-        is guaranteed to be of type T. It is a QMI-internal bug if this property is used in case _socket is None. In
-        that case, we raise an AssertionError, and we hope the users will complain to us so we can fix the bug in the
-        library.
-
-        Raises: AssertionError: in case the property is used when the underlying value of _socket is None.
-
-        Returns: The value of _socket, if it is not None. """
-        assert self._socket is not None
-        return self._socket
-
-    def _open_transport(self) -> None:
-        _logger.debug("Opening %s", self)
-        _logger.debug("Connecting TCP transport to %s", self._address)
-
-        # Create socket and connect.
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket.settimeout(self._connect_timeout)
-        # Set TCP_NODELAY socket option.
-        self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        try:
-            self._socket.connect(self._address)
-        except socket.timeout as e:
-            self._socket.close()
-            raise QMI_TimeoutException("Timeout while connecting to {}".format(self._address)) from e
-
-        self._read_buffer = bytearray()
-
-    def close(self) -> None:
-        _logger.debug("Closing TCP transport %s", self)
-        super().close()
-        self._safe_socket.close()
-
-    def write(self, data: bytes) -> None:
-        self._check_is_open()
-        # NOTE: We explicitly adjust the socket timeout before each send/recv call.
-        self._safe_socket.settimeout(None)
-        self._safe_socket.sendall(data)
-
-    def read(self, nbytes: int, timeout: Optional[float]) -> bytes:
-        self._check_is_open()
-        tstart = time.monotonic()
-        tremain = timeout
-        nbuf = len(self._read_buffer)
-        while nbuf < nbytes:
-            self._safe_socket.settimeout(tremain)
-            try:
-                b = self._safe_socket.recv(nbytes - nbuf)
-            except (BlockingIOError, socket.timeout):
-                raise QMI_TimeoutException("Timeout after {} bytes while expecting {}".format(nbuf, nbytes))
-            if not b:
-                raise QMI_EndOfInputException(
-                    "Reached end of input from socket {}".format(format_address_and_port(self._address)))
-            self._read_buffer.extend(b)
-            nbuf = len(self._read_buffer)
-            if timeout is not None:
-                tremain = tstart + timeout - time.monotonic()
-                if tremain < 0:
-                    raise QMI_TimeoutException("Timeout after {} bytes while expecting {}".format(nbuf, nbytes))
-        ret = bytes(self._read_buffer[:nbytes])
-        self._read_buffer = self._read_buffer[nbytes:]
-        return ret
-
-    def read_until(self, message_terminator: bytes, timeout: Optional[float]) -> bytes:
-        self._check_is_open()
-        tstart = time.monotonic()
-        first_pass = True
-        while True:
-            # Check if message already received.
-            p = self._read_buffer.find(message_terminator)
-            if p >= 0:
-                # Found "message_terminator" - return data.
-                nbytes = p + len(message_terminator)
-                ret = bytes(self._read_buffer[:nbytes])
-                self._read_buffer = self._read_buffer[nbytes:]
-                return ret
-            # Determine timeout.
-            if first_pass:
-                # Try to read at least once, even if timeout is zero.
-                self._safe_socket.settimeout(timeout)
-                first_pass = False
-            elif timeout is not None:
-                # Calculate remaining time.
-                tremain = tstart + timeout - time.monotonic()
-                if tremain < 0:
-                    nbuf = len(self._read_buffer)
-                    raise QMI_TimeoutException("Timeout after {} bytes without message terminator".format(nbuf))
-                self._safe_socket.settimeout(tremain)
-            # Read from socket.
-            try:
-                # NOTE: Reading up to 4096 bytes here.
-                #       Exact amount does not matter but a small power of 2 is recommended, e.g. 4096
-                #       by socket.recv() documentation.
-                b = self._safe_socket.recv(512)
-            except (BlockingIOError, socket.timeout):
-                # timeout in socket.recv()
-                nbuf = len(self._read_buffer)
-                raise QMI_TimeoutException("Timeout after {} bytes without message terminator".format(nbuf))
-            if not b:
-                # end of stream
-                raise QMI_EndOfInputException(
-                    "Reached end of input from socket {}".format(format_address_and_port(self._address)))
-            self._read_buffer.extend(b)
-
-    def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
-        try:
-            ret = self.read(nbytes, timeout)
-        except QMI_TimeoutException:
-            ret = bytes(self._read_buffer)
-            self._read_buffer = bytearray()
-        except QMI_EndOfInputException:
-            if not self._read_buffer:
-                raise
-            ret = bytes(self._read_buffer)
-            self._read_buffer = bytearray()
-        return ret
-
-    def discard_read(self) -> None:
-        self._check_is_open()
-        self._read_buffer = bytearray()
-        self._safe_socket.settimeout(0)
-        while True:
-            try:
-                b = self._safe_socket.recv(4096)
-            except socket.timeout:
-                # no more bytes available
-                break
-            except BlockingIOError:
-                # no more bytes available
-                break
-            if not b:
-                # end of stream
-                break
-
-
 def _is_valid_hostname(hostname: str) -> bool:
     """Return True if the specified host name has valid syntax."""
     # source: https://stackoverflow.com/questions/2532053/validate-a-hostname-string
@@ -761,6 +586,305 @@ def _is_valid_ipaddress(address: str) -> bool:
     except OSError:
         pass
     return False
+
+
+class QMI_SocketTransport(QMI_Transport):
+    """Base class for bidirectional data streams via socket network connection.
+
+    Attributes:
+        MIN_PACKET_SIZE: The minimum packet size to read with `read_until` method.
+        MAX_PACKET_SIZE: The maximum packet size to read with `read` method.
+    """
+    MIN_PACKET_SIZE: int
+    MAX_PACKET_SIZE: int
+
+    def __init__(self, host: str, port: int) -> None:
+        """Initialize the UDP or TCP transport with validation of host and port.
+
+        Parameters:
+            host:   The server/client IP address.
+            port:   The port for the address.
+        """
+        super().__init__()
+
+        # As 'localhost' does not necessarily resolve to '127.0.0.1', it is good to resolve it just-in-case.
+        host = socket.gethostbyname(host) if host == "localhost" else host
+        self._validate_host(host)
+        self._validate_port(port)
+        self._address = (host, port)
+        self._socket: Optional[socket.socket] = None
+        self._read_buffer = bytearray()
+
+    @staticmethod
+    def _validate_host(host):
+        if (not _is_valid_hostname(host)) and (not _is_valid_ipaddress(host)):
+            raise QMI_TransportDescriptorException(f"Invalid host name {host}")
+
+    @staticmethod
+    def _validate_port(port):
+        if port < 1 or port > 65535:
+            raise QMI_TransportDescriptorException(f"Invalid port number {port}")
+
+    @property
+    def _safe_socket(self) -> socket.socket:
+        """ The _safe_socket property should be used inside the QMI_Transport code if-and-only-if we are 100% sure that
+        the _socket attribute is not None.
+
+        This aids in static typechecking, since whereas the type of _socket is Optional[T], the result of this method
+        is guaranteed to be of type T. It is a QMI-internal bug if this property is used in case _socket is None. In
+        that case, we raise an AssertionError, and we hope the users will complain to us so we can fix the bug in the
+        library.
+
+        Raises: AssertionError: in case the property is used when the underlying value of _socket is None.
+
+        Returns: The value of _socket, if it is not None. """
+        assert self._socket is not None
+        return self._socket
+
+    def _open_transport(self) -> None:
+        _logger.debug("Opening %s with address %s", self, self._address)
+        self._read_buffer = bytearray()
+
+    def _read_from_socket(self, packet_size: int) -> Tuple[bytes, Any]:
+        """Helper function to read from a socket with specific packet size.
+        Exact amount does not matter but a small power of 2 is recommended, e.g. 4096
+        by socket.recv() documentation.
+
+        Parameters:
+            packet_size: The packet size to read.
+        """
+        try:
+            b, addr = self._safe_socket.recvfrom(packet_size)
+        except (BlockingIOError, socket.timeout) as err:
+            raise err  # Re-raise this for handling in the upper try-except.
+        except OSError as err:
+            raise QMI_RuntimeException(
+                f"UDP packet size was larger than {packet_size}. Data is lost."
+            ) from err
+
+        if not b:
+            raise QMI_EndOfInputException(
+                f"Reached end of input from socket {format_address_and_port(self._address)}"
+            )
+        return b, addr
+
+    def close(self) -> None:
+        super().close()
+        self._safe_socket.close()
+
+    def write(self, data: bytes) -> None:
+        raise NotImplementedError("QMI_SocketTransportBase.write not implemented")
+
+    def read(self, nbytes: int, timeout: Optional[float] = None) -> bytes:
+        self._check_is_open()
+        tstart = time.monotonic()
+        tremain = timeout
+        nbuf = len(self._read_buffer)
+        while nbuf < nbytes:
+            self._safe_socket.settimeout(tremain)
+            try:
+                b, addr = self._read_from_socket(max(nbytes - nbuf, self.MIN_PACKET_SIZE))
+
+            except (BlockingIOError, socket.timeout) as err:
+                raise QMI_TimeoutException(
+                    f"Timeout after {nbuf} bytes while expecting {nbytes}"
+                ) from err
+            self._read_buffer.extend(b)
+            nbuf = len(self._read_buffer)
+            if timeout is not None:
+                tremain = tstart + timeout - time.monotonic()
+                if tremain < 0:
+                    raise QMI_TimeoutException(f"Timeout after {nbuf} bytes while expecting {nbytes}")
+
+        ret = bytes(self._read_buffer[:nbytes])
+        self._read_buffer = self._read_buffer[nbytes:]
+        return ret
+
+    def read_until(self, message_terminator: bytes, timeout: Optional[float] = None) -> bytes:
+        # Check if message terminator already received. To be further handled in subclass implementation.
+        p = self._read_buffer.find(message_terminator)
+        if p >= 0:
+            # Found "message_terminator" - return data.
+            nbytes = p + len(message_terminator)
+            ret = bytes(self._read_buffer[:nbytes])
+            self._read_buffer = self._read_buffer[nbytes:]
+            return ret
+
+        self._check_is_open()
+        tstart = time.monotonic()
+        tremain = timeout
+        while True:
+            self._safe_socket.settimeout(tremain)
+            try:
+                # Read from socket.
+                b, addr = self._read_from_socket(self.MAX_PACKET_SIZE)
+                self._read_buffer.extend(b)
+            except (BlockingIOError, socket.timeout, TimeoutError) as err:
+                nbuf = len(self._read_buffer)
+                raise QMI_TimeoutException(
+                    f"Socket timeout after {nbuf} bytes without message terminator"
+                ) from err
+
+            # Check if message terminator received.
+            p = self._read_buffer.find(message_terminator)
+            if p >= 0:
+                # Found "message_terminator" - return data.
+                nbytes = p + len(message_terminator)
+                ret = bytes(self._read_buffer[:nbytes])
+                self._read_buffer = self._read_buffer[nbytes:]
+                return ret
+
+            # Determine remaining time if message terminator is not yet received.
+            if timeout is not None:
+                # Calculate remaining time.
+                tremain = tstart + timeout - time.monotonic()
+                if tremain < 0:
+                    nbuf = len(self._read_buffer)
+                    raise QMI_TimeoutException(f"Function timeout after {nbuf} bytes without message terminator.")
+
+    def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
+        try:
+            ret = self.read(nbytes, timeout)
+        except QMI_TimeoutException:
+            ret = bytes(self._read_buffer)
+            self._read_buffer = bytearray()
+        except QMI_EndOfInputException:
+            if not self._read_buffer:
+                raise
+            ret = bytes(self._read_buffer)
+            self._read_buffer = bytearray()
+        return ret
+
+    def discard_read(self) -> None:
+        self._check_is_open()
+        self._read_buffer = bytearray()
+        self._safe_socket.settimeout(0)
+        while True:
+            try:
+                b = self._safe_socket.recv(self.MAX_PACKET_SIZE)
+            except (BlockingIOError, socket.timeout):
+                # no more bytes available
+                break
+            except OSError:
+                # UDP protocol was used and > 4096 bytes in socket buffer. This discards also the rest of the packet.
+                break
+
+            if not b:
+                # end of stream
+                break
+
+
+class QMI_UdpTransport(QMI_SocketTransport):
+    """
+    An instance of QMI_UdpTransport represents a server-side UDP connection with
+    a listening port to an instrument. Client-side UDP connections are not supported.
+
+    The maximum UDP packet size is 64KB (including headers). For `write` and `read` functions,
+    this means limitations. The write function we can check the data size to send and split into
+    multiple messages. For `read` functions this is not possible and the client must limit the
+    data size as necessary. If for `read` functions the receivable data size is larger than
+    the size defined in `recvfrom(<size>)`, an exception is raised.
+
+    Attributes:
+        MIN_PACKET_SIZE: The minimum packet size to read with `read` method.
+        MAX_PACKET_SIZE: The maximum packet size to read with `read_until` method.
+    """
+    MIN_PACKET_SIZE = 4096
+    MAX_PACKET_SIZE = 4096
+
+    def __init__(self, host: str, port: int) -> None:
+        """Initialize the UDP transport by validating the UDP host and port.
+
+        Parameters:
+            host: The server IP address.
+            port: The port for the address.
+        """
+        super().__init__(host, port)
+
+    def _validate_port(self, port):
+        super()._validate_port(port)
+        if port == QMI_Context.DEFAULT_UDP_RESPONDER_PORT:
+            raise QMI_TransportDescriptorException(f"UDP port number {port} not allowed")
+
+    def __str__(self) -> str:
+        remote_addr = format_address_and_port(self._address)
+        return f"QMI_UdpTransport(remote={remote_addr})"
+
+    def _open_transport(self) -> None:
+        super()._open_transport()
+        # Validate the host exists before trying to create a socket
+        socket.gethostbyname(self._address[0])
+        # Create socket
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # To set the local address to point to our client, we need to bind it.
+        self._socket.bind(("", self._address[1]))
+
+    def close(self) -> None:
+        _logger.debug("Closing UDP transport %s", self)
+        super().close()
+
+    def write(self, data: bytes) -> None:
+        self._check_is_open()
+        # NOTE: We explicitly adjust the socket timeout before each send/recv call.
+        self._safe_socket.settimeout(None)
+        self._safe_socket.sendto(data, self._address)
+
+
+class QMI_TcpTransport(QMI_SocketTransport):
+    """Bidirectional byte stream via TCP network connection.
+
+    An instance of QMI_TcpTransport represents a client-side TCP connection
+    to an instrument. Server-side TCP connections are not supported.
+
+    Attributes:
+        DEFAULT_CONNECT_TIMEOUT: A default timeout period for connecting to TCP client. Default is 10 seconds.
+        MIN_PACKET_SIZE: The minimum packet size to read with `read` method.
+        MAX_PACKET_SIZE: The maximum packet size to read with `read_until` method.
+    """
+
+    DEFAULT_CONNECT_TIMEOUT = 10
+    MIN_PACKET_SIZE = 0
+    MAX_PACKET_SIZE = 512
+
+    def __init__(self, host: str, port: int, connect_timeout: Optional[float] = DEFAULT_CONNECT_TIMEOUT) -> None:
+        """Initialize the TCP transport by connecting to the specified address.
+
+        Parameters:
+            connect_timeout: Maximum time to connect in seconds.
+
+        Raises:
+            ~qmi.core.exceptions.QMI_TimeoutException: If connecting takes longer than the specified connection
+            timeout.
+        """
+        super().__init__(host, port)
+        self._connect_timeout = connect_timeout
+
+    def __str__(self) -> str:
+        remote_addr = format_address_and_port(self._address)
+        return f"QMI_TcpTransport(remote={remote_addr})"
+
+    def _open_transport(self) -> None:
+        super()._open_transport()
+        # Create socket and connect.
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket.settimeout(self._connect_timeout)
+        # Set TCP_NODELAY socket option.
+        self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        try:
+            self._socket.connect(self._address)
+        except socket.timeout as e:
+            self._socket.close()
+            raise QMI_TimeoutException("Timeout while connecting to {}".format(self._address)) from e
+
+    def close(self) -> None:
+        _logger.debug("Closing TCP transport %s", self)
+        super().close()
+
+    def write(self, data: bytes) -> None:
+        self._check_is_open()
+        # NOTE: We explicitly adjust the socket timeout before each send/recv call.
+        self._safe_socket.settimeout(None)
+        self._safe_socket.sendall(data)
 
 
 class QMI_UsbTmcTransport(QMI_Transport):
@@ -1158,16 +1282,17 @@ def create_transport(transport_descriptor: str,
     open a transport, including parameters such as port number, baud rate, etc.
 
     String format:
+      - UDP connection:    "tcp:host[:port]"
       - TCP connection:    "tcp:host[:port][:connect_timeout=T]"
       - Serial port:       "serial:device[:baudrate=115200][:databits=8][:parity=N][:stopbits=1]"
       - USBTMC device:     "usbtmc[:vendorid=0xvid][:productid=0xpid]:serialnr=sn"
       - GPIB device:       "gpib:[board=0]:primary_addr[:secondary_addr=2][:connect_timeout=30.0]"
       - VXI-11 instrument: "vxi11:host"
 
-    "host" (for TCP & VXI-11 transports) specifies the host name or IP address of
-    the TCP server. Numerical IPv6 addresses must be enclosed in square brackets.
+    "host" (for UDP, TCP & VXI-11 transports) specifies the host name or IP address of
+    the UDP server/TCP client. Numerical IPv6 addresses must be enclosed in square brackets.
 
-    "port" (for TCP transports) specifies the TCP port number of the server.
+    "port" (for UDP and TCP transports) specifies the UDP/TCP port number of the server/client.
 
     "connect_timeout" is TCP connection timeout. Default is 10s.
 
@@ -1202,6 +1327,9 @@ def create_transport(transport_descriptor: str,
     if SerialTransportDescriptorParser.match_interface(transport_descriptor):
         attributes = SerialTransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
         return QMI_SerialTransport(**attributes)
+    elif UdpTransportDescriptorParser.match_interface(transport_descriptor):
+        attributes = UdpTransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
+        return QMI_UdpTransport(**attributes)
     elif TcpTransportDescriptorParser.match_interface(transport_descriptor):
         attributes = TcpTransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
         return QMI_TcpTransport(**attributes)
