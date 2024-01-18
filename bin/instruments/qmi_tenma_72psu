@@ -37,7 +37,7 @@ def main() -> int:
     parser.add_argument("--gateway", type=str, help="Get/Set IP gateway", nargs='?', const='get')
     args = parser.parse_args()
 
-    instr: globals()[f"Tenma72_{args.model}"]
+    instr: getattr(qmi.instruments.tenma, f"Tenma72_{args.model}")
     with start_stop(qmi, "tenma72_psu_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
         if args.idn:
             idn = instr.get_idn()

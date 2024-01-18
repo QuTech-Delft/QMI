@@ -1,4 +1,5 @@
 """ Testcase of the Tenma series 72 power supply units."""
+import logging
 import unittest
 from unittest.mock import call, patch
 
@@ -72,6 +73,14 @@ class TestTenma72_Base(unittest.TestCase):
         self.assertEqual(expected_serial, idn.serial)
         self.assertEqual(expected_version, idn.version)
 
+    def test_get_idn_no_reply_excepts(self):
+        """ Test case for `get_idn()` function. """
+        # arrange
+        self._transport_mock.read_until_timeout.return_value = "".encode("ascii")
+        # act & assert
+        with self.assertRaises(QMI_InstrumentException):
+            self.psu.get_idn()
+
     def test_get_status_errs(self):
         """Test case for not implemented get_status() function."""
         with self.assertRaises(NotImplementedError):
@@ -86,13 +95,13 @@ class TestTenma72_Base(unittest.TestCase):
         expected_current = 0.123
         self._transport_mock.read_until_timeout.return_value = f"{expected_current:.5f}".encode("ascii")
         # Act
-        current = self.psu.read_current()  # No channel
+        current = self.psu.get_current()  # No channel
         # Assert
         self.assertEqual(expected_current, current)
         self._transport_mock.write.assert_called_once_with(bytes(cmd_1, "ascii"))
         self._transport_mock.write.reset_mock()
         # Act
-        current = self.psu.read_current(ch_2)
+        current = self.psu.get_current(ch_2)
         # Assert
         self.assertEqual(expected_current, current)
         self._transport_mock.write.assert_called_once_with(bytes(cmd_2, "ascii"))
@@ -106,13 +115,13 @@ class TestTenma72_Base(unittest.TestCase):
         expected_voltage = 1.230
         self._transport_mock.read_until_timeout.return_value = f"{expected_voltage:.5f}".encode("ascii")
         # Act
-        voltage = self.psu.read_voltage()  # No channel
+        voltage = self.psu.get_voltage()  # No channel
         # Assert
         self.assertEqual(expected_voltage, voltage)
         self._transport_mock.write.assert_called_once_with(bytes(cmd_1, "ascii"))
         self._transport_mock.write.reset_mock()
         # Act
-        voltage = self.psu.read_voltage(ch_2)
+        voltage = self.psu.get_voltage(ch_2)
         # Assert
         self.assertEqual(expected_voltage, voltage)
         self._transport_mock.write.assert_called_once_with(bytes(cmd_2, "ascii"))
@@ -261,6 +270,40 @@ class TestTenma72_2550(unittest.TestCase):
 
         # Assert
         self._transport_mock.write.assert_has_calls(expected_disable_calls)
+
+    def test_enable_disable_output_excepts(self):
+        """Test enabling or disabling output raises an exception when the check value is not the same as input."""
+        # Suppress logging.
+        logging.getLogger("qmi.instruments.tenma.psu_72").setLevel(logging.CRITICAL)
+
+        # Arrange
+        enable_cmd = "OUT1"
+        disable_cmd = "OUT0"
+        self._transport_mock.read.side_effect = [chr(0x40), chr(0x00)]
+        expected_enable_calls = [
+            call(enable_cmd.encode("ascii")),
+            call(b"STATUS?")
+        ]
+        expected_disable_calls = [
+            call(disable_cmd.encode("ascii")),
+            call(b"STATUS?")
+        ]
+        # Act
+        with self.assertRaises(QMI_InstrumentException):
+            self.psu.enable_output(False)
+
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_disable_calls)
+        self._transport_mock.write.reset_mock()
+
+        # Act
+        with self.assertRaises(QMI_InstrumentException):
+            self.psu.enable_output(True)
+
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_enable_calls)
+
+        logging.getLogger("qmi.instruments.tenma.psu_72").setLevel(logging.NOTSET)
 
 
 class TestTenma72_13350(unittest.TestCase):

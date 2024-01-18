@@ -1,9 +1,7 @@
 """Generic patcher implementations."""
-import qmi
-
-
 from unittest.mock import patch
 
+import qmi
 from qmi.core.context import QMI_Context
 
 

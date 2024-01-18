@@ -12,7 +12,7 @@ Some differences are present, even though the basis is the same, as implemented 
   the commands in group based on 2550 model they do.
 - For example, a command "ISET1:3.0" works for 2550 group, while "ISET:3.0\n" works for 13350 group.
 """
-
+from enum import Enum
 import logging
 import re
 from time import sleep
@@ -28,6 +28,17 @@ from qmi.core.transport import create_transport
 _logger = logging.getLogger(__name__)
 
 
+class TrackingState(Enum):
+    Independent = 0
+    Tracking_Series = 1
+    Tracking_Parallel = 2
+    Unknown = 99999
+
+    @classmethod
+    def _missing_(cls, value):
+        return cls.Unknown
+
+
 class Tenma72_Base(QMI_Instrument):
     """The base class for all Tenma model 72 power supply units.
 
@@ -36,11 +47,15 @@ class Tenma72_Base(QMI_Instrument):
         DEFAULT_BAUDRATE: The default baudrate in case of serial connection is used (Baud).
         MAX_VOLTAGE:      The maximum voltage that can be set with the PSU (Volts).
         MAX_CURRENT:      The maximum current that can be set with the PSU (Amperes).
+        SEND_SLEEP_TIME:  A default sleep time for sending data.
+        READ_TIMEOUT:     A default timeout for reading data.
     """
     BUFFER_SIZE = 50
     DEFAULT_BAUDRATE = 0
     MAX_VOLTAGE = 0
     MAX_CURRENT = 0
+    SEND_SLEEP_TIME = 0.02
+    READ_TIMEOUT = 0.2
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         super().__init__(context, name)
@@ -57,22 +72,19 @@ class Tenma72_Base(QMI_Instrument):
         """Writes a command to the Tenma, just an ascii string
 
         Parameters:
-            cmd:    The command to write to the device.
+            cmd: The command to write to the device.
         """
         _logger.info("[%s] Sending message %s", self._name, cmd)
         self._transport.write(bytes(cmd, "ascii"))
-        sleep(.02)  # Sleep some bits to let the message arrive
+        sleep(self.SEND_SLEEP_TIME)  # Sleep some bits to let the message arrive
 
-    def _read(self, timeout: float = 0.2) -> str:
+    def _read(self) -> str:
         """Read the response from the device, try until response received or time-out.
-
-        Parameters:
-            timeout: The time-out value for reading. Default is 200ms.
 
         Returns:
             response: Decoded response string.
         """
-        response = self._transport.read_until_timeout(self.BUFFER_SIZE, timeout)
+        response = self._transport.read_until_timeout(self.BUFFER_SIZE, self.READ_TIMEOUT)
         _logger.info("[%s] Read message %s", self._name, response)
         return response.decode('ascii')
 
@@ -80,7 +92,7 @@ class Tenma72_Base(QMI_Instrument):
         """Internal function to further communicate the output state to instrument.
 
         Parameters:
-            output: The expected output state.
+            output:  The expected output state.
             command: The enable command string.
         """
         self._send(command)
@@ -126,6 +138,10 @@ class Tenma72_Base(QMI_Instrument):
         version = next((match for match in matches[1:] if match.startswith('V')), None)
         serial = next((match for match in matches[1:] if match.startswith('SN:')), None)
 
+        if None in (vendor, model, version, serial):
+            _logger.debug("[%s] *IDN? returned %s and matching failed", self._name, idn)
+            raise QMI_InstrumentException("(Full) instrument identification failed!")
+
         return QMI_InstrumentIdentification(
             vendor=vendor,
             model=model,
@@ -139,8 +155,8 @@ class Tenma72_Base(QMI_Instrument):
         raise NotImplementedError()
 
     @rpc_method
-    def read_current(self, output_channel: Optional[int] = None) -> float:
-        """Read the current setting.
+    def get_current(self, output_channel: Optional[int] = None) -> float:
+        """Get the current setting.
 
         Parameters:
             output_channel: The channel to send the inquiry to.
@@ -156,14 +172,14 @@ class Tenma72_Base(QMI_Instrument):
 
     @rpc_method
     def set_current(self, current: float, output_channel: Optional[int] = None) -> None:
-        """Sets the current setting.
+        """Set the current setting.
 
         Parameters:
-            current: Current for the channel in Amperes.
+            current:        Current for the channel in Amperes.
             output_channel: The channel to send the inquiry to.
 
         Raises:
-            ValueError: If the current setting is not between 0 and self.MAX_CURRENT.
+            ValueError:     If the current setting is not between 0 and self.MAX_CURRENT.
         """
         if not 0 <= current <= self.MAX_CURRENT:
             raise ValueError(f"Invalid current setting {current}, not between 0 and {self.MAX_CURRENT} A")
@@ -173,8 +189,8 @@ class Tenma72_Base(QMI_Instrument):
         self._send(command)
 
     @rpc_method
-    def read_voltage(self, output_channel: Optional[int] = None) -> float:
-        """Reads the voltage setting.
+    def get_voltage(self, output_channel: Optional[int] = None) -> float:
+        """Get the voltage setting.
 
         Parameters:
             output_channel: The channel to send the inquiry to.
@@ -189,14 +205,14 @@ class Tenma72_Base(QMI_Instrument):
 
     @rpc_method
     def set_voltage(self, voltage: float, output_channel: Optional[int] = None) -> None:
-        """Sets the voltage setting.
+        """Set the voltage setting.
 
         Parameters:
-            voltage: Voltage setting for the channel in Volts.
+            voltage:        Voltage setting for the channel in Volts.
             output_channel: The channel to send the inquiry to.
 
         Raises:
-            ValueError: If the input voltage setting is not between 0 and self.MAX_VOLTAGE
+            ValueError:     If the input voltage setting is not between 0 and self.MAX_VOLTAGE.
         """
         if not 0 <= voltage <= self.MAX_VOLTAGE:
             raise ValueError(f"Invalid current setting {voltage}, not between 0 and {self.MAX_VOLTAGE} V")
@@ -235,12 +251,12 @@ class Tenma72_2550(Tenma72_Base):
         """Get the power supply status as a dictionary of status values.
 
         Dictionary composition is:
-            Ch1Mode: "C.V" | "C.C"
-            Ch2Mode: "C.V" | "C.C"
-            Tracking: xx, where xx is byte
-                * 00 = Independent
-                * 01 = Tracking series
-                * 10 = Tracking parallel
+            Ch1Mode:       "C.V" | "C.C"
+            Ch2Mode:       "C.V" | "C.C"
+            Tracking:      xx, where xx is byte
+                             * 00 = Independent
+                             * 01 = Tracking series
+                             * 10 = Tracking parallel
             OutputEnabled: True | False
         
         Returns: 
@@ -248,23 +264,15 @@ class Tenma72_2550(Tenma72_Base):
         """
         self._send("STATUS?")
         statusByte = ord(self._transport.read(1, 1))  # Read response byte
-        ch1mode = (statusByte & 0x01)
-        ch2mode = (statusByte & 0x02)
-        tracking = (statusByte & 0x0C) >> 2
-        output_enabled = (statusByte & 0x40)
+        ch1mode = statusByte & 0x01
+        ch2mode = statusByte & 0x02
+        tracking = TrackingState((statusByte & 0x0C) >> 2)
+        output_enabled = statusByte & 0x40
 
-        if tracking == 0:
-            tracking = "Independent"
-        elif tracking == 1:
-            tracking = "Tracking Series"
-        elif tracking == 2:
-            tracking = "Tracking Parallel"
-        else:
-            tracking = "Unknown"
         return {
             "Ch1Mode": "C.V" if ch1mode else "C.C",
             "Ch2Mode": "C.V" if ch2mode else "C.C",
-            "Tracking": tracking,
+            "Tracking": tracking.name.replace("_", " "),
             "OutputEnabled": bool(output_enabled),
         }
 
@@ -275,42 +283,89 @@ class Tenma72_2550(Tenma72_Base):
 
 
 class Tenma72_2535(Tenma72_2550):
+    """Instrument driver for the Tenma 72-2535, child of 72-2550.
+
+    Attributes:
+        MAX_VOLTAGE: The maximum voltage that can be set with the PSU (Volts).
+        MAX_CURRENT: The maximum current that can be set with the PSU (Amperes).
+    """
     MAX_VOLTAGE = 30
     MAX_CURRENT = 3
 
 
 class Tenma72_2540(Tenma72_2550):
+    """Instrument driver for the Tenma 72-2540, child of 72-2550.
+
+    Attributes:
+        MAX_VOLTAGE: The maximum voltage that can be set with the PSU (Volts).
+        MAX_CURRENT: The maximum current that can be set with the PSU (Amperes).
+    """
     MAX_VOLTAGE = 30
     MAX_CURRENT = 5
 
 
 class Tenma72_2545(Tenma72_2550):
+    """Instrument driver for the Tenma 72-2545, child of 72-2550.
+
+    Attributes:
+        MAX_VOLTAGE: The maximum voltage that can be set with the PSU (Volts).
+        MAX_CURRENT: The maximum current that can be set with the PSU (Amperes).
+    """
     MAX_VOLTAGE = 60
     MAX_CURRENT = 2
 
 
 class Tenma72_2925(Tenma72_2550):
+    """Instrument driver for the Tenma 72-2925, child of 72-2550.
+
+    Attributes:
+        MAX_VOLTAGE: The maximum voltage that can be set with the PSU (Volts).
+        MAX_CURRENT: The maximum current that can be set with the PSU (Amperes).
+    """
     MAX_VOLTAGE = 30
     MAX_CURRENT = 5
 
 
 class Tenma72_2930(Tenma72_2550):
+    """Instrument driver for the Tenma 72-2930, child of 72-2550.
+
+    Attributes:
+        MAX_VOLTAGE: The maximum voltage that can be set with the PSU (Volts).
+        MAX_CURRENT: The maximum current that can be set with the PSU (Amperes).
+    """
     MAX_VOLTAGE = 30
     MAX_CURRENT = 10
 
 
 class Tenma72_2935(Tenma72_2550):
+    """Instrument driver for the Tenma 72-2935, child of 72-2550.
+
+    Attributes:
+        MAX_VOLTAGE: The maximum voltage that can be set with the PSU (Volts).
+        MAX_CURRENT: The maximum current that can be set with the PSU (Amperes).
+    """
     MAX_VOLTAGE = 60
     MAX_CURRENT = 5
 
 
 class Tenma72_2940(Tenma72_2550):
-    DEFAULT_BAUDRATE = 9600
+    """Instrument driver for the Tenma 72-2940, child of 72-2550.
+
+    Attributes:
+        MAX_VOLTAGE: The maximum voltage that can be set with the PSU (Volts).
+        MAX_CURRENT: The maximum current that can be set with the PSU (Amperes).
+    """
     MAX_VOLTAGE = 60
     MAX_CURRENT = 5
 
 
 class Tenma72_10480(Tenma72_2550):
+    """Instrument driver for the Tenma 72-10480, child of 72-2550.
+
+    Attributes:
+        MAX_VOLTAGE: The maximum voltage that can be set with the PSU (Volts).
+        MAX_CURRENT: The maximum current that can be set with the PSU (Amperes).
+    """
     MAX_VOLTAGE = 30
     MAX_CURRENT = 3
 
@@ -334,30 +389,30 @@ class Tenma72_13350(Tenma72_Base):
 
     def _send(self, cmd: str) -> None:
         cmd = cmd + self.serial_eol
-        return super(Tenma72_13350, self)._send(cmd)
+        return super()._send(cmd)
 
     @rpc_method
     def get_status(self) -> Dict[str, Any]:
         """Get the power supply status as a dictionary of status values.
 
         Dictionary composition is:
-            "ChannelMode ": "C.V" | "C.C",
-            "OutputEnabled": True | False,
-            "V/C priority ": "Current priority" | "Voltage priority",
-            "Beep ": True | False,
-            "Lock ": True | False,
+            "ChannelMode ":  "C.V" | "C.C"
+            "OutputEnabled": True | False
+            "V/C priority ": "Current priority" | "Voltage priority"
+            "Beep":          True | False
+            "Lock":          True | False
 
-        Returns: 
+        Returns:
             Dictionary of status values.
         """
         self._send("STATUS?")
-        statusBytes = self._transport.read(2, 2)  # Read response byte
+        status_bytes = self._transport.read(2, 2)  # Read response byte
         # 72-13350 sends two bytes back, the second being '\n'
-        status = statusBytes[0]
+        status = status_bytes[0]
 
-        ch1mode = (status & 0x01)
+        ch1mode = status & 0x01
         output_enabled = bool(status & 0x02)
-        current_priority = (status & 0x04)
+        current_priority = status & 0x04
         beep = bool(status & 0x10)
         lock = bool(status & 0x20)
 
@@ -381,9 +436,9 @@ class Tenma72_13350(Tenma72_Base):
         Returns:
             dhcp: The current DHCP enabled state.
         """
-        cmd = ":SYST:DHCP?" + self.serial_eol
-        super(Tenma72_13350, self)._send(cmd)
-        dhcp = self._read(0.2)
+        cmd = ":SYST:DHCP?"
+        self._send(cmd)
+        dhcp = self._read()
         return int(dhcp)
 
     @rpc_method
@@ -393,8 +448,8 @@ class Tenma72_13350(Tenma72_Base):
         Parameters:
             dhcp: New DHCP state. 0 is disabled, 1 is enabled.
         """
-        cmd = f":SYST:DHCP {dhcp}" + self.serial_eol
-        super(Tenma72_13350, self)._send(cmd)
+        cmd = f":SYST:DHCP {dhcp}"
+        self._send(cmd)
 
     @rpc_method
     def get_ip_address(self) -> str:
@@ -403,9 +458,9 @@ class Tenma72_13350(Tenma72_Base):
         Returns:
             ip_address: The current IP address of the device.
         """
-        cmd = ":SYST:IPAD?" + self.serial_eol
-        super(Tenma72_13350, self)._send(cmd)
-        ip_address = self._read(0.2)
+        cmd = ":SYST:IPAD?"
+        self._send(cmd)
+        ip_address = self._read()
         return ip_address
 
     @rpc_method
@@ -415,8 +470,8 @@ class Tenma72_13350(Tenma72_Base):
         Parameters:
             ip_address: A new static IP address for the device.
         """
-        cmd = f":SYST:IPAD {ip_address}" + self.serial_eol
-        super(Tenma72_13350, self)._send(cmd)
+        cmd = f":SYST:IPAD {ip_address}"
+        self._send(cmd)
 
     @rpc_method
     def get_subnet_mask(self) -> str:
@@ -425,9 +480,9 @@ class Tenma72_13350(Tenma72_Base):
         Returns:
             subnet_mask: The current subnet mask address of the device.
         """
-        cmd = ":SYST:SMASK?" + self.serial_eol
-        super(Tenma72_13350, self)._send(cmd)
-        subnet_mask = self._read(0.2)
+        cmd = ":SYST:SMASK?"
+        self._send(cmd)
+        subnet_mask = self._read()
         return subnet_mask
 
     @rpc_method
@@ -437,8 +492,8 @@ class Tenma72_13350(Tenma72_Base):
         Parameters:
             subnet_mask: A new subnet mask address for the device.
         """
-        cmd = f":SYST:SMASK {subnet_mask}" + self.serial_eol
-        super(Tenma72_13350, self)._send(cmd)
+        cmd = f":SYST:SMASK {subnet_mask}"
+        self._send(cmd)
 
     @rpc_method
     def get_gateway_address(self) -> str:
@@ -447,9 +502,9 @@ class Tenma72_13350(Tenma72_Base):
         Returns:
             gateway: The current static gateway address of the device.
         """
-        cmd = ":SYST:GATE?" + self.serial_eol
-        super(Tenma72_13350, self)._send(cmd)
-        gateway = self._read(0.2)
+        cmd = ":SYST:GATE?"
+        self._send(cmd)
+        gateway = self._read()
         return gateway
 
     @rpc_method
@@ -459,8 +514,8 @@ class Tenma72_13350(Tenma72_Base):
         Parameters:
             gateway: A new static gateway address for the device.
         """
-        cmd = f":SYST:GATE {gateway}" + self.serial_eol
-        super(Tenma72_13350, self)._send(cmd)
+        cmd = f":SYST:GATE {gateway}"
+        self._send(cmd)
 
     @rpc_method
     def get_ip_port(self) -> int:
@@ -469,9 +524,9 @@ class Tenma72_13350(Tenma72_Base):
         Returns:
             ip_port: The current IP port number of the device.
         """
-        cmd = ":SYST:PORT?" + self.serial_eol
-        super(Tenma72_13350, self)._send(cmd)
-        ip_port = self._read(0.2)
+        cmd = ":SYST:PORT?"
+        self._send(cmd)
+        ip_port = self._read()
         return int(ip_port)
 
     @rpc_method
@@ -481,10 +536,16 @@ class Tenma72_13350(Tenma72_Base):
         Parameters:
             ip_port: A new static IP port number for the device.
         """
-        cmd = f":SYST:PORT {ip_port}" + self.serial_eol
-        super(Tenma72_13350, self)._send(cmd)
+        cmd = f":SYST:PORT {ip_port}"
+        self._send(cmd)
 
 
 class Tenma72_13360(Tenma72_13350):
+    """Instrument driver for the Tenma 72-13360, child of 72-13350.
+
+    Attributes:
+        MAX_VOLTAGE: The maximum voltage that can be set with the PSU (Volts).
+        MAX_CURRENT: The maximum current that can be set with the PSU (Amperes).
+    """
     MAX_VOLTAGE = 60
     MAX_CURRENT = 15
