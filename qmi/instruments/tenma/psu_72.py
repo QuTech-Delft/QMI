@@ -40,14 +40,14 @@ class TenmaChannelMode:
 
 
 class TrackingState(Enum):
-    Independent = 0
-    Tracking_Series = 1
-    Tracking_Parallel = 2
-    Unknown = 99999
+    INDEPENDENT = 0
+    TRACKING_SERIES = 1
+    TRACKING_PARALLEL = 2
+    UNKNOWN = 99999
 
     @classmethod
     def _missing_(cls, value):
-        return cls.Unknown
+        return cls.UNKNOWN
 
 
 class Tenma72_Base(QMI_Instrument):
@@ -283,7 +283,7 @@ class Tenma72_2550(Tenma72_Base):
         return {
             "Ch1Mode": TenmaChannelMode(ch1mode).name,
             "Ch2Mode": TenmaChannelMode(ch2mode).name,
-            "Tracking": tracking.name.replace("_", " "),
+            "Tracking": tracking.name.replace("_", " ").title(),
             "OutputEnabled": bool(output_enabled),
         }
 
