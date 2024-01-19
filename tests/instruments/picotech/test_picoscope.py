@@ -68,5 +68,16 @@ class PicoscopeFind4000AInstrumentsTestCase(unittest.TestCase):
         self.assertDictEqual(_picoscope.COMMAND_DICT, {})
 
 
+class PicotechPicoscopeBaseClassTestCase(unittest.TestCase):
+    """Test case for testing the base class functions."""
+    def test_not_implemented_methods_raise_exception(self):
+        """See that `run_block` and `get_time_resolution` of the base class raise exception when called."""
+        with self.assertRaises(NotImplementedError):
+            _picoscope.PicoTech_PicoScope(Mock(), "test_run_block", "sn1234").run_block(1, 2, 3)
+
+        with self.assertRaises(NotImplementedError):
+            _picoscope.PicoTech_PicoScope(Mock(), "test_get_t_res", "sn1234").get_time_resolution(1)
+
+
 if __name__ == "__main__":
     unittest.main()
