@@ -68,9 +68,5 @@ class PicoscopeFind4000AInstrumentsTestCase(unittest.TestCase):
         self.assertDictEqual(_picoscope.COMMAND_DICT, {})
 
 
-class PicotechPicoscopeBaseClassTestCase(unittest.TestCase):
-    """Test case for testing the base class functions."""
-
-
 if __name__ == "__main__":
     unittest.main()

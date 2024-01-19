@@ -237,6 +237,5 @@ class PicoscopeMethodsTestCase(unittest.TestCase):
             self.assertEqual(expected[i], result)
 
 
-
 if __name__ == "__main__":
     unittest.main()

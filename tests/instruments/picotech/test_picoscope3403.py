@@ -226,14 +226,14 @@ class PicoscopeMethodsTestCase(unittest.TestCase):
         for sampling intervals of 1, 2 and 4ns."""
         # prepare
         channels = [[2], [0, 2], [0, 2]]
-        max_val = [5.0, 2.0, 1.0]  # List needs to minimally be length of the largest channel number + 1 in channels
+        max_val = [0.05, 0.2, 0.1]  # List needs to minimally be length of the largest channel number + 1 in channels
         couplings = [
             ChannelCoupling.AC,
             ChannelCoupling.DC,
             ChannelCoupling.DC,
             ]  # List needs to minimally be length of the largest channel number + 1 in channels
         trigger_channel = 2
-        trigger_level = 0.2
+        trigger_level = 0.02
         sampling_intervals = [1, 2, 4]  # ns
         samples = 100
         self._picoscope._ps_attr.ps3000aSetChannel = Mock(return_value=0)
@@ -267,7 +267,7 @@ class PicoscopeMethodsTestCase(unittest.TestCase):
         """Test that the acquire_by_trigger_and_get_data returns data without timeout."""
         # prepare
         channels = [0, 2]
-        max_val = [5.0, 2.0, 1.0]  # List needs to minimally be length of the largest channel number + 1 in channels
+        max_val = [0.5, 2.0, 1.0]  # List needs to minimally be length of the largest channel number + 1 in channels
         couplings = [
             ChannelCoupling.AC,
             ChannelCoupling.DC,
@@ -275,6 +275,46 @@ class PicoscopeMethodsTestCase(unittest.TestCase):
             ]  # List needs to minimally be length of the largest channel number + 1 in channels
         trigger_channel = 2
         trigger_level = 0.2
+        sampling_interval = 8  # ns
+        samples = 100
+        time_span = sampling_interval * samples  # ns
+        self._picoscope._ps_attr.ps3000aSetChannel = Mock(return_value=0)
+        self._picoscope._ps_attr.ps3000aSetSimpleTrigger = Mock(return_value=0)
+        self._picoscope._ps_attr.ps3000aStop = Mock(return_value=0)
+        picoscope3403._ps.ps3000aGetTimebase2 = Mock(return_value=0)
+        picoscope3403._ps.ps3000aRunBlock = Mock(return_value=0)
+        self._picoscope._ps_attr.ps3000aIsReady = Mock(return_value=0)
+        self._picoscope._ps_attr.ps3000aSetDataBuffer = Mock(return_value=0)
+        self._picoscope._ps_attr.ps3000aGetValues = Mock(return_value=0)
+
+        with patch('ctypes.c_int16', side_effect=[ctypes.c_int16(1), ctypes.c_int16(0)]):
+            with patch('numpy.empty', side_effect=[np.empty((len(channels), 0), dtype=np.int16)]):
+
+                tt, voltgs = self._picoscope.acquire_by_trigger_and_get_data(
+                    channels,
+                    max_val,
+                    couplings,
+                    trigger_channel,
+                    trigger_level,
+                    sampling_interval,
+                    time_span,
+                    )
+                # Assert that time-trace length is the same as number of samples
+                self.assertEqual(samples, len(tt))
+                # Did not manage to patch the voltages output, so cannot assert that.
+
+    def test_acquire_no_trigger_and_get_data_ok(self):
+        """Test that the acquire_by_trigger_and_get_data returns data without trigger."""
+        # prepare
+        channels = [0, 2]
+        max_val = [5.0, 20.0, 10.0]  # List needs to minimally be length of the largest channel number + 1 in channels
+        couplings = [
+            ChannelCoupling.AC,
+            ChannelCoupling.DC,
+            ChannelCoupling.DC,
+            ]  # List needs to minimally be length of the largest channel number + 1 in channels
+        trigger_channel = None
+        trigger_level = 2.0
         sampling_interval = 8  # ns
         samples = 100
         time_span = sampling_interval * samples  # ns

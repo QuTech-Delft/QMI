@@ -8,7 +8,6 @@ https://github.com/picotech/picosdk-python-wrappers.
 
 import ctypes
 import logging
-from math import ceil
 from typing import List, Optional, TYPE_CHECKING
 import warnings
 
