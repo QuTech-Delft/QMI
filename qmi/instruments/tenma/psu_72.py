@@ -12,6 +12,7 @@ Some differences are present, even though the basis is the same, as implemented 
   the commands in group based on 2550 model they do.
 - For example, a command "ISET1:3.0" works for 2550 group, while "ISET:3.0\n" works for 13350 group.
 """
+from dataclasses import dataclass
 from enum import Enum
 import logging
 import re
@@ -26,6 +27,16 @@ from qmi.core.transport import create_transport
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TenmaChannelMode:
+    value: bool
+    name: str = "C.C"
+
+    def __post_init__(self):
+        if self.value:
+            self.name = "C.V"
 
 
 class TrackingState(Enum):
@@ -264,14 +275,14 @@ class Tenma72_2550(Tenma72_Base):
         """
         self._send("STATUS?")
         statusByte = ord(self._transport.read(1, 1))  # Read response byte
-        ch1mode = statusByte & 0x01
-        ch2mode = statusByte & 0x02
+        ch1mode = bool(statusByte & 0x01)
+        ch2mode = bool(statusByte & 0x02)
         tracking = TrackingState((statusByte & 0x0C) >> 2)
         output_enabled = statusByte & 0x40
 
         return {
-            "Ch1Mode": "C.V" if ch1mode else "C.C",
-            "Ch2Mode": "C.V" if ch2mode else "C.C",
+            "Ch1Mode": TenmaChannelMode(ch1mode).name,
+            "Ch2Mode": TenmaChannelMode(ch2mode).name,
             "Tracking": tracking.name.replace("_", " "),
             "OutputEnabled": bool(output_enabled),
         }
@@ -410,14 +421,14 @@ class Tenma72_13350(Tenma72_Base):
         # 72-13350 sends two bytes back, the second being '\n'
         status = status_bytes[0]
 
-        ch1mode = status & 0x01
+        ch1mode = bool(status & 0x01)
         output_enabled = bool(status & 0x02)
         current_priority = status & 0x04
         beep = bool(status & 0x10)
         lock = bool(status & 0x20)
 
         return {
-            "ChannelMode": "C.V" if ch1mode else "C.C",
+            "ChannelMode": TenmaChannelMode(ch1mode).name,
             "OutputEnabled": output_enabled,
             "V/C priority": "Current priority" if current_priority else "Voltage priority",
             "Beep": beep,
