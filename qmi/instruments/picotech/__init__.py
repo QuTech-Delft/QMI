@@ -2,8 +2,8 @@
 Pico Technology Ltd., oscilloscopes.
 
 The qmi.instruments.picotech package provides support for:
-- PicoScope 3403 and
-- PicoScope 4824 Models.
+  - PicoScope 3403A and
+  - PicoScope 4824A models.
 """
 from qmi.instruments.picotech._picoscope import ChannelCoupling, TriggerEdge
 from qmi.instruments.picotech.picoscope3403 import PicoTech_PicoScope3403

@@ -146,8 +146,6 @@ class PicoTech_PicoScope(QMI_Instrument):
         _check_error(err)
 
         self._handle = par_handle
-        self._num_samples = 0
-        self._timebase_interval_ns = 0.0
 
         super().open()
 
@@ -157,7 +155,11 @@ class PicoTech_PicoScope(QMI_Instrument):
         _logger.info("[%s] Closing connection to instrument", self._name)
         COMMAND_DICT["Stop"](self._handle)
         COMMAND_DICT["CloseUnit"](self._handle)
+        # Reset values in `close` for eventual re-open.
         self._handle = None
+        self._num_samples = 0
+        self._timebase_interval_ns = 0.0
+
         super().close()
 
     @rpc_method
@@ -352,3 +354,7 @@ class PicoTech_PicoScope(QMI_Instrument):
     @rpc_method
     def run_block(self, num_pretrig_samples: int, num_posttrig_samples: int, timebase: int) -> None:
         raise NotImplementedError("Method 'run_block' is not implemented in the base class")
+
+    @rpc_method
+    def get_time_resolution(self, time_base: int) -> float:
+        raise NotImplementedError("Method 'get_time_resolution' is not implemented in the base class")

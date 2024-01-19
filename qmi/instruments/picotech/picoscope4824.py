@@ -27,12 +27,13 @@ _logger = logging.getLogger(__name__)
 
 
 class PicoTech_PicoScope4824(PicoTech_PicoScope):
-    """Instrument driver for the PicoTech PicoScope 4824 USB oscilloscope."""
+    """Instrument driver for the PicoTech PicoScope 4824 USB oscilloscope.
 
-    # Number of oscilloscope channels.
+    Attributes:
+        NUM_CHANNELS: Number of oscilloscope channels.
+        NUM_INPUT_RANGES: Number of supported input ranges. Range '0' is not supported.
+    """
     NUM_CHANNELS = 8
-
-    # Number of supported input ranges.
     NUM_INPUT_RANGES = 12
 
     def __init__(self, context: QMI_Context, name: str, serial_number: str) -> None:
@@ -46,7 +47,7 @@ class PicoTech_PicoScope4824(PicoTech_PicoScope):
         self._library = "4000a"
 
     @rpc_method
-    def run_block(self, num_pretrig_samples: int, num_posttrig_samples: int, timebase: int) -> None:
+    def run_block(self, num_pretrig_samples: int, num_posttrig_samples: int, time_base: int) -> None:
         """Start acquisition in block mode.
 
         If the trigger is enabled (see `set_trigger()`), the oscilloscope will
@@ -61,7 +62,7 @@ class PicoTech_PicoScope4824(PicoTech_PicoScope):
         Parameters:
             num_pretrig_samples:    Number of pre-trigger samples.
             num_posttrig_samples:   Number of post-trigger samples.
-            timebase:               Timebase selector (range 0 ... 2**32-1)
+            time_base:              Timebase selector (range 0 ... 2**32-1).
                                     The effective timebase is `(timebase+1) * 12.5 ns`.
                                     Depending on the enabled channels, a minimum value of 1 may be required
                                     (minimum timebase 25 ns).
@@ -72,7 +73,7 @@ class PicoTech_PicoScope4824(PicoTech_PicoScope):
         par_interval_ns = ctypes.c_float()
         err = _ps.ps4000aGetTimebase2(
             self._handle,
-            timebase,
+            time_base,
             num_samples,
             ctypes.byref(par_interval_ns),
             None,  # maxSamples
@@ -84,7 +85,7 @@ class PicoTech_PicoScope4824(PicoTech_PicoScope):
             self._handle,
             num_pretrig_samples,
             num_posttrig_samples,
-            timebase,
+            time_base,
             None,  # timeIndisposedMs
             0,     # segmentIndex
             None,  # lpReady
@@ -94,3 +95,21 @@ class PicoTech_PicoScope4824(PicoTech_PicoScope):
 
         self._num_samples = num_samples
         self._timebase_interval_ns = par_interval_ns.value
+
+    @rpc_method
+    def get_time_resolution(self, time_base: int) -> float:
+        """Returns the scope's time resolution in nanoseconds depending on the time_base selector.
+
+        Parameters:
+            time_base:   Timebase selector (range 0 ... 2^32-1).
+                         The effective time resolution is 12.5 ns * (time_base + 1).
+
+        Returns:
+            resolution:  Scope's time resolution in nanoseconds.
+                         0 is returned for invalid time_base.
+        """
+        if 0 <= time_base < 2 ** 32:
+            return 12.5 * (time_base + 1)
+
+        else:
+            return 0

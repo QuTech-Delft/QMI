@@ -10,7 +10,7 @@ from tests.instruments.picotech.ps3000a_stub import ps3000a
 from tests.instruments.picotech.ps4000a_stub import ps4000a
 
 
-class PicoscopeFind3403InstrumentsTestCase(unittest.TestCase):
+class PicoscopeFind3000AInstrumentsTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self._picoscope = _picoscope.PicoTech_PicoScope
         _picoscope.COMMAND_DICT = {}
@@ -39,7 +39,7 @@ class PicoscopeFind3403InstrumentsTestCase(unittest.TestCase):
         self.assertDictEqual(_picoscope.COMMAND_DICT, {})
 
 
-class PicoscopeFind4824InstrumentsTestCase(unittest.TestCase):
+class PicoscopeFind4000AInstrumentsTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self._picoscope = _picoscope.PicoTech_PicoScope
         _picoscope.COMMAND_DICT = {}
@@ -66,6 +66,10 @@ class PicoscopeFind4824InstrumentsTestCase(unittest.TestCase):
             _picoscope._import_modules("3000a")
 
         self.assertDictEqual(_picoscope.COMMAND_DICT, {})
+
+
+class PicotechPicoscopeBaseClassTestCase(unittest.TestCase):
+    """Test case for testing the base class functions."""
 
 
 if __name__ == "__main__":
