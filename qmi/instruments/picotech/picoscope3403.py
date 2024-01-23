@@ -33,7 +33,7 @@ class PicoTech_PicoScope3403(PicoTech_PicoScope):
     """Instrument driver for the PicoTech PicoScope 3403 USB oscilloscope.
 
     Attributes:
-        NUM_CHANNELS: Number of oscilloscope channels.
+        NUM_CHANNELS:     Number of oscilloscope channels.
         NUM_INPUT_RANGES: Number of supported input ranges. Range '0' is not supported.
     """
     NUM_CHANNELS = 4
@@ -175,7 +175,7 @@ class PicoTech_PicoScope3403(PicoTech_PicoScope):
             raise QMI_UsageException(f"Time-base of {time_base} is not supported for {len(channels)} channels")
 
         # Give maximum voltage range per expected maximum value per enabled channel.
-        max_volts = list()
+        max_volts = []
         for chan in range(self.NUM_CHANNELS):
             if chan not in channels:
                 # Disable all channels that are not used and skip to next one.
@@ -217,7 +217,7 @@ class PicoTech_PicoScope3403(PicoTech_PicoScope):
 
         # Calculate the total number of samples in the time span.
         number_samples = time_span // sampling_interval
-        _logger.info(f"Timespan = %i Num samples = %i", time_span, number_samples)
+        _logger.info("Timespan = %i Num samples = %i", time_span, number_samples)
 
         if trigger_channel is not None:
             self.stop()
@@ -233,18 +233,18 @@ class PicoTech_PicoScope3403(PicoTech_PicoScope):
         self.wait_block_ready(timeout=1.5)
         data = self.get_block_data(channels)
         times = np.arange(0, number_samples, 1) * sampling_interval
-        voltages = list()
+        voltages = []
         for i in channels:
             voltages.append(data[0][channels.index(i)] * (max_volts[channels.index(i)] / self.MAX_SAMPLE_VALUE))
 
         return times, voltages
 
     @rpc_method
-    def get_time_resolution(self, time_base: int) -> float:
+    def get_sampling_interval(self, time_base: int) -> float:
         """Returns the scope's time resolution in nanoseconds depending on the time_base selector.
 
         Parameters:
-            time_base:   Timebase selector (range 0 ... 2^25-1).
+            time_base:   Timebase selector (range 0 ... 2^32-1).
                          The effective time resolution is 2^time_base ns for timebase <= 2.
                          The effective time resolution is (timebase-2)/(125000000) for timebase > 2.
 
@@ -255,7 +255,7 @@ class PicoTech_PicoScope3403(PicoTech_PicoScope):
         if 0 <= time_base <= 2:
             return 2.0 ** time_base
 
-        elif 2 < time_base < 2 ** 24:
+        elif 2 < time_base < 2 ** 32:
             # We can round here to 0 decimals as this model has always a resolution of multiple of 8.
             return round(((time_base - 2) / 125e6) * 1e9, 0)
 

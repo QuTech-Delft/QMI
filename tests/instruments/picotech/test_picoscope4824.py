@@ -220,20 +220,20 @@ class PicoscopeMethodsTestCase(unittest.TestCase):
             with self.assertRaises(QMI_InstrumentException):
                 self._picoscope.get_block_data(channels)
 
-    def test_get_time_resolution_ok(self):
-        """Test that the get_time_resolution returns correct values for various inputs in range 0...2**32 - 1."""
+    def test_get_sampling_interval_ok(self):
+        """Test that the get_sampling_interval returns correct values for various inputs in range 0...2**32 - 1."""
         input_values = list(range(6)) + [(125 / 12.5) - 1, 2**32 - 1]
         expected = [(e + 1) * 12.5 for e in range(6)] + [125, 2**32 * 12.5]
         for i in range(len(input_values)):
-            result = self._picoscope.get_time_resolution(input_values[i])
+            result = self._picoscope.get_sampling_interval(input_values[i])
             self.assertEqual(expected[i], result)
 
-    def test_get_time_resolution_out_of_range(self):
-        """Test that the get_time_resolution returns 0 for inputs < 0 and >= 2**32."""
+    def test_get_sampling_interval_out_of_range(self):
+        """Test that the get_sampling_interval returns 0 for inputs < 0 and >= 2**32."""
         input_values = [-1, 2**32]
         expected = [0, 0]
         for i in range(len(input_values)):
-            result = self._picoscope.get_time_resolution(input_values[i])
+            result = self._picoscope.get_sampling_interval(input_values[i])
             self.assertEqual(expected[i], result)
 
 

@@ -30,7 +30,7 @@ class PicoTech_PicoScope4824(PicoTech_PicoScope):
     """Instrument driver for the PicoTech PicoScope 4824 USB oscilloscope.
 
     Attributes:
-        NUM_CHANNELS: Number of oscilloscope channels.
+        NUM_CHANNELS:     Number of oscilloscope channels.
         NUM_INPUT_RANGES: Number of supported input ranges. Range '0' is not supported.
     """
     NUM_CHANNELS = 8
@@ -97,7 +97,7 @@ class PicoTech_PicoScope4824(PicoTech_PicoScope):
         self._timebase_interval_ns = par_interval_ns.value
 
     @rpc_method
-    def get_time_resolution(self, time_base: int) -> float:
+    def get_sampling_interval(self, time_base: int) -> float:
         """Returns the scope's time resolution in nanoseconds depending on the time_base selector.
 
         Parameters:

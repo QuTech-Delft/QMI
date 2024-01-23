@@ -448,20 +448,20 @@ class PicoscopeMethodsTestCase(unittest.TestCase):
                     125,
                     )
 
-    def test_get_time_resolution_ok(self):
-        """Test that the get_time_resolution returns correct values for various inputs in range 0...2**24 - 1."""
-        input_values = list(range(6)) + [(96 / 8) + 2, 2**24 - 1]
-        expected = [1, 2, 4] + list(range(8, 4*8, 8)) + [96, 2**27 - 24]
+    def test_get_sampling_interval_ok(self):
+        """Test that the get_sampling_interval returns correct values for various inputs in range 0...2**32 - 1."""
+        input_values = list(range(6)) + [(96 / 8) + 2, 2**32 - 1]
+        expected = [1, 2, 4] + list(range(8, 4*8, 8)) + [96, (2**32 - 3) / 125E-3]
         for i in range(len(input_values)):
-            result = self._picoscope.get_time_resolution(input_values[i])
-            self.assertEqual(expected[i], result)
+            result = self._picoscope.get_sampling_interval(input_values[i])
+            self.assertEqual(expected[i], int(result))
 
-    def test_get_time_resolution_out_of_range(self):
-        """Test that the get_time_resolution returns 0 for inputs < 0 and >= 2**24."""
-        input_values = [-1, 2**24]
+    def test_get_sampling_interval_out_of_range(self):
+        """Test that the get_sampling_interval returns 0 for inputs < 0 and >= 2**32."""
+        input_values = [-1, 2**32]
         expected = [0, 0]
         for i in range(len(input_values)):
-            result = self._picoscope.get_time_resolution(input_values[i])
+            result = self._picoscope.get_sampling_interval(input_values[i])
             self.assertEqual(expected[i], result)
 
 

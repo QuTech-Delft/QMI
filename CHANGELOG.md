@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Changed the stopping of contexts in `qmi_proc.proc_stop()` to happen in reverse order to `proc_start()`.
 - `_RpcObjectMetaClass` inherits from ABCMeta instead of type. This allows it to be used as a mixin with other ABCs.
+- PicoTech PicoSCope 3404 driver to accept also time-bases of 0 and 1 (sample intervals 1ns and 2ns).
 
 ### Fixed
 - Bug in Newport Single Axis Motion Controller that did not allow for negative relative moves.

@@ -76,7 +76,7 @@ class PicotechPicoscopeBaseClassTestCase(unittest.TestCase):
             _picoscope.PicoTech_PicoScope(Mock(), "test_run_block", "sn1234").run_block(1, 2, 3)
 
         with self.assertRaises(NotImplementedError):
-            _picoscope.PicoTech_PicoScope(Mock(), "test_get_t_res", "sn1234").get_time_resolution(1)
+            _picoscope.PicoTech_PicoScope(Mock(), "test_get_t_res", "sn1234").get_sampling_interval(1)
 
 
 if __name__ == "__main__":
