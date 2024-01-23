@@ -10,7 +10,7 @@ from tests.instruments.picotech.ps3000a_stub import ps3000a
 from tests.instruments.picotech.ps4000a_stub import ps4000a
 
 
-class PicoscopeFind3403InstrumentsTestCase(unittest.TestCase):
+class PicoscopeFind3000AInstrumentsTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self._picoscope = _picoscope.PicoTech_PicoScope
         _picoscope.COMMAND_DICT = {}
@@ -39,7 +39,7 @@ class PicoscopeFind3403InstrumentsTestCase(unittest.TestCase):
         self.assertDictEqual(_picoscope.COMMAND_DICT, {})
 
 
-class PicoscopeFind4824InstrumentsTestCase(unittest.TestCase):
+class PicoscopeFind4000AInstrumentsTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self._picoscope = _picoscope.PicoTech_PicoScope
         _picoscope.COMMAND_DICT = {}
@@ -66,6 +66,17 @@ class PicoscopeFind4824InstrumentsTestCase(unittest.TestCase):
             _picoscope._import_modules("3000a")
 
         self.assertDictEqual(_picoscope.COMMAND_DICT, {})
+
+
+class PicotechPicoscopeBaseClassTestCase(unittest.TestCase):
+    """Test case for testing the base class functions."""
+    def test_not_implemented_methods_raise_exception(self):
+        """See that `run_block` and `get_time_resolution` of the base class raise exception when called."""
+        with self.assertRaises(NotImplementedError):
+            _picoscope.PicoTech_PicoScope(Mock(), "test_run_block", "sn1234").run_block(1, 2, 3)
+
+        with self.assertRaises(NotImplementedError):
+            _picoscope.PicoTech_PicoScope(Mock(), "test_get_t_res", "sn1234").get_sampling_interval(1)
 
 
 if __name__ == "__main__":

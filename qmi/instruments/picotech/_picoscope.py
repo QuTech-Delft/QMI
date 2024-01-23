@@ -74,15 +74,17 @@ class TriggerEdge(enum.IntEnum):
 
 
 class PicoTech_PicoScope(QMI_Instrument):
+    """Base class for PicoTech's PicoScope USB oscilloscope instrument drivers.
 
-    # Min/max sample value.
+    Attributes:
+        MIN_SAMPLE_VALUE: Min sample value of int16 range.
+        MAX_SAMPLE_VALUE: Max sample value of int16 range.
+        NUM_CHANNELS:     Number of oscilloscope channels.
+        NUM_INPUT_RANGES: Number of supported input ranges. Range '0' is not supported.
+    """
     MIN_SAMPLE_VALUE = -32767
     MAX_SAMPLE_VALUE = 32767
-
-    # Number of oscilloscope channels.
     NUM_CHANNELS = 0
-
-    # Number of supported input ranges. (range '0' is not supported.)
     NUM_INPUT_RANGES = 0
 
     @staticmethod
@@ -119,7 +121,7 @@ class PicoTech_PicoScope(QMI_Instrument):
         self._serial_number = serial_number
         self._handle: Optional[ctypes.c_int16] = None
         self._num_samples: int = 0
-        self._timebase_interval_ns: float = 0.0
+        self._time_base_interval_ns: float = 0.0
         self._library: str = ""  # The sw library name, e.g. 3000a
 
     @property
@@ -146,8 +148,6 @@ class PicoTech_PicoScope(QMI_Instrument):
         _check_error(err)
 
         self._handle = par_handle
-        self._num_samples = 0
-        self._timebase_interval_ns = 0.0
 
         super().open()
 
@@ -157,7 +157,11 @@ class PicoTech_PicoScope(QMI_Instrument):
         _logger.info("[%s] Closing connection to instrument", self._name)
         COMMAND_DICT["Stop"](self._handle)
         COMMAND_DICT["CloseUnit"](self._handle)
+        # Reset values in `close` for eventual re-open.
         self._handle = None
+        self._num_samples = 0
+        self._time_base_interval_ns = 0.0
+
         super().close()
 
     @rpc_method
@@ -292,9 +296,9 @@ class PicoTech_PicoScope(QMI_Instrument):
             channels: List of channels for which to retrieve samples and overrange indications.
 
         Returns:
-            Tuple `(samples, timebase_ns, overrange)`.
+            Tuple `(samples, time_base_interval_ns, overrange)`:
             `samples` is a 2D Numpy array with shape (num_channels, num_samples) containing signed 16-bit samples.
-            `timebase_ns` is the time interval between samples as a floating point number in nanoseconds.
+            `time_base_interval_ns` is the time interval between samples as a floating point number in nanoseconds.
             `overrange` is a list of booleans indicating whether overvoltage occurred on the selected channels.
         """
         self._check_is_open()
@@ -347,8 +351,12 @@ class PicoTech_PicoScope(QMI_Instrument):
         # Extract overrange markers.
         overrange = [bool((par_overflow.value >> chan) & 1) for chan in channels]
 
-        return samples, self._timebase_interval_ns, overrange
+        return samples, self._time_base_interval_ns, overrange
 
     @rpc_method
-    def run_block(self, num_pretrig_samples: int, num_posttrig_samples: int, timebase: int) -> None:
+    def run_block(self, num_pretrig_samples: int, num_posttrig_samples: int, time_base: int) -> None:
         raise NotImplementedError("Method 'run_block' is not implemented in the base class")
+
+    @rpc_method
+    def get_sampling_interval(self, time_base: int) -> float:
+        raise NotImplementedError("Method 'get_sampling_interval' is not implemented in the base class")
