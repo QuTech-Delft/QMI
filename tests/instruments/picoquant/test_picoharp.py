@@ -3,10 +3,11 @@ import time
 import unittest
 from unittest.mock import patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException
 from qmi.instruments.picoquant.support._phlib_function_signatures import _phlib_function_signatures
 from qmi.instruments.picoquant import PicoQuant_PicoHarp300
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class PicoHarpOldLibrayTestCase(unittest.TestCase):
@@ -20,10 +21,9 @@ class PicoHarpOldLibrayTestCase(unittest.TestCase):
 
         self.addCleanup(patcher.stop)
 
-        qmi.start('test_picoharp')
-
-        self._picoharp: PicoQuant_PicoHarp300 = qmi.make_instrument('picoharp', PicoQuant_PicoHarp300,
-                                                                      '1111111')
+        self._picoharp: PicoQuant_PicoHarp300 = PicoQuant_PicoHarp300(
+            QMI_Context("test_picoharp"), 'picoharp', '1111111'
+        )
 
         self._library_mock.PH_GetLibraryVersion.return_value = 0
         self._library_mock.PH_OpenDevice.return_value = 0
@@ -42,8 +42,6 @@ class PicoHarpOldLibrayTestCase(unittest.TestCase):
         self._library_mock.PH_CloseDevice.return_value = 0
         self._picoharp.close()
 
-        qmi.stop()
-
 
 class PicoHarpMethodsTestCase(unittest.TestCase):
 
@@ -56,9 +54,9 @@ class PicoHarpMethodsTestCase(unittest.TestCase):
 
         self.addCleanup(patcher.stop)
 
-        qmi.start('test_picoharp')
-
-        self._picoharp: PicoQuant_PicoHarp300 = qmi.make_instrument('picoharp', PicoQuant_PicoHarp300, '1111111')
+        self._picoharp: PicoQuant_PicoHarp300 = PicoQuant_PicoHarp300(
+            QMI_Context("test_picoharp"), 'picoharp', '1111111'
+        )
 
         self._library_mock.PH_GetLibraryVersion.return_value = 0
         self._library_mock.PH_OpenDevice.return_value = 0
@@ -71,8 +69,6 @@ class PicoHarpMethodsTestCase(unittest.TestCase):
     def tearDown(self) -> None:
         self._library_mock.PH_CloseDevice.return_value = 0
         self._picoharp.close()
-
-        qmi.stop()
 
     def test_open_ph(self):
         """Test PicoHarp open where regular open fails and we need to get the SN with a query."""

@@ -134,7 +134,6 @@ Reference
 #########
 """
 
-from abc import ABCMeta
 import inspect
 import logging
 import threading

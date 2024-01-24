@@ -309,6 +309,7 @@ class PicoQuant_MultiHarp150(_PicoquantHarp):
         # Reset the event filter configuration.
         self.set_event_filter(reset_filter=True)
         self.set_block_events(False)
+        _logger.info("[%s] Initialized device with mode %s and source %s", self._name, mode.value, refsource.value)
 
     @rpc_method
     def get_module_info(self) -> List[Tuple[int, int]]:
@@ -447,12 +448,14 @@ class PicoQuant_MultiHarp150(_PicoquantHarp):
             timedw1 = ctypes.c_uint()
             timedw0 = ctypes.c_uint()
             self._lib.GetStartTime(self._devidx, timedw2, timedw1, timedw0)
-            timedw2_int = timedw2.value
-            timedw1_int = timedw1.value
-            timedw0_int = timedw0.value
-            picoseconds = (timedw2_int << 64) | (timedw1_int << 32) | timedw0_int
-            starttime = Fraction(picoseconds, 1000000000000)
-            return starttime
+
+        timedw2_int = timedw2.value
+        timedw1_int = timedw1.value
+        timedw0_int = timedw0.value
+        picoseconds = (timedw2_int << 64) | (timedw1_int << 32) | timedw0_int
+        starttime = Fraction(picoseconds, 1000000000000)
+        _logger.debug("[%s] Measurement start-time fraction is %s", self._name, starttime)
+        return starttime
 
     @rpc_method
     def get_warnings(self) -> List[str]:

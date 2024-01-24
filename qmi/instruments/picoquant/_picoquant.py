@@ -255,7 +255,9 @@ class _PicoquantHarp(QMI_Instrument):
         with self._device_lock:
             error_string = ctypes.create_string_buffer(40)
             self._lib.GetErrorString(error_string, error_code)
-            return error_string.value.decode()
+
+        _logger.error("[%s] Got error %s", self._name, error_string.value.decode())
+        return error_string.value.decode()
 
     @rpc_method
     def get_hardware_info(self) -> Tuple[str, str, str]:
@@ -494,6 +496,8 @@ class _PicoquantHarp(QMI_Instrument):
             # Start collecting data in the background thread.
             self._fetch_events_thread.activate(_MODE.T3, sync_rate.value, int(resolution.value))
 
+        _logger.info("[%s] Activated events thread fetching in mode %r", self._name, self._mode)
+
     @rpc_method
     def stop_measurement(self) -> None:
         """Stop a running measurement.
@@ -514,6 +518,7 @@ class _PicoquantHarp(QMI_Instrument):
         if self._mode in [_MODE.T2, _MODE.T3]:
             # Stop collecting data in the background thread.
             self._fetch_events_thread.deactivate()
+            _logger.info("[%s] De-activated events thread fetching for mode %r", self._name, self._mode)
         self._measurement_running = False
 
     @rpc_method
@@ -571,6 +576,7 @@ class _PicoquantHarp(QMI_Instrument):
         """
         self._check_is_open()
         assert self._fetch_events_thread is not None
+        _logger.info("[%s] Fetching events from thread in mode %r", self._name, self._mode)
         (_timestamp, events) = self._fetch_events_thread.get_events(self.MAX_EVENTS_PER_CALL)
         return events
 
@@ -596,6 +602,7 @@ class _PicoquantHarp(QMI_Instrument):
         """
         self._check_is_open()
         assert self._fetch_events_thread is not None
+        _logger.info("[%s] Fetching timestamped events from thread in mode %r", self._name, self._mode)
         return self._fetch_events_thread.get_events(self.MAX_EVENTS_PER_CALL)
 
     @rpc_method
@@ -716,6 +723,7 @@ class _PicoquantHarp(QMI_Instrument):
         """
         self._check_is_open()
         assert self._fetch_events_thread is not None
+        _logger.info("[%s] Setting event data stream blocking to %r", self._name, blocked)
         self._fetch_events_thread.set_block_events(blocked)
 
     @rpc_method
@@ -739,7 +747,7 @@ class _PicoquantHarp(QMI_Instrument):
         within a specific time window after a SYNC event (`EventFilterMode.APERTURE`).
 
         If `EventFilterMode.APERTURE` is selected for the SYNC channel, the filter accepts
-        only the SYNC events that are eithr preceded or followed by a non-SYNC events.
+        only the SYNC events that are either preceded or followed by a non-SYNC events.
         This mode can be used to discard redundant SYNCs when nothing interesting is happening.
 
         Parameters:
@@ -759,12 +767,15 @@ class _PicoquantHarp(QMI_Instrument):
             for event_type in range(NUM_CHANNELS):
                 self._event_filter_channels[event_type] = EventFilterMode.ALL_EVENTS
             self._event_filter_channels[SYNC_TYPE] = EventFilterMode.ALL_EVENTS
+            _logger.info("[%s] Reset event filter to accept all event types", self._name)
 
         if channel_filter is not None:
             self._event_filter_channels.update(channel_filter)
+            _logger.info("[%s] Set event filter to filter channels %s", self._name, channel_filter)
 
         if sync_aperture is not None:
             self._event_filter_aperture = sync_aperture
+            _logger.info("[%s] Set event sync aperture to be %s", self._name, sync_aperture)
 
         self._fetch_events_thread.set_event_filter_config(self._event_filter_channels, self._event_filter_aperture)
 
@@ -790,6 +801,10 @@ class _PicoquantHarp(QMI_Instrument):
         self._check_is_open()
         assert self._fetch_events_thread is not None
         self._fetch_events_thread.set_histogram_config(channels, bin_resolution, num_bins, num_sync)
+        _logger.info(
+            "[%s] Set histogram for channels %s to have resolution of %i with %i bins and %i sync periods",
+            self._name, channels, bin_resolution, num_bins, num_sync
+        )
 
     @rpc_method
     def set_realtime_countrate(self, sync_aperture: Tuple[int, int], num_sync: int) -> None:
@@ -810,6 +825,10 @@ class _PicoquantHarp(QMI_Instrument):
         self._check_is_open()
         assert self._fetch_events_thread is not None
         self._fetch_events_thread.set_countrate_config(sync_aperture, num_sync)
+        _logger.info(
+            "[%s] Set real-time countrate with sync aperture %s with %i sync periods",
+            self._name, sync_aperture, num_sync
+        )
 
     @rpc_method
     def set_histogram_length(self, lencode: int) -> int:

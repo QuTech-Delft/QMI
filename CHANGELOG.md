@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## \[x.y.z] - Unreleased
 
 ### Added
+- More logging on levels from INFO to DEBUG into PicoQuant device drivers.
 - Added a new transport for communicating with instruments over UDP protocol. This works with transport string "udp:host:port".
 - The `transport.py` was introduced with common base class for TCP and UDP protocols, where several implementations are present
   for functions that work the same for both protocols. Some modifications, especially for `read` functions, were required for doing this.
@@ -14,14 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - QMI drivers for Tenma 72-series power supply units in `qmi.instruments.tenma`
 
 ### Changed
+- Refactored some unit-tests to use a QMI_Context patcher rather than the real thing, and adjusted the CI pipeline files and package requirements.
 - Changed the stopping of contexts in `qmi_proc.proc_stop()` to happen in reverse order to `proc_start()`.
 - `_RpcObjectMetaClass` inherits from ABCMeta instead of type. This allows it to be used as a mixin with other ABCs.
 - PicoTech PicoSCope 3404 driver to accept also time-bases of 0 and 1 (sample intervals 1ns and 2ns).
 
 ### Fixed
+- Improved PicoQuant unit-testing modules and comment line fixes on some other modules.
 - Bug in Newport Single Axis Motion Controller that did not allow for negative relative moves.
 
-## [0.43.0] - 2023-11-22
+## [0.43.0] - 2023-11-23
 
 ### Added
 - Calls to enable and disable basik emission for `KoherasAdjustikLaser`.
