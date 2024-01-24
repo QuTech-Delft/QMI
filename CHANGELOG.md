@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+## [0.44.0] - 2024-01-24
+
 ### Added
 - More logging on levels from INFO to DEBUG into PicoQuant device drivers.
 - Added a new transport for communicating with instruments over UDP protocol. This works with transport string "udp:host:port".
