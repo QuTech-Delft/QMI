@@ -3,10 +3,11 @@ import time
 import unittest
 from unittest.mock import patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException
 from qmi.instruments.picoquant.support._hhlib_function_signatures import _hhlib_function_signatures
 from qmi.instruments.picoquant import PicoQuant_HydraHarp400
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class HydraHarpOldLibrayTestCase(unittest.TestCase):
@@ -20,10 +21,9 @@ class HydraHarpOldLibrayTestCase(unittest.TestCase):
 
         self.addCleanup(patcher.stop)
 
-        qmi.start('test_hydraharp')
-
-        self._hydraharp: PicoQuant_HydraHarp400 = qmi.make_instrument('hydraharp', PicoQuant_HydraHarp400,
-                                                                      '1111111')
+        self._hydraharp: PicoQuant_HydraHarp400 = PicoQuant_HydraHarp400(
+            QMI_Context("Test_hydraharp"), 'hydraharp', '1111111'
+        )
 
         self._library_mock.HH_GetLibraryVersion.return_value = 0
         self._library_mock.HH_OpenDevice.return_value = 0
@@ -42,8 +42,6 @@ class HydraHarpOldLibrayTestCase(unittest.TestCase):
         self._library_mock.HH_CloseDevice.return_value = 0
         self._hydraharp.close()
 
-        qmi.stop()
-
 
 class HydraHarpMethodsTestCase(unittest.TestCase):
 
@@ -56,9 +54,9 @@ class HydraHarpMethodsTestCase(unittest.TestCase):
 
         self.addCleanup(patcher.stop)
 
-        qmi.start('test_hydraharp')
-
-        self._hydraharp: PicoQuant_HydraHarp400 = qmi.make_instrument('hydraharp', PicoQuant_HydraHarp400, '1111111')
+        self._hydraharp: PicoQuant_HydraHarp400 = PicoQuant_HydraHarp400(
+            QMI_Context("test_hydraharp"), 'hydraharp', '1111111'
+        )
 
         self._library_mock.HH_GetLibraryVersion.return_value = 0
         self._library_mock.HH_OpenDevice.return_value = 0
@@ -71,8 +69,6 @@ class HydraHarpMethodsTestCase(unittest.TestCase):
     def tearDown(self) -> None:
         self._library_mock.HH_CloseDevice.return_value = 0
         self._hydraharp.close()
-
-        qmi.stop()
 
     def test_open_hh(self):
         """Test HydraHarp open where regular open fails and we need to get the SN with a query."""

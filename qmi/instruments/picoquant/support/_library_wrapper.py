@@ -5,6 +5,7 @@ the respective licence terms can be found in the dedicated instrument software p
 https://www.picoquant.com/products/category/tcspc-and-time-tagging-modules.
 """
 import ctypes
+import logging
 import sys
 from typing import Any
 
@@ -12,6 +13,8 @@ from qmi.core.exceptions import QMI_InstrumentException
 from qmi.instruments.picoquant.support._hhlib_function_signatures import _hhlib_function_signatures
 from qmi.instruments.picoquant.support._mhlib_function_signatures import _mhlib_function_signatures
 from qmi.instruments.picoquant.support._phlib_function_signatures import _phlib_function_signatures
+
+_logger = logging.getLogger(__name__)
 
 
 class _LibWrapper:
@@ -79,8 +82,13 @@ class _LibWrapper:
         attr = getattr(self._lib, attr_name)
 
         def wrap_fun(*args, **kwargs):
+            _logger.debug(
+                "Using %s library to call function %s with arguments %s, %s",
+                self._prefix, attr_name, args, kwargs
+            )
             errcode = attr(*args, **kwargs)
             if errcode != 0:
+                _logger.error("[%s] Call to function %s failed with errorcode %i", self._prefix, attr_name, errcode)
                 raise QMI_InstrumentException(f"Interaction with PicoQuant library failed, errorcode [{errcode}].")
 
         return wrap_fun

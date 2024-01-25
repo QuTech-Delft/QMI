@@ -6,9 +6,10 @@ from typing import Any
 import unittest
 from unittest.mock import patch, call
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException
 from qmi.instruments.picoquant._picoquant import _PicoquantHarp
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 _shlib_function_signatures = [
@@ -141,17 +142,13 @@ class PicoQuant_SomeHarp000(_PicoquantHarp):
 class PicoQuantSomeHarpOpenTestCase(unittest.TestCase):
 
     def setUp(self) -> None:
-        qmi.start("test_someharp")
         patcher = patch('ctypes.cdll.LoadLibrary', spec=ctypes.CDLL)
         self._library_mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
 
-    def tearDown(self) -> None:
-        qmi.stop()
-
     def test_open_close(self):
         """Test regular open where SN is returned immediately."""
-        someharp = qmi.make_instrument('someharp', PicoQuant_SomeHarp000, '1111111')
+        someharp = PicoQuant_SomeHarp000(QMI_Context("test_someharp"), 'someharp', '1111111')
 
         self._library_mock.SH_GetLibraryVersion.return_value = 0
         self._library_mock.SH_OpenDevice.return_value = 0
@@ -167,7 +164,7 @@ class PicoQuantSomeHarpOpenTestCase(unittest.TestCase):
 
     def test_open_model_not_implemented_exception(self):
         """Test that model type 'SH' raises an exception if no device serial number is immediately received."""
-        someharp = qmi.make_instrument('someharp', PicoQuant_SomeHarp000, '1111111')
+        someharp = PicoQuant_SomeHarp000(QMI_Context("test_someharp"), 'someharp', '1111111')
 
         self._library_mock.SH_GetLibraryVersion.return_value = 0
         self._library_mock.SH_OpenDevice.return_value = 0
@@ -185,7 +182,7 @@ class PicoQuantSomeHarpOpenTestCase(unittest.TestCase):
         """When trying to find an instrument with a wrong serial, we fail after _MAXDEVNUM SH_OpenDevice calls."""
         wrong_serial = '1111111'
         serial = '1111112'
-        someharp = qmi.make_instrument('someharp', PicoQuant_SomeHarp000, serial)
+        someharp = PicoQuant_SomeHarp000(QMI_Context("test_someharp"), 'someharp', serial)
 
         self._library_mock.SH_GetLibraryVersion.return_value = 0
         self._library_mock.SH_OpenDevice.return_value = 0
@@ -215,9 +212,7 @@ class PicoQuantSomeHarpTestCase(unittest.TestCase):
 
         self.addCleanup(patcher.stop)
 
-        qmi.start("test_someharp")
-
-        self._someharp = qmi.make_instrument('someharp', PicoQuant_SomeHarp000, '1111111')
+        self._someharp = PicoQuant_SomeHarp000(QMI_Context("test_someharp"), 'someharp', '1111111')
 
         self._library_mock.SH_GetLibraryVersion.return_value = 0
         self._library_mock.SH_OpenDevice.return_value = 0
@@ -230,8 +225,6 @@ class PicoQuantSomeHarpTestCase(unittest.TestCase):
     def tearDown(self) -> None:
         self._library_mock.SH_CloseDevice.return_value = 0
         self._someharp.close()
-
-        qmi.stop()
 
     def test_get_error_string(self):
         """Test that get_error_string can be called and returns a string."""

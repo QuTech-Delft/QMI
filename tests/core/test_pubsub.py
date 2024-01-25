@@ -48,7 +48,8 @@ class TestLocalPubSub(unittest.TestCase):
     """Test publish/subscribe within the local context."""
 
     def setUp(self):
-        qmi.start("test_context")
+        self.context_name = "test_local_pubsub"
+        qmi.start(self.context_name)
 
     def tearDown(self):
         qmi.stop()
@@ -82,21 +83,21 @@ class TestLocalPubSub(unittest.TestCase):
         recv2 = QMI_SignalReceiver()
 
         # Subscribe to signals.
-        qmi.context().subscribe_signal("test_context", "pub1", "sig1", recv)
-        qmi.context().subscribe_signal("test_context", "pub2", "sig2", recv)
-        qmi.context().subscribe_signal("test_context", "pub1", "sig1", recv2)
+        qmi.context().subscribe_signal(self.context_name, "pub1", "sig1", recv)
+        qmi.context().subscribe_signal(self.context_name, "pub2", "sig2", recv)
+        qmi.context().subscribe_signal(self.context_name, "pub1", "sig1", recv2)
 
         # Unsubscribe from signals.
-        qmi.context().unsubscribe_signal("test_context", "pub1", "sig1", recv)
-        qmi.context().unsubscribe_signal("test_context", "pub2", "sig2", recv)
-        qmi.context().unsubscribe_signal("test_context", "pub1", "sig1", recv2)
+        qmi.context().unsubscribe_signal(self.context_name, "pub1", "sig1", recv)
+        qmi.context().unsubscribe_signal(self.context_name, "pub2", "sig2", recv)
+        qmi.context().unsubscribe_signal(self.context_name, "pub1", "sig1", recv2)
 
         # Check that receiver queues are still empty.
         self.assertFalse(recv.has_signal_ready())
         self.assertFalse(recv2.has_signal_ready())
 
         # Try to unsubscribe from a non-subscribed signal - should be ignored.
-        qmi.context().unsubscribe_signal("test_context", "pub1", "sig1", recv)
+        qmi.context().unsubscribe_signal(self.context_name, "pub1", "sig1", recv)
 
     def test_pubsub(self):
         # Publish and receive signals.
@@ -108,9 +109,9 @@ class TestLocalPubSub(unittest.TestCase):
         recv = QMI_SignalReceiver()
 
         # Subscribe to signals.
-        qmi.context().subscribe_signal("test_context", "pub1", "sig1", recv)
-        qmi.context().subscribe_signal("test_context", "pub1", "sig2", recv)
-        qmi.context().subscribe_signal("test_context", "pub2", "sig1", recv)
+        qmi.context().subscribe_signal(self.context_name, "pub1", "sig1", recv)
+        qmi.context().subscribe_signal(self.context_name, "pub1", "sig2", recv)
+        qmi.context().subscribe_signal(self.context_name, "pub2", "sig1", recv)
 
         # Publish signals.
         qmi.context().publish_signal("pub1", "sig1", 111)
@@ -121,19 +122,19 @@ class TestLocalPubSub(unittest.TestCase):
         self.assertTrue(recv.has_signal_ready())
         self.assertEqual(recv.get_queue_length(), 3)
         sig = recv.get_next_signal()
-        self.assertEqual(sig.publisher_context, "test_context")
+        self.assertEqual(sig.publisher_context, self.context_name)
         self.assertEqual(sig.publisher_name, "pub1")
         self.assertEqual(sig.signal_name, "sig1")
         self.assertEqual(sig.args, (111,))
         self.assertEqual(sig.receiver_seqnr, 0)
         sig = recv.get_next_signal()
-        self.assertEqual(sig.publisher_context, "test_context")
+        self.assertEqual(sig.publisher_context, self.context_name)
         self.assertEqual(sig.publisher_name, "pub1")
         self.assertEqual(sig.signal_name, "sig1")
         self.assertEqual(sig.args, (112,))
         self.assertEqual(sig.receiver_seqnr, 1)
         sig = recv.get_next_signal()
-        self.assertEqual(sig.publisher_context, "test_context")
+        self.assertEqual(sig.publisher_context, self.context_name)
         self.assertEqual(sig.publisher_name, "pub1")
         self.assertEqual(sig.signal_name, "sig2")
         self.assertEqual(sig.args, ("aap", "noot"))
@@ -154,7 +155,7 @@ class TestLocalPubSub(unittest.TestCase):
         self.assertFalse(recv.has_signal_ready())
 
         # Unsubscribe from one of the signals.
-        qmi.context().unsubscribe_signal("test_context", "pub1", "sig1", recv)
+        qmi.context().unsubscribe_signal(self.context_name, "pub1", "sig1", recv)
 
         # Publish more signals.
         qmi.context().publish_signal("pub1", "sig1", 113)
@@ -164,15 +165,15 @@ class TestLocalPubSub(unittest.TestCase):
         self.assertTrue(recv.has_signal_ready())
         self.assertEqual(recv.get_queue_length(), 1)
         sig = recv.get_next_signal()
-        self.assertEqual(sig.publisher_context, "test_context")
+        self.assertEqual(sig.publisher_context, self.context_name)
         self.assertEqual(sig.publisher_name, "pub1")
         self.assertEqual(sig.signal_name, "sig2")
         self.assertEqual(sig.args, ("mies", "wim"))
         self.assertEqual(sig.receiver_seqnr, 3)
 
         # Unsubscribe from all signals.
-        qmi.context().unsubscribe_signal("test_context", "pub1", "sig2", recv)
-        qmi.context().unsubscribe_signal("test_context", "pub2", "sig1", recv)
+        qmi.context().unsubscribe_signal(self.context_name, "pub1", "sig2", recv)
+        qmi.context().unsubscribe_signal(self.context_name, "pub2", "sig1", recv)
 
         # Publish more signals.
         qmi.context().publish_signal("pub1", "sig1", 114)
@@ -232,25 +233,25 @@ class TestLocalPubSub(unittest.TestCase):
         self.assertTrue(recv.has_signal_ready())
         self.assertEqual(recv.get_queue_length(), 4)
         sig = recv.get_next_signal()
-        self.assertEqual(sig.publisher_context, "test_context")
+        self.assertEqual(sig.publisher_context, self.context_name)
         self.assertEqual(sig.publisher_name, "pub1")
         self.assertEqual(sig.signal_name, "sig1")
         self.assertEqual(sig.args, ())
         self.assertEqual(sig.receiver_seqnr, 0)
         sig = recv.get_next_signal()
-        self.assertEqual(sig.publisher_context, "test_context")
+        self.assertEqual(sig.publisher_context, self.context_name)
         self.assertEqual(sig.publisher_name, "pub1")
         self.assertEqual(sig.signal_name, "sig1")
         self.assertEqual(sig.args, ())
         self.assertEqual(sig.receiver_seqnr, 1)
         sig = recv.get_next_signal()
-        self.assertEqual(sig.publisher_context, "test_context")
+        self.assertEqual(sig.publisher_context, self.context_name)
         self.assertEqual(sig.publisher_name, "pub1")
         self.assertEqual(sig.signal_name, "sig2")
         self.assertEqual(sig.args, (24,))
         self.assertEqual(sig.receiver_seqnr, 2)
         sig = recv.get_next_signal()
-        self.assertEqual(sig.publisher_context, "test_context")
+        self.assertEqual(sig.publisher_context, self.context_name)
         self.assertEqual(sig.publisher_name, "pub2")
         self.assertEqual(sig.signal_name, "sig1")
         self.assertEqual(sig.args, ())
@@ -294,39 +295,39 @@ class TestLocalPubSub(unittest.TestCase):
         self.assertTrue(recv1.has_signal_ready())
         self.assertEqual(recv1.get_queue_length(), 6)
         sig = recv1.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub1", "sig2", (24,), 0))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig2", (24,), 0))
         sig = recv1.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub1", "sig3", (21, "one"), 1))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig3", (21, "one"), 1))
         sig = recv1.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub2", "sig3", (41, "two"), 2))
+        self.assertEqual(sig, (self.context_name, "pub2", "sig3", (41, "two"), 2))
         sig = recv1.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub1", "sig2", (24,), 3))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig2", (24,), 3))
         sig = recv1.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub1", "sig3", (22, ""), 4))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig3", (22, ""), 4))
         sig = recv1.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub2", "sig3", (42, ""), 5))
+        self.assertEqual(sig, (self.context_name, "pub2", "sig3", (42, ""), 5))
 
         self.assertTrue(recv2.has_signal_ready())
         self.assertEqual(recv2.get_queue_length(), 4)
         sig = recv2.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub1", "sig3", (21, "one"), 0))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig3", (21, "one"), 0))
         sig = recv2.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub2", "sig3", (41, "two"), 1))
+        self.assertEqual(sig, (self.context_name, "pub2", "sig3", (41, "two"), 1))
         sig = recv2.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub1", "sig3", (22, ""), 2))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig3", (22, ""), 2))
         sig = recv2.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub2", "sig3", (42, ""), 3))
+        self.assertEqual(sig, (self.context_name, "pub2", "sig3", (42, ""), 3))
 
         self.assertTrue(recv3.has_signal_ready())
         self.assertEqual(recv3.get_queue_length(), 4)
         sig = recv3.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub2", "sig2", (24,), 0))
+        self.assertEqual(sig, (self.context_name, "pub2", "sig2", (24,), 0))
         sig = recv3.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub2", "sig3", (41, "two"), 1))
+        self.assertEqual(sig, (self.context_name, "pub2", "sig3", (41, "two"), 1))
         sig = recv3.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub2", "sig2", (24,), 2))
+        self.assertEqual(sig, (self.context_name, "pub2", "sig2", (24,), 2))
         sig = recv3.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub2", "sig3", (42, ""), 3))
+        self.assertEqual(sig, (self.context_name, "pub2", "sig3", (42, ""), 3))
 
         # Unsubscribe some receivers.
         pub1.sig3.unsubscribe(recv2)
@@ -341,7 +342,7 @@ class TestLocalPubSub(unittest.TestCase):
         self.assertTrue(recv1.has_signal_ready())
         self.assertEqual(recv1.get_queue_length(), 1)
         sig = recv1.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub2", "sig3", (43, "three"), 6))
+        self.assertEqual(sig, (self.context_name, "pub2", "sig3", (43, "three"), 6))
 
         # Check no further signals received.
         self.assertFalse(recv1.has_signal_ready())
@@ -366,7 +367,7 @@ class TestLocalPubSub(unittest.TestCase):
         # Check that only the last 5 signals remain in the queue.
         self.assertEqual(recv.get_queue_length(), 5)
         sig = recv.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub1", "sig3", (15, ""), 5))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig3", (15, ""), 5))
 
         # Publish another signal - should fit in the queue without overflow.
         pub1.send3(20, "")
@@ -374,7 +375,7 @@ class TestLocalPubSub(unittest.TestCase):
         # Check.
         self.assertEqual(recv.get_queue_length(), 5)
         sig = recv.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub1", "sig3", (16, ""), 6))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig3", (16, ""), 6))
 
         # Publish more signals - should push old signals out of the queue.
         for i in range(3):
@@ -383,12 +384,12 @@ class TestLocalPubSub(unittest.TestCase):
         # Check queue contents.
         self.assertEqual(recv.get_queue_length(), 5)
         sig = recv.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub1", "sig3", (19, ""), 9))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig3", (19, ""), 9))
         sig = recv.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub1", "sig3", (20, ""), 10))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig3", (20, ""), 10))
         for i in range(3):
             sig = recv.get_next_signal()
-            self.assertEqual(sig, ("test_context", "pub1", "sig3", (30 + i, ""), 11 + i))
+            self.assertEqual(sig, (self.context_name, "pub1", "sig3", (30 + i, ""), 11 + i))
 
         self.assertFalse(recv.has_signal_ready())
         self.assertEqual(recv.get_queue_length(), 0)
@@ -406,7 +407,7 @@ class TestLocalPubSub(unittest.TestCase):
         # Check that only the first 5 signals remain in the queue.
         self.assertEqual(recv.get_queue_length(), 5)
         sig = recv.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub1", "sig3", (10, ""), 0))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig3", (10, ""), 0))
 
         # Publish more signals - only one of them can fit in the queue.
         for i in range(3):
@@ -416,9 +417,9 @@ class TestLocalPubSub(unittest.TestCase):
         self.assertEqual(recv.get_queue_length(), 5)
         for i in range(4):
             sig = recv.get_next_signal()
-            self.assertEqual(sig, ("test_context", "pub1", "sig3", (11 + i, ""), 1 + i))
+            self.assertEqual(sig, (self.context_name, "pub1", "sig3", (11 + i, ""), 1 + i))
         sig = recv.get_next_signal()
-        self.assertEqual(sig, ("test_context", "pub1", "sig3", (30, ""), 10))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig3", (30, ""), 10))
 
         self.assertFalse(recv.has_signal_ready())
         self.assertEqual(recv.get_queue_length(), 0)
@@ -442,7 +443,7 @@ class TestLocalPubSub(unittest.TestCase):
 
         # Blocking wait for first signal.
         sig = recv.get_next_signal(timeout=2.0)
-        self.assertEqual(sig, ("test_context", "pub1", "sig2", (0,), 0))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig2", (0,), 0))
 
         # Check no further signals received.
         self.assertFalse(recv.has_signal_ready())
@@ -453,11 +454,11 @@ class TestLocalPubSub(unittest.TestCase):
 
         # Check second signal.
         sig = recv.get_next_signal(timeout=0)
-        self.assertEqual(sig, ("test_context", "pub1", "sig2", (1,), 1))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig2", (1,), 1))
 
         # Blocking wait for 3rd signal.
         sig = recv.get_next_signal(timeout=2.0)
-        self.assertEqual(sig, ("test_context", "pub1", "sig2", (2,), 2))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig2", (2,), 2))
 
         # Check no further signals ready.
         with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
@@ -465,14 +466,14 @@ class TestLocalPubSub(unittest.TestCase):
 
         # Blocking wait for 4th signal.
         sig = recv.get_next_signal(timeout=2.0)
-        self.assertEqual(sig, ("test_context", "pub1", "sig2", (3,), 3))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig2", (3,), 3))
 
         # Finish the RPC call.
         future.wait()
 
         # Check 5th signal.
         sig = recv.get_next_signal(timeout=0)
-        self.assertEqual(sig, ("test_context", "pub1", "sig2", (4,), 4))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig2", (4,), 4))
 
     def test_subscribe_unknown_object(self):
         # Subscribing to a non-existing object gives an error.
@@ -497,7 +498,7 @@ class TestLocalPubSub(unittest.TestCase):
         # Publish a signal and check that it is received.
         pub1.send1()
         sig = recv.get_next_signal(timeout=0)
-        self.assertEqual(sig, ("test_context", "pub1", "sig1", (), 0))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig1", (), 0))
 
         # Remove publisher.
         qmi.context().remove_rpc_object(pub1)
@@ -515,7 +516,7 @@ class TestLocalPubSub(unittest.TestCase):
         # Publish a signal and check that it is received.
         pub1.send1()
         sig = recv.get_next_signal(timeout=0)
-        self.assertEqual(sig, ("test_context", "pub1", "sig1", (), 1))
+        self.assertEqual(sig, (self.context_name, "pub1", "sig1", (), 1))
 
 
 class TestRemotePubSub(unittest.TestCase):
@@ -808,7 +809,7 @@ class TestRemotePubSubQmi(unittest.TestCase):
     def setUp(self):
 
         # Initialize two QMI contexts. Use random numbers to avoid conflicts on server between contexts.
-        random_port = random.randint(1024, 30000)
+        random_port = random.randint(10000, 30000)  # dynamic port numbers
         random_context = random.randint(3, 100)
         self.random_context_1 = f"context{random_context}"
         self.random_context_2 = f"context{random_context + 1}"

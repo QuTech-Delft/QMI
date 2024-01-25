@@ -4,10 +4,11 @@ import unittest
 from fractions import Fraction
 from unittest.mock import patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException
 from qmi.instruments.picoquant.support._mhlib_function_signatures import _mhlib_function_signatures
 from qmi.instruments.picoquant import PicoQuant_MultiHarp150
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class MultiHarpOldLibrayTestCase(unittest.TestCase):
@@ -21,10 +22,9 @@ class MultiHarpOldLibrayTestCase(unittest.TestCase):
 
         self.addCleanup(patcher.stop)
 
-        qmi.start('test_multiharp')
-
-        self._multiharp: PicoQuant_MultiHarp150 = qmi.make_instrument('multiharp', PicoQuant_MultiHarp150,
-                                                                      '1111111')
+        self._multiharp: PicoQuant_MultiHarp150 = PicoQuant_MultiHarp150(
+            QMI_Context("Test_multiharp"), 'multiharp', '1111111'
+        )
 
         self._library_mock.MH_GetLibraryVersion.return_value = 0
         self._library_mock.MH_OpenDevice.return_value = 0
@@ -43,8 +43,6 @@ class MultiHarpOldLibrayTestCase(unittest.TestCase):
         self._library_mock.MH_CloseDevice.return_value = 0
         self._multiharp.close()
 
-        qmi.stop()
-
 
 class MultiharpMethodsTestCase(unittest.TestCase):
 
@@ -57,9 +55,9 @@ class MultiharpMethodsTestCase(unittest.TestCase):
 
         self.addCleanup(patcher.stop)
 
-        qmi.start("test_multiharp")
-
-        self._multiharp: PicoQuant_MultiHarp150 = qmi.make_instrument('multiharp', PicoQuant_MultiHarp150, '1111111')
+        self._multiharp: PicoQuant_MultiHarp150 = PicoQuant_MultiHarp150(
+            QMI_Context("test_multiharp"), 'multiharp', '1111111'
+        )
 
         self._library_mock.MH_GetLibraryVersion.return_value = 0
         self._library_mock.MH_OpenDevice.return_value = 0
@@ -72,8 +70,6 @@ class MultiharpMethodsTestCase(unittest.TestCase):
     def tearDown(self) -> None:
         self._library_mock.MH_CloseDevice.return_value = 0
         self._multiharp.close()
-
-        qmi.stop()
 
     def test_open_mh(self):
         """Test MultiHarp open where regular open fails and we need to get the SN with a query."""
