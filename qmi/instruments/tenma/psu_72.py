@@ -153,6 +153,7 @@ class Tenma72_Base(QMI_Instrument):
             _logger.debug("[%s] *IDN? returned %s and matching failed", self._name, idn)
             raise QMI_InstrumentException("(Full) instrument identification failed!")
 
+        assert serial is not None  # For satisfying a mypy check
         return QMI_InstrumentIdentification(
             vendor=vendor,
             model=model,
