@@ -114,7 +114,7 @@ class MOT_GET_USTATUSUPDATE(AptDataPacket):
         motor_current:  Motor current in mA.
         status_bits:    Status bits that provide various errors and indications.
     """
-    MESSAGE_ID = AptMessageId.MOT_GET_POSCOUNTER.value
+    MESSAGE_ID = AptMessageId.MOT_GET_USTATUSUPDATE.value
     _fields_: List[Tuple[str, type]] = [
         ("chan_ident", apt_word),
         ("position", apt_long),
