@@ -66,6 +66,21 @@ class Teraxion_TFNSettings:
     frequency: float
     dispersion: float
 
+@dataclass
+class Teraxion_TFNChannelPlan:
+    """
+    Channel plan of TFN.
+
+    Attributes:
+        first_frequency:    The first frequency in GHz.
+        last_frequency:     The last frequency in GHz.
+        num_cal_channels:   Number of calibrated channels.
+    """
+
+    first_frequency: float
+    last_frequency: float
+    num_cal_channels: int
+
 
 @dataclass
 class Teraxion_TFNCommand:
@@ -208,6 +223,14 @@ class Teraxion_TFNCommand_SaveNominalSettings(Teraxion_TFNCommand):
 
     command_id = 0x36
     num_received_bytes = 12
+
+class Teraxion_TFNCommand_GetChannelPlan(Teraxion_TFNCommand):
+    """
+    Command to get the channel plan.
+    """
+
+    command_id = 0x3B
+    num_received_bytes = 16
 
 
 class Teraxion_TFN(QMI_Instrument):
@@ -585,3 +608,21 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # send command
         self._write(Teraxion_TFNCommand_SaveNominalSettings)
+
+    @rpc_method
+    def get_channel_plan(self) -> Teraxion_TFNChannelPlan:
+        """
+        Get channel plan for specified grid.
+
+        Returns:
+            an instance of Teraxion_TFNChannelPlan.
+        """
+        _logger.info("Getting channel plan of instrument [%s]", self._name)
+        self._check_is_open()
+        # get response
+        resp = self._read(Teraxion_TFNCommand_GetChannelPlan)
+        # unpack the frequencies and number of calibrated channels
+        first_freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES :self.LEN_STATUS_BYTES + 4])[0]
+        last_freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4 + 4 :self.LEN_STATUS_BYTES + 4 + 4 + 4])[0]
+        num_cal_channels = struct.unpack(">L", resp[self.LEN_STATUS_BYTES + 4 + 4 + 4:self.LEN_STATUS_BYTES + 4 + 4 + 4 + 4])[0]
+        return Teraxion_TFNChannelPlan(first_freq, last_freq, num_cal_channels)
