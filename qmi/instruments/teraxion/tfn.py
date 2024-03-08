@@ -4,6 +4,7 @@ Instrument driver for TeraXion TFN.
 
 import binascii
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 import logging
 import struct
@@ -74,7 +75,6 @@ class Teraxion_TFNCommand:
 
     command_id: int
     num_received_bytes: Optional[int]
-    num_sent_bytes: Optional[int]
     module_address: int = 0x30
 
 
@@ -139,10 +139,18 @@ class Teraxion_TFNCommand_DisableDevice(Teraxion_TFNCommand):
 
 class Teraxion_TFNCommand_GetStartupByte(Teraxion_TFNCommand):
     """
-    Command to set teh startup byte of the TFN.
+    Command to get the startup byte of the TFN.
     """
 
     command_id = 0x35
+    num_received_bytes = 5
+
+class Teraxion_TFNCommand_SetStartupByte(Teraxion_TFNCommand):
+    """
+    Command to set the startup byte of the TFN.
+    """
+
+    command_id = 0x34
     num_received_bytes = 5
 
 class Teraxion_TFNCommand_GetFirmwareVersion(Teraxion_TFNCommand):
@@ -218,40 +226,75 @@ class Teraxion_TFN(QMI_Instrument):
         )
         self._scpi_protocol = ScpiProtocol(self._transport, command_terminator="")
 
-    def _send(
+    def _make_write_command(
         self,
         cmd: Teraxion_TFNCommand,
-        value: Optional[bytes] = None,
-        timeout: float = DEFAULT_READ_TIMEOUT,
-    ) -> Optional[bytes]:
+        value: Optional[bytes] = None
+    ) -> str:
         """
-        Helper method to create a command and send it. If a response is provided then it is returned.
-        This is usually for the read commands.
+        Helper method to make the write command.
 
         Parameters:
             cmd:        A Teraxion_TFNCommand.
             value:      The optional value to write in bytes.
-            timeout:    The timeout for the read commands.
         """
         # convert the value to its hex representation
         hex_val = binascii.hexlify(value).decode() if value else ""
         # shift module address by one and set the write bit
         module_write_mode = int(cmd.module_address) << 1
-        # make write command
-        wc = f"{self.CMD_START_CONDITION}{module_write_mode:02x}{cmd.command_id:02x}{hex_val}{self.CMD_STOP_CONDTION}"
+        # make write command and return
+        return f"{self.CMD_START_CONDITION}{module_write_mode:02x}{cmd.command_id:02x}{hex_val}{self.CMD_STOP_CONDTION}"
 
+    def _make_read_command(
+        self,
+        cmd: Teraxion_TFNCommand,
+    ) -> str:
+        """
+        Helper method to make the read command.
+
+        Parameters:
+            cmd:        A Teraxion_TFNCommand.
+        """
         # shift module address by one and set the read bit
         module_read_mode = cmd.module_address << 1 ^ 1
-        # make read command
-        rc = f"{self.CMD_START_CONDITION}{module_read_mode:02x}{cmd.num_received_bytes:02d}{self.CMD_STOP_CONDTION}"
+        # make read command and return
+        return f"{self.CMD_START_CONDITION}{module_read_mode:02x}{cmd.num_received_bytes:02d}{self.CMD_STOP_CONDTION}"
 
-        if cmd.num_received_bytes:
-            # send the 2 commands and return the response
-            resp = self._scpi_protocol.ask(f"{wc} {rc}", timeout=timeout)
-            # convert to hex reprensation
-            return bytes.fromhex(resp)
-        else:
-            return self._scpi_protocol.write(f"{wc} L{self.READ_WRITE_DELAY:02x} {rc}")
+    def _write(
+        self,
+        cmd: Teraxion_TFNCommand,
+        value: Optional[bytes] = None
+    ) -> None:
+        """
+        Helper method to send a wrie command.
+
+        Parameters:
+            cmd:        A Teraxion_TFNCommand.
+            value:      The optional value to write in bytes.
+        """
+        wc = self._make_write_command(cmd, value)
+        rc = self._make_read_command(cmd)
+        self._scpi_protocol.write(f"{wc} L{self.READ_WRITE_DELAY:02x} {rc}")
+
+    def _read(
+        self,
+        cmd: Teraxion_TFNCommand,
+        value: Optional[bytes] = None,
+        timeout: float = DEFAULT_READ_TIMEOUT,
+    ) -> bytes:
+        """
+        Helper method to send a read command.
+
+        Parameters:
+            cmd:        A Teraxion_TFNCommand.
+            value:      The optional value to write in bytes.
+            timeout:    The timeout for the command.
+        """
+        wc = self._make_write_command(cmd, value)
+        rc = self._make_read_command(cmd)
+        resp = self._scpi_protocol.ask(f"{wc} {rc}", timeout=timeout)
+        # convert to hex representation
+        return bytes.fromhex(resp)
 
     @rpc_method
     def open(self) -> None:
@@ -278,7 +321,7 @@ class Teraxion_TFN(QMI_Instrument):
         _logger.info("[%s] Getting firmware version of instrument", self._name)
         self._check_is_open()
         # get response
-        resp = self._send(Teraxion_TFNCommand_GetFirmwareVersion)
+        resp = self._read(Teraxion_TFNCommand_GetFirmwareVersion)
         # get the data after the status bytes and ignore the null bytes
         firmware_version = resp[self.LEN_STATUS_BYTES :]
         major_version = struct.unpack(">B", firmware_version[:1])[0]
@@ -296,10 +339,9 @@ class Teraxion_TFN(QMI_Instrument):
         _logger.info("[%s] Getting manufacturer name of instrument", self._name)
         self._check_is_open()
         # get response
-        resp = self._send(Teraxion_TFNCommand_GetManufacturerName)
+        resp = self._read(Teraxion_TFNCommand_GetManufacturerName)
         # get the data after the status bytes and ignore the null bytes
         manufacturer_name = resp[self.LEN_STATUS_BYTES:]
-        print(manufacturer_name)
         return manufacturer_name.decode("ascii")[:manufacturer_name.find(b"\x00")]
 
     @rpc_method
@@ -313,7 +355,7 @@ class Teraxion_TFN(QMI_Instrument):
         _logger.info("[%s] Getting model number of instrument", self._name)
         self._check_is_open()
         # get response
-        resp = self._send(Teraxion_TFNCommand_GetModelNumber)
+        resp = self._read(Teraxion_TFNCommand_GetModelNumber)
         # get the data after the status bytes and ignore the null bytes
         model_number = resp[self.LEN_STATUS_BYTES:]
         return model_number.decode("ascii")[:model_number.find(b"\x00")]
@@ -329,7 +371,7 @@ class Teraxion_TFN(QMI_Instrument):
         _logger.info("[%s] Getting serial number of instrument", self._name)
         self._check_is_open()
         # get response
-        resp = self._send(Teraxion_TFNCommand_GetSerialNumber)
+        resp = self._read(Teraxion_TFNCommand_GetSerialNumber)
         # get the data after the status bytes and ignore the null bytes
         serial_number = resp[self.LEN_STATUS_BYTES:]
         return serial_number.decode("ascii")[:serial_number.find(b"\x00")]
@@ -350,7 +392,7 @@ class Teraxion_TFN(QMI_Instrument):
                                             version=self.get_firmware_version())
 
     @rpc_method
-    def get_manufacturing_date(self) -> str:
+    def get_manufacturing_date(self) -> datetime.date:
         """
         Get manufacturing date of the TFN.
 
@@ -360,10 +402,11 @@ class Teraxion_TFN(QMI_Instrument):
         _logger.info("[%s] Getting manufacturing date of instrument", self._name)
         self._check_is_open()
         # get response
-        resp = self._send(Teraxion_TFNCommand_GetManufacturingDate)
+        resp = self._read(Teraxion_TFNCommand_GetManufacturingDate)
         # get the data after the status bytes and ignore the null bytes
         date = resp[self.LEN_STATUS_BYTES:]
-        return date.decode("ascii")[:date.find(b"\x00")]
+        date_decoded = date.decode("ascii")[:date.find(b"\x00")]
+        return datetime.strptime(date_decoded, "%Y%m%d").date()
 
     @rpc_method
     def get_status(self) -> str:
@@ -376,7 +419,7 @@ class Teraxion_TFN(QMI_Instrument):
         _logger.info("[%s] Getting status of instrument", self._name)
         self._check_is_open()
         # get response
-        resp = struct.unpack(">L", self._send(Teraxion_TFNCommand_GetStatus))[0]
+        resp = struct.unpack(">L", self._read(Teraxion_TFNCommand_GetStatus))[0]
 
         return Teraxion_TFNStatus(busy_error=           bool(resp & 0b00000000100000000000000000000000),
                                   overrun_error=        bool(resp & 0b00000000010000000000000000000000),
@@ -418,10 +461,10 @@ class Teraxion_TFN(QMI_Instrument):
         """
         _logger.info("[%s] Setting frequency of instrument to [%f]", self._name, frequency)
         self._check_is_open()
-        # pack the frequency to a byte array
+        # pack the frequency to a byte array of 4 bytes
         freq = struct.pack(">f", frequency)
         # send command
-        self._send(Teraxion_TFNCommand_SetFrequency, freq)
+        self._write(Teraxion_TFNCommand_SetFrequency, freq)
 
     @rpc_method
     def get_frequency(self) -> float:
@@ -434,7 +477,7 @@ class Teraxion_TFN(QMI_Instrument):
         _logger.info("Getting frequency of instrument [%s]", self._name)
         self._check_is_open()
         # get response
-        resp = self._send(Teraxion_TFNCommand_GetFrequency)
+        resp = self._read(Teraxion_TFNCommand_GetFrequency)
         # unpack the frequency and return
         return struct.unpack(">f", resp[self.LEN_STATUS_BYTES :])[0]
 
@@ -451,10 +494,10 @@ class Teraxion_TFN(QMI_Instrument):
         """
         _logger.info("[%s] Getting RTD temperature of %s", self._name, element.name)
         self._check_is_open()
-        # pack the element to a byte array
+        # pack the element to a byte array of size 1
         el = struct.pack(">B", element.value)
         # get response
-        resp = self._send(Teraxion_TFNCommand_GetRTDTemperature, el)
+        resp = self._read(Teraxion_TFNCommand_GetRTDTemperature, el)
         # unpack the temperature and return
         return struct.unpack(">H", resp[self.LEN_STATUS_BYTES :])[0]
 
@@ -466,7 +509,7 @@ class Teraxion_TFN(QMI_Instrument):
         _logger.info("[%s] Enabling instrument", self._name)
         self._check_is_open()
         # send command
-        self._send(Teraxion_TFNCommand_EnableDevice)
+        self._write(Teraxion_TFNCommand_EnableDevice)
 
     @rpc_method
     def disable_device(self) -> None:
@@ -476,7 +519,7 @@ class Teraxion_TFN(QMI_Instrument):
         _logger.info("[%s] Disabling instrument", self._name)
         self._check_is_open()
         # send command
-        self._send(Teraxion_TFNCommand_DisableDevice)
+        self._write(Teraxion_TFNCommand_DisableDevice)
 
     @rpc_method
     def get_startup_byte(self) -> bytes:
@@ -489,14 +532,29 @@ class Teraxion_TFN(QMI_Instrument):
         _logger.info("Getting startup byte of instrument [%s]", self._name)
         self._check_is_open()
         # get response
-        resp = self._send(Teraxion_TFNCommand_GetStartupByte)
+        resp = self._read(Teraxion_TFNCommand_GetStartupByte)
         # unpack the startup byte and return
         return resp[self.LEN_STATUS_BYTES :]
 
     @rpc_method
+    def set_startup_byte(self, tec_status: bool) -> bytes:
+        """
+        Set the startup byte of the TFN.
+
+        Parameters:
+            tec_status: The status of the TECs on startup. True for all enable anf False for all disabled.
+        """
+        _logger.info("Setting startup byte of instrument [%s]", self._name)
+        self._check_is_open()
+        # pack the element to a byte array
+        val = struct.pack(">B", int(tec_status))
+        # send command
+        self._write(Teraxion_TFNCommand_SetStartupByte, val)
+
+    @rpc_method
     def get_nominal_settings(self) -> Teraxion_TFNSettings:
         """
-        Get nomial settings of the TFN.
+        Get nominal settings of the TFN.
 
         Returns:
             an instance of Teraxion_TFNSettings.
@@ -504,7 +562,7 @@ class Teraxion_TFN(QMI_Instrument):
         _logger.info("Getting frequency of instrument [%s]", self._name)
         self._check_is_open()
         # get response
-        resp = self._send(Teraxion_TFNCommand_GetNominalSettings)
+        resp = self._read(Teraxion_TFNCommand_GetNominalSettings)
         # unpack the frequency and dispersion
         freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES :self.LEN_STATUS_BYTES + 4])[0]
         disp = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4 + 4 :self.LEN_STATUS_BYTES + 4 + 4 + 4])[0]
