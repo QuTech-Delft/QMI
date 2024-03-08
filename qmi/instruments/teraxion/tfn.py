@@ -201,6 +201,14 @@ class Teraxion_TFNCommand_GetNominalSettings(Teraxion_TFNCommand):
     command_id = 0x37
     num_received_bytes = 12
 
+class Teraxion_TFNCommand_SaveNominalSettings(Teraxion_TFNCommand):
+    """
+    Command to save the nominal settings.
+    """
+
+    command_id = 0x36
+    num_received_bytes = 12
+
 
 class Teraxion_TFN(QMI_Instrument):
     """
@@ -567,3 +575,13 @@ class Teraxion_TFN(QMI_Instrument):
         freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES :self.LEN_STATUS_BYTES + 4])[0]
         disp = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4 + 4 :self.LEN_STATUS_BYTES + 4 + 4 + 4])[0]
         return Teraxion_TFNSettings(freq, disp)
+
+    @rpc_method
+    def save_nominal_settings(self) -> None:
+        """
+        Save nominal settings of the TFN. These settings are the current frequency and dispersion values.
+        """
+        _logger.info("[%s] Saving nominal settings of instrument", self._name)
+        self._check_is_open()
+        # send command
+        self._write(Teraxion_TFNCommand_SaveNominalSettings)
