@@ -10,7 +10,7 @@ import struct
 import time
 from typing import Optional
 from qmi.core.context import QMI_Context
-from qmi.core.instrument import QMI_Instrument
+from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.scpi_protocol import ScpiProtocol
 from qmi.core.transport import create_transport
@@ -51,6 +51,19 @@ class Teraxion_TFNStatus:
     tec_3_in_range: bool
     tec_2_in_range: bool
     tec_1_in_range: bool
+
+@dataclass
+class Teraxion_TFNSettings:
+    """
+    Settings of TFN.
+
+    Attributes:
+        frequency:  The current frequency in GHz.
+        dispersion: The dispersion in ps/nm.
+    """
+
+    frequency: float
+    dispersion: float
 
 
 @dataclass
@@ -172,6 +185,14 @@ class Teraxion_TFNCommand_GetManufacturingDate(Teraxion_TFNCommand):
     command_id = 0x2B
     num_received_bytes = 13
 
+class Teraxion_TFNCommand_GetNominalSettings(Teraxion_TFNCommand):
+    """
+    Command to get the nominal settings.
+    """
+
+    command_id = 0x37
+    num_received_bytes = 12
+
 
 class Teraxion_TFN(QMI_Instrument):
     """
@@ -245,6 +266,104 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         self._transport.close()
         super().close()
+
+    @rpc_method
+    def get_firmware_version(self) -> str:
+        """
+        Get firmware version of the TFN.
+
+        Returns:
+            the firmware version.
+        """
+        _logger.info("[%s] Getting firmware version of instrument", self._name)
+        self._check_is_open()
+        # get response
+        resp = self._send(Teraxion_TFNCommand_GetFirmwareVersion)
+        # get the data after the status bytes and ignore the null bytes
+        firmware_version = resp[self.LEN_STATUS_BYTES :]
+        major_version = struct.unpack(">B", firmware_version[:1])[0]
+        minor_version = struct.unpack(">B", firmware_version[1:])[0]
+        return f"{major_version}.{minor_version}"
+
+    @rpc_method
+    def get_manufacturer_name(self) -> str:
+        """
+        Get manufacturer name of the TFN.
+
+        Returns:
+            the name of the manufacturer.
+        """
+        _logger.info("[%s] Getting manufacturer name of instrument", self._name)
+        self._check_is_open()
+        # get response
+        resp = self._send(Teraxion_TFNCommand_GetManufacturerName)
+        # get the data after the status bytes and ignore the null bytes
+        manufacturer_name = resp[self.LEN_STATUS_BYTES:]
+        print(manufacturer_name)
+        return manufacturer_name.decode("ascii")[:manufacturer_name.find(b"\x00")]
+
+    @rpc_method
+    def get_model_number(self) -> str:
+        """
+        Get model number of the TFN.
+
+        Returns:
+            the model number.
+        """
+        _logger.info("[%s] Getting model number of instrument", self._name)
+        self._check_is_open()
+        # get response
+        resp = self._send(Teraxion_TFNCommand_GetModelNumber)
+        # get the data after the status bytes and ignore the null bytes
+        model_number = resp[self.LEN_STATUS_BYTES:]
+        return model_number.decode("ascii")[:model_number.find(b"\x00")]
+
+    @rpc_method
+    def get_serial_number(self) -> str:
+        """
+        Get serial number of the TFN.
+
+        Returns:
+            the serial number.
+        """
+        _logger.info("[%s] Getting serial number of instrument", self._name)
+        self._check_is_open()
+        # get response
+        resp = self._send(Teraxion_TFNCommand_GetSerialNumber)
+        # get the data after the status bytes and ignore the null bytes
+        serial_number = resp[self.LEN_STATUS_BYTES:]
+        return serial_number.decode("ascii")[:serial_number.find(b"\x00")]
+
+    @rpc_method
+    def get_idn(self) -> QMI_InstrumentIdentification:
+        """
+        Get instrument identification of the TFN.
+        
+        Returns:
+            an instance of QMI_InstrumentIdentification.
+        """
+        _logger.info("[%s] Getting instrument identitification of instrument", self._name)
+        self._check_is_open()
+        return QMI_InstrumentIdentification(vendor=self.get_manufacturer_name(),
+                                            model=self.get_model_number(),
+                                            serial=self.get_serial_number(),
+                                            version=self.get_firmware_version())
+
+    @rpc_method
+    def get_manufacturing_date(self) -> str:
+        """
+        Get manufacturing date of the TFN.
+
+        Returns:
+            the manufacturing date.
+        """
+        _logger.info("[%s] Getting manufacturing date of instrument", self._name)
+        self._check_is_open()
+        # get response
+        resp = self._send(Teraxion_TFNCommand_GetManufacturingDate)
+        # get the data after the status bytes and ignore the null bytes
+        date = resp[self.LEN_STATUS_BYTES:]
+        return date.decode("ascii")[:date.find(b"\x00")]
 
     @rpc_method
     def get_status(self) -> str:
@@ -373,85 +492,20 @@ class Teraxion_TFN(QMI_Instrument):
         resp = self._send(Teraxion_TFNCommand_GetStartupByte)
         # unpack the startup byte and return
         return resp[self.LEN_STATUS_BYTES :]
-    
-    @rpc_method
-    def get_firmware_version(self) -> str:
-        """
-        Get firmware version of the TFN.
-
-        Returns:
-            the firmware version.
-        """
-        _logger.info("[%s] Getting firmware version of instrument", self._name)
-        self._check_is_open()
-        # get response
-        resp = self._send(Teraxion_TFNCommand_GetFirmwareVersion)
-        # get the data after the status bytes and ignore the null bytes
-        firmware_version = resp[self.LEN_STATUS_BYTES :]
-        major_version = struct.unpack(">B", firmware_version[:1])[0]
-        minor_version = struct.unpack(">B", firmware_version[1:])[0]
-        return f"{major_version}.{minor_version}"
 
     @rpc_method
-    def get_manufacturer_name(self) -> str:
+    def get_nominal_settings(self) -> Teraxion_TFNSettings:
         """
-        Get manufacturer name of the TFN.
+        Get nomial settings of the TFN.
 
         Returns:
-            the name of the manufacturer.
+            an instance of Teraxion_TFNSettings.
         """
-        _logger.info("[%s] Getting manufacturer name of instrument", self._name)
+        _logger.info("Getting frequency of instrument [%s]", self._name)
         self._check_is_open()
         # get response
-        resp = self._send(Teraxion_TFNCommand_GetManufacturerName)
-        # get the data after the status bytes and ignore the null bytes
-        manufacturer_name = resp[self.LEN_STATUS_BYTES:]
-        return manufacturer_name.decode("ascii")[:manufacturer_name.find(b"\x00")]
-
-    @rpc_method
-    def get_model_number(self) -> str:
-        """
-        Get model number of the TFN.
-
-        Returns:
-            the model number.
-        """
-        _logger.info("[%s] Getting model number of instrument", self._name)
-        self._check_is_open()
-        # get response
-        resp = self._send(Teraxion_TFNCommand_GetModelNumber)
-        # get the data after the status bytes and ignore the null bytes
-        model_number = resp[self.LEN_STATUS_BYTES:]
-        return model_number.decode("ascii")[:model_number.find(b"\x00")]
-
-    @rpc_method
-    def get_serial_number(self) -> str:
-        """
-        Get serial number of the TFN.
-
-        Returns:
-            the serial number.
-        """
-        _logger.info("[%s] Getting serial number of instrument", self._name)
-        self._check_is_open()
-        # get response
-        resp = self._send(Teraxion_TFNCommand_GetSerialNumber)
-        # get the data after the status bytes and ignore the null bytes
-        serial_number = resp[self.LEN_STATUS_BYTES:]
-        return serial_number.decode("ascii")[:serial_number.find(b"\x00")]
-    
-    @rpc_method
-    def get_manufacturing_date(self) -> str:
-        """
-        Get manufacturing date of the TFN.
-
-        Returns:
-            the manufacturing date.
-        """
-        _logger.info("[%s] Getting manufacturing date of instrument", self._name)
-        self._check_is_open()
-        # get response
-        resp = self._send(Teraxion_TFNCommand_GetManufacturingDate)
-        # get the data after the status bytes and ignore the null bytes
-        date = resp[self.LEN_STATUS_BYTES:]
-        return date.decode("ascii")[:date.find(b"\x00")]
+        resp = self._send(Teraxion_TFNCommand_GetNominalSettings)
+        # unpack the frequency and dispersion
+        freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES :self.LEN_STATUS_BYTES + 4])[0]
+        disp = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4 + 4 :self.LEN_STATUS_BYTES + 4 + 4 + 4])[0]
+        return Teraxion_TFNSettings(freq, disp)
