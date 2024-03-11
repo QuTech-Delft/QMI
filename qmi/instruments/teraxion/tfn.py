@@ -562,27 +562,27 @@ class Teraxion_TFN(QMI_Instrument):
         self._write(Teraxion_TFNCommand_DisableDevice)
 
     @rpc_method
-    def get_startup_byte(self) -> bytes:
+    def get_startup_byte(self) -> bool:
         """
         Get the startup byte of the TFN.
 
         Returns:
-            the startup byte.
+            The status of the TECs on startup. True for all enable and False for all disabled.
         """
         _logger.info("Getting startup byte of instrument [%s]", self._name)
         self._check_is_open()
         # get response
         resp = self._read(Teraxion_TFNCommand_GetStartupByte)
         # unpack the startup byte and return
-        return resp[self.LEN_STATUS_BYTES:]
+        return bool(struct.unpack(">B", resp[self.LEN_STATUS_BYTES:])[0])
 
     @rpc_method
-    def set_startup_byte(self, tec_status: bool) -> bytes:
+    def set_startup_byte(self, tec_status: bool) -> None:
         """
         Set the startup byte of the TFN.
 
         Parameters:
-            tec_status: The status of the TECs on startup. True for all enable anf False for all disabled.
+            tec_status: The status of the TECs on startup. True for all enable and False for all disabled.
         """
         _logger.info("Setting startup byte of instrument [%s]", self._name)
         self._check_is_open()
