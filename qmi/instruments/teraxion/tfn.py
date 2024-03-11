@@ -313,7 +313,7 @@ class Teraxion_TFN(QMI_Instrument):
         wc = self._make_write_command(cmd, value)
         rc = self._make_read_command(cmd)
         # ask for the reponse to clear the buffer
-        _ = self._scpi_protocol.ask(f"{wc} L{self.READ_WRITE_DELAY:02x} {rc}", timeout=timeout)
+        _ = self._scpi_protocol.ask(f"{wc} L{self.READ_WRITE_DELAY:04x} {rc}", timeout=timeout)
 
     def _read(
         self,
@@ -481,6 +481,7 @@ class Teraxion_TFN(QMI_Instrument):
         Perform a software reset.
         """
         _logger.info("[%s] Software resetting instrument", self._name)
+        self._check_is_open()
         cmd = Teraxion_TFNCommand_Reset
         # shift module address by one and set the write bit
         module_write_mode = int(cmd.module_address) << 1
@@ -604,7 +605,7 @@ class Teraxion_TFN(QMI_Instrument):
         resp = self._read(Teraxion_TFNCommand_GetNominalSettings)
         # unpack the frequency and dispersion
         freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES:self.LEN_STATUS_BYTES + 4])[0]
-        disp = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4 + 4:self.LEN_STATUS_BYTES + 4 + 4 + 4])[0]
+        disp = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4:self.LEN_STATUS_BYTES + 8])[0]
         return Teraxion_TFNSettings(freq, disp)
 
     @rpc_method
@@ -631,12 +632,12 @@ class Teraxion_TFN(QMI_Instrument):
         resp = self._read(Teraxion_TFNCommand_GetChannelPlan)
         # unpack the frequencies and number of calibrated channels
         first_freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES:self.LEN_STATUS_BYTES + 4])[0]
-        last_freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 8:self.LEN_STATUS_BYTES + 12])[0]
-        num_cal_channels = struct.unpack(">L", resp[self.LEN_STATUS_BYTES + 12:self.LEN_STATUS_BYTES + 16])[0]
+        last_freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4:self.LEN_STATUS_BYTES + 8])[0]
+        num_cal_channels = struct.unpack(">L", resp[self.LEN_STATUS_BYTES + 8:self.LEN_STATUS_BYTES + 12])[0]
         return Teraxion_TFNChannelPlan(first_freq, last_freq, num_cal_channels)
 
     @rpc_method
-    def set_i2c_adress(self, address: int) -> None:
+    def set_i2c_address(self, address: int) -> None:
         """
         Set the I2C address of the TFN module.
         
@@ -645,6 +646,9 @@ class Teraxion_TFN(QMI_Instrument):
         """
         _logger.info("Setting I2C address of instrument [%s]", self._name)
         self._check_is_open()
-        # pack the element to a byte array of size 2
-        val = struct.pack(">H", int(address))
-        self._write(Teraxion_TFNCommand_SetI2CAddress, val)
+        cmd = Teraxion_TFNCommand_SetI2CAddress
+        # shift module address by one and set the write bit
+        write_mode = int(cmd.module_address) << 1
+        # make write command and send
+        wc = f"{self.CMD_START_CONDITION}{write_mode:02x}{cmd.command_id:02x}{address:04x}{self.CMD_STOP_CONDTION}"
+        self._scpi_protocol.write(f"{wc}")
