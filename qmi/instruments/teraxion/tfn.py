@@ -259,10 +259,9 @@ class Teraxion_TFN(QMI_Instrument):
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         super().__init__(context, name)
-        self._transport = create_transport(
-            transport, default_attributes={"baudrate": 57600}
-        )
+        self._transport = create_transport(transport, default_attributes={"baudrate": 57600})
         self._scpi_protocol = ScpiProtocol(self._transport, command_terminator="")
+        self._status: Teraxion_TFNStatus
 
     def _make_write_command(
         self,
@@ -279,9 +278,9 @@ class Teraxion_TFN(QMI_Instrument):
         # convert the value to its hex representation
         hex_val = binascii.hexlify(value).decode() if value else ""
         # shift module address by one and set the write bit
-        module_write_mode = int(cmd.module_address) << 1
+        write_mode = int(cmd.module_address) << 1
         # make write command and return
-        return f"{self.CMD_START_CONDITION}{module_write_mode:02x}{cmd.command_id:02x}{hex_val}{self.CMD_STOP_CONDTION}"
+        return f"{self.CMD_START_CONDITION}{write_mode:02x}{cmd.command_id:02x}{hex_val}{self.CMD_STOP_CONDTION}"
 
     def _make_read_command(
         self,
@@ -294,25 +293,28 @@ class Teraxion_TFN(QMI_Instrument):
             cmd:        A Teraxion_TFNCommand.
         """
         # shift module address by one and set the read bit
-        module_read_mode = cmd.module_address << 1 ^ 1
+        read_mode = cmd.module_address << 1 ^ 1
         # make read command and return
-        return f"{self.CMD_START_CONDITION}{module_read_mode:02x}{cmd.num_received_bytes:02d}{self.CMD_STOP_CONDTION}"
+        return f"{self.CMD_START_CONDITION}{read_mode:02x}{cmd.num_received_bytes:02d}{self.CMD_STOP_CONDTION}"
 
     def _write(
         self,
         cmd: Teraxion_TFNCommand,
-        value: Optional[bytes] = None
+        value: Optional[bytes] = None,
+        timeout: float = DEFAULT_READ_TIMEOUT,
     ) -> None:
         """
         Helper method to send a wrie command.
 
         Parameters:
-            cmd:        A Teraxion_TFNCommand.
-            value:      The optional value to write in bytes.
+            cmd:    A Teraxion_TFNCommand.
+            value:  The optional value to write in bytes.
+            timeout:    The timeout for the command.
         """
         wc = self._make_write_command(cmd, value)
         rc = self._make_read_command(cmd)
-        self._scpi_protocol.write(f"{wc} L{self.READ_WRITE_DELAY:02x} {rc}")
+        # ask for the reponse to clear the buffer
+        _ = self._scpi_protocol.ask(f"{wc} L{self.READ_WRITE_DELAY:02x} {rc}", timeout=timeout)
 
     def _read(
         self,
@@ -361,7 +363,7 @@ class Teraxion_TFN(QMI_Instrument):
         # get response
         resp = self._read(Teraxion_TFNCommand_GetFirmwareVersion)
         # get the data after the status bytes and ignore the null bytes
-        firmware_version = resp[self.LEN_STATUS_BYTES :]
+        firmware_version = resp[self.LEN_STATUS_BYTES:]
         major_version = struct.unpack(">B", firmware_version[:1])[0]
         minor_version = struct.unpack(">B", firmware_version[1:])[0]
         return f"{major_version}.{minor_version}"
@@ -517,7 +519,7 @@ class Teraxion_TFN(QMI_Instrument):
         # get response
         resp = self._read(Teraxion_TFNCommand_GetFrequency)
         # unpack the frequency and return
-        return struct.unpack(">f", resp[self.LEN_STATUS_BYTES :])[0]
+        return struct.unpack(">f", resp[self.LEN_STATUS_BYTES:])[0]
 
     @rpc_method
     def get_rtd_temperature(self, element: Teraxion_TFNElement) -> int:
@@ -537,7 +539,7 @@ class Teraxion_TFN(QMI_Instrument):
         # get response
         resp = self._read(Teraxion_TFNCommand_GetRTDTemperature, el)
         # unpack the temperature and return
-        return struct.unpack(">H", resp[self.LEN_STATUS_BYTES :])[0]
+        return struct.unpack(">H", resp[self.LEN_STATUS_BYTES:])[0]
 
     @rpc_method
     def enable_device(self) -> None:
@@ -572,7 +574,7 @@ class Teraxion_TFN(QMI_Instrument):
         # get response
         resp = self._read(Teraxion_TFNCommand_GetStartupByte)
         # unpack the startup byte and return
-        return resp[self.LEN_STATUS_BYTES :]
+        return resp[self.LEN_STATUS_BYTES:]
 
     @rpc_method
     def set_startup_byte(self, tec_status: bool) -> bytes:
@@ -602,8 +604,8 @@ class Teraxion_TFN(QMI_Instrument):
         # get response
         resp = self._read(Teraxion_TFNCommand_GetNominalSettings)
         # unpack the frequency and dispersion
-        freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES :self.LEN_STATUS_BYTES + 4])[0]
-        disp = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4 + 4 :self.LEN_STATUS_BYTES + 4 + 4 + 4])[0]
+        freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES:self.LEN_STATUS_BYTES + 4])[0]
+        disp = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4 + 4:self.LEN_STATUS_BYTES + 4 + 4 + 4])[0]
         return Teraxion_TFNSettings(freq, disp)
 
     @rpc_method
@@ -629,9 +631,9 @@ class Teraxion_TFN(QMI_Instrument):
         # get response
         resp = self._read(Teraxion_TFNCommand_GetChannelPlan)
         # unpack the frequencies and number of calibrated channels
-        first_freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES :self.LEN_STATUS_BYTES + 4])[0]
-        last_freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4 + 4 :self.LEN_STATUS_BYTES + 4 + 4 + 4])[0]
-        num_cal_channels = struct.unpack(">L", resp[self.LEN_STATUS_BYTES + 4 + 4 + 4:self.LEN_STATUS_BYTES + 4 + 4 + 4 + 4])[0]
+        first_freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES:self.LEN_STATUS_BYTES + 4])[0]
+        last_freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 8:self.LEN_STATUS_BYTES + 12])[0]
+        num_cal_channels = struct.unpack(">L", resp[self.LEN_STATUS_BYTES + 12:self.LEN_STATUS_BYTES + 16])[0]
         return Teraxion_TFNChannelPlan(first_freq, last_freq, num_cal_channels)
 
     @rpc_method
