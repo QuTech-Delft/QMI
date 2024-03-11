@@ -232,6 +232,13 @@ class Teraxion_TFNCommand_GetChannelPlan(Teraxion_TFNCommand):
     command_id = 0x3B
     num_received_bytes = 16
 
+class Teraxion_TFNCommand_SetI2CAddress(Teraxion_TFNCommand):
+    """
+    Command to get the channel plan.
+    """
+
+    command_id = 0x42
+
 
 class Teraxion_TFN(QMI_Instrument):
     """
@@ -626,3 +633,17 @@ class Teraxion_TFN(QMI_Instrument):
         last_freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4 + 4 :self.LEN_STATUS_BYTES + 4 + 4 + 4])[0]
         num_cal_channels = struct.unpack(">L", resp[self.LEN_STATUS_BYTES + 4 + 4 + 4:self.LEN_STATUS_BYTES + 4 + 4 + 4 + 4])[0]
         return Teraxion_TFNChannelPlan(first_freq, last_freq, num_cal_channels)
+
+    @rpc_method
+    def set_i2c_adress(self, address: int) -> None:
+        """
+        Set the I2C address of the TFN module.
+        
+        Parameters:
+            address:    New I2C address for module.
+        """
+        _logger.info("Setting I2C address of instrument [%s]", self._name)
+        self._check_is_open()
+        # pack the element to a byte array of size 2
+        val = struct.pack(">H", int(address))
+        self._write(Teraxion_TFNCommand_SetI2CAddress, val)
