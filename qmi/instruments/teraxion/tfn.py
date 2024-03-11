@@ -261,7 +261,6 @@ class Teraxion_TFN(QMI_Instrument):
         super().__init__(context, name)
         self._transport = create_transport(transport, default_attributes={"baudrate": 57600})
         self._scpi_protocol = ScpiProtocol(self._transport, command_terminator="")
-        self._status: Teraxion_TFNStatus
 
     def _make_write_command(
         self,
