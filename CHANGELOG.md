@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+### Added
+- QMI driver for TeraXion TFN in `qmi.instruments.teraxion` with CLI client.
+
 ## [0.44.0] - 2024-01-25
 
 ### Added

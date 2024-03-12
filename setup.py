@@ -116,6 +116,7 @@ setup(
         'bin/instruments/qmi_thorlabs_k10cr1',
         'bin/instruments/qmi_timebase_dim3000',
         'bin/instruments/qmi_wavelength_tclab',
-        'bin/instruments/qmi_wieserlabs_flexdds'
+        'bin/instruments/qmi_wieserlabs_flexdds',
+        'bin/instruments/qmi_teraxion_tfn'
     ]
 )
