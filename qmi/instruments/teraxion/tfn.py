@@ -182,7 +182,7 @@ class Teraxion_TFNCommand_GetManufacturerName(Teraxion_TFNCommand):
     """
 
     command_id = 0x0E
-    num_received_bytes = 13
+    num_received_bytes = 255
 
 class Teraxion_TFNCommand_GetModelNumber(Teraxion_TFNCommand):
     """
@@ -190,7 +190,7 @@ class Teraxion_TFNCommand_GetModelNumber(Teraxion_TFNCommand):
     """
 
     command_id = 0x27
-    num_received_bytes = 13
+    num_received_bytes = 255
 
 class Teraxion_TFNCommand_GetSerialNumber(Teraxion_TFNCommand):
     """
@@ -198,7 +198,7 @@ class Teraxion_TFNCommand_GetSerialNumber(Teraxion_TFNCommand):
     """
 
     command_id = 0x29
-    num_received_bytes = 13
+    num_received_bytes = 255
 
 class Teraxion_TFNCommand_GetManufacturingDate(Teraxion_TFNCommand):
     """
@@ -206,7 +206,7 @@ class Teraxion_TFNCommand_GetManufacturingDate(Teraxion_TFNCommand):
     """
 
     command_id = 0x2B
-    num_received_bytes = 13
+    num_received_bytes = 255
 
 class Teraxion_TFNCommand_GetNominalSettings(Teraxion_TFNCommand):
     """
@@ -214,7 +214,7 @@ class Teraxion_TFNCommand_GetNominalSettings(Teraxion_TFNCommand):
     """
 
     command_id = 0x37
-    num_received_bytes = 12
+    num_received_bytes = 16
 
 class Teraxion_TFNCommand_SaveNominalSettings(Teraxion_TFNCommand):
     """
@@ -222,7 +222,7 @@ class Teraxion_TFNCommand_SaveNominalSettings(Teraxion_TFNCommand):
     """
 
     command_id = 0x36
-    num_received_bytes = 12
+    num_received_bytes = 16
 
 class Teraxion_TFNCommand_GetChannelPlan(Teraxion_TFNCommand):
     """
@@ -256,6 +256,9 @@ class Teraxion_TFN(QMI_Instrument):
     READ_WRITE_DELAY = 0x000A  # 10ms delay value between a write and read command in hex.
 
     SOFTWARE_RESET_DELAY = 0.25  # delay after a software reset command in seconds.
+    GET_PROCESS_TIME = 0.01 # GET requests usually have a process time of 10ms
+    SET_PROCESS_TIME = 0.02 # SET requests usually have a process time of 20ms
+    GET_LONG_PROCESS_TIME = 0.05 # Long GET requests that return 255 bytes of data usually have a process time of 50ms.
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         super().__init__(context, name)
@@ -294,7 +297,7 @@ class Teraxion_TFN(QMI_Instrument):
         # shift module address by one and set the read bit
         read_mode = cmd.module_address << 1 ^ 1
         # make read command and return
-        return f"{self.CMD_START_CONDITION}{read_mode:02x}{cmd.num_received_bytes:02d}{self.CMD_STOP_CONDTION}"
+        return f"{self.CMD_START_CONDITION}{read_mode:02x}{cmd.num_received_bytes:02x}{self.CMD_STOP_CONDTION}"
 
     def _write(
         self,
@@ -348,6 +351,7 @@ class Teraxion_TFN(QMI_Instrument):
         val = struct.pack(">B", int(tec_status))
         # send command
         self._write(Teraxion_TFNCommand_SetStartupByte, val)
+        time.sleep(self.SET_PROCESS_TIME)
 
     @rpc_method
     def open(self) -> None:
@@ -375,10 +379,9 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # get response
         resp = self._read(Teraxion_TFNCommand_GetFirmwareVersion)
-        # get the data after the status bytes and ignore the null bytes
-        firmware_version = resp[self.LEN_STATUS_BYTES:]
-        major_version = struct.unpack(">B", firmware_version[:1])[0]
-        minor_version = struct.unpack(">B", firmware_version[1:])[0]
+        time.sleep(self.GET_PROCESS_TIME)
+        # get the data after the status bytes
+        _, major_version, minor_version = struct.unpack(">IBB", resp)
         return f"{major_version}.{minor_version}"
 
     @rpc_method
@@ -393,6 +396,7 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # get response
         resp = self._read(Teraxion_TFNCommand_GetManufacturerName)
+        time.sleep(self.GET_LONG_PROCESS_TIME)
         # get the data after the status bytes and ignore the null bytes
         manufacturer_name = resp[self.LEN_STATUS_BYTES:]
         return manufacturer_name.decode("ascii")[:manufacturer_name.find(b"\x00")]
@@ -409,6 +413,7 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # get response
         resp = self._read(Teraxion_TFNCommand_GetModelNumber)
+        time.sleep(self.GET_LONG_PROCESS_TIME)
         # get the data after the status bytes and ignore the null bytes
         model_number = resp[self.LEN_STATUS_BYTES:]
         return model_number.decode("ascii")[:model_number.find(b"\x00")]
@@ -425,6 +430,7 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # get response
         resp = self._read(Teraxion_TFNCommand_GetSerialNumber)
+        time.sleep(self.GET_LONG_PROCESS_TIME)
         # get the data after the status bytes and ignore the null bytes
         serial_number = resp[self.LEN_STATUS_BYTES:]
         return serial_number.decode("ascii")[:serial_number.find(b"\x00")]
@@ -456,6 +462,7 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # get response
         resp = self._read(Teraxion_TFNCommand_GetManufacturingDate)
+        time.sleep(self.GET_LONG_PROCESS_TIME)
         # get the data after the status bytes and ignore the null bytes
         date = resp[self.LEN_STATUS_BYTES:]
         date_decoded = date.decode("ascii")[:date.find(b"\x00")]
@@ -472,7 +479,9 @@ class Teraxion_TFN(QMI_Instrument):
         _logger.info("[%s] Getting status of instrument", self._name)
         self._check_is_open()
         # get response
-        resp = struct.unpack(">L", self._read(Teraxion_TFNCommand_GetStatus))[0]
+        status = self._read(Teraxion_TFNCommand_GetStatus)
+        time.sleep(self.GET_PROCESS_TIME)
+        resp = struct.unpack(">L", status)[0]
 
         return Teraxion_TFNStatus(busy_error=           bool(resp & 0b00000000100000000000000000000000),
                                   overrun_error=        bool(resp & 0b00000000010000000000000000000000),
@@ -519,6 +528,7 @@ class Teraxion_TFN(QMI_Instrument):
         freq = struct.pack(">f", frequency)
         # send command
         self._write(Teraxion_TFNCommand_SetFrequency, freq)
+        time.sleep(self.GET_PROCESS_TIME)
 
     @rpc_method
     def get_frequency(self) -> float:
@@ -532,8 +542,10 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # get response
         resp = self._read(Teraxion_TFNCommand_GetFrequency)
+        time.sleep(self.GET_PROCESS_TIME)
         # unpack the frequency and return
-        return struct.unpack(">f", resp[self.LEN_STATUS_BYTES:])[0]
+        _, freq = struct.unpack(">If", resp)
+        return freq
 
     @rpc_method
     def get_rtd_temperature(self, element: Teraxion_TFNElement) -> int:
@@ -553,7 +565,8 @@ class Teraxion_TFN(QMI_Instrument):
         # get response
         resp = self._read(Teraxion_TFNCommand_GetRTDTemperature, el)
         # unpack the temperature and return
-        return struct.unpack(">H", resp[self.LEN_STATUS_BYTES:])[0]
+        _, temp = struct.unpack(">IH", resp)
+        return temp
 
     @rpc_method
     def enable_device(self) -> None:
@@ -564,6 +577,7 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # send command
         self._write(Teraxion_TFNCommand_EnableDevice)
+        time.sleep(self.GET_PROCESS_TIME)
 
     @rpc_method
     def disable_device(self) -> None:
@@ -574,6 +588,7 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # send command
         self._write(Teraxion_TFNCommand_DisableDevice)
+        time.sleep(self.GET_PROCESS_TIME)
 
     @rpc_method
     def get_startup_byte(self) -> bool:
@@ -587,8 +602,10 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # get response
         resp = self._read(Teraxion_TFNCommand_GetStartupByte)
+        time.sleep(self.GET_PROCESS_TIME)
         # unpack the startup byte and return
-        return bool(struct.unpack(">B", resp[self.LEN_STATUS_BYTES:])[0])
+        _, startup_byte = struct.unpack(">IB", resp)
+        return bool(startup_byte)
 
     @rpc_method
     def enable_tecs_on_startup(self) -> None:
@@ -616,9 +633,9 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # get response
         resp = self._read(Teraxion_TFNCommand_GetNominalSettings)
+        time.sleep(self.GET_PROCESS_TIME)
         # unpack the frequency and dispersion
-        freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES:self.LEN_STATUS_BYTES + 4])[0]
-        disp = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4:self.LEN_STATUS_BYTES + 8])[0]
+        _, freq, disp, _ = struct.unpack(">IffI", resp)
         return Teraxion_TFNSettings(freq, disp)
 
     @rpc_method
@@ -630,6 +647,7 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # send command
         self._write(Teraxion_TFNCommand_SaveNominalSettings)
+        time.sleep(self.SET_PROCESS_TIME)
 
     @rpc_method
     def get_channel_plan(self) -> Teraxion_TFNChannelPlan:
@@ -643,16 +661,15 @@ class Teraxion_TFN(QMI_Instrument):
         self._check_is_open()
         # get response
         resp = self._read(Teraxion_TFNCommand_GetChannelPlan)
+        time.sleep(self.GET_PROCESS_TIME)
         # unpack the frequencies and number of calibrated channels
-        first_freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES:self.LEN_STATUS_BYTES + 4])[0]
-        last_freq = struct.unpack(">f", resp[self.LEN_STATUS_BYTES + 4:self.LEN_STATUS_BYTES + 8])[0]
-        num_cal_channels = struct.unpack(">L", resp[self.LEN_STATUS_BYTES + 8:self.LEN_STATUS_BYTES + 12])[0]
+        _, first_freq, last_freq, num_cal_channels = struct.unpack(">IffL", resp)
         return Teraxion_TFNChannelPlan(first_freq, last_freq, num_cal_channels)
 
     @rpc_method
     def set_i2c_address(self, address: int) -> None:
         """
-        Set the I2C address of the TFN module.
+        Set the I2C address of the TFN module. This all will need a power cycle to take effect.
         
         Parameters:
             address:    New I2C address for module.

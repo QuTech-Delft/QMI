@@ -41,7 +41,7 @@ class TestTeraxionTfn(unittest.TestCase):
         """Test get manufacturer name, gets manufacturer name."""
         # Arrange
         expected_manufacturer_name = "TeraXion"
-        expected_command = "S600eP S6113P"
+        expected_command = "S600eP S61ffP"
         ask_mock.return_value = "001000005465726158696F6E00"
 
         # Act
@@ -56,7 +56,7 @@ class TestTeraxionTfn(unittest.TestCase):
         """Test get model number, gets model number."""
         # Arrange
         expected_model_number = "TFN-XXXX"
-        expected_command = "S6027P S6113P"
+        expected_command = "S6027P S61ffP"
         ask_mock.return_value = "0010000054464E2D5858585800"
 
         # Act
@@ -71,7 +71,7 @@ class TestTeraxionTfn(unittest.TestCase):
         """Test get serial number, gets serial number."""
         # Arrange
         expected_serial_number = "Txxxxxx"
-        expected_command = "S6029P S6113P"
+        expected_command = "S6029P S61ffP"
         ask_mock.return_value = "001000005478787878787800"
 
         # Act
@@ -89,9 +89,9 @@ class TestTeraxionTfn(unittest.TestCase):
         expected_model_number = "TFN-XXXX"
         expected_serial_number = "Txxxxxx"
         expected_version = "1.0"
-        expected_manufactuer_name_command = "S600eP S6113P"
-        expected_model_number_command = "S6027P S6113P"
-        expected_serial_number_command = "S6029P S6113P"
+        expected_manufactuer_name_command = "S600eP S61ffP"
+        expected_model_number_command = "S6027P S61ffP"
+        expected_serial_number_command = "S6029P S61ffP"
         expected_firmware_version_command = "S600fP S6106P"
 
         ask_mock.side_effect = ["001000005465726158696F6E00", "0010000054464E2D5858585800", "001000005478787878787800", "001000000100"]
@@ -114,7 +114,7 @@ class TestTeraxionTfn(unittest.TestCase):
         """Test get manufacturing number, gets manufacturing date."""
         # Arrange
         expected_date = datetime.strptime("20231120", "%Y%m%d").date()
-        expected_command = "S602bP S6113P"
+        expected_command = "S602bP S61ffP"
         ask_mock.return_value = "00100000323032333131323000"
 
         # Act
@@ -261,8 +261,8 @@ class TestTeraxionTfn(unittest.TestCase):
         """Test get nominal settings, gets nominal settings."""
         # Arrange
         expected_settings = Teraxion_TFNSettings(192400, 0)
-        expected_command = "S6037P S6112P"
-        ask_mock.return_value = "00100000483be40000000000"
+        expected_command = "S6037P S6110P"
+        ask_mock.return_value = "00100000483be4000000000000000000"
 
         # Act
         settings = self.tfn.get_nominal_settings()
@@ -275,7 +275,7 @@ class TestTeraxionTfn(unittest.TestCase):
     def test_save_nominal_settings_sends_save_nominal_settings_command(self, ask_mock):
         """Test save nominal settings, saves nominal settings."""
         # Arrange
-        expected_command = "S6036P L000a S6112P"
+        expected_command = "S6036P L000a S6110P"
 
         # Act
         self.tfn.save_nominal_settings()
@@ -288,7 +288,7 @@ class TestTeraxionTfn(unittest.TestCase):
         """Test get channel plan, gets channel plan."""
         # Arrange
         expected_channel_plan = Teraxion_TFNChannelPlan(193420, 193370, 1)
-        expected_command = "S603bP S6116P"
+        expected_command = "S603bP S6110P"
         ask_mock.return_value = "00100000483CE300483CD68000000001"
 
         # Act
