@@ -25,8 +25,6 @@ def main() -> int:
 
     parser.add_argument("--frequency", action="store", type=float, help="set frequency setpoint in GHz")
 
-    parser.add_argument("--channel-plan", action="store_true", help="get channel plan of device")
-
     args = parser.parse_args()
 
     instr: Teraxion_TFN
