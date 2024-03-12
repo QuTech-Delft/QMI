@@ -1,7 +1,7 @@
 """Unit-tests for Teraxion TFN."""
 from datetime import datetime
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from qmi.core.context import QMI_Context
 from qmi.instruments.teraxion.tfn import Teraxion_TFN, Teraxion_TFNChannelPlan, Teraxion_TFNElement, Teraxion_TFNSettings, Teraxion_TFNStatus
@@ -82,6 +82,34 @@ class TestTeraxionTfn(unittest.TestCase):
         self.assertEqual(serial_number, expected_serial_number)
 
     @unittest.mock.patch("qmi.core.scpi_protocol.ScpiProtocol.ask")
+    def test_get_idn_sends_get_idn_command(self, ask_mock):
+        """Test get idn, sends gets idn command."""
+        # Arrange
+        expected_vendor = "TeraXion"
+        expected_model_number = "TFN-XXXX"
+        expected_serial_number = "Txxxxxx"
+        expected_version = "1.0"
+        expected_manufactuer_name_command = "S600eP S6113P"
+        expected_model_number_command = "S6027P S6113P"
+        expected_serial_number_command = "S6029P S6113P"
+        expected_firmware_version_command = "S600fP S6106P"
+
+        ask_mock.side_effect = ["001000005465726158696F6E00", "0010000054464E2D5858585800", "001000005478787878787800", "001000000100"]
+
+        # Act
+        idn = self.tfn.get_idn()
+
+        # Assert
+        ask_mock.assert_has_calls([call(expected_manufactuer_name_command, timeout=self.tfn.DEFAULT_READ_TIMEOUT),
+                                  call(expected_model_number_command, timeout=self.tfn.DEFAULT_READ_TIMEOUT),
+                                  call(expected_serial_number_command, timeout=self.tfn.DEFAULT_READ_TIMEOUT),
+                                  call(expected_firmware_version_command, timeout=self.tfn.DEFAULT_READ_TIMEOUT)])
+        self.assertEqual(idn.vendor, expected_vendor)
+        self.assertEqual(idn.model, expected_model_number)
+        self.assertEqual(idn.serial, expected_serial_number)
+        self.assertEqual(idn.version, expected_version)
+
+    @unittest.mock.patch("qmi.core.scpi_protocol.ScpiProtocol.ask")
     def test_get_manufacturing_date_gets_manufacturing_date(self, ask_mock):
         """Test get manufacturing number, gets manufacturing date."""
         # Arrange
@@ -110,7 +138,7 @@ class TestTeraxionTfn(unittest.TestCase):
         # Assert
         ask_mock.assert_called_once_with(expected_command, timeout=self.tfn.DEFAULT_READ_TIMEOUT)
         self.assertEqual(status, expected_status)
-    
+
     @unittest.mock.patch("qmi.core.scpi_protocol.ScpiProtocol.write")
     def test_reset_resets(self, write_mock):
         """Test reset, resets."""
@@ -191,13 +219,25 @@ class TestTeraxionTfn(unittest.TestCase):
         ask_mock.assert_called_once_with(expected_command, timeout=self.tfn.DEFAULT_READ_TIMEOUT)
 
     @unittest.mock.patch("qmi.core.scpi_protocol.ScpiProtocol.ask")
-    def test_set_startup_byte_sends_set_startup_byte_command(self, ask_mock):
-        """Test set startup byte, sends startup byte command."""
+    def test_enable_tecs_on_startup_sends_set_startup_byte_command(self, ask_mock):
+        """Test enable tecs on startup, sends startup byte command."""
         # Arrange
         expected_command = "S603401P L000a S6105P"
 
         # Act
-        self.tfn.set_startup_byte(True)
+        self.tfn.enable_tecs_on_startup()
+
+        # Assert
+        ask_mock.assert_called_once_with(expected_command, timeout=self.tfn.DEFAULT_READ_TIMEOUT)
+
+    @unittest.mock.patch("qmi.core.scpi_protocol.ScpiProtocol.ask")
+    def test_disable_tecs_on_startup_sends_set_startup_byte_command(self, ask_mock):
+        """Test disable tecs on startup, sends startup byte command."""
+        # Arrange
+        expected_command = "S603400P L000a S6105P"
+
+        # Act
+        self.tfn.disable_tecs_on_startup()
 
         # Assert
         ask_mock.assert_called_once_with(expected_command, timeout=self.tfn.DEFAULT_READ_TIMEOUT)

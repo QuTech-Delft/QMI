@@ -335,6 +335,20 @@ class Teraxion_TFN(QMI_Instrument):
         # convert to hex representation
         return bytes.fromhex(resp)
 
+    def _set_startup_byte(self, tec_status: bool) -> None:
+        """
+        Set the startup byte of the TFN.
+
+        Parameters:
+            tec_status: The status of the TECs on startup. True for all enable and False for all disabled.
+        """
+        _logger.info("Setting startup byte of instrument [%s]", self._name)
+        self._check_is_open()
+        # pack the element to a byte array
+        val = struct.pack(">B", int(tec_status))
+        # send command
+        self._write(Teraxion_TFNCommand_SetStartupByte, val)
+
     @rpc_method
     def open(self) -> None:
         _logger.info("[%s] Opening connection instrument", self._name)
@@ -577,19 +591,18 @@ class Teraxion_TFN(QMI_Instrument):
         return bool(struct.unpack(">B", resp[self.LEN_STATUS_BYTES:])[0])
 
     @rpc_method
-    def set_startup_byte(self, tec_status: bool) -> None:
+    def enable_tecs_on_startup(self) -> None:
         """
-        Set the startup byte of the TFN.
+        Enable TECs on startup of TFN.
+        """
+        self._set_startup_byte(True)
 
-        Parameters:
-            tec_status: The status of the TECs on startup. True for all enable and False for all disabled.
+    @rpc_method
+    def disable_tecs_on_startup(self) -> None:
         """
-        _logger.info("Setting startup byte of instrument [%s]", self._name)
-        self._check_is_open()
-        # pack the element to a byte array
-        val = struct.pack(">B", int(tec_status))
-        # send command
-        self._write(Teraxion_TFNCommand_SetStartupByte, val)
+        Disable TECs on startup of TFN.
+        """
+        self._set_startup_byte(False)
 
     @rpc_method
     def get_nominal_settings(self) -> Teraxion_TFNSettings:
