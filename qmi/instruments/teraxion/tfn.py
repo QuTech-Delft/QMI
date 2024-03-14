@@ -4,12 +4,12 @@ Instrument driver for TeraXion TFN.
 
 import binascii
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 import logging
 import struct
 import time
-from typing import Optional
+from typing import Optional, Type, TypeVar
 from qmi.core.context import QMI_Context
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
@@ -18,7 +18,6 @@ from qmi.core.transport import create_transport
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
-
 
 class Teraxion_TFNElement(Enum):
     """
@@ -91,6 +90,8 @@ class Teraxion_TFNCommand:
     command_id: int
     num_received_bytes: Optional[int]
     module_address: int = 0x30
+
+T = TypeVar('T', bound=Teraxion_TFNCommand)
 
 
 class Teraxion_TFNCommand_GetStatus(Teraxion_TFNCommand):
@@ -267,7 +268,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     def _make_write_command(
         self,
-        cmd: Teraxion_TFNCommand,
+        cmd: Type[T],
         value: Optional[bytes] = None
     ) -> str:
         """
@@ -286,7 +287,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     def _make_read_command(
         self,
-        cmd: Teraxion_TFNCommand,
+        cmd: Type[T],
     ) -> str:
         """
         Helper method to make the read command.
@@ -301,7 +302,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     def _write(
         self,
-        cmd: Teraxion_TFNCommand,
+        cmd: Type[T],
         value: Optional[bytes] = None,
         timeout: float = DEFAULT_READ_TIMEOUT,
     ) -> None:
@@ -320,7 +321,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     def _read(
         self,
-        cmd: Teraxion_TFNCommand,
+        cmd: Type[T],
         value: Optional[bytes] = None,
         timeout: float = DEFAULT_READ_TIMEOUT,
     ) -> bytes:
@@ -451,7 +452,7 @@ class Teraxion_TFN(QMI_Instrument):
                                             version=self.get_firmware_version())
 
     @rpc_method
-    def get_manufacturing_date(self) -> datetime.date:
+    def get_manufacturing_date(self) -> date:
         """
         Get manufacturing date of the TFN.
 
@@ -464,12 +465,12 @@ class Teraxion_TFN(QMI_Instrument):
         resp = self._read(Teraxion_TFNCommand_GetManufacturingDate)
         time.sleep(self.GET_LONG_PROCESS_TIME)
         # get the data after the status bytes and ignore the null bytes
-        date = resp[self.LEN_STATUS_BYTES:]
-        date_decoded = date.decode("ascii")[:date.find(b"\x00")]
+        manufacturing_date = resp[self.LEN_STATUS_BYTES:]
+        date_decoded = manufacturing_date.decode("ascii")[:manufacturing_date.find(b"\x00")]
         return datetime.strptime(date_decoded, "%Y%m%d").date()
 
     @rpc_method
-    def get_status(self) -> str:
+    def get_status(self) -> Teraxion_TFNStatus:
         """
         Get status of the TFN.
 
