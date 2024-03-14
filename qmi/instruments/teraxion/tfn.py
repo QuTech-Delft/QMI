@@ -214,7 +214,7 @@ class Teraxion_TFNCommand_GetNominalSettings(Teraxion_TFNCommand):
     """
 
     command_id = 0x37
-    num_received_bytes = 16
+    num_received_bytes = 12
 
 class Teraxion_TFNCommand_SaveNominalSettings(Teraxion_TFNCommand):
     """
@@ -222,7 +222,7 @@ class Teraxion_TFNCommand_SaveNominalSettings(Teraxion_TFNCommand):
     """
 
     command_id = 0x36
-    num_received_bytes = 16
+    num_received_bytes = 12
 
 class Teraxion_TFNCommand_GetChannelPlan(Teraxion_TFNCommand):
     """
@@ -635,7 +635,7 @@ class Teraxion_TFN(QMI_Instrument):
         resp = self._read(Teraxion_TFNCommand_GetNominalSettings)
         time.sleep(self.GET_PROCESS_TIME)
         # unpack the frequency and dispersion
-        _, freq, disp, _ = struct.unpack(">IffI", resp)
+        _, freq, disp = struct.unpack(">Iff", resp)
         return Teraxion_TFNSettings(freq, disp)
 
     @rpc_method

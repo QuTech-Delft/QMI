@@ -261,8 +261,8 @@ class TestTeraxionTfn(unittest.TestCase):
         """Test get nominal settings, gets nominal settings."""
         # Arrange
         expected_settings = Teraxion_TFNSettings(192400, 0)
-        expected_command = "S6037P S6110P"
-        ask_mock.return_value = "00100000483be4000000000000000000"
+        expected_command = "S6037P S610cP"
+        ask_mock.return_value = "00100000483be40000000000"
 
         # Act
         settings = self.tfn.get_nominal_settings()
@@ -275,7 +275,7 @@ class TestTeraxionTfn(unittest.TestCase):
     def test_save_nominal_settings_sends_save_nominal_settings_command(self, ask_mock):
         """Test save nominal settings, saves nominal settings."""
         # Arrange
-        expected_command = "S6036P L000a S6110P"
+        expected_command = "S6036P L000a S610cP"
 
         # Act
         self.tfn.save_nominal_settings()
