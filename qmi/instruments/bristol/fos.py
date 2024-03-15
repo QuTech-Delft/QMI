@@ -29,7 +29,7 @@ def _import_modules() -> None:
     """
     global uldaq
     if uldaq is None:
-        import uldaq  #pylint: disable=W0621
+        import uldaq  # pylint: disable=W0621
 
 
 class Bristol_FOS(QMI_Instrument):

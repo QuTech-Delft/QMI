@@ -459,7 +459,7 @@ class TestTasksAndUserToInstrumentWithLock(unittest.TestCase):
         self.receiver = QMI_SignalReceiver()
         self.publisher_proxy = self.c1.get_task("instr_server.controller")
         self.publisher_proxy.sig_sample.subscribe(self.receiver)
-        self.wait_timeout = 0.12
+        self.wait_timeout = 0.1
 
     def tearDown(self) -> None:
         # Close task and QMI
@@ -480,6 +480,7 @@ class TestTasksAndUserToInstrumentWithLock(unittest.TestCase):
         """Test that the task runs as expected."""
         expected = [3.5e-07, 3.77e-07, 4.08e-07, 4.45e-07, 4.9e-07, 5.44e-07, 6.13e-07, 7e-07]
         self.controller.start()
+        time.sleep(self.wait_timeout * 10)  # Enough data should have been produced
         for s in range(len(expected)):
             signal = self.receiver.get_next_signal(timeout=self.wait_timeout)
             self.assertEqual(expected[s], round(signal.args[0], 9))

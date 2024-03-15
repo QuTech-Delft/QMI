@@ -192,6 +192,7 @@ class PicoQuant_HydraHarp400(_PicoquantHarp):
         # Reset the event filter configuration.
         self.set_event_filter(reset_filter=True)
         self.set_block_events(False)
+        _logger.info("[%s] Initialized device with mode %s and source %s", self._name, mode.value, refsource.value)
 
     @rpc_method
     def get_module_info(self) -> List[Tuple[int, int]]:

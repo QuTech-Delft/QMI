@@ -15,7 +15,14 @@ import qmi.core.exceptions
 from qmi.utils.context_managers import start_stop
 from qmi.core.pubsub import QMI_Signal, QMI_SignalReceiver
 from qmi.core.rpc import QMI_RpcObject, rpc_method
-from qmi.core.task import QMI_Task, QMI_LoopTask, QMI_LoopTaskMissedLoopPolicy, QMI_TaskRunner
+from qmi.core.task import (
+    QMI_Task,
+    QMI_LoopTask,
+    QMI_LoopTaskMissedLoopPolicy,
+    QMI_TaskRunner,
+)
+
+from tests.patcher import PatcherQmiContext
 
 
 class CustomTaskRunner(QMI_TaskRunner):
@@ -35,23 +42,35 @@ class SimpleTestTask(QMI_Task):
 
     my_signal = QMI_Signal([int])
 
-    def __init__(self, task_runner, name, raise_exception_in_init, raise_exception_in_run, duration, value):
-
+    def __init__(
+        self,
+        task_runner,
+        name,
+        raise_exception_in_init,
+        raise_exception_in_run,
+        duration,
+        value,
+    ):
         super().__init__(task_runner, name)
 
-        self.settings = SimpleTestTask.Settings("Hello, world from within SimpleTestTask!",
-                                                value)
+        self.settings = SimpleTestTask.Settings(
+            "Hello, world from within SimpleTestTask!", value
+        )
         self.raise_exception_in_run = raise_exception_in_run
         self.duration = duration
 
         if raise_exception_in_init:
-            raise ValueError("This error originates from within SimpleTestTask's __init__() method.")
+            raise ValueError(
+                "This error originates from within SimpleTestTask's __init__() method."
+            )
 
     def run(self):
         """Run this task."""
 
         if self.raise_exception_in_run:
-            raise ValueError("This error originates from within SimpleTestTask's run() method.")
+            raise ValueError(
+                "This error originates from within SimpleTestTask's run() method."
+            )
 
         run_until = time.monotonic() + self.duration
         while time.monotonic() < run_until:
@@ -150,23 +169,31 @@ class LoopTestTask(QMI_LoopTask):
 
     my_signal = QMI_Signal([int])
 
-    def __init__(self, task_runner, name, status_value, loop_period, policy, nr_of_loops, increase_loop, error=None):
-
+    def __init__(
+        self,
+        task_runner,
+        name,
+        status_value,
+        loop_period,
+        policy,
+        nr_of_loops,
+        increase_loop,
+        error=None,
+    ):
         super().__init__(task_runner, name, loop_period, policy)
-
+        # Initialize settings and status with some (default) values
         self.settings = LoopTestTask.Settings("Standard setting for LoopTestTask", 1)
         self.status = LoopTestTask.Status("LoopTestTask loop iteration status is", status_value)
+        self._status_value = status_value
         self._nr_of_loops = nr_of_loops
         self._increase_loop = increase_loop
         self._error = error
-        self._loop_nr_increasing = 0
         self._current_loop = 0
 
     def loop_prepare(self):
-        # prepare something
-        self.status = LoopTestTask.Status("LoopTestTask loop iteration status is", self._current_loop)
+        # Initial settings and status value publishing
+        self.sig_settings_updated.publish(self.settings.value)
         self.sig_status_updated.publish(self.status.value)
-        self._loop_nr_increasing = 1
         # sleep until next monotonic period start. Makes sure we won't get random missed loops depending on which
         # monotonic moment we start our looping
         time_to_sleep = self._loop_period - (time.monotonic() % self._loop_period)
@@ -174,17 +201,20 @@ class LoopTestTask(QMI_LoopTask):
             self.sleep(time_to_sleep)
 
     def loop_iteration(self):
+        # This follows settings update and processing step if settings are changed. Status is updated after this.
+        self._current_loop += 1  # increase loop value
         # do some kind of "work"
-        self._current_loop += self._loop_nr_increasing
-        self.status = LoopTestTask.Status("LoopTestTask loop iteration status is", self._current_loop)
-        self.sig_status_updated.publish(self.status.value)
+        self._status_value += 1
+        self.status = LoopTestTask.Status("LoopTestTask loop iteration status is", self._status_value)
+        self.settings = LoopTestTask.Settings("Standard setting for LoopTestTask", self._current_loop)
         if self._current_loop >= self._nr_of_loops:
+            time.sleep(self._loop_period)  # Make sure the latest loop finishes before stopping
             self._task_runner.stop()
             return
 
         if self._increase_loop:
-            self.settings = LoopTestTask.Settings("Standard setting for LoopTestTask", self._current_loop)
-            self._task_runner.set_settings(self.settings)
+            self._status_value += 1  # increase status value
+            # update also settings
             time.sleep(self._loop_period / 2.0)
 
         if self._error:
@@ -193,13 +223,11 @@ class LoopTestTask(QMI_LoopTask):
                 self._current_loop += 1  # skip a loop
 
     def loop_finalize(self):
-        # Clean up at the end of the loop task
+        # Clean up at the end of the loop task and set status and settings back to default (1)
         time.sleep(self._loop_period / 2.0)
         self.status = LoopTestTask.Status("LoopTestTask loop iteration status is", 1)
-
-    def process_new_settings(self):
-        # get new setting value and set loop increase accordingly
-        self._loop_nr_increasing = self.settings.value
+        self.settings = LoopTestTask.Settings("Standard setting for LoopTestTask", 1)
+        self._task_runner.set_settings(self.settings)
 
     def update_status(self):
         # Try to obtain new status.
@@ -209,9 +237,17 @@ class LoopTestTask(QMI_LoopTask):
 
         return False
 
+    def process_new_settings(self) -> None:
+        # Update the settings
+        self.settings = LoopTestTask.Settings(
+            "Standard setting for LoopTestTask", self._current_loop
+        )
+
     def publish_signals(self):
         # Publish something
-        self.my_signal.publish(self._loop_nr_increasing)
+        self.my_signal.publish(self.settings.value + self.status.value)
+        self.sig_settings_updated.publish(self.settings.value)
+        self.sig_status_updated.publish(self.status.value)
 
 
 class TestQMITaskContextManager(unittest.TestCase):
@@ -220,7 +256,9 @@ class TestQMITaskContextManager(unittest.TestCase):
         logging.getLogger("qmi.core.task").setLevel(logging.ERROR)
         logging.getLogger("qmi.core.rpc").setLevel(logging.ERROR)
         qmi.start("test-taskrunner")
-        task: QMI_TaskRunner = qmi.make_task("taskrunner", SimpleTestTask, False, False, 1.0, 2.0)
+        task: QMI_TaskRunner = qmi.make_task(
+            "taskrunner", SimpleTestTask, False, False, 1.0, 2.0
+        )
         with start_stop(task):
             task.get_status()
 
@@ -231,46 +269,52 @@ class TestQMITaskContextManager(unittest.TestCase):
 
 
 class TestQMITasks(unittest.TestCase):
-
     def setUp(self):
         logging.getLogger("qmi.core.task").setLevel(logging.ERROR)
         logging.getLogger("qmi.core.rpc").setLevel(logging.ERROR)
         self._ctx_qmi_id = f"test-tasks-{random.randint(0, 100)}"
-        qmi.start(self._ctx_qmi_id)
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start(self._ctx_qmi_id)
 
     def tearDown(self):
-        qmi.stop()
+        self.qmi_patcher.stop()
         logging.getLogger("qmi.core.task").setLevel(logging.NOTSET)
         logging.getLogger("qmi.core.rpc").setLevel(logging.NOTSET)
 
     def test_exception_during_init(self):
         with self.assertRaises(qmi.core.exceptions.QMI_TaskInitException):
-            qmi.make_task("simple_task_init",
-                          SimpleTestTask,
-                          raise_exception_in_init=True,
-                          raise_exception_in_run=False,
-                          duration=1.0,
-                          value=5)
+            qmi.make_task(
+                "simple_task_init",
+                SimpleTestTask,
+                raise_exception_in_init=True,
+                raise_exception_in_run=False,
+                duration=1.0,
+                value=5,
+            )
 
     def test_exception_during_run(self):
-        task_proxy = qmi.make_task("simple_task_run",
-                                   SimpleTestTask,
-                                   raise_exception_in_init=False,
-                                   raise_exception_in_run=True,
-                                   duration=1.0,
-                                   value=6)
+        task_proxy = qmi.make_task(
+            "simple_task_run",
+            SimpleTestTask,
+            raise_exception_in_init=False,
+            raise_exception_in_run=True,
+            duration=1.0,
+            value=6,
+        )
         task_proxy.start()
         time.sleep(2.0)
         with self.assertRaises(qmi.core.exceptions.QMI_TaskRunException):
-            result = task_proxy.join()
+            task_proxy.join()
 
     def test_run_to_completion(self):
-        task_proxy = qmi.make_task("simple_task_complete",
-                                   SimpleTestTask,
-                                   raise_exception_in_init=False,
-                                   raise_exception_in_run=False,
-                                   duration=1.0,
-                                   value=7)
+        task_proxy = qmi.make_task(
+            "simple_task_complete",
+            SimpleTestTask,
+            raise_exception_in_init=False,
+            raise_exception_in_run=False,
+            duration=1.0,
+            value=7,
+        )
         self.assertFalse(task_proxy.is_running())
         task_proxy.start()
         self.assertTrue(task_proxy.is_running())
@@ -284,12 +328,14 @@ class TestQMITasks(unittest.TestCase):
         self.assertEqual(status, 7)
 
     def test_run_to_stopped(self):
-        task_proxy = qmi.make_task("simple_task_stopped",
-                                   SimpleTestTask,
-                                   raise_exception_in_init=False,
-                                   raise_exception_in_run=False,
-                                   duration=2.0,
-                                   value=8)
+        task_proxy = qmi.make_task(
+            "simple_task_stopped",
+            SimpleTestTask,
+            raise_exception_in_init=False,
+            raise_exception_in_run=False,
+            duration=2.0,
+            value=8,
+        )
         task_proxy.start()
         time.sleep(0.5)
         self.assertTrue(task_proxy.is_running())
@@ -307,12 +353,14 @@ class TestQMITasks(unittest.TestCase):
         self.assertIsNone(status)
 
     def test_update_settings(self):
-        task_proxy = qmi.make_task("simple_task_update",
-                                   SimpleTestTask,
-                                   raise_exception_in_init=False,
-                                   raise_exception_in_run=False,
-                                   duration=2.0,
-                                   value=9)
+        task_proxy = qmi.make_task(
+            "simple_task_update",
+            SimpleTestTask,
+            raise_exception_in_init=False,
+            raise_exception_in_run=False,
+            duration=2.0,
+            value=9,
+        )
         recv = QMI_SignalReceiver()
         task_proxy.sig_settings_updated.subscribe(recv)
         task_proxy.start()
@@ -333,11 +381,9 @@ class TestQMITasks(unittest.TestCase):
 
     def test_get_pending_settings(self):
         event = threading.Event()
-        task_proxy = qmi.make_task("slow_task",
-                                   SlowTestTask,
-                                   duration=2.0,
-                                   value=9,
-                                   event=event)
+        task_proxy = qmi.make_task(
+            "slow_task", SlowTestTask, duration=2.0, value=9, event=event
+        )
         recv = QMI_SignalReceiver()
         task_proxy.sig_settings_updated.subscribe(recv)
         task_proxy.start()
@@ -362,12 +408,14 @@ class TestQMITasks(unittest.TestCase):
         self.assertIsNone(post_pending_settings)
 
     def test_signals(self):
-        task_proxy = qmi.make_task("simple_task_signals",
-                                   SimpleTestTask,
-                                   raise_exception_in_init=False,
-                                   raise_exception_in_run=False,
-                                   duration=1.0,
-                                   value=10)
+        task_proxy = qmi.make_task(
+            "simple_task_signals",
+            SimpleTestTask,
+            raise_exception_in_init=False,
+            raise_exception_in_run=False,
+            duration=1.0,
+            value=10,
+        )
         recv = QMI_SignalReceiver()
         task_proxy.my_signal.subscribe(recv)
         task_proxy.start()
@@ -382,12 +430,14 @@ class TestQMITasks(unittest.TestCase):
         self.assertEqual(sig.args, (10,))
 
     def test_stop_before_start(self):
-        task_proxy = qmi.make_task("simple_task_stop",
-                                   SimpleTestTask,
-                                   raise_exception_in_init=False,
-                                   raise_exception_in_run=False,
-                                   duration=2.0,
-                                   value=11)
+        task_proxy = qmi.make_task(
+            "simple_task_stop",
+            SimpleTestTask,
+            raise_exception_in_init=False,
+            raise_exception_in_run=False,
+            duration=2.0,
+            value=11,
+        )
         time.sleep(0.5)
         self.assertFalse(task_proxy.is_running())
         task_proxy.stop()
@@ -401,7 +451,12 @@ class TestQMITasks(unittest.TestCase):
 
     def test_receive_signals(self):
         publisher_proxy = qmi.context().make_rpc_object("test_publisher", TestPublisher)
-        task_proxy = qmi.make_task("receiving_task", SignalWaitingTask, wait_timeout=None, context_id=self._ctx_qmi_id)
+        task_proxy = qmi.make_task(
+            "receiving_task",
+            SignalWaitingTask,
+            wait_timeout=None,
+            context_id=self._ctx_qmi_id,
+        )
         task_proxy.start()
         time.sleep(0.1)
         status = task_proxy.get_status()
@@ -421,7 +476,12 @@ class TestQMITasks(unittest.TestCase):
 
     def test_timeout_while_waiting_for_signal(self):
         qmi.context().make_rpc_object("test_publisher", TestPublisher)
-        task_proxy = qmi.make_task("receiving_task", SignalWaitingTask, wait_timeout=1.0, context_id=self._ctx_qmi_id)
+        task_proxy = qmi.make_task(
+            "receiving_task",
+            SignalWaitingTask,
+            wait_timeout=1.0,
+            context_id=self._ctx_qmi_id,
+        )
         task_proxy.start()
         time.sleep(0.1)
         self.assertTrue(task_proxy.is_running())
@@ -434,8 +494,13 @@ class TestQMITasks(unittest.TestCase):
             task_proxy.join()
 
     def test_stop_while_waiting_for_signal(self):
-        publisher_proxy = qmi.context().make_rpc_object("test_publisher", TestPublisher)
-        task_proxy = qmi.make_task("receiving_task", SignalWaitingTask, wait_timeout=30.0, context_id=self._ctx_qmi_id)
+        qmi.context().make_rpc_object("test_publisher", TestPublisher)
+        task_proxy = qmi.make_task(
+            "receiving_task",
+            SignalWaitingTask,
+            wait_timeout=30.0,
+            context_id=self._ctx_qmi_id,
+        )
         task_proxy.start()
         time.sleep(0.1)
         self.assertTrue(task_proxy.is_running())
@@ -447,82 +512,98 @@ class TestQMITasks(unittest.TestCase):
         task_proxy.join()
 
     def test_run_to_loop_finish(self):
-        """ Test and assert that loop runs normally from start to finish if there are no glitches."""
+        """Test and assert that loop runs normally from start to finish if there are no glitches."""
         # Arrange
-        status_signals_expected = list(range(-1, 4, 1)) + [1]
-        receiver_signals_expected = list(range(0, 4))
+
         status_signals_received = []
-        receiver_signals_received = []
+        settings_signals_received = []
         nr_of_loops = 3
         increase_loop = False
         initial_status_value = -1
         loop_period = 0.1
         policy = QMI_LoopTaskMissedLoopPolicy.IMMEDIATE
+        status_signals_expected = list(range(initial_status_value, nr_of_loops, 1)) + [1]
+        settings_signals_expected = [1] + list(range(1, 4))
 
-        task_proxy = qmi.make_task("loop_task",
-                                   LoopTestTask,
-                                   increase_loop=increase_loop,
-                                   nr_of_loops=nr_of_loops,
-                                   status_value=initial_status_value,
-                                   loop_period=loop_period,
-                                   policy=policy)
-        self.receiver = QMI_SignalReceiver()
-        publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task")
-        publisher_proxy.sig_settings_updated.subscribe(self.receiver)
-        publisher_proxy.sig_status_updated.subscribe(self.receiver)
+        task_proxy = qmi.make_task(
+            "loop_task_finish",
+            LoopTestTask,
+            increase_loop=increase_loop,
+            nr_of_loops=nr_of_loops,
+            status_value=initial_status_value,
+            loop_period=loop_period,
+            policy=policy,
+        )
+        receiver = QMI_SignalReceiver()
+        publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task_finish")
+        publisher_proxy.sig_settings_updated.subscribe(receiver)
 
         # Act
-        # Test that initial status value is set as -1
-        status_signals_received.append(task_proxy.get_status().value)
         task_proxy.start()
         # Test that prepare has done its job
-        receiver_signals_received.append(self.receiver.get_next_signal(timeout=2*loop_period).args[-1])
         status_signals_received.append(task_proxy.get_status().value)
+        settings_signals_received.append(
+            receiver.get_next_signal(timeout=2 * loop_period).args[-1]
+        )
         # LoopTestTask does 3x 1 second loops --> should be finished after 3 seconds
-        for n in range(3):
+        for n in range(nr_of_loops):
             # Test that the status changes at the end of each loop, after receiver signal increments
-            receiver_signals_received.append(self.receiver.get_next_signal(timeout=2*loop_period).args[-1])
+            while task_proxy.get_status().value == status_signals_received[-1]:
+                time.sleep(0.1 * loop_period)
+
+            settings_signals_received.append(
+                receiver.get_next_signal(timeout=2 * loop_period).args[-1]
+            )
             status_signals_received.append(task_proxy.get_status().value)
 
-        time.sleep(loop_period)  # Need to sleep once more for waiting the last loop `sleep`
         # Test that finalize_loop sets status back to 1
+        while task_proxy.get_status().value == status_signals_received[-1]:
+            time.sleep(0.1 * loop_period)
+
         status_signals_received.append(task_proxy.get_status().value)
+        time.sleep(2 * loop_period)  # Give time to finalize
         # Assert
+        self.assertListEqual(status_signals_expected, status_signals_received)
+        self.assertListEqual(settings_signals_expected, settings_signals_received)
         self.assertFalse(task_proxy.is_running())
-        self.assertListEqual(status_signals_received, status_signals_expected)
-        self.assertListEqual(receiver_signals_received, receiver_signals_expected)
 
     def test_my_signal(self):
         """See that my_signal also gets updated and sent in each loop with increasing step"""
         # Arrange
-        receiver_signals_expected = [1, 1, 2, 4]
-        receiver_signals_received = []
-        increase_loop = True
+        increase_loop = True  # +1 extra status value / round
         nr_of_loops = 5
-        initial_status_value = 0
+        initial_status_value = 5
         loop_period = 0.1
         policy = QMI_LoopTaskMissedLoopPolicy.IMMEDIATE
+        my_signals_expected = list(range(
+            initial_status_value + 2, initial_status_value + nr_of_loops * 2, 3)
+        )  # my_signal sums up (increasing) status and settings values, starting after 1st round.
+        my_signals_received = []
 
-        task_proxy = qmi.make_task("loop_task",
-                                   LoopTestTask,
-                                   increase_loop=increase_loop,
-                                   nr_of_loops=nr_of_loops,
-                                   status_value=initial_status_value,
-                                   loop_period=loop_period,
-                                   policy=policy)
-        self.receiver = QMI_SignalReceiver()
-        publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task")
-        publisher_proxy.my_signal.subscribe(self.receiver)
+        task_proxy = qmi.make_task(
+            "loop_task_my_signal",
+            LoopTestTask,
+            increase_loop=increase_loop,
+            nr_of_loops=nr_of_loops,
+            status_value=initial_status_value,
+            loop_period=loop_period,
+            policy=policy,
+        )
+        receiver = QMI_SignalReceiver()
+        publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task_my_signal")
+        publisher_proxy.my_signal.subscribe(receiver)
         LoopTestTask.Settings("Standard setting for LoopTestTask", 1)
 
         # Act
         task_proxy.start()
-        for n in range(4):
-            # Test that the my_signal is sent at each loop with increasing loop jumps
-            receiver_signals_received.append(self.receiver.get_next_signal(timeout=2*loop_period).args[-1])
+        for n in range(len(my_signals_expected)):
+            # Test that the my_signal is sent at each loop with increasing value
+            my_signals_received.append(
+                receiver.get_next_signal(timeout=2 * loop_period).args[-1]
+            )
 
         # Assert
-        self.assertListEqual(receiver_signals_received, receiver_signals_expected)
+        self.assertListEqual(my_signals_expected, my_signals_received)
 
     def test_my_signal_timeout(self):
         """See that my_signal raises timeout if trying to wait for more signals than the loops"""
@@ -533,16 +614,18 @@ class TestQMITasks(unittest.TestCase):
         loop_period = 0.1
         policy = QMI_LoopTaskMissedLoopPolicy.IMMEDIATE
 
-        task_proxy = qmi.make_task("loop_task",
-                                   LoopTestTask,
-                                   increase_loop=increase_loop,
-                                   nr_of_loops=nr_of_loops,
-                                   status_value=initial_status_value,
-                                   loop_period=loop_period,
-                                   policy=policy)
-        self.receiver = QMI_SignalReceiver()
+        task_proxy = qmi.make_task(
+            "loop_task",
+            LoopTestTask,
+            increase_loop=increase_loop,
+            nr_of_loops=nr_of_loops,
+            status_value=initial_status_value,
+            loop_period=loop_period,
+            policy=policy,
+        )
+        receiver = QMI_SignalReceiver()
         publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task")
-        publisher_proxy.my_signal.subscribe(self.receiver)
+        publisher_proxy.my_signal.subscribe(receiver)
         LoopTestTask.Settings("Standard setting for LoopTestTask", 1)
 
         # Act
@@ -552,171 +635,229 @@ class TestQMITasks(unittest.TestCase):
         with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
             for n in range(3):
                 # Test that the my_signal is sent at each loop with increasing loop jumps
-                _ = self.receiver.get_next_signal(timeout=2 * loop_period).args[-1]
+                _ = receiver.get_next_signal(timeout=2 * loop_period).args[-1]
 
     def test_loop_timeout_policy_IMMEDIATE(self):
-        """See that all loop iterations are obtained even if with some delay """
+        """See that all loop iterations are obtained even if with some delay"""
         # Arrange
-        status_signals_expected = list(range(-1, 4, 1)) + [1]
-        receiver_signals_expected = list(range(0, 4))
-        status_signals_received = []
-        receiver_signals_received = []
-        nr_of_loops = 3
+        nr_of_loops = 5
         increase_loop = False
         initial_status_value = -1
         loop_period = 0.1
         policy = QMI_LoopTaskMissedLoopPolicy.IMMEDIATE
-        # The `error="IMMEDIATE` in the task object creation makes each loop be 1.1 times longer than loop period.
-        task_proxy = qmi.make_task("loop_task",
-                                   LoopTestTask,
-                                   increase_loop=increase_loop,
-                                   nr_of_loops=nr_of_loops,
-                                   status_value=initial_status_value,
-                                   loop_period=loop_period,
-                                   policy=policy,
-                                   error="IMMEDIATE")
-        self.receiver = QMI_SignalReceiver()
-        publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task")
-        publisher_proxy.sig_settings_updated.subscribe(self.receiver)
-        publisher_proxy.sig_status_updated.subscribe(self.receiver)
+
+        status_signals_expected = list(range(
+            initial_status_value, initial_status_value + nr_of_loops + 1, 1)
+        )
+        settings_signals_expected = [1] + list(range(1, nr_of_loops + 1))
+        status_got = []
+        settings_got = []
+        status_signals_received = []
+        settings_signals_received = []
+
+        # The `error=IMMEDIATE` in the task object creation makes each loop be 1.1 times longer than loop period.
+        task_proxy = qmi.make_task(
+            "loop_task_immediate",
+            LoopTestTask,
+            increase_loop=increase_loop,
+            nr_of_loops=nr_of_loops,
+            status_value=initial_status_value,
+            loop_period=loop_period,
+            policy=policy,
+            error="IMMEDIATE",
+        )
+        receiver_sett = QMI_SignalReceiver()
+        receiver_stat = QMI_SignalReceiver()
+        publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task_immediate")
+        publisher_proxy.sig_settings_updated.subscribe(receiver_sett)
+        publisher_proxy.sig_status_updated.subscribe(receiver_stat)
 
         # Act
-        # Test that initial status value is set as -1
-        status_signals_received.append(task_proxy.get_status().value)
+        # Get initial values before start
+        settings_got.append(task_proxy.get_settings().value)
+        status_got.append(task_proxy.get_status().value)
         start = time.time()
         task_proxy.start()
         # Test that prepare has done its job
-        receiver_signals_received.append(self.receiver.get_next_signal(timeout=2*loop_period).args[-1])
-        status_signals_received.append(task_proxy.get_status().value)
-        # LoopTestTask does 3x 1.1 loop_period --> should be finished after 3*loop_period
-        for n in range(3):
+        settings_signals_received.append(
+            receiver_sett.get_next_signal(timeout=2 * loop_period).args[-1]
+        )
+        status_signals_received.append(
+            receiver_stat.get_next_signal(timeout=2 * loop_period).args[-1]
+        )
+        # LoopTestTask does 1.1x loop_period --> should be finished after nr_of_loops*loop_period
+        for n in range(nr_of_loops):
             # Test that the status changes at the end of each loop, after receiver signal increments
-            receiver_signals_received.append(self.receiver.get_next_signal(timeout=2*loop_period).args[-1])
-            status_signals_received.append(task_proxy.get_status().value)
+            settings_got.append(task_proxy.get_settings().value)
+            while task_proxy.get_status().value == status_got[-1]:
+                time.sleep(0.1 * loop_period)
 
-        time.sleep(loop_period)  # Need to sleep once more for waiting the last loop `sleep`.
-        # Test that finalize_loop sets status back to 1
-        status_signals_received.append(task_proxy.get_status().value)
+            status_got.append(task_proxy.get_status().value)
+            settings_signals_received.append(
+                receiver_sett.get_next_signal(timeout=2 * loop_period).args[-1]
+            )
+            status_signals_received.append(
+                receiver_stat.get_next_signal(timeout=loop_period).args[-1]
+            )
+
+        time.sleep(loop_period * 2)  # Need to sleep once more for waiting the last loop `sleep`.
+        # Test that finalize_loop sets settings and status back to 1
+        settings_got.append(task_proxy.get_settings().value)
+        status_got.append(task_proxy.get_status().value)
         end = time.time()
         # Assert
         self.assertFalse(task_proxy.is_running())
-        self.assertGreater(end - start, 3*loop_period)
-        self.assertListEqual(status_signals_received, status_signals_expected)
-        self.assertListEqual(receiver_signals_received, receiver_signals_expected)
+        self.assertGreater(end - start, 3 * loop_period)
+        self.assertListEqual(settings_signals_received, settings_got[:-1])
+        self.assertListEqual(status_signals_expected, status_got[:-1])
+        self.assertEqual(1, settings_got[-1])  # loop_finalize should set the last value as 1
+        self.assertEqual(1, status_got[-1])  # loop_finalize should set the last value as 1
+        self.assertListEqual(status_signals_expected, status_signals_received)
+        self.assertListEqual(settings_signals_expected, settings_signals_received)
 
     def test_loop_timeout_policy_SKIP(self):
         """See that setting policy to skip causes to skip loops"""
         # Arrange
-        status_signals_expected = list(range(-1, 2, 1)) + [3, 5, 1]  # skips loops 2 & 4
-        receiver_signals_expected = list(range(0, 2)) + [3, 5]
         status_signals_received = []
-        receiver_signals_received = []
+        settings_signals_received = []
         increase_loop = False
         nr_of_loops = 5
         initial_status_value = -1
         loop_period = 0.1
         policy = QMI_LoopTaskMissedLoopPolicy.SKIP
 
-        task_proxy = qmi.make_task("loop_task",
-                                   LoopTestTask,
-                                   increase_loop=increase_loop,
-                                   nr_of_loops=nr_of_loops,
-                                   status_value=initial_status_value,
-                                   loop_period=loop_period,
-                                   policy=policy,
-                                   error="SKIP")
-        self.receiver = QMI_SignalReceiver()
+        status_signals_expected = list(range(initial_status_value, round(nr_of_loops / 2 + 1e-15)))
+        settings_signals_expected = [1] + [1, 3, 5]  # default value + skips loops 2 & 4
+
+        task_proxy = qmi.make_task(
+            "loop_task",
+            LoopTestTask,
+            increase_loop=increase_loop,
+            nr_of_loops=nr_of_loops,
+            status_value=initial_status_value,
+            loop_period=loop_period,
+            policy=policy,
+            error="SKIP",
+        )
+        receiver_sett = QMI_SignalReceiver()
+        receiver_stat = QMI_SignalReceiver()
         publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task")
-        publisher_proxy.sig_settings_updated.subscribe(self.receiver)
-        publisher_proxy.sig_status_updated.subscribe(self.receiver)
+        publisher_proxy.sig_settings_updated.subscribe(receiver_sett)
+        publisher_proxy.sig_status_updated.subscribe(receiver_stat)
 
         # Act
-        # Test that initial status value is set as -1
-        status_signals_received.append(task_proxy.get_status().value)
+        status_got = task_proxy.get_status().value
         task_proxy.start()
         # Test that prepare has done its job
-        receiver_signals_received.append(self.receiver.get_next_signal(timeout=2*loop_period).args[-1])
-        status_signals_received.append(task_proxy.get_status().value)
-        # LoopTestTask does 5x 1 second loops, but we should miss every second loop --> should be finished after 3 loops
-        for n in range(3):
+        settings_signals_received.append(
+            receiver_sett.get_next_signal(timeout=loop_period).args[-1]
+        )
+        status_signals_received.append(
+            receiver_stat.get_next_signal(timeout=loop_period).args[-1]
+        )
+        # LoopTestTask does 1.1x loop_period --> should be finished after half, rounded up, nr_of_loops has been done.
+        for n in range(round(nr_of_loops / 2 + 1e-15)):  # + 1e-15 to cheat on "banker's rounding" to "always" round up
             # Test that the status changes at the end of each loop, after receiver signal increments
-            receiver_signals_received.append(self.receiver.get_next_signal(timeout=2*loop_period).args[-1])
-            status_signals_received.append(task_proxy.get_status().value)
+            while task_proxy.get_status().value == status_got:
+                time.sleep(0.1 * loop_period)
 
-        time.sleep(loop_period * 4)
-        # Test that finalize_loop sets status back to 1
-        status_signals_received.append(task_proxy.get_status().value)
+            status_got = task_proxy.get_status().value
+            status_signals_received.append(
+                receiver_stat.get_next_signal(timeout=2 * loop_period).args[-1]
+            )
+            settings_signals_received.append(
+                receiver_sett.get_next_signal(timeout=2 * loop_period).args[-1]
+            )
+
+        time.sleep(loop_period * 2)  # Make sure the loop has time to finalize
         # Assert
+        # Test that finalize_loop sets status back to 1
         self.assertFalse(task_proxy.is_running())
-        self.assertListEqual(status_signals_received, status_signals_expected)
-        self.assertListEqual(receiver_signals_received, receiver_signals_expected)
+        self.assertEqual(1, task_proxy.get_settings().value)
+        self.assertEqual(1, task_proxy.get_status().value)
+        self.assertListEqual(status_signals_expected, status_signals_received)
+        self.assertListEqual(settings_signals_expected, settings_signals_received)
 
     def test_loop_timeout_policy_TERMINATE(self):
         """See that setting policy to terminate stops the task"""
         # Arrange
-        status_signals_expected = list(range(-1, 2, 1)) + [1]
-        receiver_signals_expected = list(range(0, 2))
         status_signals_received = []
-        receiver_signals_received = []
+        settings_signals_received = []
         increase_loop = False
         nr_of_loops = 5
-        initial_status_value = -1
+        initial_status_value = 3
         loop_period = 0.1
         policy = QMI_LoopTaskMissedLoopPolicy.TERMINATE
 
-        task_proxy = qmi.make_task("loop_task",
-                                   LoopTestTask,
-                                   increase_loop=increase_loop,
-                                   nr_of_loops=nr_of_loops,
-                                   status_value=initial_status_value,
-                                   loop_period=loop_period,
-                                   policy=policy,
-                                   error="TERMINATE")
-        self.receiver = QMI_SignalReceiver()
-        publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task")
-        publisher_proxy.sig_settings_updated.subscribe(self.receiver)
-        publisher_proxy.sig_status_updated.subscribe(self.receiver)
+        status_signals_expected = list(range(
+            initial_status_value, initial_status_value + 2, 1)
+        ) + [1]  # Expected to skip a sample on 2nd step and terminate, last value defaults back to 1
+        settings_signals_expected = [1, 1]  # initial value, 1st loop
+
+        task_proxy = qmi.make_task(
+            "loop_task_terminate",
+            LoopTestTask,
+            increase_loop=increase_loop,
+            nr_of_loops=nr_of_loops,
+            status_value=initial_status_value,
+            loop_period=loop_period,
+            policy=policy,
+            error="TERMINATE",
+        )
+        receiver = QMI_SignalReceiver()
+        publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task_terminate")
+        publisher_proxy.sig_settings_updated.subscribe(receiver)
 
         # Act
         # Test that initial status value is set as -1
         status_signals_received.append(task_proxy.get_status().value)
         task_proxy.start()
-        # Test that prepare has done its job
-        receiver_signals_received.append(self.receiver.get_next_signal(timeout=2*loop_period).args[-1])
-        status_signals_received.append(task_proxy.get_status().value)
-        # LoopTestTask does 5x 1 second loops, but we should miss every second loop --> should be finished after 3 loops
-        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
-            for n in range(3):
-                # Test that the status changes at the end of each loop, after receiver signal increments
-                receiver_signals_received.append(self.receiver.get_next_signal(timeout=2*loop_period).args[-1])
-                status_signals_received.append(task_proxy.get_status().value)
+        # LoopTestTask does 5x 1 second loops, but we should miss every second loop --> should be finished after 2 loops
+        for n in range(2):
+            settings_signals_received.append(
+                receiver.get_next_signal(timeout=2 * loop_period).args[-1]
+            )
+            # Test that the status changes at the end of each loop, after receiver signal increments
+            while task_proxy.get_status().value == status_signals_received[-1]:
+                time.sleep(0.1 * loop_period)
 
-        # Test that finalize_loop sets status back to 1
-        status_signals_received.append(task_proxy.get_status().value)
+            status_signals_received.append(task_proxy.get_status().value)
+
+        # 3rd loop should raise the timeout exception
+        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException):
+            settings_signals_received.append(
+                receiver.get_next_signal(timeout=loop_period).args[-1]
+            )
+
+        time.sleep(loop_period)  # The loop should terminate with the timeout
         # Assert
         self.assertFalse(task_proxy.is_running())
-        self.assertListEqual(status_signals_received, status_signals_expected)
-        self.assertListEqual(receiver_signals_received, receiver_signals_expected)
+        self.assertListEqual(status_signals_expected, status_signals_received)
+        self.assertListEqual(settings_signals_expected, settings_signals_received)
 
     def test_get_task_class_name(self):
-        task_proxy = qmi.make_task("simple_task_name",
-                                   SimpleTestTask,
-                                   raise_exception_in_init=False,
-                                   raise_exception_in_run=False,
-                                   duration=1.0,
-                                   value=7)
+        task_proxy = qmi.make_task(
+            "simple_task_name",
+            SimpleTestTask,
+            raise_exception_in_init=False,
+            raise_exception_in_run=False,
+            duration=1.0,
+            value=7,
+        )
         task_class_name = task_proxy.get_task_class_name()
         expect_name = __name__ + ".SimpleTestTask"
         self.assertEqual(task_class_name, expect_name)
 
     def test_custom_task_runner(self):
-        task_proxy = qmi.make_task("simple_task_runner",
-                                   SimpleTestTask,
-                                   task_runner=CustomTaskRunner,
-                                   raise_exception_in_init=False,
-                                   raise_exception_in_run=False,
-                                   duration=1.0,
-                                   value=7)
+        task_proxy = qmi.make_task(
+            "simple_task_runner",
+            SimpleTestTask,
+            task_runner=CustomTaskRunner,
+            raise_exception_in_init=False,
+            raise_exception_in_run=False,
+            duration=1.0,
+            value=7,
+        )
         actual = task_proxy.get_custom_taskrunner_attr()
         self.assertEqual(actual, sentinel.custom_taskrunner_attr)
 

@@ -131,6 +131,7 @@ class PicoQuant_PicoHarp300(_PicoquantHarp):
         # Reset the event filter configuration.
         self.set_event_filter(reset_filter=True)
         self.set_block_events(False)
+        _logger.info("[%s] Initialized device with mode %s", self._name, mode.value)
 
     @rpc_method
     def set_sync_offset(self, sync_offset: int) -> None:

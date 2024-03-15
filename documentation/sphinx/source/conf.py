@@ -24,7 +24,7 @@ copyright = '2019-2023, QuTech — Delft, The Netherlands'
 author = 'QuTech'
 
 # The full version, including alpha/beta/rc tags
-release = '0.43.0'
+release = '0.45.0-beta.0'
 
 # The default master_doc used to be 'index', but it was changed to 'contents'.
 # Override that here (maybe rename the file to the new default later).
@@ -48,7 +48,7 @@ autodoc_default_options = {
    # 'undoc_members'     : True,
    # 'private-members'   : False,
    # 'special-members'   : '',
-   # 'inherited-members' : False,
+   'inherited-members' : True,
    # 'show-inheritance'  : False,
    # 'ignore-module-all' : False,
    'imported-members'  : True

@@ -18,7 +18,7 @@ def read(*names, **kwargs):
 
 setup(
     name='qmi',
-    version='0.43.0',
+    version='0.45.0-beta.0',
     description='The Quantum Measurement Infrastructure framework',
     long_description="{}\n{}".format(
         read('README.md'),
@@ -116,6 +116,7 @@ setup(
         'bin/instruments/qmi_thorlabs_k10cr1',
         'bin/instruments/qmi_timebase_dim3000',
         'bin/instruments/qmi_wavelength_tclab',
-        'bin/instruments/qmi_wieserlabs_flexdds'
+        'bin/instruments/qmi_wieserlabs_flexdds',
+        'bin/instruments/qmi_teraxion_tfn'
     ]
 )
