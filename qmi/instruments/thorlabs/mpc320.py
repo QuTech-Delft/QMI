@@ -1,26 +1,38 @@
 """Module for a Thorlabs MPC320 motorised fibre polarisation controller."""
+
 import logging
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_TimeoutException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.transport import create_transport
-from qmi.instruments.thorlabs.apt_packets import HW_GET_INFO, MOD_GET_CHANENABLESTATE, MOT_GET_SET_POSCOUNTER, MOT_GET_USTATUSUPDATE, MOT_MOVE_COMPLETED, MOT_MOVE_HOMED, MOT_SET_EEPROMPARAMS, POL_GET_SET_PARAMS
+from qmi.instruments.thorlabs.apt_packets import (
+    HW_GET_INFO,
+    MOD_GET_CHANENABLESTATE,
+    MOT_GET_USTATUSUPDATE,
+    MOT_MOVE_COMPLETED,
+    MOT_MOVE_HOMED,
+    MOT_SET_EEPROMPARAMS,
+    POL_GET_SET_PARAMS,
+)
 from qmi.instruments.thorlabs.apt_protocol import AptChannelState, AptMessageId, AptProtocol
+
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
+
 
 class Thorlabs_MPC320(QMI_Instrument):
     """
     Driver for a Thorlabs MPC320 motorised fibre polarisation controller.
     """
+
     DEFAULT_RESPONSE_TIMEOUT = 1.0
 
-    def __init__(self,
-                 context: QMI_Context,
-                 name: str,
-                 transport: str
-                 ) -> None:
+    # the maximum range for a paddle is 170 degrees
+    # the value returned by the encoder is 1370 for 170 degrees
+    ENCODER_CONVERSION_UNIT = 1370 / 170
+
+    def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize the instrument driver.
 
         Parameters:
@@ -49,7 +61,7 @@ class Thorlabs_MPC320(QMI_Instrument):
     def get_idn(self) -> QMI_InstrumentIdentification:
         """
         Read instrument type and version and return QMI_InstrumentIdentification instance.
-        
+
         Returns:
             an instance of QMI_InstrumentIdentification. The version refers to the firmware version.
         """
@@ -60,7 +72,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         # Get response
         resp = self._apt_protocol.ask(HW_GET_INFO)
         return QMI_InstrumentIdentification("Thorlabs", resp.model_number, resp.serial_number, resp.firmware_version)
-    
+
     @rpc_method
     def identify_channel(self, channel_number: int) -> None:
         """
@@ -86,7 +98,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         # TODO: check and validate channel number for MPC320
         self._check_is_open()
         # Send message.
-        self._apt_protocol.write_param_command(AptMessageId.MOD_IDENTIFY.value, channel_number, state.value)
+        self._apt_protocol.write_param_command(AptMessageId.MOD_SET_CHANENABLESTATE.value, channel_number, state.value)
 
     @rpc_method
     def enable_channel(self, channel_number: int) -> None:
@@ -117,7 +129,7 @@ class Thorlabs_MPC320(QMI_Instrument):
 
         Parameters:
             channel_number: The channel to check.
-        
+
         Returns:
             The state of the channel as an AptChannelState enum.
         """
@@ -128,7 +140,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         # Get response
         resp = self._apt_protocol.ask(MOD_GET_CHANENABLESTATE)
         return AptChannelState(resp.enable_state)
-    
+
     @rpc_method
     def disconnect_hardware(self) -> None:
         """
@@ -160,54 +172,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._apt_protocol.write_param_command(AptMessageId.HW_STOP_UPDATEMSGS.value)
 
     @rpc_method
-    def restore_factory_settings(self) -> None:
-        """
-        Restore settings to the default values stored in the EEPROM.
-        """
-        _logger.info("[%s] Restoring factory settings of instrument", self._name)
-        self._check_is_open()
-        # Send message.
-        self._apt_protocol.write_param_command(AptMessageId.RESTOREFACTORYSETTINGS.value)
-
-    @rpc_method
-    def set_position_counter(self, channel_number: int, position_counter: int) -> None:
-        """
-        Set the live position count in the controller.
-
-        Paramters:
-            channel_number:     The channel to change the position counter for.
-            position_counter:   The value of the position counter.
-        """
-        _logger.info("[%s] Changing position counter of channel %d to %d", self._name, channel_number, position_counter)
-        self._check_is_open()
-        # Make data packet.
-        data_packet = MOT_GET_SET_POSCOUNTER(chan_ident=channel_number, position=position_counter)
-        # Send message.
-        self._apt_protocol.write_data_command(AptMessageId.MOT_SET_POSCOUNTER.value, data_packet)
-
-    @rpc_method
-    def get_position_counter(self, channel_number: int) -> int:
-        """
-        Get the value of the position counter for a channel.
-
-        Paramters:
-            channel_number: The channel to query.
-        
-        Returns:
-            position counter for a channel.
-        """
-        _logger.info("[%s] Getting position counter of channel %d", self._name, channel_number)
-        self._check_is_open()
-        # Send request message.
-        self._apt_protocol.write_param_command(AptMessageId.MOT_REQ_POSCOUNTER.value, channel_number)
-        # Get response
-        resp = self._apt_protocol.ask(MOT_GET_SET_POSCOUNTER)
-        return resp.position
-    
-    @rpc_method
     def home_channel(self, channel_number: int) -> None:
         """
-        Start the homing sequence for a given channel. 
+        Start the homing sequence for a given channel.
 
         Paramters:
             channel_number: The channel to home.
@@ -217,12 +184,11 @@ class Thorlabs_MPC320(QMI_Instrument):
         # Send message.
         self._apt_protocol.write_param_command(AptMessageId.MOT_MOVE_HOME.value)
 
-    
     @rpc_method
     def is_channel_homed(self, channel_number: int, timeout: float = DEFAULT_RESPONSE_TIMEOUT) -> bool:
         """
         Check if a given channel is homed. This command should only be run after the method `home_channel`.
-        Otherwise you will read bytes from other commands using this method. 
+        Otherwise you will read bytes from other commands using this method.
 
         Paramters:
             channel_number: The channel to check.
@@ -232,7 +198,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         Returns:
             True if the device was homed and a response was received before the timeout else False.
         """
-        _logger.info("[%s] Check if channel %d is homed", self._name, channel_number)
+        _logger.info("[%s] Checking if channel %d is homed", self._name, channel_number)
         self._check_is_open()
         # Get response
         try:
@@ -240,12 +206,12 @@ class Thorlabs_MPC320(QMI_Instrument):
             return True
         except QMI_TimeoutException:
             return False
-        
+
     @rpc_method
     def is_move_completed(self, channel_number: int, timeout: float = DEFAULT_RESPONSE_TIMEOUT) -> bool:
         """
-        Check if a given channel has completed its move. This command should only be run after a relative or absolute move command.
-        Otherwise you will read bytes from other commands using this method. 
+        Check if a given channel has completed its move. This command should only be run after a relative or absolute
+        move command. Otherwise you will read bytes from other commands.
 
         Paramters:
             channel_number: The channel to check.
@@ -256,7 +222,11 @@ class Thorlabs_MPC320(QMI_Instrument):
             True if the move was completed and a response was received before the timeout else False.
         """
         # TODO: add status data packet
-        _logger.info("[%s] Check if channel %d has completed its move", self._name, channel_number)
+        _logger.info(
+            "[%s] Checking if channel %d has completed its move",
+            self._name,
+            channel_number,
+        )
         self._check_is_open()
         # Get response
         try:
@@ -264,7 +234,7 @@ class Thorlabs_MPC320(QMI_Instrument):
             return True
         except QMI_TimeoutException:
             return False
-    
+
     @rpc_method
     def save_parameter_settings(self, channel_number: int, message_id: int) -> None:
         """
@@ -285,7 +255,8 @@ class Thorlabs_MPC320(QMI_Instrument):
     @rpc_method
     def get_status_update(self, channel_number: int) -> MOT_GET_USTATUSUPDATE:
         """
-        Get the status update for a given channel.
+        Get the status update for a given channel. This call will return the position, velocity, motor current and
+        status of the channel.
 
         Parameters:
             channel_number: The channel to query.
@@ -299,9 +270,16 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._apt_protocol.write_param_command(AptMessageId.MOT_GET_USTATUSUPDATE.value, channel_number)
         # Get response
         return self._apt_protocol.ask(MOT_GET_USTATUSUPDATE)
-    
+
     @rpc_method
-    def set_polarisation_parameters(self, velocity: int, home_pos: int, jog_step1: int, jog_step2: int, jog_step3: int) -> None:
+    def set_polarisation_parameters(
+        self,
+        velocity: int,
+        home_pos: int,
+        jog_step1: int,
+        jog_step2: int,
+        jog_step3: int,
+    ) -> None:
         """
         Set the polarisation parameters.
 
@@ -316,12 +294,18 @@ class Thorlabs_MPC320(QMI_Instrument):
         _logger.info("[%s] Setting polarisation parameters", self._name)
         self._check_is_open()
         # Make data packet.
-        data_packet = POL_GET_SET_PARAMS(velocity=velocity, home_position=home_pos, jog_step1=jog_step1, jog_step2=jog_step2, jog_step3=jog_step3)
+        data_packet = POL_GET_SET_PARAMS(
+            velocity=velocity,
+            home_position=home_pos,
+            jog_step1=jog_step1,
+            jog_step2=jog_step2,
+            jog_step3=jog_step3,
+        )
         # Send message.
         self._apt_protocol.write_data_command(AptMessageId.POL_SET_PARAMS.value, data_packet)
 
     @rpc_method
-    def get_polarisation_parameters(self) -> MOT_GET_SET_POSCOUNTER:
+    def get_polarisation_parameters(self) -> POL_GET_SET_PARAMS:
         """
         Get the polarisation parameters.
         """
@@ -330,4 +314,4 @@ class Thorlabs_MPC320(QMI_Instrument):
         # Send request message.
         self._apt_protocol.write_param_command(AptMessageId.POL_REQ_PARAMS.value)
         # Get response
-        return self._apt_protocol.ask(MOT_GET_SET_POSCOUNTER)
+        return self._apt_protocol.ask(POL_GET_SET_PARAMS)

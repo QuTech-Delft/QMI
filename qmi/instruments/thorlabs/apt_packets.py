@@ -1,5 +1,16 @@
+"""Module containing the packets for the APT protocol."""
+
 from typing import List, Tuple
-from qmi.instruments.thorlabs.apt_protocol import AptDataPacket, AptMessageHeaderWithParams, AptMessageId, apt_long, apt_dword, apt_char, apt_word, apt_byte
+from qmi.instruments.thorlabs.apt_protocol import (
+    AptDataPacket,
+    AptMessageHeaderWithParams,
+    AptMessageId,
+    apt_long,
+    apt_dword,
+    apt_char,
+    apt_word,
+    apt_byte,
+)
 
 
 class HW_GET_INFO(AptDataPacket):
@@ -15,17 +26,22 @@ class HW_GET_INFO(AptDataPacket):
         mod_state:          Modification state of device.
         num_channels:       Number of channels in device.
     """
+
     MESSAGE_ID = AptMessageId.HW_GET_INFO.value
     _fields_: List[Tuple[str, type]] = [
         ("serial_number", apt_long),
         ("model_number", apt_char * 8),
         ("type", apt_word),
         ("firmware_version", apt_dword),
-        ("internal", apt_dword * 15), #this is for internal use, so we don't know what type it returns
+        (
+            "internal",
+            apt_dword * 15,
+        ),  # this is for internal use, so we don't know what type it returns
         ("hw_version", apt_word),
         ("mod_state", apt_word),
-        ("num_channels", apt_word)
+        ("num_channels", apt_word),
     ]
+
 
 class MOD_GET_CHANENABLESTATE(AptMessageHeaderWithParams):
     """
@@ -38,29 +54,16 @@ class MOD_GET_CHANENABLESTATE(AptMessageHeaderWithParams):
         dest:           Destination of message.
         source:         Source of message.
     """
+
     MESSAGE_ID = AptMessageId.MOD_GET_CHANENABLESTATE.value
     _fields_: List[Tuple[str, type]] = [
         ("message_id", apt_word),
         ("chan_ident", apt_byte),
         ("enable_state", apt_byte),
         ("dest", apt_byte),
-        ("source", apt_byte)
+        ("source", apt_byte),
     ]
 
-class MOT_GET_SET_POSCOUNTER(AptDataPacket):
-    """
-    Data packet structure for the MOT_GET_POSCOUNTER command. This packet is sent as a response to MOT_REQ_POSCOUNTER.
-    It is also the data packet structure for the MOT_SET_POSCOUNTER.
-
-    Fields:
-        chan_ident: Channel number.
-        position:   Position in encoder counts.
-    """
-    MESSAGE_ID = AptMessageId.MOT_GET_POSCOUNTER.value
-    _fields_: List[Tuple[str, type]] = [
-        ("chan_ident", apt_word),
-        ("position", apt_long)
-    ]
 
 class MOT_MOVE_HOMED(AptMessageHeaderWithParams):
     """
@@ -73,14 +76,16 @@ class MOT_MOVE_HOMED(AptMessageHeaderWithParams):
         dest:           Destination of message.
         source:         Source of message.
     """
+
     MESSAGE_ID = AptMessageId.MOT_MOVE_HOMED.value
     _fields_: List[Tuple[str, type]] = [
         ("message_id", apt_word),
         ("chan_ident", apt_byte),
         ("param2", apt_byte),
         ("dest", apt_byte),
-        ("source", apt_byte)
+        ("source", apt_byte),
     ]
+
 
 class MOT_MOVE_COMPLETED(AptMessageHeaderWithParams):
     """
@@ -94,14 +99,16 @@ class MOT_MOVE_COMPLETED(AptMessageHeaderWithParams):
         dest:           Destination of message.
         source:         Source of message.
     """
+
     MESSAGE_ID = AptMessageId.MOT_MOVE_COMPLETED.value
     _fields_: List[Tuple[str, type]] = [
         ("message_id", apt_word),
         ("chan_ident", apt_byte),
         ("param2", apt_byte),
         ("dest", apt_byte),
-        ("source", apt_byte)
+        ("source", apt_byte),
     ]
+
 
 class MOT_GET_USTATUSUPDATE(AptDataPacket):
     """
@@ -114,14 +121,16 @@ class MOT_GET_USTATUSUPDATE(AptDataPacket):
         motor_current:  Motor current in mA.
         status_bits:    Status bits that provide various errors and indications.
     """
-    MESSAGE_ID = AptMessageId.MOT_GET_USTATUSUPDATE.value
+
+    MESSAGE_ID = AptMessageId.MOT_REQ_USTATUSUPDATE.value
     _fields_: List[Tuple[str, type]] = [
         ("chan_ident", apt_word),
         ("position", apt_long),
         ("velocity", apt_word),
         ("motor_current", apt_word),
-        ("status_bits", apt_dword)
+        ("status_bits", apt_dword),
     ]
+
 
 class MOT_SET_EEPROMPARAMS(AptDataPacket):
     """
@@ -131,14 +140,13 @@ class MOT_SET_EEPROMPARAMS(AptDataPacket):
         chan_ident: The channel being addressed.
         msg_id:     ID of message whose settings should be save.
     """
+
     MESSAGE_ID = AptMessageId.MOT_SET_EEPROMPARAMS.value
-    _fields_: List[Tuple[str, type]] = [
-        ("chan_ident", apt_word),
-        ("msg_id", apt_word)
-    ]
+    _fields_: List[Tuple[str, type]] = [("chan_ident", apt_word), ("msg_id", apt_word)]
+
 
 class POL_GET_SET_PARAMS(AptDataPacket):
-    """"
+    """ "
     Data packet structure for POL_SET_PARAMS command. It is also the data packet structure for the POL_SET_PARAMS.
 
     Fields:
@@ -149,6 +157,7 @@ class POL_GET_SET_PARAMS(AptDataPacket):
         jog_step2:      Size fo jog step to be performed on paddle 2.
         jog_step3:      Size fo jog step to be performed on paddle 3.
     """
+
     MESSAGE_ID = AptMessageId.POL_SET_PARAMS.value
     _fields_: List[Tuple[str, type]] = [
         ("not_used", apt_word),
@@ -156,5 +165,5 @@ class POL_GET_SET_PARAMS(AptDataPacket):
         ("home_position", apt_word),
         ("jog_step1", apt_word),
         ("jog_step2", apt_word),
-        ("jog_step3", apt_word)
+        ("jog_step3", apt_word),
     ]
