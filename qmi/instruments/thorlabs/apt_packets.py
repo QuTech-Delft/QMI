@@ -45,7 +45,8 @@ class HW_GET_INFO(AptDataPacket):
 
 class MOD_GET_CHANENABLESTATE(AptMessageHeaderWithParams):
     """
-    Header structure for the MOD_GET_CHANENABLESTATE response. This header is sent as a response to MOD_REQ_CHANENABLESTATE.
+    Header structure for the MOD_GET_CHANENABLESTATE response. This header is sent as a response to
+    MOD_REQ_CHANENABLESTATE.
 
     Fields:
         message_id:     ID of message.
@@ -67,7 +68,8 @@ class MOD_GET_CHANENABLESTATE(AptMessageHeaderWithParams):
 
 class MOT_MOVE_HOMED(AptMessageHeaderWithParams):
     """
-    Header structure for the MOT_MOVE_HOMED response. This header is sent as a response to MOT_MOVE_HOME once homing is complete.
+    Header structure for the MOT_MOVE_HOMED response. This header is sent as a response to MOT_MOVE_HOME
+    once homing is complete.
 
     Fields:
         message_id:     ID of message.
@@ -89,8 +91,8 @@ class MOT_MOVE_HOMED(AptMessageHeaderWithParams):
 
 class MOT_MOVE_COMPLETED(AptMessageHeaderWithParams):
     """
-    Header structure for the MOT_MOVE_COMPLETED response. This header is sent as a response to a relative or absolute move command
-    once the move has been completed.
+    Header structure for the MOT_MOVE_COMPLETED response. This header is sent as a response to a relative or absolute
+    move command once the move has been completed.
 
     Fields:
         message_id:     ID of message.

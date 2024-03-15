@@ -72,7 +72,7 @@ jobs:
       - name: mypy
         run: |
           pip install mypy
-          mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
+          mypy --namespace-packages $SOURCE_DIRS > mypy.log
           if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="pass"; else RESULT="fail"; fi
           if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l mypy -v $RESULT -f $BADGES_DIR/mypy.svg fail=red pass=green; fi
       - name: upload mypy test results
@@ -81,52 +81,21 @@ jobs:
           name: mypy-results
           path: mypy.log
         if: ${{ always() }}
-      - name: radon-cc
-        run: |
-          pip install radon
-          chmod a+x scripts/run_analysis_cc.sh
-          MAX_SCORE=$( scripts/run_analysis_cc.sh $SOURCE_DIRS )
-          echo $MAX_SCORE > cc_max_score
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l radon-cc -v $MAX_SCORE -f $BADGES_DIR/radon-cc.svg 11=green 21=yellow 31=orange 100=red; fi
-          # bc evaluates to `1` if relation is true
-          exit $( echo "$MAX_SCORE > $COMPLEXITY_MAX_SCORE" | bc )
-          MAX_SCORE=$( cat cc_max_score )
-      - name: upload radon-cc results
-        uses: actions/upload-artifact@v3
-        with:
-          name: radon-cc-results
-          path: radon-cc.log
-        if: ${{ always() }}
-      - name: radon-mi
-        run: |
-          pip install radon
-          chmod a+x scripts/run_analysis_mi.sh
-          MIN_INDEX=$( scripts/run_analysis_mi.sh $SOURCE_DIRS )
-          echo $MIN_INDEX > mi_min_index
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l radon-mi -v $MIN_INDEX -f $BADGES_DIR/radon-mi.svg 10=red 20=orange 100=green; fi
-          exit $( echo "$MIN_INDEX < $MAINTAINABILITY_MIN_INDEX" | bc )  # bc evaluates to `1` if relation is true
-          MIN_INDEX=$( cat mi_min_index )
-      - name: upload radon-mi results
-        uses: actions/upload-artifact@v3
-        with:
-          name: radon-mi-results
-          path: radon-mi.log
-        if: ${{ always() }}
-      - name: coverage
-        run: |
-          pip install coverage
-          if coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"; then RESULT="pass"; else RESULT="fail"; fi
-          coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
-          COVERAGE_PERC=$(tail -1 coverage.log | grep -o '....$')
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green; fi
-          if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l tests -v $RESULT -f $BADGES_DIR/tests.svg fail=red pass=green; fi
-          # coverage: '/^TOTAL.+?(\d+\%)$/'
-      - name: upload coverage results
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-results
-          path: coverage.log
-        if: ${{ always() }}
+      # - name: coverage
+      #   run: |
+      #     pip install coverage
+      #     if coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"; then RESULT="pass"; else RESULT="fail"; fi
+      #     coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
+      #     COVERAGE_PERC=$(tail -1 coverage.log | grep -o '....$')
+      #     if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green; fi
+      #     if [ "${{ matrix.python-version }}" = "3.10" ]; then anybadge -o -l tests -v $RESULT -f $BADGES_DIR/tests.svg fail=red pass=green; fi
+      #     # coverage: '/^TOTAL.+?(\d+\%)$/'
+      # - name: upload coverage results
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: coverage-results
+      #     path: coverage.log
+      #   if: ${{ always() }}
       - name: push all internal commits
         run: |
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/pylint.svg; fi

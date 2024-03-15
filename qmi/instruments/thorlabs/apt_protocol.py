@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple, TypeVar
 from qmi.core.transport import QMI_Transport
 from qmi.core.exceptions import QMI_InstrumentException
 
-APT_DATA_PACKET_TYPE = TypeVar("APT_DATA_PACKET_TYPE", bound="AptDataPacket")
+T = TypeVar("T", bound="AptDataPacket")
 
 # APT format specifiers
 apt_word = c_uint16
@@ -173,7 +173,7 @@ class AptProtocol:
         # Send command.
         self._transport.write(msg)
 
-    def write_data_command(self, message_id: int, data: APT_DATA_PACKET_TYPE) -> None:
+    def write_data_command(self, message_id: int, data: T) -> None:
         """
         Send and APT protocol command with data.
         """
@@ -187,7 +187,7 @@ class AptProtocol:
         self._transport.write(msg)
         self._transport.write(data)
 
-    def ask(self, data_type: APT_DATA_PACKET_TYPE, timeout: Optional[float] = None) -> APT_DATA_PACKET_TYPE:
+    def ask(self, data_type: T, timeout: Optional[float] = None) -> T:
         """
         Ask for a response.
 
