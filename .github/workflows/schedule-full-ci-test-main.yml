@@ -38,6 +38,7 @@ jobs:
           pip install -e '.[dev]'
           pip install anybadge
       - name: pylint
+        if: always()
         run: |
           pip install pylint
           - pip install pylint
@@ -49,56 +50,57 @@ jobs:
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
           SCORE=$( cat pylint_score )
           anybadge -l pylint -v $SCORE -f pylint.svg 2=red 4=orange 8=yellow 10=green
-        continue-on-error: true
       - name: upload pylint test results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: pylint-results
           path: pylint.log
-        if: ${{ always() }}
       - name: upload pylint test badge
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: pylint-badge
           path: pylint.svg
-        if: always()
       - name: mypy
+        if: always()
         run: |
           pip install mypy
           mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
           if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passed"; else RESULT="failed"; fi
           anybadge -l mypy -v $RESULT -f mypy.svg failed=red passed=green
-        continue-on-error: true
       - name: upload mypy test results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: mypy-results
           path: mypy.log
-        if: always()
       - name: upload mypy test badge
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: mypy-badge
           path: mypy.svg
-        if: always()
       - name: coverage
+        if: always()
         run: |
           pip install coverage
           if coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"; then RESULT="pass"; else RESULT="fail"; fi
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC > coverage.log
       - name: upload coverage results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: coverage-results
           path: coverage.log
-        if: always()
       - name: unit-tests latest
+        if: always()
         run: |
           pip install unittest-xml-reporting
           python -m xmlrunner --output-file testresults.xml discover --start-directory=tests --pattern="test_*.py"
       - name: upload unit-tests results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: unit-test-results
           path: testresults.xml
-        if: always()

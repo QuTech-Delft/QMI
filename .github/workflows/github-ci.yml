@@ -51,6 +51,7 @@ jobs:
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
       - name: upload pylint test results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: pylint-results
@@ -63,6 +64,7 @@ jobs:
           if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="pass"; else RESULT="fail"; fi
           echo $RESULT
       - name: upload mypy test results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: mypy-results
@@ -74,6 +76,7 @@ jobs:
           coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC > coverage.log
       - name: upload coverage results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: coverage-results
