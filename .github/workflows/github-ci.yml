@@ -16,9 +16,9 @@ env:
   # minimum pylint code quality score (max. 10)
   PYLINT_MIN_SCORE: "9.00"
   # minimum code coverage (goal: 90%; max. 100%)
-  COVERAGE_MIN_PERC: "90"
+  COVERAGE_MIN_PERC: "100"
   # maximum code complexity (goal: <= 30; unbounded)
-  COMPLEXITY_MAX_SCORE: "30"
+  COMPLEXITY_MAX_SCORE: "1"
   # this should be a comma separated list
   SOURCE_DIRS: "qmi/"
 
