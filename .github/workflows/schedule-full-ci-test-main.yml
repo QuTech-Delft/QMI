@@ -1,20 +1,9 @@
 name: QMI Python CI full test runner
 
-# on:
-#   schedule:
-#     # Schedule for every Monday at 7am
-#     - cron: "0 7 * * 1"
 on:
-  pull_request:
-    branches: [ "main" ]
-    paths-ignore:
-        - README.md
-        - CHANGELOG.md
-        - .gitignore
-        - ACKNOWLEDGEMENTS.md
-        - LICENSE.md
-        - CONTRIBUTING.md
-        - TESTING.md
+  schedule:
+    # Schedule for every Monday at 7am
+    - cron: "0 7 * * 1"
 
 env:
   # minimum pylint code quality score (max. 10)
@@ -52,7 +41,6 @@ jobs:
         if: always()
         run: |
           pip install pylint
-          - pip install pylint
           pylint --score=yes --load-plugins=pylint.extensions.mccabe --max-complexity=$COMPLEXITY_MAX_SCORE $SOURCE_DIRS | tee pylint.log
           SCORE=$( tail -n 2 pylint.log | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1 )
           echo "Pylint score: $SCORE"

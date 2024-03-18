@@ -302,7 +302,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     def _make_read_command(
         self,
-        cmd: T,
+        cmd: Type[T],
     ) -> str:
         """
         Helper method to make the read command.
