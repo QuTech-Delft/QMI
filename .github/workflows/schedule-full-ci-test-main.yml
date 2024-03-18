@@ -8,10 +8,11 @@ on:
 env:
   # minimum pylint code quality score (max. 10)
   PYLINT_MIN_SCORE: "9.00"
-  # minimum code coverage (goal: 80%; max. 100%)
+  # minimum code coverage (goal: 90%; max. 100%)
   COVERAGE_MIN_PERC: "90"
-  # maximum code complexity (goal: <= 15; unbounded)
+  # maximum code complexity (goal: <= 30; unbounded)
   COMPLEXITY_MAX_SCORE: "30"
+  # this should be a comma separated list
   SOURCE_DIRS: "qmi/"
 
 jobs:
@@ -40,7 +41,7 @@ jobs:
         run: |
           pip install pylint
           - pip install pylint
-          pylint --score=yes --max-complexity=$COMPLEXITY_MAX_SCORE $SOURCE_DIRS | tee pylint.log
+          pylint --score=yes --load-plugins=pylint.extensions.mccabe --max-complexity=$COMPLEXITY_MAX_SCORE $SOURCE_DIRS | tee pylint.log
           SCORE=$( tail -n 2 pylint.log | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1 )
           echo $SCORE
           echo $SCORE > pylint_score
