@@ -53,6 +53,7 @@ jobs:
           git config user.mail "<>"
           chmod u+w $BADGES_DIR
       - name: pylint
+        if: always()
         run: |
           pip install pylint
           pylint --score=yes --load-plugins=pylint.extensions.mccabe --max-complexity=$COMPLEXITY_MAX_SCORE $SOURCE_DIRS | tee pylint.log
@@ -68,8 +69,8 @@ jobs:
         with:
           name: pylint-results
           path: pylint.log
-        if: always()
       - name: mypy
+        if: always()
         run: |
           pip install mypy
           mypy --namespace-packages $SOURCE_DIRS > mypy.log
@@ -80,8 +81,8 @@ jobs:
         with:
           name: mypy-results
           path: mypy.log
-        if: always()
       - name: coverage
+        if: always()
         run: |
           pip install coverage
           if coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"; then RESULT="pass"; else RESULT="fail"; fi
@@ -94,7 +95,6 @@ jobs:
         with:
           name: coverage-results
           path: coverage.log
-        if: always()
       - name: push all internal commits
         run: |
           if [ "${{ matrix.python-version }}" = "3.10" ]; then git add $BADGES_DIR/pylint.svg; fi
