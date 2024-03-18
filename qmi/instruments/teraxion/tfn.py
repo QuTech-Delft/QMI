@@ -19,6 +19,7 @@ from qmi.core.transport import create_transport
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
+
 class Teraxion_TFNElement(Enum):
     """
     TeraXion TFN elements.
@@ -52,6 +53,7 @@ class Teraxion_TFNStatus:
     tec_2_in_range: bool
     tec_1_in_range: bool
 
+
 @dataclass
 class Teraxion_TFNSettings:
     """
@@ -64,6 +66,7 @@ class Teraxion_TFNSettings:
 
     frequency: float
     dispersion: float
+
 
 @dataclass
 class Teraxion_TFNChannelPlan:
@@ -91,7 +94,8 @@ class Teraxion_TFNCommand:
     num_received_bytes: Optional[int]
     module_address: int = 0x30
 
-T = TypeVar('T', bound=Teraxion_TFNCommand)
+
+T = TypeVar("T", bound=Teraxion_TFNCommand)
 
 
 class Teraxion_TFNCommand_GetStatus(Teraxion_TFNCommand):
@@ -137,6 +141,7 @@ class Teraxion_TFNCommand_GetRTDTemperature(Teraxion_TFNCommand):
     command_id = 0x17
     num_received_bytes = 6
 
+
 class Teraxion_TFNCommand_EnableDevice(Teraxion_TFNCommand):
     """
     Command to enable the TFN.
@@ -144,6 +149,7 @@ class Teraxion_TFNCommand_EnableDevice(Teraxion_TFNCommand):
 
     command_id = 0x1E
     num_received_bytes = 4
+
 
 class Teraxion_TFNCommand_DisableDevice(Teraxion_TFNCommand):
     """
@@ -153,6 +159,7 @@ class Teraxion_TFNCommand_DisableDevice(Teraxion_TFNCommand):
     command_id = 0x1F
     num_received_bytes = 4
 
+
 class Teraxion_TFNCommand_GetStartupByte(Teraxion_TFNCommand):
     """
     Command to get the startup byte of the TFN.
@@ -160,6 +167,7 @@ class Teraxion_TFNCommand_GetStartupByte(Teraxion_TFNCommand):
 
     command_id = 0x35
     num_received_bytes = 5
+
 
 class Teraxion_TFNCommand_SetStartupByte(Teraxion_TFNCommand):
     """
@@ -169,6 +177,7 @@ class Teraxion_TFNCommand_SetStartupByte(Teraxion_TFNCommand):
     command_id = 0x34
     num_received_bytes = 5
 
+
 class Teraxion_TFNCommand_GetFirmwareVersion(Teraxion_TFNCommand):
     """
     Command to get the firmware version.
@@ -176,6 +185,7 @@ class Teraxion_TFNCommand_GetFirmwareVersion(Teraxion_TFNCommand):
 
     command_id = 0x0F
     num_received_bytes = 6
+
 
 class Teraxion_TFNCommand_GetManufacturerName(Teraxion_TFNCommand):
     """
@@ -185,6 +195,7 @@ class Teraxion_TFNCommand_GetManufacturerName(Teraxion_TFNCommand):
     command_id = 0x0E
     num_received_bytes = 255
 
+
 class Teraxion_TFNCommand_GetModelNumber(Teraxion_TFNCommand):
     """
     Command to get the model number.
@@ -192,6 +203,7 @@ class Teraxion_TFNCommand_GetModelNumber(Teraxion_TFNCommand):
 
     command_id = 0x27
     num_received_bytes = 255
+
 
 class Teraxion_TFNCommand_GetSerialNumber(Teraxion_TFNCommand):
     """
@@ -201,6 +213,7 @@ class Teraxion_TFNCommand_GetSerialNumber(Teraxion_TFNCommand):
     command_id = 0x29
     num_received_bytes = 255
 
+
 class Teraxion_TFNCommand_GetManufacturingDate(Teraxion_TFNCommand):
     """
     Command to get the manufacturing date.
@@ -208,6 +221,7 @@ class Teraxion_TFNCommand_GetManufacturingDate(Teraxion_TFNCommand):
 
     command_id = 0x2B
     num_received_bytes = 255
+
 
 class Teraxion_TFNCommand_GetNominalSettings(Teraxion_TFNCommand):
     """
@@ -217,6 +231,7 @@ class Teraxion_TFNCommand_GetNominalSettings(Teraxion_TFNCommand):
     command_id = 0x37
     num_received_bytes = 12
 
+
 class Teraxion_TFNCommand_SaveNominalSettings(Teraxion_TFNCommand):
     """
     Command to save the nominal settings.
@@ -225,6 +240,7 @@ class Teraxion_TFNCommand_SaveNominalSettings(Teraxion_TFNCommand):
     command_id = 0x36
     num_received_bytes = 12
 
+
 class Teraxion_TFNCommand_GetChannelPlan(Teraxion_TFNCommand):
     """
     Command to get the channel plan.
@@ -232,6 +248,7 @@ class Teraxion_TFNCommand_GetChannelPlan(Teraxion_TFNCommand):
 
     command_id = 0x3B
     num_received_bytes = 16
+
 
 class Teraxion_TFNCommand_SetI2CAddress(Teraxion_TFNCommand):
     """
@@ -257,20 +274,18 @@ class Teraxion_TFN(QMI_Instrument):
     READ_WRITE_DELAY = 0x000A  # 10ms delay value between a write and read command in hex.
 
     SOFTWARE_RESET_DELAY = 0.25  # delay after a software reset command in seconds.
-    GET_PROCESS_TIME = 0.01 # GET requests usually have a process time of 10ms
-    SET_PROCESS_TIME = 0.02 # SET requests usually have a process time of 20ms
-    GET_LONG_PROCESS_TIME = 0.05 # Long GET requests that return 255 bytes of data usually have a process time of 50ms.
+    GET_PROCESS_TIME = 0.01  # GET requests usually have a process time of 10ms
+    SET_PROCESS_TIME = 0.02  # SET requests usually have a process time of 20ms
+    GET_LONG_PROCESS_TIME = (
+        0.05  # Long GET requests that return 255 bytes of data usually have a process time of 50ms.
+    )
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         super().__init__(context, name)
         self._transport = create_transport(transport, default_attributes={"baudrate": 57600})
         self._scpi_protocol = ScpiProtocol(self._transport, command_terminator="")
 
-    def _make_write_command(
-        self,
-        cmd: Type[T],
-        value: Optional[bytes] = None
-    ) -> str:
+    def _make_write_command(self, cmd: Type[T], value: Optional[bytes] = None) -> str:
         """
         Helper method to make the write command.
 
@@ -287,7 +302,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     def _make_read_command(
         self,
-        cmd: Type[T],
+        cmd: T,
     ) -> str:
         """
         Helper method to make the read command.
@@ -399,8 +414,8 @@ class Teraxion_TFN(QMI_Instrument):
         resp = self._read(Teraxion_TFNCommand_GetManufacturerName)
         time.sleep(self.GET_LONG_PROCESS_TIME)
         # get the data after the status bytes and ignore the null bytes
-        manufacturer_name = resp[self.LEN_STATUS_BYTES:]
-        return manufacturer_name.decode("ascii")[:manufacturer_name.find(b"\x00")]
+        manufacturer_name = resp[self.LEN_STATUS_BYTES :]
+        return manufacturer_name.decode("ascii")[: manufacturer_name.find(b"\x00")]
 
     @rpc_method
     def get_model_number(self) -> str:
@@ -416,8 +431,8 @@ class Teraxion_TFN(QMI_Instrument):
         resp = self._read(Teraxion_TFNCommand_GetModelNumber)
         time.sleep(self.GET_LONG_PROCESS_TIME)
         # get the data after the status bytes and ignore the null bytes
-        model_number = resp[self.LEN_STATUS_BYTES:]
-        return model_number.decode("ascii")[:model_number.find(b"\x00")]
+        model_number = resp[self.LEN_STATUS_BYTES :]
+        return model_number.decode("ascii")[: model_number.find(b"\x00")]
 
     @rpc_method
     def get_serial_number(self) -> str:
@@ -433,23 +448,25 @@ class Teraxion_TFN(QMI_Instrument):
         resp = self._read(Teraxion_TFNCommand_GetSerialNumber)
         time.sleep(self.GET_LONG_PROCESS_TIME)
         # get the data after the status bytes and ignore the null bytes
-        serial_number = resp[self.LEN_STATUS_BYTES:]
-        return serial_number.decode("ascii")[:serial_number.find(b"\x00")]
+        serial_number = resp[self.LEN_STATUS_BYTES :]
+        return serial_number.decode("ascii")[: serial_number.find(b"\x00")]
 
     @rpc_method
     def get_idn(self) -> QMI_InstrumentIdentification:
         """
         Get instrument identification of the TFN.
-        
+
         Returns:
             an instance of QMI_InstrumentIdentification.
         """
         _logger.info("[%s] Getting instrument identitification of instrument", self._name)
         self._check_is_open()
-        return QMI_InstrumentIdentification(vendor=self.get_manufacturer_name(),
-                                            model=self.get_model_number(),
-                                            serial=self.get_serial_number(),
-                                            version=self.get_firmware_version())
+        return QMI_InstrumentIdentification(
+            vendor=self.get_manufacturer_name(),
+            model=self.get_model_number(),
+            serial=self.get_serial_number(),
+            version=self.get_firmware_version(),
+        )
 
     @rpc_method
     def get_manufacturing_date(self) -> date:
@@ -465,8 +482,8 @@ class Teraxion_TFN(QMI_Instrument):
         resp = self._read(Teraxion_TFNCommand_GetManufacturingDate)
         time.sleep(self.GET_LONG_PROCESS_TIME)
         # get the data after the status bytes and ignore the null bytes
-        manufacturing_date = resp[self.LEN_STATUS_BYTES:]
-        date_decoded = manufacturing_date.decode("ascii")[:manufacturing_date.find(b"\x00")]
+        manufacturing_date = resp[self.LEN_STATUS_BYTES :]
+        date_decoded = manufacturing_date.decode("ascii")[: manufacturing_date.find(b"\x00")]
         return datetime.strptime(date_decoded, "%Y%m%d").date()
 
     @rpc_method
@@ -484,20 +501,22 @@ class Teraxion_TFN(QMI_Instrument):
         time.sleep(self.GET_PROCESS_TIME)
         resp = struct.unpack(">L", status)[0]
 
-        return Teraxion_TFNStatus(busy_error=           bool(resp & 0b00000000100000000000000000000000),
-                                  overrun_error=        bool(resp & 0b00000000010000000000000000000000),
-                                  command_error=        bool(resp & 0b00000000001000000000000000000000),
-                                  tfn_active=           bool(resp & 0b00000000000100000000000000000000),
-                                  tfn_ready=            bool(resp & 0b00000000000010000000000000000000),
-                                  invalid_eeprom_error= bool(resp & 0b00000000000001000000000000000000),
-                                  tec_4_temp_limit=     bool(resp & 0b00000000000000000000000010000000),
-                                  tec_3_temp_limit=     bool(resp & 0b00000000000000000000000001000000),
-                                  tec_2_temp_limit=     bool(resp & 0b00000000000000000000000000100000),
-                                  tec_1_temp_limit=     bool(resp & 0b00000000000000000000000000010000),
-                                  tec_4_in_range=       bool(resp & 0b00000000000000000000000000001000),
-                                  tec_3_in_range=       bool(resp & 0b00000000000000000000000000000100),
-                                  tec_2_in_range=       bool(resp & 0b00000000000000000000000000000010),
-                                  tec_1_in_range=       bool(resp & 0b00000000000000000000000000000001))
+        return Teraxion_TFNStatus(
+            busy_error=bool(resp & 0b00000000100000000000000000000000),
+            overrun_error=bool(resp & 0b00000000010000000000000000000000),
+            command_error=bool(resp & 0b00000000001000000000000000000000),
+            tfn_active=bool(resp & 0b00000000000100000000000000000000),
+            tfn_ready=bool(resp & 0b00000000000010000000000000000000),
+            invalid_eeprom_error=bool(resp & 0b00000000000001000000000000000000),
+            tec_4_temp_limit=bool(resp & 0b00000000000000000000000010000000),
+            tec_3_temp_limit=bool(resp & 0b00000000000000000000000001000000),
+            tec_2_temp_limit=bool(resp & 0b00000000000000000000000000100000),
+            tec_1_temp_limit=bool(resp & 0b00000000000000000000000000010000),
+            tec_4_in_range=bool(resp & 0b00000000000000000000000000001000),
+            tec_3_in_range=bool(resp & 0b00000000000000000000000000000100),
+            tec_2_in_range=bool(resp & 0b00000000000000000000000000000010),
+            tec_1_in_range=bool(resp & 0b00000000000000000000000000000001),
+        )
 
     @rpc_method
     def reset(self) -> None:
@@ -671,7 +690,7 @@ class Teraxion_TFN(QMI_Instrument):
     def set_i2c_address(self, address: int) -> None:
         """
         Set the I2C address of the TFN module. This all will need a power cycle to take effect.
-        
+
         Parameters:
             address:    New I2C address for module.
         """
