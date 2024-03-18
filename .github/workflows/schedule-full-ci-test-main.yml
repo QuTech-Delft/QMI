@@ -46,7 +46,6 @@ jobs:
           SCORE=$( tail -n 2 pylint.log | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1 )
           echo "Pylint score: $SCORE"
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
-          SCORE=$( cat pylint_score )
       - name: upload pylint test results
         if: always()
         uses: actions/upload-artifact@v3
@@ -71,8 +70,11 @@ jobs:
         if: always()
         run: |
           pip install coverage
-          if coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"; then RESULT="pass"; else RESULT="fail"; fi
-          coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC > coverage.log
+          coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"
+          coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
+          COVERAGE_PERC=$(grep "TOTAL" coverage.log | grep -Eo '[0-9.]+%' | sed 's/%//')
+          echo "Coverage: $COVERAGE_PERC%"
+          exit $( echo "$COVERAGE_PERC < $COVERAGE_MIN_PERC" | bc )
       - name: upload coverage results
         if: always()
         uses: actions/upload-artifact@v3
