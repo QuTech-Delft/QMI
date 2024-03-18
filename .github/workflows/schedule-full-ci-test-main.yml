@@ -9,11 +9,9 @@ env:
   # minimum pylint code quality score (max. 10)
   PYLINT_MIN_SCORE: "9.00"
   # minimum code coverage (goal: 80%; max. 100%)
-  COVERAGE_MIN_PERC: "68"
+  COVERAGE_MIN_PERC: "90"
   # maximum code complexity (goal: <= 15; unbounded)
-  COMPLEXITY_MAX_SCORE: "38"
-  # minimum maintainability index (goal: >=20; max. 100)
-  MAINTAINABILITY_MIN_INDEX: "10.62"
+  COMPLEXITY_MAX_SCORE: "30"
   SOURCE_DIRS: "qmi/"
 
 jobs:
@@ -41,9 +39,10 @@ jobs:
       - name: pylint
         run: |
           pip install pylint
-          chmod a+x scripts/run_analysis_pylint.sh
-          SCORE=$( scripts/run_analysis_pylint.sh )
-          echo $SCORE $PYLINT_MIN_SCORE
+          - pip install pylint
+          pylint --score=yes --max-complexity=$COMPLEXITY_MAX_SCORE $SOURCE_DIRS | tee pylint.log
+          SCORE=$( tail -n 2 pylint.log | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1 )
+          echo $SCORE
           echo $SCORE > pylint_score
           # bc evaluates to `1` if relation is true
           exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
@@ -61,7 +60,7 @@ jobs:
         with:
           name: pylint-badge
           path: pylint.svg
-        if: ${{ always() }}
+        if: always()
       - name: mypy
         run: |
           pip install mypy
@@ -74,73 +73,24 @@ jobs:
         with:
           name: mypy-results
           path: mypy.log
-        if: ${{ always() }}
+        if: always()
       - name: upload mypy test badge
         uses: actions/upload-artifact@v3
         with:
           name: mypy-badge
           path: mypy.svg
-        if: ${{ always() }}
-      - name: radon-cc
-        run: |
-          pip install radon
-          chmod a+x scripts/run_analysis_cc.sh
-          MAX_SCORE=$( scripts/run_analysis_cc.sh $SOURCE_DIRS )
-          echo $MAX_SCORE $COMPLEXITY_MAX_SCORE
-          echo $MAX_SCORE > cc_max_score
-          # bc evaluates to `1` if relation is true
-          exit $( echo "$MAX_SCORE > $COMPLEXITY_MAX_SCORE" | bc )
-          MAX_SCORE=$( cat cc_max_score )
-          anybadge -l radon-cc -v $MAX_SCORE -f radon-cc.svg 11=green 21=yellow 31=orange 100=red
-        continue-on-error: true
-      - name: upload radon-cc results
-        uses: actions/upload-artifact@v3
-        with:
-          name: radon-cc-results
-          path: radon-cc.log
-        if: ${{ always() }}
-      - name: upload radon-cc badge
-        uses: actions/upload-artifact@v3
-        with:
-          name: radon-cc-badge
-          path: radon-cc.svg
-        if: ${{ always() }}
-      - name: radon-mi
-        run: |
-          pip install radon
-          chmod a+x scripts/run_analysis_mi.sh
-          MIN_INDEX=$( scripts/run_analysis_mi.sh $SOURCE_DIRS )
-          echo $MIN_INDEX $MAINTAINABILITY_MIN_INDEX
-          echo $MIN_INDEX > mi_min_index
-          exit $( echo "$MIN_INDEX < $MAINTAINABILITY_MIN_INDEX" | bc )  # bc evaluates to `1` if relation is true
-          MIN_INDEX=$( cat mi_min_index )
-          anybadge -l radon-mi -v $MIN_INDEX -f radon-mi.svg 10=red 20=orange 100=green
-        continue-on-error: true
-      - name: upload radon-mi results
-        uses: actions/upload-artifact@v3
-        with:
-          name: radon-mi-results
-          path: radon-mi.log
-        if: ${{ always() }}
-      - name: upload radon-mi badge
-        uses: actions/upload-artifact@v3
-        with:
-          name: radon-mi-badge
-          path: radon-mi.svg
-        if: ${{ always() }}
+        if: always()
       - name: coverage
         run: |
           pip install coverage
-          chmod a+x scripts/run_unit_tests_with_coverage.sh
-          scripts/run_unit_tests_with_coverage.sh $SOURCE_DIRS
-          coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
-          # coverage: '/^TOTAL.+?(\d+\%)$/'
+          if coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"; then RESULT="pass"; else RESULT="fail"; fi
+          coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC > coverage.log
       - name: upload coverage results
         uses: actions/upload-artifact@v3
         with:
           name: coverage-results
           path: coverage.log
-        if: ${{ always() }}
+        if: always()
       - name: unit-tests latest
         run: |
           pip install unittest-xml-reporting
@@ -150,4 +100,4 @@ jobs:
         with:
           name: unit-test-results
           path: testresults.xml
-        if: ${{ always() }}
+        if: always()
