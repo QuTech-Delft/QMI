@@ -15,13 +15,11 @@ on:
 env:
   # minimum pylint code quality score (max. 10)
   PYLINT_MIN_SCORE: "9.00"
-  # minimum code coverage (goal: 80%; max. 100%)
-  COVERAGE_MIN_PERC: "68"
-  # maximum code complexity (goal: <= 15; unbounded)
-  COMPLEXITY_MAX_SCORE: "38"
-  # minimum maintainability index (goal: >=20; max. 100)
-  MAINTAINABILITY_MIN_INDEX: "10.62"
-  # this should be a comma separated list of new line separated list
+  # minimum code coverage (goal: 90%; max. 100%)
+  COVERAGE_MIN_PERC: "90"
+  # maximum code complexity (goal: <= 30; unbounded)
+  COMPLEXITY_MAX_SCORE: "30"
+  # this should be a comma separated list
   SOURCE_DIRS: "qmi/"
 
 jobs:
@@ -43,71 +41,43 @@ jobs:
           pip install --upgrade pip
           pip install -e '.[dev]'
       - name: pylint
+        if: always()
         run: |
-          pip install pylint
-          chmod a+x scripts/run_analysis_pylint.sh 
-          SCORE=$( scripts/run_analysis_pylint.sh )
-          echo $SCORE $PYLINT_MIN_SCORE
-          echo $SCORE > pylint_score
-          # bc evaluates to `1` if relation is true
-          exit $( echo "$SCORE < $PYLINT_MIN_SCORE" | bc )
+          pylint --score=yes --load-plugins=pylint.extensions.mccabe --max-complexity=$COMPLEXITY_MAX_SCORE $SOURCE_DIRS | tee pylint.log
+          PYLINT_SCORE=$( tail -n 2 pylint.log | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1 )
+          echo "Pylint score: $PYLINT_SCORE"
+          exit $( echo "$PYLINT_SCORE < $PYLINT_MIN_SCORE" | bc )
       - name: upload pylint test results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: pylint-results
           path: pylint.log
-        if: ${{ always() }}
       - name: mypy
+        if: always()
         run: |
-          pip install mypy
           mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
           if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="pass"; else RESULT="fail"; fi
-          echo $RESULT
+          echo "Mypy result: $RESULT"
+          if [[ "$RESULT" = *"pass"* ]]; then exit 0; else exit 1; fi
       - name: upload mypy test results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: mypy-results
           path: mypy.log
-        if: ${{ always() }}
-      - name: radon-cc
-        run: |
-          pip install radon
-          chmod a+x scripts/run_analysis_cc.sh
-          MAX_SCORE=$( scripts/run_analysis_cc.sh $SOURCE_DIRS )
-          echo $MAX_SCORE $COMPLEXITY_MAX_SCORE
-          echo $MAX_SCORE > cc_max_score
-          # bc evaluates to `1` if relation is true
-          exit $( echo "$MAX_SCORE > $COMPLEXITY_MAX_SCORE" | bc )
-      - name: upload radon-cc results
-        uses: actions/upload-artifact@v3
-        with:
-          name: radon-cc-results
-          path: radon-cc.log
-        if: ${{ always() }}
-      - name: radon-mi
-        run: |
-          pip install radon
-          chmod a+x scripts/run_analysis_mi.sh
-          MIN_INDEX=$( scripts/run_analysis_mi.sh $SOURCE_DIRS )
-          echo $MIN_INDEX $MAINTAINABILITY_MIN_INDEX
-          echo $MIN_INDEX > mi_min_index
-          exit $( echo "$MIN_INDEX < $MAINTAINABILITY_MIN_INDEX" | bc )  # bc evaluates to `1` if relation is true
-      - name: upload radon-mi results
-        uses: actions/upload-artifact@v3
-        with:
-          name: radon-mi-results
-          path: radon-mi.log
-        if: ${{ always() }}
       - name: coverage
+        if: always()
         run: |
-          pip install coverage
           coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
-          # coverage: '/^TOTAL.+?(\d+\%)$/'
+          COVERAGE_PERC=$(grep "TOTAL" coverage.log | grep -Eo '[0-9.]+%' | sed 's/%//')
+          echo "Coverage: $COVERAGE_PERC%"
+          exit $( echo "$COVERAGE_PERC < $COVERAGE_MIN_PERC" | bc )
       - name: upload coverage results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: coverage-results
           path: coverage.log
-        if: ${{ always() }}
 

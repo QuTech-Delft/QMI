@@ -23,35 +23,17 @@ In any case, both tools can be run from the command line:
     $ mypy qmi/
 
 
-### Maintainability
-
-Code maintainability is evaluated using [Radon](https://radon.readthedocs.io/en/latest/). Two metrics are considered:
-
- - Cyclomatic complexity
- - Maintainability index
-
-To run Radon from the command line:
-
-    $ radon cc
-    $ radon mi
-
-Two wrapper scripts are provided in the `scripts/` directory that are also used in the CI environment.
-
-
 Unit tests
 ----------
 
 Unit tests are executed in the CI environment against different Python versions: 3.8, 3.9 and 3.10. Code coverage of
 the tests is computed using [Coverage.py](https://coverage.readthedocs.io/en/coverage-5.3.1/). To run the tests
-locally, use the scripts provided in `scripts/`:
-
-    $ run_unit_tests.sh
-    $ run_unit_tests_with_coverage.sh
-
-When unit tests are run locally, the Python version you have installed will be used. The coverage can also be run using
+locally, use:
 ```zsh
 coverage run --branch -m unittest discover --start-directory=tests --pattern="test_*.py";
 ```
+
+When unit tests are run locally, the Python version you have installed will be used.
 
 
 CI configuration
@@ -80,10 +62,9 @@ The fourth workflow packages the source code into an installable Python package.
 
 The following limits are defined for code quality and maintainability metrics:
 
- - Pylint score: at least 8.0
+ - Pylint score: at least 9.0
  - Mypy: 0 errors
  - Cyclomatic complexity: at most 30
- - Maintainability index: at least 20
- - Code coverage: at least 80%
+ - Code coverage: at least 90%
 
 If any of the metrics does not comply to the set thresholds, the corresponding job fails.
