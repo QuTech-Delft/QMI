@@ -82,8 +82,6 @@ setup(
             "coverage",
             "pylint",
             "mypy",
-            # version bump
-            "bump2version",
         ],
         "rtd": [
             # For generating documentation

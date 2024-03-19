@@ -40,7 +40,6 @@ jobs:
       - name: pylint
         if: always()
         run: |
-          pip install pylint
           pylint --score=yes --load-plugins=pylint.extensions.mccabe --max-complexity=$COMPLEXITY_MAX_SCORE $SOURCE_DIRS | tee pylint.log
           SCORE=$( tail -n 2 pylint.log | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1 )
           echo "Pylint score: $SCORE"
@@ -54,7 +53,6 @@ jobs:
       - name: mypy
         if: always()
         run: |
-          pip install mypy
           mypy --namespace-packages $SOURCE_DIRS | tee mypy.log
           if [ -n "$( tail -n 1 mypy.log | grep -e '^Succes' )" ]; then RESULT="passed"; else RESULT="failed"; fi
           echo "Mypy result: $RESULT"
@@ -68,7 +66,6 @@ jobs:
       - name: coverage
         if: always()
         run: |
-          pip install coverage
           coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage.log
           COVERAGE_PERC=$(grep "TOTAL" coverage.log | grep -Eo '[0-9.]+%' | sed 's/%//')
