@@ -1,9 +1,10 @@
 """QMI Instrument driver for the TimeBase DIM3000 AOM driver."""
+
 from dataclasses import dataclass, fields
 from enum import IntEnum
 import logging
 import time
-from typing import Optional, Tuple, Type, TypeVar, Union, ClassVar, get_origin, get_args
+from typing import Dict, Optional, Tuple, Type, TypeVar, Union, ClassVar, get_origin, get_args
 import re
 
 from qmi.core.context import QMI_Context
@@ -17,11 +18,12 @@ from qmi.core.transport import create_transport
 _logger = logging.getLogger(__name__)
 
 
-T = TypeVar('T', bound='DIM3000Base')
+T = TypeVar("T", bound="DIM3000Base")
 
 
 class DIM3000SweepMode(IntEnum):
     """Options for frequency sweep mode."""
+
     OFF = 0
     TRI_INT_TRIG = 1
     TRI_EXT_TRIG = 2
@@ -31,6 +33,7 @@ class DIM3000SweepMode(IntEnum):
 
 class DIM3000FMDeviation(IntEnum):
     """Options for available frequency deviation during frequency modulation."""
+
     _3200HZ = 0
     _6400HZ = 1
     _12800HZ = 2
@@ -63,7 +66,7 @@ class DIM3000Base:
         if (match := re.match(cls.PATTERN, string)) is None:
             raise QMI_InstrumentException(f"Unexpected string returned from device: {string}")
 
-        kwargs: dict[str, Union[int, float, bool, str, None]] = {}
+        kwargs: Dict[str, Union[int, float, bool, str, None]] = {}
 
         for field in fields(cls):
             # remap optional field type
@@ -94,11 +97,8 @@ class DIM3000Base:
 @dataclass(frozen=True)
 class DIM3000DevInfo(DIM3000Base):
     """Dataclass containing device information."""
-    PATTERN = (r"^Rdev:(?P<dev>\w*)\|"
-               r"Rhv:(?P<hv>\w*)\|"
-               r"Rfv:(?P<fv>\w*)\|"
-               r"Rfb:(?P<fb>\w*)\|"
-               r"Rsn:(?P<sn>\w*)")
+
+    PATTERN = r"^Rdev:(?P<dev>\w*)\|" r"Rhv:(?P<hv>\w*)\|" r"Rfv:(?P<fv>\w*)\|" r"Rfb:(?P<fb>\w*)\|" r"Rsn:(?P<sn>\w*)"
     dev: str
     hv: str
     fv: str
@@ -109,12 +109,15 @@ class DIM3000DevInfo(DIM3000Base):
 @dataclass(frozen=True)
 class DIM3000InitData(DIM3000Base):
     """Dataclass containing initial data."""
-    PATTERN = (r"^Ramoffsmin:(?P<amoffsmin>-?\d*)\|"
-               r"Ramoffsmax:(?P<amoffsmax>-?\d*)\|"
-               r"Ramoffsnom:(?P<amoffsnom>-?\d*)\|"
-               r"(Rbtstat:(?P<btstat>\d)\|)?"
-               r"(Radcoffs:(?P<adcoffs>-?\d*)\|)?"
-               r"Rinit:(?P<init>\d)")
+
+    PATTERN = (
+        r"^Ramoffsmin:(?P<amoffsmin>-?\d*)\|"
+        r"Ramoffsmax:(?P<amoffsmax>-?\d*)\|"
+        r"Ramoffsnom:(?P<amoffsnom>-?\d*)\|"
+        r"(Rbtstat:(?P<btstat>\d)\|)?"
+        r"(Radcoffs:(?P<adcoffs>-?\d*)\|)?"
+        r"Rinit:(?P<init>\d)"
+    )
     amoffsmin: int
     amoffsmax: int
     amoffsnom: int
@@ -126,30 +129,33 @@ class DIM3000InitData(DIM3000Base):
 @dataclass(frozen=True)
 class DIM3000Parameters(DIM3000Base):
     """Dataclass containing parameter data."""
-    PATTERN = (r"^Rfreq:(?P<freq>\d*)\|"
-               r"Rampl:(?P<ampl>\d*)\|"
-               r"Rout:(?P<out>\d*)\|"
-               r"Rpmon:\d*\|"
-               r"Rpmfr:\d*\|"
-               r"Rpmd:\d*\|"
-               r"Rpmphc:\d*\|"
-               r"Rswpm:(?P<swpm>\d*)\|"
-               r"Rswps:(?P<swps>\d*)\|"
-               r"Rswpp:(?P<swpp>\d*)\|"
-               r"Rswpf:(?P<swpf>\d*)\|"
-               r"Rswpt:(?P<swpt>\d*)\|"
-               r"Rfmon:(?P<fmon>\d*)\|"
-               r"Rfmdev:(?P<fmdev>\d*)\|"
-               r"Rplson:(?P<plson>\d*)\|"
-               r"Rplsfr:(?P<plsfr>\d*)\|"
-               r"Rplsdt:(?P<plsdt>\d*)\|"
-               r"Rffreq:(?P<ffreq>\d*)\|"
-               r"Rfampl:(?P<fampl>\d*)\|"
-               r"Ramoffs:(?P<amoffs>-?\d*)\|"
-               r"Rpcbtemp:(?P<pcbtemp>\d*)\|"
-               r"Rrefstat:(?P<refstat>\d*)\|"
-               r"Rreflev:(?P<reflev>-?\d*)\|"
-               r"Rvcclev:(?P<vcclev>\d*)")
+
+    PATTERN = (
+        r"^Rfreq:(?P<freq>\d*)\|"
+        r"Rampl:(?P<ampl>\d*)\|"
+        r"Rout:(?P<out>\d*)\|"
+        r"Rpmon:\d*\|"
+        r"Rpmfr:\d*\|"
+        r"Rpmd:\d*\|"
+        r"Rpmphc:\d*\|"
+        r"Rswpm:(?P<swpm>\d*)\|"
+        r"Rswps:(?P<swps>\d*)\|"
+        r"Rswpp:(?P<swpp>\d*)\|"
+        r"Rswpf:(?P<swpf>\d*)\|"
+        r"Rswpt:(?P<swpt>\d*)\|"
+        r"Rfmon:(?P<fmon>\d*)\|"
+        r"Rfmdev:(?P<fmdev>\d*)\|"
+        r"Rplson:(?P<plson>\d*)\|"
+        r"Rplsfr:(?P<plsfr>\d*)\|"
+        r"Rplsdt:(?P<plsdt>\d*)\|"
+        r"Rffreq:(?P<ffreq>\d*)\|"
+        r"Rfampl:(?P<fampl>\d*)\|"
+        r"Ramoffs:(?P<amoffs>-?\d*)\|"
+        r"Rpcbtemp:(?P<pcbtemp>\d*)\|"
+        r"Rrefstat:(?P<refstat>\d*)\|"
+        r"Rreflev:(?P<reflev>-?\d*)\|"
+        r"Rvcclev:(?P<vcclev>\d*)"
+    )
     freq: int
     ampl: float
     out: bool
@@ -175,17 +181,22 @@ class DIM3000Parameters(DIM3000Base):
         # Correct some scaling of parameters
         # Using __setattr__ because this is what is recommended by python when working with frozen classes
         # See https://docs.python.org/3/library/dataclasses.html#frozen-instances
-        object.__setattr__(self, 'ampl', self.ampl/10.)
-        object.__setattr__(self, 'fampl', self.fampl/10.)
-        object.__setattr__(self, 'pcbtemp', self.pcbtemp/100.)
-        object.__setattr__(self, 'vcclev', self.vcclev/100.)
+        object.__setattr__(self, "ampl", self.ampl / 10.0)
+        object.__setattr__(self, "fampl", self.fampl / 10.0)
+        object.__setattr__(self, "pcbtemp", self.pcbtemp / 100.0)
+        object.__setattr__(self, "vcclev", self.vcclev / 100.0)
 
 
 class TimeBase_DIM3000(QMI_Instrument):
     """QMI Instrument driver for the TimeBase DIM3000 AOM driver."""
 
     _rpc_constants = [
-        "FREQ_RANGE", "TIME_RANGE", "PULSE_FREQ_RANGE", "DUTY_CYCLE_RANGE", "AM_OFFSET_RANGE", "MINIMUM_EXEC_DELAY_S"
+        "FREQ_RANGE",
+        "TIME_RANGE",
+        "PULSE_FREQ_RANGE",
+        "DUTY_CYCLE_RANGE",
+        "AM_OFFSET_RANGE",
+        "MINIMUM_EXEC_DELAY_S",
     ]
 
     # Public class constants
@@ -197,7 +208,7 @@ class TimeBase_DIM3000(QMI_Instrument):
     MINIMUM_EXEC_DELAY_S = 0.1  # Maximum execution speed of 10 cmds/sec from manual
 
     _RESPONSE_TIMEOUT_S = 2.0
-    _TERMINATOR = b'\n'
+    _TERMINATOR = b"\n"
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialization of the TimeBase DIM3000 instrument driver.
@@ -211,29 +222,29 @@ class TimeBase_DIM3000(QMI_Instrument):
         """
         super().__init__(context, name)
         self._transport = create_transport(transport, default_attributes={"baudrate": 19200})
-        self._prev_cmd_ts = 0.
+        self._prev_cmd_ts = 0.0
 
     def _write_par(self, par: str, val: int) -> None:
         """Set a parameter of the device with a specified value."""
         self._check_is_open()
         self._check_cmd_exec_speed(time.monotonic())
-        self._transport.write(f"S{par}:{val}".encode('ascii') + self._TERMINATOR)
+        self._transport.write(f"S{par}:{val}".encode("ascii") + self._TERMINATOR)
 
     def _ask(self, cmd: str) -> str:
         """Send command to instrument and return response from instrument."""
         self._check_is_open()
         self._check_cmd_exec_speed(time.monotonic())
         self._transport.discard_read()
-        self._transport.write(cmd.encode('ascii') + self._TERMINATOR)
-        resp = self._transport.read_until(message_terminator=self._TERMINATOR,
-                                          timeout=self._RESPONSE_TIMEOUT_S)
-        return resp.rstrip().decode('ascii')
+        self._transport.write(cmd.encode("ascii") + self._TERMINATOR)
+        resp = self._transport.read_until(message_terminator=self._TERMINATOR, timeout=self._RESPONSE_TIMEOUT_S)
+        return resp.rstrip().decode("ascii")
 
     def _check_cmd_exec_speed(self, now: float) -> None:
         """Checks if command execution is higher than expected."""
         if (delay := now - self._prev_cmd_ts) < self.MINIMUM_EXEC_DELAY_S:
-            _logger.warning("Delay since previous command (%f) is shorter than recommended (%f)!",
-                            delay, self.MINIMUM_EXEC_DELAY_S)
+            _logger.warning(
+                "Delay since previous command (%f) is shorter than recommended (%f)!", delay, self.MINIMUM_EXEC_DELAY_S
+            )
         self._prev_cmd_ts = now
 
     def _check_range(self, range: Tuple[int, int], val: int) -> None:
@@ -262,7 +273,7 @@ class TimeBase_DIM3000(QMI_Instrument):
             vendor="TimeBase",
             model=f"DIM3000[{dev_info.dev}]",
             serial=dev_info.sn,
-            version=f"{dev_info.hv}.{dev_info.fv}.{dev_info.fb}"
+            version=f"{dev_info.hv}.{dev_info.fv}.{dev_info.fb}",
         )
 
     @rpc_method
@@ -289,7 +300,7 @@ class TimeBase_DIM3000(QMI_Instrument):
     @rpc_method
     def set_output_amplitude(self, ampl_dbm: float) -> None:
         """Set the output amplitude in dBm."""
-        self._write_par("ampl", int(ampl_dbm*10.))
+        self._write_par("ampl", int(ampl_dbm * 10.0))
 
     @rpc_method
     def set_sweep_mode(self, swpm: DIM3000SweepMode) -> None:
@@ -376,7 +387,7 @@ class TimeBase_DIM3000(QMI_Instrument):
     @rpc_method
     def set_fsk_amplitude(self, fampl_dbm: float) -> None:
         """Set the FSK amplitude in dBm."""
-        self._write_par("fampl", int(fampl_dbm*10.))
+        self._write_par("fampl", int(fampl_dbm * 10.0))
 
     @rpc_method
     def set_am_offset(self, amoffs: int) -> None:

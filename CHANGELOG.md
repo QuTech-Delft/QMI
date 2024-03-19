@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - QMI driver for TeraXion TFN in `qmi.instruments.teraxion` with CLI client.
 
+### Fixed
+- mypy errors not failing pipeline
+
+### Removed
+- Radon workflows as radon is no longer actively maintained. Pylint has taken over as the complexity checker.
+
 ## [0.44.0] - 2024-01-25
 
 ### Added
