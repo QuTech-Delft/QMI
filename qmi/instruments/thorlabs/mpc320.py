@@ -1,5 +1,6 @@
 """Module for a Thorlabs MPC320 motorised fibre polarisation controller."""
 
+from dataclasses import dataclass
 import logging
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_TimeoutException
@@ -10,6 +11,7 @@ from qmi.instruments.thorlabs.apt_packets import (
     HW_GET_INFO,
     MOD_GET_CHANENABLESTATE,
     MOT_GET_USTATUSUPDATE,
+    MOT_MOVE_ABSOLUTE,
     MOT_MOVE_COMPLETED,
     MOT_MOVE_HOMED,
     MOT_SET_EEPROMPARAMS,
@@ -19,6 +21,22 @@ from qmi.instruments.thorlabs.apt_protocol import AptChannelState, AptMessageId,
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
+
+@dataclass
+class Thorlabs_MPC320_Status:
+    """
+    Data class for the status of the MPC320
+
+    Attributes:
+        channel:        Channel number.
+        position:       Absolute position of the channel in degrees.
+        velocity:       Velocity in controller units.
+        motor_current:  Current of motor in mA
+    """
+    channel: int
+    position: float
+    velocity: int
+    motor_current: int
 
 
 class Thorlabs_MPC320(QMI_Instrument):
@@ -30,7 +48,7 @@ class Thorlabs_MPC320(QMI_Instrument):
 
     # the maximum range for a paddle is 170 degrees
     # the value returned by the encoder is 1370 for 170 degrees
-    ENCODER_CONVERSION_UNIT = 1370 / 170
+    ENCODER_CONVERSION_UNIT = 170/1370
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize the instrument driver.
@@ -206,6 +224,26 @@ class Thorlabs_MPC320(QMI_Instrument):
             return True
         except QMI_TimeoutException:
             return False
+        
+    @rpc_method
+    def move_absolute(self, channel_number: int, position: float) -> None:
+        """
+        Move a channel to the specified position. The specified position is in degeres. A conversion is done to convert this
+        into encoder counts. This means that there may be a slight mismatch in the specified position and the actual position.
+        You may use the get_status_update method to get the actual position.
+
+        Parameters:
+            channel_number: The channel to address.
+            position:       Absolute position to move to in degrees.
+        """
+        _logger.info("[%s] Moving channel %d", self._name, channel_number)
+        self._check_is_open()
+        # Convert position in degrees to encoder counts.
+        encoder_position = round(position / self.ENCODER_CONVERSION_UNIT)
+        # Make data packet.
+        data_packet = MOT_MOVE_ABSOLUTE(chan_ident=channel_number, absolute_distance=encoder_position)
+        # Send message.
+        self._apt_protocol.write_data_command(AptMessageId.MOT_MOVE_ABSOLUTE.value, data_packet)
 
     @rpc_method
     def is_move_completed(self, channel_number: int, timeout: float = DEFAULT_RESPONSE_TIMEOUT) -> bool:
@@ -222,11 +260,7 @@ class Thorlabs_MPC320(QMI_Instrument):
             True if the move was completed and a response was received before the timeout else False.
         """
         # TODO: add status data packet
-        _logger.info(
-            "[%s] Checking if channel %d has completed its move",
-            self._name,
-            channel_number,
-        )
+        _logger.info("[%s] Checking if channel %d has completed its move", self._name, channel_number)
         self._check_is_open()
         # Get response
         try:
@@ -253,7 +287,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._apt_protocol.write_data_command(AptMessageId.MOT_SET_EEPROMPARAMS.value, data_packet)
 
     @rpc_method
-    def get_status_update(self, channel_number: int) -> MOT_GET_USTATUSUPDATE:
+    def get_status_update(self, channel_number: int) -> Thorlabs_MPC320_Status:
         """
         Get the status update for a given channel. This call will return the position, velocity, motor current and
         status of the channel.
@@ -262,14 +296,16 @@ class Thorlabs_MPC320(QMI_Instrument):
             channel_number: The channel to query.
 
         Returns:
-            An instance of MOT_GET_USTATUSUPDATE.
+            An instance of Thorlabs_MPC320_Status.
         """
         _logger.info("[%s] Getting position counter of channel %d", self._name, channel_number)
         self._check_is_open()
         # Send request message.
-        self._apt_protocol.write_param_command(AptMessageId.MOT_GET_USTATUSUPDATE.value, channel_number)
+        self._apt_protocol.write_param_command(AptMessageId.MOT_REQ_USTATUSUPDATE.value, channel_number)
         # Get response
-        return self._apt_protocol.ask(MOT_GET_USTATUSUPDATE)
+        resp = self._apt_protocol.ask(MOT_GET_USTATUSUPDATE)
+        return Thorlabs_MPC320_Status(channel=channel_number, position=resp.position * self.ENCODER_CONVERSION_UNIT,
+                                      velocity=resp.velocity, motor_current=resp.motor_current)
 
     @rpc_method
     def set_polarisation_parameters(

@@ -5,12 +5,10 @@ here https://www.thorlabs.com/Software/Motion%20Control/APT_Communications_Proto
 
 from ctypes import LittleEndianStructure, c_uint8, c_uint16, c_int16, c_uint32, c_int32, c_char, sizeof
 from enum import Enum
-from typing import List, Optional, Tuple, TypeVar
+from typing import List, Optional, Tuple, Type, TypeVar
 
 from qmi.core.transport import QMI_Transport
 from qmi.core.exceptions import QMI_InstrumentException
-
-T = TypeVar("T", bound="AptDataPacket")
 
 # APT format specifiers
 apt_word = c_uint16
@@ -72,6 +70,7 @@ class AptMessageId(Enum):
     HW_STOP_UPDATEMSGS = 0x0012
     MOT_MOVE_HOME = 0x0443
     MOT_MOVE_HOMED = 0x0444
+    MOT_MOVE_ABSOLUTE = 0x0453
     MOT_MOVE_COMPLETED = 0x0464
     MOT_SET_EEPROMPARAMS = 0x04B9
     MOT_REQ_USTATUSUPDATE = 0x0490
@@ -117,14 +116,16 @@ class AptMessageHeaderForData(LittleEndianStructure):
     ]
 
 
-class AptDataPacket(LittleEndianStructure):
+class AptMessage(LittleEndianStructure):
     """
-    Base class for APT data packet.
+    Base class for an APT message.
     """
 
     MESSAGE_ID: int
+    HEADER_ONLY: bool = False
     _pack_ = True
 
+T = TypeVar("T", bound=AptMessage)
 
 class AptProtocol:
     """
@@ -169,9 +170,8 @@ class AptProtocol:
         msg = AptMessageHeaderWithParams(
             message_id, param1 or 0x00, param2 or 0x00, self._apt_device_address, self._host_address
         )
-
         # Send command.
-        self._transport.write(msg)
+        self._transport.write(bytearray(msg))
 
     def write_data_command(self, message_id: int, data: T) -> None:
         """
@@ -181,13 +181,12 @@ class AptProtocol:
         data_length = sizeof(data)
 
         # Make the header.
-        msg = AptMessageHeaderWithParams(message_id, data_length, self._apt_device_address | 0x80, self._host_address)
+        msg = AptMessageHeaderForData(message_id, data_length, self._apt_device_address | 0x80, self._host_address)
 
         # Send the header and data packet.
-        self._transport.write(msg)
-        self._transport.write(data)
+        self._transport.write(bytearray(msg) + bytearray(data))
 
-    def ask(self, data_type: T, timeout: Optional[float] = None) -> T:
+    def ask(self, data_type: Type[T], timeout: Optional[float] = None) -> T:
         """
         Ask for a response.
 
@@ -203,8 +202,10 @@ class AptProtocol:
             timeout = self._timeout
 
         # Read the header first.
-        resp = self._transport.read(nbytes=self.HEADER_SIZE_BYTES, timeout=timeout)
-        header = AptMessageHeaderForData.from_buffer_copy(resp)
+        header_bytes = self._transport.read(nbytes=self.HEADER_SIZE_BYTES, timeout=timeout)
+        if data_type.HEADER_ONLY:
+            return data_type.from_buffer_copy(header_bytes)
+        header = AptMessageHeaderForData.from_buffer_copy(header_bytes)
         data_length = header.date_length
 
         # Check that the received message ID is the ID that is expected.

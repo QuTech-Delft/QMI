@@ -2,8 +2,7 @@
 
 from typing import List, Tuple
 from qmi.instruments.thorlabs.apt_protocol import (
-    AptDataPacket,
-    AptMessageHeaderWithParams,
+    AptMessage,
     AptMessageId,
     apt_long,
     apt_dword,
@@ -13,7 +12,7 @@ from qmi.instruments.thorlabs.apt_protocol import (
 )
 
 
-class HW_GET_INFO(AptDataPacket):
+class HW_GET_INFO(AptMessage):
     """
     Data packet structure for the HW_GET_INFO response. This packet is sent as a response to HW_GET_INFO.
 
@@ -43,7 +42,7 @@ class HW_GET_INFO(AptDataPacket):
     ]
 
 
-class MOD_GET_CHANENABLESTATE(AptMessageHeaderWithParams):
+class MOD_GET_CHANENABLESTATE(AptMessage):
     """
     Header structure for the MOD_GET_CHANENABLESTATE response. This header is sent as a response to
     MOD_REQ_CHANENABLESTATE.
@@ -57,6 +56,7 @@ class MOD_GET_CHANENABLESTATE(AptMessageHeaderWithParams):
     """
 
     MESSAGE_ID = AptMessageId.MOD_GET_CHANENABLESTATE.value
+    HEADER_ONLY = True
     _fields_: List[Tuple[str, type]] = [
         ("message_id", apt_word),
         ("chan_ident", apt_byte),
@@ -66,7 +66,7 @@ class MOD_GET_CHANENABLESTATE(AptMessageHeaderWithParams):
     ]
 
 
-class MOT_MOVE_HOMED(AptMessageHeaderWithParams):
+class MOT_MOVE_HOMED(AptMessage):
     """
     Header structure for the MOT_MOVE_HOMED response. This header is sent as a response to MOT_MOVE_HOME
     once homing is complete.
@@ -80,6 +80,7 @@ class MOT_MOVE_HOMED(AptMessageHeaderWithParams):
     """
 
     MESSAGE_ID = AptMessageId.MOT_MOVE_HOMED.value
+    HEADER_ONLY = True
     _fields_: List[Tuple[str, type]] = [
         ("message_id", apt_word),
         ("chan_ident", apt_byte),
@@ -88,8 +89,20 @@ class MOT_MOVE_HOMED(AptMessageHeaderWithParams):
         ("source", apt_byte),
     ]
 
+class MOT_MOVE_ABSOLUTE(AptMessage):
+    """
+    Data packet structure for a MOT_SMOVE_ABSOLUTE command.
 
-class MOT_MOVE_COMPLETED(AptMessageHeaderWithParams):
+    Fields:
+        chan_ident:         The channel being addressed.
+        absolute_distance:  The distance to move in encoder units.
+    """
+
+    MESSAGE_ID = AptMessageId.MOT_SET_EEPROMPARAMS.value
+    _fields_: List[Tuple[str, type]] = [("chan_ident", apt_word), ("absolute_distance", apt_long)]
+
+
+class MOT_MOVE_COMPLETED(AptMessage):
     """
     Header structure for the MOT_MOVE_COMPLETED response. This header is sent as a response to a relative or absolute
     move command once the move has been completed.
@@ -103,6 +116,7 @@ class MOT_MOVE_COMPLETED(AptMessageHeaderWithParams):
     """
 
     MESSAGE_ID = AptMessageId.MOT_MOVE_COMPLETED.value
+    HEADER_ONLY = True
     _fields_: List[Tuple[str, type]] = [
         ("message_id", apt_word),
         ("chan_ident", apt_byte),
@@ -112,7 +126,7 @@ class MOT_MOVE_COMPLETED(AptMessageHeaderWithParams):
     ]
 
 
-class MOT_GET_USTATUSUPDATE(AptDataPacket):
+class MOT_GET_USTATUSUPDATE(AptMessage):
     """
     Data packet structure for a MOT_GET_USTATUSUPDATE command.
 
@@ -124,7 +138,7 @@ class MOT_GET_USTATUSUPDATE(AptDataPacket):
         status_bits:    Status bits that provide various errors and indications.
     """
 
-    MESSAGE_ID = AptMessageId.MOT_REQ_USTATUSUPDATE.value
+    MESSAGE_ID = AptMessageId.MOT_GET_USTATUSUPDATE.value
     _fields_: List[Tuple[str, type]] = [
         ("chan_ident", apt_word),
         ("position", apt_long),
@@ -134,7 +148,7 @@ class MOT_GET_USTATUSUPDATE(AptDataPacket):
     ]
 
 
-class MOT_SET_EEPROMPARAMS(AptDataPacket):
+class MOT_SET_EEPROMPARAMS(AptMessage):
     """
     Data packet structure for a MOT_SET_EEPROMPARAMS command.
 
@@ -147,7 +161,7 @@ class MOT_SET_EEPROMPARAMS(AptDataPacket):
     _fields_: List[Tuple[str, type]] = [("chan_ident", apt_word), ("msg_id", apt_word)]
 
 
-class POL_GET_SET_PARAMS(AptDataPacket):
+class POL_GET_SET_PARAMS(AptMessage):
     """ "
     Data packet structure for POL_SET_PARAMS command. It is also the data packet structure for the POL_SET_PARAMS.
 
