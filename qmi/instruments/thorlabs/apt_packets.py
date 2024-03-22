@@ -174,7 +174,7 @@ class POL_GET_SET_PARAMS(AptMessage):
         jog_step3:      Size fo jog step to be performed on paddle 3.
     """
 
-    MESSAGE_ID = AptMessageId.POL_SET_PARAMS.value
+    MESSAGE_ID = AptMessageId.POL_GET_PARAMS.value
     _fields_: List[Tuple[str, type]] = [
         ("not_used", apt_word),
         ("velocity", apt_word),

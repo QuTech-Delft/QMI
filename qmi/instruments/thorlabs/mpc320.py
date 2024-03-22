@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import logging
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_TimeoutException
+from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.transport import create_transport
@@ -38,6 +38,24 @@ class Thorlabs_MPC320_Status:
     velocity: int
     motor_current: int
 
+@dataclass
+class Thorlabs_MPC320_PolarisationParameters:
+    """
+    Data class for the polarisation parameters of the MPC320
+
+    Attributes:
+        velocity:       The velocity in percentage of the max velocity 400 degrees/s.
+        home_position:  The home position of all the paddles/channels in degrees.
+        jog_step1:      The position to move paddel/channel 1 by for a jog step in degrees.
+        jog_step2:      The position to move paddel/channel 2 by for a jog step in degrees.
+        jog_step3:      The position to move paddel/channel 3 by for a jog step in degrees.
+    """
+    velocity: float
+    home_position: float
+    jog_step1: float
+    jog_step2: float
+    jog_step3: float
+
 
 class Thorlabs_MPC320(QMI_Instrument):
     """
@@ -50,6 +68,12 @@ class Thorlabs_MPC320(QMI_Instrument):
     # the value returned by the encoder is 1370 for 170 degrees
     ENCODER_CONVERSION_UNIT = 170/1370
 
+    MIN_POSITION = 0
+    MAX_POSITION = 170
+
+    MIN_VELOCITY_PERC = 10
+    MAX_VELOCITY_PERC = 100
+
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize the instrument driver.
 
@@ -60,7 +84,32 @@ class Thorlabs_MPC320(QMI_Instrument):
         super().__init__(context, name)
         self._transport = create_transport(transport, default_attributes={"baudrate": 115200, "rtscts": True})
         self._apt_protocol = AptProtocol(self._transport, default_timeout=self.DEFAULT_RESPONSE_TIMEOUT)
-        self._power_unit_configured = False
+
+    def _validate_position(self, pos: float) -> None:
+        """
+        Validate the position. Any position for the MPC320 needs to be in the range 0 to 170 degrees, or 0 to 1370 in encoder counts.
+
+        Parameters:
+            pos:    Position to validate in degrees.
+
+        Raises:
+            an instance of QMI_InstrumentException if the position is invalid.
+        """
+        if not self.MIN_POSITION <= pos <= self.MAX_POSITION:
+            raise QMI_InstrumentException(f"Given position {pos} is outside the valid range [{self.MIN_POSITION}, {self.MAX_POSITION}]")
+        
+    def _validate_velocity(self, vel: float) -> None:
+        """
+        Validate the velocity. Any velocity for the MPC320 needs to be in the range 40 to 400 degrees/s, or 10 to 100% of 400 degrees/s.
+
+        Parameters:
+            vel:    Velocity to validate in percentage.
+
+        Raises:
+            an instance of QMI_InstrumentException if the velocity is invalid.
+        """
+        if not self.MIN_VELOCITY_PERC <= vel <= self.MAX_VELOCITY_PERC:
+            raise QMI_InstrumentException(f"Given relative velocity {vel} is outside the valid range [{self.MIN_VELOCITY_PERC}%, {self.MAX_VELOCITY_PERC}%]")
 
     @rpc_method
     def open(self) -> None:
@@ -321,21 +370,26 @@ class Thorlabs_MPC320(QMI_Instrument):
 
         Parameters:
             velocity:       Velocity in range 10% to 100% of 400 degrees/s.
-            home_position:  Home position in encoder counts.
-            jog_step1:      Size fo jog step to be performed on paddle 1.
-            jog_step2:      Size fo jog step to be performed on paddle 2.
-            jog_step3:      Size fo jog step to be performed on paddle 3.
+            home_position:  Home position in degrees.
+            jog_step1:      Size of jog step for paddle 1.
+            jog_step2:      Size of jog step for paddle 2.
+            jog_step3:      Size of jog step for paddle 3.
         """
-        # TODO: finish command
         _logger.info("[%s] Setting polarisation parameters", self._name)
         self._check_is_open()
+        # Validate parameters.
+        self._validate_velocity(velocity)
+        self._validate_position(home_pos)
+        self._validate_position(jog_step1)
+        self._validate_position(jog_step2)
+        self._validate_position(jog_step3)
         # Make data packet.
         data_packet = POL_GET_SET_PARAMS(
             velocity=velocity,
-            home_position=home_pos,
-            jog_step1=jog_step1,
-            jog_step2=jog_step2,
-            jog_step3=jog_step3,
+            home_position=round(home_pos / self.ENCODER_CONVERSION_UNIT),
+            jog_step1=round(jog_step1 / self.ENCODER_CONVERSION_UNIT),
+            jog_step2=round(jog_step2 / self.ENCODER_CONVERSION_UNIT),
+            jog_step3=round(jog_step3 / self.ENCODER_CONVERSION_UNIT),
         )
         # Send message.
         self._apt_protocol.write_data_command(AptMessageId.POL_SET_PARAMS.value, data_packet)
@@ -349,5 +403,10 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._check_is_open()
         # Send request message.
         self._apt_protocol.write_param_command(AptMessageId.POL_REQ_PARAMS.value)
-        # Get response
-        return self._apt_protocol.ask(POL_GET_SET_PARAMS)
+        # Get response.
+        params = self._apt_protocol.ask(POL_GET_SET_PARAMS)
+        return Thorlabs_MPC320_PolarisationParameters(velocity=params.velocity,
+                                                      home_position=params.home_position * self.ENCODER_CONVERSION_UNIT,
+                                                      jog_step1=params.jog_step1 * self.ENCODER_CONVERSION_UNIT,
+                                                      jog_step2=params.jog_step2 * self.ENCODER_CONVERSION_UNIT,
+                                                      jog_step3=params.jog_step3 * self.ENCODER_CONVERSION_UNIT)
