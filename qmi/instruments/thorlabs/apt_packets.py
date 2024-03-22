@@ -98,7 +98,7 @@ class MOT_MOVE_ABSOLUTE(AptMessage):
         absolute_distance:  The distance to move in encoder units.
     """
 
-    MESSAGE_ID = AptMessageId.MOT_SET_EEPROMPARAMS.value
+    MESSAGE_ID = AptMessageId.MOT_MOVE_ABSOLUTE.value
     _fields_: List[Tuple[str, type]] = [("chan_ident", apt_word), ("absolute_distance", apt_long)]
 
 

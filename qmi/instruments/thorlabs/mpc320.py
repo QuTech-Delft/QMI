@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass
 import logging
+from typing import Dict
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
+from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.transport import create_transport
@@ -55,6 +56,12 @@ class Thorlabs_MPC320_PolarisationParameters:
     jog_step1: float
     jog_step2: float
     jog_step3: float
+
+Thorlabs_MPC320_ChannelMap: Dict[int, int] = {
+    1: 0x01,
+    2: 0x02,
+    3: 0x04
+}
 
 
 class Thorlabs_MPC320(QMI_Instrument):
@@ -169,7 +176,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._validate_channel(channel_number)
         self._check_is_open()
         # Send message.
-        self._apt_protocol.write_param_command(AptMessageId.MOD_IDENTIFY.value, channel_number)
+        self._apt_protocol.write_param_command(AptMessageId.MOD_IDENTIFY.value, Thorlabs_MPC320_ChannelMap[channel_number])
 
     def _toggle_channel_state(self, channel_number: int, state: AptChannelState) -> None:
         """
@@ -182,7 +189,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._check_is_open()
         self._validate_channel(channel_number)
         # Send message.
-        self._apt_protocol.write_param_command(AptMessageId.MOD_SET_CHANENABLESTATE.value, channel_number, state.value)
+        self._apt_protocol.write_param_command(AptMessageId.MOD_SET_CHANENABLESTATE.value, Thorlabs_MPC320_ChannelMap[channel_number], state.value)
 
     @rpc_method
     def enable_channel(self, channel_number: int) -> None:
@@ -221,7 +228,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._validate_channel(channel_number)
         self._check_is_open()
         # Send request message.
-        self._apt_protocol.write_param_command(AptMessageId.MOD_REQ_CHANENABLESTATE.value, channel_number)
+        self._apt_protocol.write_param_command(AptMessageId.MOD_REQ_CHANENABLESTATE.value, Thorlabs_MPC320_ChannelMap[channel_number])
         # Get response
         resp = self._apt_protocol.ask(MOD_GET_CHANENABLESTATE)
         return AptChannelState(resp.enable_state)
@@ -268,7 +275,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._validate_channel(channel_number)
         self._check_is_open()
         # Send message.
-        self._apt_protocol.write_param_command(AptMessageId.MOT_MOVE_HOME.value)
+        self._apt_protocol.write_param_command(AptMessageId.MOT_MOVE_HOME.value, Thorlabs_MPC320_ChannelMap[channel_number])
 
     @rpc_method
     def is_channel_homed(self, channel_number: int, timeout: float = DEFAULT_RESPONSE_TIMEOUT) -> bool:
@@ -282,17 +289,15 @@ class Thorlabs_MPC320(QMI_Instrument):
                             and is set to a default value of DEFAULT_RESPONSE_TIMEOUT.
 
         Returns:
-            True if the device was homed and a response was received before the timeout else False.
+            True if the channel was homed.
         """
         _logger.info("[%s] Checking if channel %d is homed", self._name, channel_number)
         self._validate_channel(channel_number)
         self._check_is_open()
-        # Get response
-        try:
-            _ = self._apt_protocol.ask(MOT_MOVE_HOMED, timeout)
-            return True
-        except QMI_TimeoutException:
-            return False
+        # Get response.
+        resp = self._apt_protocol.ask(MOT_MOVE_HOMED, timeout)
+        # Check if the channel number in the response is equal to the one that was asked for.
+        return resp.chan_ident == Thorlabs_MPC320_ChannelMap[channel_number]
         
     @rpc_method
     def move_absolute(self, channel_number: int, position: float) -> None:
@@ -311,7 +316,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         # Convert position in degrees to encoder counts.
         encoder_position = round(position / self.ENCODER_CONVERSION_UNIT)
         # Make data packet.
-        data_packet = MOT_MOVE_ABSOLUTE(chan_ident=channel_number, absolute_distance=encoder_position)
+        data_packet = MOT_MOVE_ABSOLUTE(chan_ident=Thorlabs_MPC320_ChannelMap[channel_number], absolute_distance=encoder_position)
         # Send message.
         self._apt_protocol.write_data_command(AptMessageId.MOT_MOVE_ABSOLUTE.value, data_packet)
 
@@ -327,18 +332,15 @@ class Thorlabs_MPC320(QMI_Instrument):
                             and is set to a default value of DEFAULT_RESPONSE_TIMEOUT.
 
         Returns:
-            True if the move was completed and a response was received before the timeout else False.
+            True if the move for the channel was completed.
         """
         # TODO: add status data packet
         _logger.info("[%s] Checking if channel %d has completed its move", self._name, channel_number)
         self._validate_channel(channel_number)
         self._check_is_open()
         # Get response
-        try:
-            _ = self._apt_protocol.ask(MOT_MOVE_COMPLETED, timeout)
-            return True
-        except QMI_TimeoutException:
-            return False
+        resp = self._apt_protocol.ask(MOT_MOVE_COMPLETED, timeout)
+        return resp.chan_ident == Thorlabs_MPC320_ChannelMap[channel_number]
 
     @rpc_method
     def save_parameter_settings(self, channel_number: int, message_id: int) -> None:
@@ -354,7 +356,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._check_is_open()
         self._validate_channel(channel_number)
         # Make data packet.
-        data_packet = MOT_SET_EEPROMPARAMS(chan_ident=channel_number, msg_id=message_id)
+        data_packet = MOT_SET_EEPROMPARAMS(chan_ident=Thorlabs_MPC320_ChannelMap[channel_number], msg_id=message_id)
         # Send message.
         self._apt_protocol.write_data_command(AptMessageId.MOT_SET_EEPROMPARAMS.value, data_packet)
 
@@ -374,7 +376,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._check_is_open()
         self._validate_channel(channel_number)
         # Send request message.
-        self._apt_protocol.write_param_command(AptMessageId.MOT_REQ_USTATUSUPDATE.value, channel_number)
+        self._apt_protocol.write_param_command(AptMessageId.MOT_REQ_USTATUSUPDATE.value, Thorlabs_MPC320_ChannelMap[channel_number])
         # Get response
         resp = self._apt_protocol.ask(MOT_GET_USTATUSUPDATE)
         return Thorlabs_MPC320_Status(channel=channel_number, position=resp.position * self.ENCODER_CONVERSION_UNIT,
@@ -419,7 +421,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._apt_protocol.write_data_command(AptMessageId.POL_SET_PARAMS.value, data_packet)
 
     @rpc_method
-    def get_polarisation_parameters(self) -> POL_GET_SET_PARAMS:
+    def get_polarisation_parameters(self) -> Thorlabs_MPC320_PolarisationParameters:
         """
         Get the polarisation parameters.
         """
