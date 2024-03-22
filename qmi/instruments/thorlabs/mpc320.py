@@ -68,8 +68,8 @@ class Thorlabs_MPC320(QMI_Instrument):
     # the value returned by the encoder is 1370 for 170 degrees
     ENCODER_CONVERSION_UNIT = 170/1370
 
-    MIN_POSITION = 0
-    MAX_POSITION = 170
+    MIN_POSITION_DEGREES = 0
+    MAX_POSITION_DEGREES = 170
 
     MIN_VELOCITY_PERC = 10
     MAX_VELOCITY_PERC = 100
@@ -98,8 +98,8 @@ class Thorlabs_MPC320(QMI_Instrument):
         Raises:
             an instance of QMI_InstrumentException if the position is invalid.
         """
-        if not self.MIN_POSITION <= pos <= self.MAX_POSITION:
-            raise QMI_InstrumentException(f"Given position {pos} is outside the valid range [{self.MIN_POSITION}, {self.MAX_POSITION}]")
+        if not self.MIN_POSITION_DEGREES <= pos <= self.MAX_POSITION_DEGREES:
+            raise QMI_InstrumentException(f"Given position {pos} is outside the valid range [{self.MIN_POSITION_DEGREES}, {self.MAX_POSITION_DEGREES}]")
         
     def _validate_velocity(self, vel: float) -> None:
         """
