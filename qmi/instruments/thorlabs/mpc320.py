@@ -74,6 +74,9 @@ class Thorlabs_MPC320(QMI_Instrument):
     MIN_VELOCITY_PERC = 10
     MAX_VELOCITY_PERC = 100
 
+    MIN_CHANNEL_NUMBER = 1
+    MAX_CHANNEL_NUMBER = 3
+
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize the instrument driver.
 
@@ -110,6 +113,20 @@ class Thorlabs_MPC320(QMI_Instrument):
         """
         if not self.MIN_VELOCITY_PERC <= vel <= self.MAX_VELOCITY_PERC:
             raise QMI_InstrumentException(f"Given relative velocity {vel} is outside the valid range [{self.MIN_VELOCITY_PERC}%, {self.MAX_VELOCITY_PERC}%]")
+        
+    def _validate_channel(self, channel_number: int) -> None:
+        """
+        Validate the channel number. The MPC320 has 3 channels.
+
+        Parameters:
+            channel_number: Channel number to validate.
+
+        Raises:
+            an instance of QMI_InstrumentException if the channel is not 1, 2 or 3
+        """
+
+        if channel_number not in [1, 2, 3]:
+            raise QMI_InstrumentException(f"Given channel {channel_number} is not in the valid range [{self.MIN_CHANNEL_NUMBER}, {self.MAX_CHANNEL_NUMBER}]")
 
     @rpc_method
     def open(self) -> None:
@@ -149,7 +166,7 @@ class Thorlabs_MPC320(QMI_Instrument):
             channel_number: The channel to be identified.
         """
         _logger.info("[%s] Identify channel %d", self._name, channel_number)
-        # TODO: check and validate channel number for MPC320
+        self._validate_channel(channel_number)
         self._check_is_open()
         # Send message.
         self._apt_protocol.write_param_command(AptMessageId.MOD_IDENTIFY.value, channel_number)
@@ -162,8 +179,8 @@ class Thorlabs_MPC320(QMI_Instrument):
             channel_number: The channel to toggle.
             state:          The state to change the channel to.
         """
-        # TODO: check and validate channel number for MPC320
         self._check_is_open()
+        self._validate_channel(channel_number)
         # Send message.
         self._apt_protocol.write_param_command(AptMessageId.MOD_SET_CHANENABLESTATE.value, channel_number, state.value)
 
@@ -201,6 +218,7 @@ class Thorlabs_MPC320(QMI_Instrument):
             The state of the channel as an AptChannelState enum.
         """
         _logger.info("[%s] Getting state of channel %d", self._name, channel_number)
+        self._validate_channel(channel_number)
         self._check_is_open()
         # Send request message.
         self._apt_protocol.write_param_command(AptMessageId.MOD_REQ_CHANENABLESTATE.value, channel_number)
@@ -247,6 +265,7 @@ class Thorlabs_MPC320(QMI_Instrument):
             channel_number: The channel to home.
         """
         _logger.info("[%s] Homing channel %d", self._name, channel_number)
+        self._validate_channel(channel_number)
         self._check_is_open()
         # Send message.
         self._apt_protocol.write_param_command(AptMessageId.MOT_MOVE_HOME.value)
@@ -266,6 +285,7 @@ class Thorlabs_MPC320(QMI_Instrument):
             True if the device was homed and a response was received before the timeout else False.
         """
         _logger.info("[%s] Checking if channel %d is homed", self._name, channel_number)
+        self._validate_channel(channel_number)
         self._check_is_open()
         # Get response
         try:
@@ -286,6 +306,7 @@ class Thorlabs_MPC320(QMI_Instrument):
             position:       Absolute position to move to in degrees.
         """
         _logger.info("[%s] Moving channel %d", self._name, channel_number)
+        self._validate_channel(channel_number)
         self._check_is_open()
         # Convert position in degrees to encoder counts.
         encoder_position = round(position / self.ENCODER_CONVERSION_UNIT)
@@ -310,6 +331,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         """
         # TODO: add status data packet
         _logger.info("[%s] Checking if channel %d has completed its move", self._name, channel_number)
+        self._validate_channel(channel_number)
         self._check_is_open()
         # Get response
         try:
@@ -330,6 +352,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         """
         _logger.info("[%s] Saving parameters of message %d", self._name, message_id)
         self._check_is_open()
+        self._validate_channel(channel_number)
         # Make data packet.
         data_packet = MOT_SET_EEPROMPARAMS(chan_ident=channel_number, msg_id=message_id)
         # Send message.
@@ -349,6 +372,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         """
         _logger.info("[%s] Getting position counter of channel %d", self._name, channel_number)
         self._check_is_open()
+        self._validate_channel(channel_number)
         # Send request message.
         self._apt_protocol.write_param_command(AptMessageId.MOT_REQ_USTATUSUPDATE.value, channel_number)
         # Get response
