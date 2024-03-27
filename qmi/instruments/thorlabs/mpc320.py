@@ -165,31 +165,16 @@ class Thorlabs_MPC320(QMI_Instrument):
         return QMI_InstrumentIdentification("Thorlabs", resp.model_number, resp.serial_number, resp.firmware_version)
 
     @rpc_method
-    def identify_channel(self, channel_number: int) -> None:
+    def identify(self) -> None:
         """
-        Identify a channel by flashing the front panel LEDs.
-
-        Parameters:
-            channel_number: The channel to be identified.
+        Identify device by flashing the front panel LEDs.
         """
-        _logger.info("[%s] Identify channel %d", self._name, channel_number)
-        self._validate_channel(channel_number)
+        _logger.info("[%s] Identifying device", self._name)
         self._check_is_open()
         # Send message.
-        self._apt_protocol.write_param_command(AptMessageId.MOD_IDENTIFY.value, Thorlabs_MPC320_ChannelMap[channel_number])
-
-    def _toggle_channel_state(self, channel_number: int, state: AptChannelState) -> None:
-        """
-        Toggle the state of the channel.
-
-        Parameters:
-            channel_number: The channel to toggle.
-            state:          The state to change the channel to.
-        """
-        self._check_is_open()
-        self._validate_channel(channel_number)
-        # Send message.
-        self._apt_protocol.write_param_command(AptMessageId.MOD_SET_CHANENABLESTATE.value, Thorlabs_MPC320_ChannelMap[channel_number], state.value)
+        # For the MPC320 the channel number does not matter here. The device has one LED that flashes irrespective
+        # of the provided channel number.
+        self._apt_protocol.write_param_command(AptMessageId.MOD_IDENTIFY.value, 0x01)
 
     @rpc_method
     def enable_channels(self, channel_numbers: List[int]) -> None:
@@ -253,7 +238,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         """
         Disconnect hardware from USB bus.
         """
-        _logger.info("[%s] Disconnecting instrument from USB hub", self._name)
+        _logger.info("[%s] Disconnecting instrument from USB bus", self._name)
         self._check_is_open()
         # Send message.
         self._apt_protocol.write_param_command(AptMessageId.HW_DISCONNECT.value)
