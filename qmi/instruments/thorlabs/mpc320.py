@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 import logging
-from typing import Dict
+from typing import Dict, List
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
@@ -192,26 +192,38 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._apt_protocol.write_param_command(AptMessageId.MOD_SET_CHANENABLESTATE.value, Thorlabs_MPC320_ChannelMap[channel_number], state.value)
 
     @rpc_method
-    def enable_channel(self, channel_number: int) -> None:
+    def enable_channels(self, channel_numbers: List[int]) -> None:
         """
-        Enable the channel.
+        Enable the channel(s). Note that this method will disable any channel that is not provided as an argument. For example, if
+        you enable channel 1, then 2 and 3 will be disabled. If you have previously enabled a channel(s) and fail
+        to include it/them again in this call, that channel(s) will be disabled. For example, if you run the following:
+        self.enable_channel([1])
+        self.enable_channel([2])
+        only channel 2 will be enabled and 1 and 3 will be disabled. The correct way to call this method in this case is
+        self.enable_channel([1,2])
 
         Parameters:
-            channel_number: The channel to enable.
+            channel_number: The channnels(s) to enable.
         """
-        _logger.info("[%s] Enabling channel %d", self._name, channel_number)
-        self._toggle_channel_state(channel_number, AptChannelState.ENABLE)
+        _logger.info("[%s] Enabling channel(s) %s", self._name, str(channel_numbers))
+        self._check_is_open()
+        for channel_number in channel_numbers:
+            self._validate_channel(channel_number)
+        # Make hexadecimal value for channels
+        channels_to_enable = 0x00
+        for channel_number in channel_numbers:
+            channels_to_enable ^= channel_number
+        # Send message.
+        self._apt_protocol.write_param_command(AptMessageId.MOD_SET_CHANENABLESTATE.value, channels_to_enable, AptChannelState.ENABLE.value)
 
     @rpc_method
-    def disable_channel(self, channel_number: int) -> None:
+    def disable_all_channels(self) -> None:
         """
-        Disable the channel.
-
-        Parameters:
-            channel_number: The channel to disable.
+        Disable all the channels.
         """
-        _logger.info("[%s] Disabling channel %d", self._name, channel_number)
-        self._toggle_channel_state(channel_number, AptChannelState.DISABLE)
+        _logger.info("[%s] Disabling channels", self._name)
+        self._check_is_open()
+        self._apt_protocol.write_param_command(AptMessageId.MOD_SET_CHANENABLESTATE.value, 0x00, AptChannelState.ENABLE.value)
 
     @rpc_method
     def get_channel_state(self, channel_number: int) -> AptChannelState:
@@ -231,6 +243,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._apt_protocol.write_param_command(AptMessageId.MOD_REQ_CHANENABLESTATE.value, Thorlabs_MPC320_ChannelMap[channel_number])
         # Get response
         resp = self._apt_protocol.ask(MOD_GET_CHANENABLESTATE)
+        # For the MPC320 the state 0x00 is also a valid channel state. It is also the disable state
+        if resp.enable_state == 0x00:
+            return AptChannelState.DISABLE
         return AptChannelState(resp.enable_state)
 
     @rpc_method
@@ -310,6 +325,7 @@ class Thorlabs_MPC320(QMI_Instrument):
             channel_number: The channel to address.
             position:       Absolute position to move to in degrees.
         """
+        # TODO: check for move completed command, otherwise the that message will stay in the buffer
         _logger.info("[%s] Moving channel %d", self._name, channel_number)
         self._validate_channel(channel_number)
         self._check_is_open()
