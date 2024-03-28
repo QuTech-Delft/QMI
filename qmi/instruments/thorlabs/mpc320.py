@@ -18,7 +18,7 @@ from qmi.instruments.thorlabs.apt_packets import (
     MOT_SET_EEPROMPARAMS,
     POL_GET_SET_PARAMS,
 )
-from qmi.instruments.thorlabs.apt_protocol import AptChannelState, AptMessageId, AptProtocol
+from qmi.instruments.thorlabs.apt_protocol import AptChannelJogDirection, AptChannelState, AptMessageId, AptProtocol
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
@@ -238,6 +238,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         """
         Disconnect hardware from USB bus.
         """
+        # TODO: this does nothing
         _logger.info("[%s] Disconnecting instrument from USB bus", self._name)
         self._check_is_open()
         # Send message.
@@ -382,6 +383,22 @@ class Thorlabs_MPC320(QMI_Instrument):
         resp = self._apt_protocol.ask(MOT_GET_USTATUSUPDATE)
         return Thorlabs_MPC320_Status(channel=channel_number, position=resp.position * self.ENCODER_CONVERSION_UNIT,
                                       velocity=resp.velocity, motor_current=resp.motor_current)
+
+    @rpc_method
+    def jog(self, channel_number: int, direction: AptChannelJogDirection=  AptChannelJogDirection.FORWARD) -> None:
+        """
+        Move a channel specified by its jog step.
+
+        Parameters:
+            channel_number: The channel to job.
+            direction:      The direction to job. This can either be forward or backward. Default is forward.
+        """
+        # TODO: check for jog completion
+        _logger.info("[%s] Getting position counter of channel %d", self._name, channel_number)
+        self._check_is_open()
+        self._validate_channel(channel_number)
+        # Send request message.
+        self._apt_protocol.write_param_command(AptMessageId.MOT_MOVE_JOG.value, Thorlabs_MPC320_ChannelMap[channel_number], direction.value)
 
     @rpc_method
     def set_polarisation_parameters(

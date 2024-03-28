@@ -75,16 +75,23 @@ class AptMessageId(Enum):
     MOT_SET_EEPROMPARAMS = 0x04B9
     MOT_REQ_USTATUSUPDATE = 0x0490
     MOT_GET_USTATUSUPDATE = 0x0491
+    MOT_MOVE_JOG = 0x046A
     POL_SET_PARAMS = 0x0530
     POL_REQ_PARAMS = 0x0531
     POL_GET_PARAMS = 0x0532
 
 
 class AptChannelState(Enum):
-    """Possible channel states"""
+    """Channel state"""
 
     ENABLE = 0x01
     DISABLE = 0x02
+
+class AptChannelJogDirection(Enum):
+    """Jog direction"""
+
+    FORWARD = 0x01
+    BACKWARD = 0x02
 
 
 class AptMessageHeaderWithParams(LittleEndianStructure):
