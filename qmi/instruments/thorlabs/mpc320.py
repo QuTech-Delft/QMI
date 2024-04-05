@@ -197,7 +197,7 @@ class Thorlabs_MPC320(QMI_Instrument):
         # Make hexadecimal value for channels
         channels_to_enable = 0x00
         for channel_number in channel_numbers:
-            channels_to_enable ^= channel_number
+            channels_to_enable ^= Thorlabs_MPC320_ChannelMap[channel_number]
         # Send message.
         self._apt_protocol.write_param_command(AptMessageId.MOD_SET_CHANENABLESTATE.value, channels_to_enable, AptChannelState.ENABLE.value)
 
