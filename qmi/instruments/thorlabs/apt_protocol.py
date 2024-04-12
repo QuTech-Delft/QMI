@@ -16,7 +16,9 @@ apt_short = c_int16
 apt_dword = c_uint32
 apt_long = c_int32
 apt_char = c_char
-apt_byte = c_uint8  # this format specifier is not defined in the APT protocol manual but is helpful for packets that are divided into single bytes
+# this format specifier is not defined in the APT protocol manual but is helpful for packets that are divided into
+# single bytes
+apt_byte = c_uint8
 
 
 class AptStatusBits(Enum):
@@ -87,6 +89,7 @@ class AptChannelState(Enum):
     ENABLE = 0x01
     DISABLE = 0x02
 
+
 class AptChannelJogDirection(Enum):
     """Jog direction"""
 
@@ -132,7 +135,9 @@ class AptMessage(LittleEndianStructure):
     HEADER_ONLY: bool = False
     _pack_ = True
 
+
 T = TypeVar("T", bound=AptMessage)
+
 
 class AptProtocol:
     """

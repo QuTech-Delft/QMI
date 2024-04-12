@@ -23,6 +23,7 @@ from qmi.instruments.thorlabs.apt_protocol import AptChannelJogDirection, AptCha
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
+
 @dataclass
 class Thorlabs_MPC320_Status:
     """
@@ -34,10 +35,12 @@ class Thorlabs_MPC320_Status:
         velocity:       Velocity in controller units.
         motor_current:  Current of motor in mA
     """
+
     channel: int
     position: float
     velocity: int
     motor_current: int
+
 
 @dataclass
 class Thorlabs_MPC320_PolarisationParameters:
@@ -51,17 +54,15 @@ class Thorlabs_MPC320_PolarisationParameters:
         jog_step2:      The position to move paddel/channel 2 by for a jog step in degrees.
         jog_step3:      The position to move paddel/channel 3 by for a jog step in degrees.
     """
+
     velocity: float
     home_position: float
     jog_step1: float
     jog_step2: float
     jog_step3: float
 
-Thorlabs_MPC320_ChannelMap: Dict[int, int] = {
-    1: 0x01,
-    2: 0x02,
-    3: 0x04
-}
+
+Thorlabs_MPC320_ChannelMap: Dict[int, int] = {1: 0x01, 2: 0x02, 3: 0x04}
 
 
 class Thorlabs_MPC320(QMI_Instrument):
@@ -73,7 +74,7 @@ class Thorlabs_MPC320(QMI_Instrument):
 
     # the maximum range for a paddle is 170 degrees
     # the value returned by the encoder is 1370 for 170 degrees
-    ENCODER_CONVERSION_UNIT = 170/1370
+    ENCODER_CONVERSION_UNIT = 170 / 1370
 
     MIN_POSITION_DEGREES = 0
     MAX_POSITION_DEGREES = 170
@@ -97,7 +98,8 @@ class Thorlabs_MPC320(QMI_Instrument):
 
     def _validate_position(self, pos: float) -> None:
         """
-        Validate the position. Any position for the MPC320 needs to be in the range 0 to 170 degrees, or 0 to 1370 in encoder counts.
+        Validate the position. Any position for the MPC320 needs to be in the range 0 to 170 degrees,
+        or 0 to 1370 in encoder counts.
 
         Parameters:
             pos:    Position to validate in degrees.
@@ -106,11 +108,15 @@ class Thorlabs_MPC320(QMI_Instrument):
             an instance of QMI_InstrumentException if the position is invalid.
         """
         if not self.MIN_POSITION_DEGREES <= pos <= self.MAX_POSITION_DEGREES:
-            raise QMI_InstrumentException(f"Given position {pos} is outside the valid range [{self.MIN_POSITION_DEGREES}, {self.MAX_POSITION_DEGREES}]")
-        
+            raise QMI_InstrumentException(
+                f"Given position {pos} is outside the valid range \
+                    [{self.MIN_POSITION_DEGREES}, {self.MAX_POSITION_DEGREES}]"
+            )
+
     def _validate_velocity(self, vel: float) -> None:
         """
-        Validate the velocity. Any velocity for the MPC320 needs to be in the range 40 to 400 degrees/s, or 10 to 100% of 400 degrees/s.
+        Validate the velocity. Any velocity for the MPC320 needs to be in the range 40 to 400 degrees/s,
+        or 10 to 100% of 400 degrees/s.
 
         Parameters:
             vel:    Velocity to validate in percentage.
@@ -119,8 +125,11 @@ class Thorlabs_MPC320(QMI_Instrument):
             an instance of QMI_InstrumentException if the velocity is invalid.
         """
         if not self.MIN_VELOCITY_PERC <= vel <= self.MAX_VELOCITY_PERC:
-            raise QMI_InstrumentException(f"Given relative velocity {vel} is outside the valid range [{self.MIN_VELOCITY_PERC}%, {self.MAX_VELOCITY_PERC}%]")
-        
+            raise QMI_InstrumentException(
+                f"Given relative velocity {vel} is outside the valid range \
+                    [{self.MIN_VELOCITY_PERC}%, {self.MAX_VELOCITY_PERC}%]"
+            )
+
     def _validate_channel(self, channel_number: int) -> None:
         """
         Validate the channel number. The MPC320 has 3 channels.
@@ -133,7 +142,10 @@ class Thorlabs_MPC320(QMI_Instrument):
         """
 
         if channel_number not in [1, 2, 3]:
-            raise QMI_InstrumentException(f"Given channel {channel_number} is not in the valid range [{self.MIN_CHANNEL_NUMBER}, {self.MAX_CHANNEL_NUMBER}]")
+            raise QMI_InstrumentException(
+                f"Given channel {channel_number} is not in the valid range \
+                    [{self.MIN_CHANNEL_NUMBER}, {self.MAX_CHANNEL_NUMBER}]"
+            )
 
     @rpc_method
     def open(self) -> None:
@@ -179,12 +191,14 @@ class Thorlabs_MPC320(QMI_Instrument):
     @rpc_method
     def enable_channels(self, channel_numbers: List[int]) -> None:
         """
-        Enable the channel(s). Note that this method will disable any channel that is not provided as an argument. For example, if
-        you enable channel 1, then 2 and 3 will be disabled. If you have previously enabled a channel(s) and fail
-        to include it/them again in this call, that channel(s) will be disabled. For example, if you run the following:
+        Enable the channel(s). Note that this method will disable any channel that is not provided as an argument. For
+        example, if you enable channel 1, then 2 and 3 will be disabled. If you have previously enabled a channel(s)
+        and fail to include it/them again in this call, that channel(s) will be disabled. For example, if you run the
+        following:
         self.enable_channel([1])
         self.enable_channel([2])
-        only channel 2 will be enabled and 1 and 3 will be disabled. The correct way to call this method in this case is
+        only channel 2 will be enabled and 1 and 3 will be disabled.
+        The correct way to call this method in this case is
         self.enable_channel([1,2])
 
         Parameters:
@@ -199,7 +213,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         for channel_number in channel_numbers:
             channels_to_enable ^= Thorlabs_MPC320_ChannelMap[channel_number]
         # Send message.
-        self._apt_protocol.write_param_command(AptMessageId.MOD_SET_CHANENABLESTATE.value, channels_to_enable, AptChannelState.ENABLE.value)
+        self._apt_protocol.write_param_command(
+            AptMessageId.MOD_SET_CHANENABLESTATE.value, channels_to_enable, AptChannelState.ENABLE.value
+        )
 
     @rpc_method
     def disable_all_channels(self) -> None:
@@ -208,7 +224,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         """
         _logger.info("[%s] Disabling channels", self._name)
         self._check_is_open()
-        self._apt_protocol.write_param_command(AptMessageId.MOD_SET_CHANENABLESTATE.value, 0x00, AptChannelState.ENABLE.value)
+        self._apt_protocol.write_param_command(
+            AptMessageId.MOD_SET_CHANENABLESTATE.value, 0x00, AptChannelState.ENABLE.value
+        )
 
     @rpc_method
     def get_channel_state(self, channel_number: int) -> AptChannelState:
@@ -225,13 +243,15 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._validate_channel(channel_number)
         self._check_is_open()
         # Send request message.
-        self._apt_protocol.write_param_command(AptMessageId.MOD_REQ_CHANENABLESTATE.value, Thorlabs_MPC320_ChannelMap[channel_number])
+        self._apt_protocol.write_param_command(
+            AptMessageId.MOD_REQ_CHANENABLESTATE.value, Thorlabs_MPC320_ChannelMap[channel_number]
+        )
         # Get response
         resp = self._apt_protocol.ask(MOD_GET_CHANENABLESTATE)
-        # For the MPC320 the state 0x00 is also a valid channel state. It is also the disable state
-        if resp.enable_state == 0x00:
-            return AptChannelState.DISABLE
-        return AptChannelState(resp.enable_state)
+        # For the MPC320 the state 0x01 is the ENABLE state and anything else is DISABLE
+        if resp.enable_state == 0x01:
+            return AptChannelState.ENABLE
+        return AptChannelState.DISABLE
 
     @rpc_method
     def disconnect_hardware(self) -> None:
@@ -276,7 +296,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._validate_channel(channel_number)
         self._check_is_open()
         # Send message.
-        self._apt_protocol.write_param_command(AptMessageId.MOT_MOVE_HOME.value, Thorlabs_MPC320_ChannelMap[channel_number])
+        self._apt_protocol.write_param_command(
+            AptMessageId.MOT_MOVE_HOME.value, Thorlabs_MPC320_ChannelMap[channel_number]
+        )
 
     @rpc_method
     def is_channel_homed(self, channel_number: int, timeout: float = DEFAULT_RESPONSE_TIMEOUT) -> bool:
@@ -299,13 +321,13 @@ class Thorlabs_MPC320(QMI_Instrument):
         resp = self._apt_protocol.ask(MOT_MOVE_HOMED, timeout)
         # Check if the channel number in the response is equal to the one that was asked for.
         return resp.chan_ident == Thorlabs_MPC320_ChannelMap[channel_number]
-        
+
     @rpc_method
     def move_absolute(self, channel_number: int, position: float) -> None:
         """
-        Move a channel to the specified position. The specified position is in degeres. A conversion is done to convert this
-        into encoder counts. This means that there may be a slight mismatch in the specified position and the actual position.
-        You may use the get_status_update method to get the actual position.
+        Move a channel to the specified position. The specified position is in degeres. A conversion is done to convert
+        this into encoder counts. This means that there may be a slight mismatch in the specified position and the
+        actual position. You may use the get_status_update method to get the actual position.
 
         Parameters:
             channel_number: The channel to address.
@@ -318,7 +340,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         # Convert position in degrees to encoder counts.
         encoder_position = round(position / self.ENCODER_CONVERSION_UNIT)
         # Make data packet.
-        data_packet = MOT_MOVE_ABSOLUTE(chan_ident=Thorlabs_MPC320_ChannelMap[channel_number], absolute_distance=encoder_position)
+        data_packet = MOT_MOVE_ABSOLUTE(
+            chan_ident=Thorlabs_MPC320_ChannelMap[channel_number], absolute_distance=encoder_position
+        )
         # Send message.
         self._apt_protocol.write_data_command(AptMessageId.MOT_MOVE_ABSOLUTE.value, data_packet)
 
@@ -378,14 +402,20 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._check_is_open()
         self._validate_channel(channel_number)
         # Send request message.
-        self._apt_protocol.write_param_command(AptMessageId.MOT_REQ_USTATUSUPDATE.value, Thorlabs_MPC320_ChannelMap[channel_number])
+        self._apt_protocol.write_param_command(
+            AptMessageId.MOT_REQ_USTATUSUPDATE.value, Thorlabs_MPC320_ChannelMap[channel_number]
+        )
         # Get response
         resp = self._apt_protocol.ask(MOT_GET_USTATUSUPDATE)
-        return Thorlabs_MPC320_Status(channel=channel_number, position=resp.position * self.ENCODER_CONVERSION_UNIT,
-                                      velocity=resp.velocity, motor_current=resp.motor_current)
+        return Thorlabs_MPC320_Status(
+            channel=channel_number,
+            position=resp.position * self.ENCODER_CONVERSION_UNIT,
+            velocity=resp.velocity,
+            motor_current=resp.motor_current,
+        )
 
     @rpc_method
-    def jog(self, channel_number: int, direction: AptChannelJogDirection=  AptChannelJogDirection.FORWARD) -> None:
+    def jog(self, channel_number: int, direction: AptChannelJogDirection = AptChannelJogDirection.FORWARD) -> None:
         """
         Move a channel specified by its jog step.
 
@@ -398,7 +428,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._check_is_open()
         self._validate_channel(channel_number)
         # Send request message.
-        self._apt_protocol.write_param_command(AptMessageId.MOT_MOVE_JOG.value, Thorlabs_MPC320_ChannelMap[channel_number], direction.value)
+        self._apt_protocol.write_param_command(
+            AptMessageId.MOT_MOVE_JOG.value, Thorlabs_MPC320_ChannelMap[channel_number], direction.value
+        )
 
     @rpc_method
     def set_polarisation_parameters(
@@ -449,8 +481,10 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._apt_protocol.write_param_command(AptMessageId.POL_REQ_PARAMS.value)
         # Get response.
         params = self._apt_protocol.ask(POL_GET_SET_PARAMS)
-        return Thorlabs_MPC320_PolarisationParameters(velocity=params.velocity,
-                                                      home_position=params.home_position * self.ENCODER_CONVERSION_UNIT,
-                                                      jog_step1=params.jog_step1 * self.ENCODER_CONVERSION_UNIT,
-                                                      jog_step2=params.jog_step2 * self.ENCODER_CONVERSION_UNIT,
-                                                      jog_step3=params.jog_step3 * self.ENCODER_CONVERSION_UNIT)
+        return Thorlabs_MPC320_PolarisationParameters(
+            velocity=params.velocity,
+            home_position=params.home_position * self.ENCODER_CONVERSION_UNIT,
+            jog_step1=params.jog_step1 * self.ENCODER_CONVERSION_UNIT,
+            jog_step2=params.jog_step2 * self.ENCODER_CONVERSION_UNIT,
+            jog_step3=params.jog_step3 * self.ENCODER_CONVERSION_UNIT,
+        )
