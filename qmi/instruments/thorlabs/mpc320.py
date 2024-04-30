@@ -18,7 +18,12 @@ from qmi.instruments.thorlabs.apt_packets import (
     MOT_SET_EEPROMPARAMS,
     POL_GET_SET_PARAMS,
 )
-from qmi.instruments.thorlabs.apt_protocol import AptChannelJogDirection, AptChannelState, AptMessageId, AptProtocol
+from qmi.instruments.thorlabs.apt_protocol import (
+    AptChannelJogDirection,
+    AptChannelState,
+    AptMessageId,
+    AptProtocol,
+)
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
@@ -214,7 +219,9 @@ class Thorlabs_MPC320(QMI_Instrument):
             channels_to_enable ^= Thorlabs_MPC320_ChannelMap[channel_number]
         # Send message.
         self._apt_protocol.write_param_command(
-            AptMessageId.MOD_SET_CHANENABLESTATE.value, channels_to_enable, AptChannelState.ENABLE.value
+            AptMessageId.MOD_SET_CHANENABLESTATE.value,
+            channels_to_enable,
+            AptChannelState.ENABLE.value,
         )
 
     @rpc_method
@@ -225,7 +232,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         _logger.info("[%s] Disabling channels", self._name)
         self._check_is_open()
         self._apt_protocol.write_param_command(
-            AptMessageId.MOD_SET_CHANENABLESTATE.value, 0x00, AptChannelState.ENABLE.value
+            AptMessageId.MOD_SET_CHANENABLESTATE.value,
+            0x00,
+            AptChannelState.ENABLE.value,
         )
 
     @rpc_method
@@ -244,7 +253,8 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._check_is_open()
         # Send request message.
         self._apt_protocol.write_param_command(
-            AptMessageId.MOD_REQ_CHANENABLESTATE.value, Thorlabs_MPC320_ChannelMap[channel_number]
+            AptMessageId.MOD_REQ_CHANENABLESTATE.value,
+            Thorlabs_MPC320_ChannelMap[channel_number],
         )
         # Get response
         resp = self._apt_protocol.ask(MOD_GET_CHANENABLESTATE)
@@ -252,17 +262,6 @@ class Thorlabs_MPC320(QMI_Instrument):
         if resp.enable_state == 0x01:
             return AptChannelState.ENABLE
         return AptChannelState.DISABLE
-
-    @rpc_method
-    def disconnect_hardware(self) -> None:
-        """
-        Disconnect hardware from USB bus.
-        """
-        # TODO: this does nothing
-        _logger.info("[%s] Disconnecting instrument from USB bus", self._name)
-        self._check_is_open()
-        # Send message.
-        self._apt_protocol.write_param_command(AptMessageId.HW_DISCONNECT.value)
 
     @rpc_method
     def start_auto_status_update(self) -> None:
@@ -317,8 +316,17 @@ class Thorlabs_MPC320(QMI_Instrument):
         _logger.info("[%s] Checking if channel %d is homed", self._name, channel_number)
         self._validate_channel(channel_number)
         self._check_is_open()
-        # Get response.
-        resp = self._apt_protocol.ask(MOT_MOVE_HOMED, timeout)
+        # This command needs a workaround. Instead of returning the MOT_MOVE_HOMED message, the instrument may return
+        # its current state first. So subsequent messages may have to be read.
+        num_reads = 5
+        while num_reads > 0:
+            try:
+                # Get response.
+                resp = self._apt_protocol.ask(MOT_MOVE_HOMED, timeout)
+            except QMI_InstrumentException:
+                num_reads -= 1
+                continue
+
         # Check if the channel number in the response is equal to the one that was asked for.
         return resp.chan_ident == Thorlabs_MPC320_ChannelMap[channel_number]
 
@@ -341,7 +349,8 @@ class Thorlabs_MPC320(QMI_Instrument):
         encoder_position = round(position / self.ENCODER_CONVERSION_UNIT)
         # Make data packet.
         data_packet = MOT_MOVE_ABSOLUTE(
-            chan_ident=Thorlabs_MPC320_ChannelMap[channel_number], absolute_distance=encoder_position
+            chan_ident=Thorlabs_MPC320_ChannelMap[channel_number],
+            absolute_distance=encoder_position,
         )
         # Send message.
         self._apt_protocol.write_data_command(AptMessageId.MOT_MOVE_ABSOLUTE.value, data_packet)
@@ -360,12 +369,24 @@ class Thorlabs_MPC320(QMI_Instrument):
         Returns:
             True if the move for the channel was completed.
         """
-        # TODO: add status data packet
-        _logger.info("[%s] Checking if channel %d has completed its move", self._name, channel_number)
+        _logger.info(
+            "[%s] Checking if channel %d has completed its move",
+            self._name,
+            channel_number,
+        )
         self._validate_channel(channel_number)
         self._check_is_open()
-        # Get response
-        resp = self._apt_protocol.ask(MOT_MOVE_COMPLETED, timeout)
+        # This command needs a workaround. Instead of returning the MOT_MOVE_HOMED message, the instrument may return
+        # its current state first. So subsequent messages may have to be read.
+        num_reads = 5
+        while num_reads > 0:
+            try:
+                # Get response.
+                resp = self._apt_protocol.ask(MOT_MOVE_COMPLETED, timeout)
+            except QMI_InstrumentException:
+                num_reads -= 1
+                continue
+
         return resp.chan_ident == Thorlabs_MPC320_ChannelMap[channel_number]
 
     @rpc_method
@@ -403,7 +424,8 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._validate_channel(channel_number)
         # Send request message.
         self._apt_protocol.write_param_command(
-            AptMessageId.MOT_REQ_USTATUSUPDATE.value, Thorlabs_MPC320_ChannelMap[channel_number]
+            AptMessageId.MOT_REQ_USTATUSUPDATE.value,
+            Thorlabs_MPC320_ChannelMap[channel_number],
         )
         # Get response
         resp = self._apt_protocol.ask(MOT_GET_USTATUSUPDATE)
@@ -415,7 +437,11 @@ class Thorlabs_MPC320(QMI_Instrument):
         )
 
     @rpc_method
-    def jog(self, channel_number: int, direction: AptChannelJogDirection = AptChannelJogDirection.FORWARD) -> None:
+    def jog(
+        self,
+        channel_number: int,
+        direction: AptChannelJogDirection = AptChannelJogDirection.FORWARD,
+    ) -> None:
         """
         Move a channel specified by its jog step.
 
@@ -423,13 +449,14 @@ class Thorlabs_MPC320(QMI_Instrument):
             channel_number: The channel to job.
             direction:      The direction to job. This can either be forward or backward. Default is forward.
         """
-        # TODO: check for jog completion
         _logger.info("[%s] Getting position counter of channel %d", self._name, channel_number)
         self._check_is_open()
         self._validate_channel(channel_number)
         # Send request message.
         self._apt_protocol.write_param_command(
-            AptMessageId.MOT_MOVE_JOG.value, Thorlabs_MPC320_ChannelMap[channel_number], direction.value
+            AptMessageId.MOT_MOVE_JOG.value,
+            Thorlabs_MPC320_ChannelMap[channel_number],
+            direction.value,
         )
 
     @rpc_method

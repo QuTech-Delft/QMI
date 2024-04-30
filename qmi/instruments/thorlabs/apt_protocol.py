@@ -3,7 +3,16 @@ Module for the APT protocol used by Thorlabs. The documentation for the protocol
 here https://www.thorlabs.com/Software/Motion%20Control/APT_Communications_Protocol.pdf
 """
 
-from ctypes import LittleEndianStructure, c_uint8, c_uint16, c_int16, c_uint32, c_int32, c_char, sizeof
+from ctypes import (
+    LittleEndianStructure,
+    c_uint8,
+    c_uint16,
+    c_int16,
+    c_uint32,
+    c_int32,
+    c_char,
+    sizeof,
+)
 from enum import Enum
 from typing import List, Optional, Tuple, Type, TypeVar
 
@@ -67,7 +76,6 @@ class AptMessageId(Enum):
     MOD_SET_CHANENABLESTATE = 0x0210
     MOD_REQ_CHANENABLESTATE = 0x0211
     MOD_GET_CHANENABLESTATE = 0x0212
-    HW_DISCONNECT = 0x0002
     HW_START_UPDATEMSGS = 0x0011
     HW_STOP_UPDATEMSGS = 0x0012
     MOT_MOVE_HOME = 0x0443
@@ -169,7 +177,12 @@ class AptProtocol:
         self._apt_device_address = apt_device_address
         self._host_address = host_address
 
-    def write_param_command(self, message_id: int, param1: Optional[int] = None, param2: Optional[int] = None) -> None:
+    def write_param_command(
+        self,
+        message_id: int,
+        param1: Optional[int] = None,
+        param2: Optional[int] = None,
+    ) -> None:
         """
         Send an APT protocol command that is a header (i.e. 6 bytes) with params.
 
@@ -180,7 +193,11 @@ class AptProtocol:
         """
         # Make the command.
         msg = AptMessageHeaderWithParams(
-            message_id, param1 or 0x00, param2 or 0x00, self._apt_device_address, self._host_address
+            message_id,
+            param1 or 0x00,
+            param2 or 0x00,
+            self._apt_device_address,
+            self._host_address,
         )
         # Send command.
         self._transport.write(bytearray(msg))
@@ -220,12 +237,13 @@ class AptProtocol:
         header = AptMessageHeaderForData.from_buffer_copy(header_bytes)
         data_length = header.date_length
 
+        # Read the data packet that follows the header.
+        data_bytes = self._transport.read(nbytes=data_length, timeout=timeout)
+
         # Check that the received message ID is the ID that is expected.
         if data_type.MESSAGE_ID != header.message_id:
             raise QMI_InstrumentException(
                 f"Expected message with ID {data_type.MESSAGE_ID}, but received {header.message_id}"
             )
 
-        # Read the data packet that follows the header.
-        data_bytes = self._transport.read(nbytes=data_length, timeout=timeout)
         return data_type.from_buffer_copy(data_bytes)

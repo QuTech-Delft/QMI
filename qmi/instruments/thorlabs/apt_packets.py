@@ -89,6 +89,7 @@ class MOT_MOVE_HOMED(AptMessage):
         ("source", apt_byte),
     ]
 
+
 class MOT_MOVE_ABSOLUTE(AptMessage):
     """
     Data packet structure for a MOT_SMOVE_ABSOLUTE command.
