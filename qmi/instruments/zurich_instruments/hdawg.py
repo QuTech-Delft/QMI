@@ -13,13 +13,14 @@ import jsonschema  # type: ignore
 import numpy as np
 
 from qmi.core.context import QMI_Context
+from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.instrument import QMI_Instrument
 from qmi.core.rpc import rpc_method
 
 
 # Lazy import of the zhinst module. See the function _import_modules() below.
 if typing.TYPE_CHECKING:
-    import zhinst.ziPython
+    import zhinst.core
     import zhinst.utils
 else:
     zhinst = None
@@ -30,7 +31,8 @@ _logger = logging.getLogger(__name__)
 
 
 def _import_modules() -> None:
-    """Import the zhinst library.
+    """
+    Import the zhinst library.
 
     This import is done in a function, instead of at the top-level,
     to avoid an unnecessary dependency for programs that do not access
@@ -59,10 +61,10 @@ SEQC_PAR_PATTERN = re.compile(r"\$[A-Za-z][A-Za-z0-9_]*", re.ASCII)
 # Status enumerations.
 class CompilerStatus(enum.IntEnum):
     """Enumeration of compiler process status."""
-    NOT_READY = -1
-    READY = 0
-    READY_WITH_ERRORS = 1
-    READY_WITH_WARNINGS = 2
+    IDLE = -1
+    SUCCESS = 0
+    FAILED = 1
+    COMPLETED_WITH_WARNINGS = 2
 
 
 class UploadStatus(enum.IntEnum):
@@ -80,16 +82,27 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     NUM_CHANNELS = 8
     NUM_CHANNELS_PER_AWG = 2
 
+    CONNECTION_INTERFACE = "1GbE" # For Ethernet and USB the connection interface is 1GbE
+
+    # Node paths
+    AWG_DEVICE = "awgModule/device"
+    AWG_INDEX = "awgModule/index"
+    AWG_COMPILER_SOURCE_STRING = "awgModule/compiler/sourcestring"
+    AWG_COMPILER_STATUS = "awgModule/compiler/status"
+    AWG_COMPILER_STATUS_STRING = "awgModule/compiler/status"
+    AWG_ELF_STATUS = "awgModule/elf/status"
+    AWG_PROGRESS = "awgModule/progress"
+
     def __init__(self, context: QMI_Context, name: str, server_host: str, server_port: int, device_name: str) -> None:
         """Initialize driver.
 
         We connect to a specific HDAWG via a Data Server, which is a process running on some computer.
 
         Parameters:
-            name: Name for this instrument instance.
-            server_host: Host where the ziDataServer process is running.
-            server_port: TCP port there the ziDataServer process can be reached.
-            device_name: Name of the HDAWG device (typically "devNNNN").
+            name:           Name for this instrument instance.
+            server_host:    Host where the ziDataServer process is running.
+            server_port:    TCP port there the ziDataServer process can be reached.
+            device_name:    Name of the HDAWG device (typically "devNNNN").
         """
         super().__init__(context, name)
 
@@ -105,56 +118,82 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Import the "zhinst" module.
         _import_modules()
 
+    def _check_data_server_exists(self) -> None:
+        """
+        Check if the Zurich Instrument data server exists.
+
+        Raises:
+            QMI_InstrumentException if no data server was connected.
+        """
+        if not self._daq_server:
+            raise QMI_InstrumentException("Could not connect to Zurich Instruments Data Server")
+        
+    def _check_awg_module_exists(self) -> None:
+        """
+        Check if the AwgModule exists.
+
+        Raises:
+            QMI_InstrumentException if no AwgModule exists.
+        """
+        if not self._awg_module:
+            raise QMI_InstrumentException("Could not create an AwgModule")
+
     @rpc_method
     def open(self) -> None:
 
         self._check_is_closed()
         _logger.info("[%s] Opening connection to instrument", self._name)
 
-        # This may fail!
-        self._daq_server = zhinst.ziPython.ziDAQServer(self._server_host, self._server_port)
+        # Connect to Zurich Instruments Data Server
+        self._daq_server = zhinst.core.ziDAQServer(self._server_host, self._server_port)
+
+        self._check_data_server_exists()
 
         # Connect to the device via Ethernet.
-        # If the device is already connected, this is a no-op.
-        assert self._daq_server is not None
-        self._daq_server.connectDevice(self._device_name, "1GbE")
+        self._daq_server.connectDevice(self._device_name, self.CONNECTION_INTERFACE)
 
+        # Create an AwgModule object
         self._awg_module = self._daq_server.awgModule()
 
-        assert self._awg_module is not None
-        self._awg_module.set("awgModule/device", self._device_name)
-        self._awg_module.set("awgModule/index", 0)  # only support 1x8 mode, so only one AWG module
+        self._check_awg_module_exists()
+
+        # Set the target device for the AWG sequencer programs
+        self._awg_module.set(self.AWG_DEVICE, self._device_name)
+        self._awg_module.set(self.AWG_INDEX, 0)  # only support 1x8 mode, so only one AWG module
 
         # Verify that the AWG thread is not running.
-        assert self._awg_module.finished()
+        if not self._awg_module.finished():
+            raise QMI_InstrumentException("AWG thread still running")
 
         # Start the AWG thread.
         self._awg_module.execute()
 
         # Verify that the AWG thread is running.
-        assert not self._awg_module.finished()
+        if self._awg_module.finished():
+            raise QMI_InstrumentException("AWG thread not running")
 
         super().open()
 
     @rpc_method
     def close(self) -> None:
-
         self._check_is_open()
-        assert self._awg_module is not None
+        self._check_awg_module_exists()
 
         _logger.info("[%s] Closing connection to instrument", self._name)
         # Verify that the AWG thread is running.
-        assert not self._awg_module.finished()
+        if self._awg_module.finished():
+            raise QMI_InstrumentException("AWG thread not running")
 
         # Stop the AWG module thread.
         self._awg_module.finish()
 
         # Verify that the AWG thread is no longer running.
-        assert self._awg_module.finished()
+        if not self._awg_module.finished():
+            raise QMI_InstrumentException("AWG thread still running")
 
         self._awg_module = None
 
-        assert self._daq_server is not None
+        self._check_data_server_exists()
         self._daq_server.disconnect()
         self._daq_server = None
 
@@ -167,27 +206,27 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             node_path:  Path in the device tree, relative to the "/devNNNN/" subtree.
             value:      Value to write.
         """
-        assert self._daq_server is not None
+        self._check_data_server_exists()
         self._daq_server.set('/' + self._device_name + '/' + node_path, value)
 
     def _set_dev_int(self, node_path: str, value: int) -> None:
         """Set an integer value in the device node tree.
 
         Parameters:
-            node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
-            value: Integer value to write.
+            node_path:  Path in the device tree, relative to the "/devNNNN/" subtree.
+            value:      Integer value to write.
         """
-        assert self._daq_server is not None
+        self._check_data_server_exists()
         self._daq_server.setInt('/' + self._device_name + '/' + node_path, value)
 
     def _set_dev_double(self, node_path: str, value: float) -> None:
         """Set a floating point value in the device node tree.
 
         Parameters:
-            node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
-            value: Floating point value to write.
+            node_path:  Path in the device tree, relative to the "/devNNNN/" subtree.
+            value:      Floating point value to write.
         """
-        assert self._daq_server is not None
+        self._check_data_server_exists()
         self._daq_server.setDouble('/' + self._device_name + '/' + node_path, value)
 
     def _get_dev_int(self, node_path: str) -> int:
@@ -196,7 +235,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Parameters:
             node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
         """
-        assert self._daq_server is not None
+        self._check_data_server_exists()
         return self._daq_server.getInt('/' + self._device_name + '/' + node_path)
 
     def _get_dev_double(self, node_path: str) -> float:
@@ -205,12 +244,21 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Parameters:
             node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
         """
-        assert self._daq_server is not None
+        self._check_data_server_exists()
         return self._daq_server.getDouble('/' + self._device_name + '/' + node_path)
 
     @staticmethod
     def _process_parameter_replacements(sequencer_program: str, replacements: Dict[str, Union[str, int, float]]) -> str:
-        """Process parameter replacements for sequencer code."""
+        """
+        Process parameter replacements for sequencer code.
+
+        Parameters:
+            sequencer_program:  Sequencer program to process.
+            replacements:       Dictionary of replacements.
+        
+        Returns:
+            sequencer program with repelacements
+        """
         for parameter, replacement in replacements.items():
             # Convert replacements to "str".
             if isinstance(replacement, (int, float)):
@@ -238,8 +286,13 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return sequencer_program
 
     @staticmethod
-    def _check_program_not_empty(sequencer_program: str):
-        """Check if the program is non-empty (compiler silently ignores empty programs)."""
+    def _check_program_not_empty(sequencer_program: str) -> None:
+        """
+        Check if the program is non-empty (compiler silently ignores empty programs).
+        
+        Parameters:
+            sequencer_program:  Sequencer program to check.
+        """
         # Filter out lines that start with // or /* (comments) or are empty.
         seqc_statements = list(filter(
             lambda s: not (s.startswith("//") or s.startswith("/*") or len(s) == 0),
@@ -251,23 +304,31 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Source string does not contain executable statements")
 
     def _wait_compile(self, sequencer_program: str) -> CompilerStatus:
-        """Start a compilation of a sequencer program."""
+        """
+        Start a compilation of a sequencer program.
+        
+        Parameters:
+            sequencer_program:  Sequencer program to check.
+
+        Returns:
+            compilation status
+        """
 
         self._check_is_open()
-        assert self._awg_module is not None
+        self._check_awg_module_exists()
 
         # Compile the sequencer program with replacements made.
-        self._awg_module.set("awgModule/compiler/sourcestring", sequencer_program)
+        self._awg_module.set(self.AWG_COMPILER_SOURCE_STRING, sequencer_program)
 
         # Poll the AWG module to check if compilation progress.
         # See https://docs.zhinst.com/labone_programming_manual/awg_module.html#_awg_module_parameters for how to query
         # the progress.
         compilation_start_time = time.monotonic()
         _logger.debug("Compilation started ... ")
-        compilation_status = CompilerStatus(self._awg_module.getInt("awgModule/compiler/status"))
-        while compilation_status == CompilerStatus.NOT_READY:
+        compilation_status = CompilerStatus(self._awg_module.getInt(self.AWG_COMPILER_STATUS))
+        while compilation_status == CompilerStatus.IDLE:
             time.sleep(0.1)
-            compilation_status = CompilerStatus(self._awg_module.getInt("awgModule/compiler/status"))
+            compilation_status = CompilerStatus(self._awg_module.getInt(self.AWG_COMPILER_STATUS))
             if time.monotonic() - compilation_start_time > _COMPILE_TIMEOUT:
                 raise RuntimeError("Compilation process timed out (timeout={})".format(_COMPILE_TIMEOUT))
         compilation_end_time = time.monotonic()
@@ -280,20 +341,25 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return compilation_status
 
     def _wait_upload(self) -> UploadStatus:
-        """Poll ELF upload progress and check result."""
+        """
+        Poll ELF upload progress and check result.
+        
+        Returns:
+            Upload status.
+        """
 
         self._check_is_open()
-        assert self._awg_module is not None
+        self._check_awg_module_exists()
 
         # Poll the AWG module to check ELF upload progress.
         upload_start_time = time.monotonic()
         _logger.debug("Polling ELF upload status ...")
-        upload_progress = self._awg_module.getDouble("awgModule/progress")
-        upload_status = UploadStatus(self._awg_module.getInt("awgModule/elf/status"))
+        upload_progress = self._awg_module.getDouble(self.AWG_PROGRESS)
+        upload_status = UploadStatus(self._awg_module.getInt(self.AWG_ELF_STATUS))
         while upload_progress < 1.0 and upload_status in (UploadStatus.WAITING, UploadStatus.DONE, UploadStatus.BUSY):
             time.sleep(0.1)
-            upload_progress = self._awg_module.getDouble("awgModule/progress")
-            upload_status = UploadStatus(self._awg_module.getInt("awgModule/elf/status"))
+            upload_progress = self._awg_module.getDouble(self.AWG_PROGRESS)
+            upload_status = UploadStatus(self._awg_module.getInt(self.AWG_ELF_STATUS))
             if time.monotonic() - upload_start_time > _UPLOAD_TIMEOUT:
                 raise RuntimeError("Upload process timed out (timeout={})".format(_UPLOAD_TIMEOUT))
         upload_end_time = time.monotonic()
@@ -306,54 +372,67 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return upload_status
 
     def _interpret_compilation_result_is_ok(self, compilation_result: CompilerStatus) -> bool:
-        """Interpret compilation result."""
+        """
+        Interpret compilation result.
+
+        Parameters:
+            compilation_result: Result of the compilation.
+        
+        Returns:
+            True if compilation succeed, else False.
+
+        Raises:
+            ValueError if the CompilerStatus is not one of READY, READY_WITH_ERRORS, READY_WITH_WARNINGS
+        """
 
         self._check_is_open()
-        assert self._awg_module is not None
+        self._check_awg_module_exists()
 
-        if compilation_result == CompilerStatus.READY:
-            # Successful compilation; proceed.
-            ok_to_proceed = True
-        elif compilation_result == CompilerStatus.READY_WITH_ERRORS:
-            # Compilation finished with errors.
-            error_message = self._awg_module.getString("awgModule/compiler/statusstring")
+        if compilation_result == CompilerStatus.SUCCESS:
+            return True
+        elif compilation_result == CompilerStatus.FAILED:
+            error_message = self._awg_module.getString(self.AWG_COMPILER_STATUS_STRING)
             _logger.error("Compilation finished with errors: %s", error_message)
-            ok_to_proceed = False
-        elif compilation_result == CompilerStatus.READY_WITH_WARNINGS:
-            # Compilation finished with warnings.
-            warning_message = self._awg_module.getString("awgModule/compiler/statusstring")
+            return False
+        elif compilation_result == CompilerStatus.COMPLETED_WITH_WARNINGS:
+            warning_message = self._awg_module.getString(self.AWG_COMPILER_STATUS_STRING)
             _logger.warning("Compilation finished with warnings: %s", warning_message)
-            ok_to_proceed = False
+            return False
         else:
             raise ValueError("Unknown compiler status: {}".format(compilation_result))
 
-        return ok_to_proceed
-
     def _interpret_upload_result_is_ok(self, upload_result: UploadStatus) -> bool:
-        """Interpret upload result."""
+        """
+        Interpret upload result.
+        
+        Parameters:
+            upload_result: Result of the upload.
+        
+        Returns:
+            True if compilation succeed, else False.
+
+        Raises:
+            ValueError if the UploadStatus is not one of DONE, FAILED, BUSY
+        """
 
         self._check_is_open()
-        assert self._awg_module is not None
+        self._check_awg_module_exists()
 
         if upload_result == UploadStatus.DONE:
-            # Successful upload; proceed.
-            ok_to_proceed = True
+            return True
         elif upload_result == UploadStatus.FAILED:
-            # Upload failed.
             _logger.error("ELF upload failed")
-            ok_to_proceed = False
+            return False
         elif upload_result == UploadStatus.BUSY:
-            # Upload still in progress; we should never get here.
             _logger.error("ELF upload in progress but aborted for unknown reason.")
-            ok_to_proceed = False
+            return False
         else:
             raise ValueError("Unknown upload status: {}".format(upload_result))
 
-        return ok_to_proceed
-
     @rpc_method
     def set_node_value(self, node_path: str, value: Union[int, float, str]) -> None:
-        """Write an arbitrary value to the device node tree.
+        """
+        Write an arbitrary value to the device node tree.
 
         Requires LabOne version 21.08 or newer.
 
@@ -365,16 +444,21 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def get_node_int(self, node_path: str) -> int:
-        """Get an integer value in the device node tree.
+        """
+        Get an integer value in the device node tree.
 
         Parameters:
             node_path:  Path in the device tree, relative to the "/devNNNN/" subtree.
+
+        Returns:
+            integer value for node.
         """
         return self._get_dev_int(node_path)
 
     @rpc_method
     def set_node_int(self, node_path: str, value: int) -> None:
-        """Set an integer value in the device node tree.
+        """
+        Set an integer value in the device node tree.
 
         Parameters:
             node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
@@ -384,10 +468,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def get_node_double(self, node_path: str) -> float:
-        """Get a floating point value in the device node tree.
+        """
+        Get a floating point value in the device node tree.
 
         Parameters:
             node_path:  Path in the device tree, relative to the "/devNNNN/" subtree.
+
+        Returns:
+            floating point value for node.
         """
         return self._get_dev_double(node_path)
 
@@ -427,7 +515,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
 
         self._check_is_open()
-        assert self._awg_module is not None
+        self._check_awg_module_exists()
 
         # Perform parameter replacements.
         if replacements is None:
@@ -437,24 +525,28 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         # Compile.
         compilation_result = self._wait_compile(sequencer_program)
-        result_ok = self._interpret_compilation_result_is_ok(compilation_result)
-        if result_ok:
+        result = self._interpret_compilation_result_is_ok(compilation_result)
+        if result:
             # Allow some time for upload to start.
             time.sleep(1.0)
 
             # Wait for upload to finish.
             upload_result = self._wait_upload()
-            result_ok = self._interpret_upload_result_is_ok(upload_result)
+            result = self._interpret_upload_result_is_ok(upload_result)
 
-        # Done; store result.
-        self._last_compilation_successful = result_ok
+        # Store result.
+        self._last_compilation_successful = result
 
     @rpc_method
     def compilation_successful(self) -> bool:
-        """Query result of compilation process (sequence compilation and ELF upload).
+        """
+        Query result of compilation process (sequence compilation and ELF upload).
 
         Note: this will only return a meaningful value after starting at least one compilation process. The method
         returns False if there was no previous compilation result.
+
+        Returns:
+            True if the compilation was successful, else False.
         """
         return self._last_compilation_successful
 
@@ -466,7 +558,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                         wave2: Optional[np.ndarray] = None,
                         markers: Optional[np.ndarray] = None
                         ) -> None:
-        """Upload new waveform data to the AWG.
+        """
+        Upload new waveform data to the AWG.
 
         The AWG must be explicitly disabled by calling `set_awg_module_enabled(0)`
         before uploading waveforms, and re-enabled by calling
@@ -493,7 +586,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                              represent the 4 marker channels.
         """
         self._check_is_open()
-        assert self._daq_server is not None
+        self._check_data_server_exists()
         waveform_data = zhinst.utils.convert_awg_waveform(wave1, wave2, markers)
         waveform_address = f"/{self._device_name}/awgs/{awg_index}/waveform/waves/{waveform_index}"
         self._daq_server.setVector(waveform_address, waveform_data)
@@ -516,7 +609,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                 maximum sized batches. Default size is 50 waveform entries.
         """
         self._check_is_open()
-        assert self._daq_server is not None
+        self._check_data_server_exists()
 
         waves_set = []
         for wf_count, sequence in enumerate(unpacked_waveforms):
@@ -536,7 +629,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def upload_command_table(self, awg_index: int, command_table_entries: List[Dict[str, Any]]) -> None:
-        """Upload a new command table to the AWG.
+        """
+        Upload a new command table to the AWG.
 
         Command tables are needed for using e.g. `assignWaveIndex` and must be uploaded before the sequencer program
         is executed. Do not upload while a program is running. Note that each core that is used by the sequencer
@@ -556,7 +650,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             command_table_entries:  actual command table as a list of entries (dicts).
         """
         self._check_is_open()
-        assert self._daq_server is not None
+        self._check_data_server_exists()
 
         # Check AWG core index.
         if awg_index not in (0, 1, 2, 3):
@@ -603,7 +697,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def sync(self) -> None:
-        """Synchronize the state of the AWG.
+        """
+        Synchronize the state of the AWG.
 
         This call ensures that all previous settings have taken effect on
         the instrument, and stale data is flushed from local buffers.
@@ -614,7 +709,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def set_channel_grouping(self, value: int) -> None:
-        """Set the channel grouping of the device.
+        """
+        Set the channel grouping of the device.
 
         This QMI driver currently supports only channel grouping 2 (1x8 channels).
 
