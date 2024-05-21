@@ -61,6 +61,7 @@ SEQC_PAR_PATTERN = re.compile(r"\$[A-Za-z][A-Za-z0-9_]*", re.ASCII)
 # Status enumerations.
 class CompilerStatus(enum.IntEnum):
     """Enumeration of compiler process status."""
+
     IDLE = -1
     SUCCESS = 0
     FAILED = 1
@@ -69,6 +70,7 @@ class CompilerStatus(enum.IntEnum):
 
 class UploadStatus(enum.IntEnum):
     """Enumeration of ELF upload process status."""
+
     WAITING = -1
     DONE = 0
     FAILED = 1
@@ -82,7 +84,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     NUM_CHANNELS = 8
     NUM_CHANNELS_PER_AWG = 2
 
-    CONNECTION_INTERFACE = "1GbE" # For Ethernet and USB the connection interface is 1GbE
+    CONNECTION_INTERFACE = "1GbE"  # For Ethernet and USB the connection interface is 1GbE
 
     # Node paths
     AWG_DEVICE = "awgModule/device"
@@ -110,8 +112,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._server_port = server_port
         self._device_name = device_name
 
-        self._daq_server: Optional[zhinst.ziPython.ziDAQServer] = None
-        self._awg_module: Optional[zhinst.ziPython.AwgModule] = None
+        self._daq_server: zhinst.ziPython.ziDAQServer
+        self._awg_module: zhinst.ziPython.AwgModule
 
         self._last_compilation_successful = False
 
@@ -127,7 +129,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         if not self._daq_server:
             raise QMI_InstrumentException("Could not connect to Zurich Instruments Data Server")
-        
+
     def _check_awg_module_exists(self) -> None:
         """
         Check if the AwgModule exists.
@@ -138,19 +140,20 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if not self._awg_module:
             raise QMI_InstrumentException("Could not create an AwgModule")
 
+        assert self._awg_module is not None
+
     @rpc_method
     def open(self) -> None:
-
         self._check_is_closed()
         _logger.info("[%s] Opening connection to instrument", self._name)
 
         # Connect to Zurich Instruments Data Server
-        self._daq_server = zhinst.core.ziDAQServer(self._server_host, self._server_port)
+        self._daq_server = zhinst.core.ziDAQServer(self._server_host, self._server_port, 6)
 
         self._check_data_server_exists()
 
         # Connect to the device via Ethernet.
-        self._daq_server.connectDevice(self._device_name, self.CONNECTION_INTERFACE)
+        self._daq_server.connectDevice(self._device_name, "1GbE")
 
         # Create an AwgModule object
         self._awg_module = self._daq_server.awgModule()
@@ -191,11 +194,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if not self._awg_module.finished():
             raise QMI_InstrumentException("AWG thread still running")
 
-        self._awg_module = None
-
         self._check_data_server_exists()
         self._daq_server.disconnect()
-        self._daq_server = None
 
         super().close()
 
@@ -207,7 +207,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:      Value to write.
         """
         self._check_data_server_exists()
-        self._daq_server.set('/' + self._device_name + '/' + node_path, value)
+        self._daq_server.set("/" + self._device_name + "/" + node_path, value)
 
     def _set_dev_int(self, node_path: str, value: int) -> None:
         """Set an integer value in the device node tree.
@@ -217,7 +217,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:      Integer value to write.
         """
         self._check_data_server_exists()
-        self._daq_server.setInt('/' + self._device_name + '/' + node_path, value)
+        self._daq_server.setInt("/" + self._device_name + "/" + node_path, value)
 
     def _set_dev_double(self, node_path: str, value: float) -> None:
         """Set a floating point value in the device node tree.
@@ -227,7 +227,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:      Floating point value to write.
         """
         self._check_data_server_exists()
-        self._daq_server.setDouble('/' + self._device_name + '/' + node_path, value)
+        self._daq_server.setDouble("/" + self._device_name + "/" + node_path, value)
 
     def _get_dev_int(self, node_path: str) -> int:
         """Return an integer value from the device node tree.
@@ -236,7 +236,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
         """
         self._check_data_server_exists()
-        return self._daq_server.getInt('/' + self._device_name + '/' + node_path)
+        return self._daq_server.getInt("/" + self._device_name + "/" + node_path)
 
     def _get_dev_double(self, node_path: str) -> float:
         """Return a floating point value from the device node tree.
@@ -245,17 +245,19 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
         """
         self._check_data_server_exists()
-        return self._daq_server.getDouble('/' + self._device_name + '/' + node_path)
+        return self._daq_server.getDouble("/" + self._device_name + "/" + node_path)
 
     @staticmethod
-    def _process_parameter_replacements(sequencer_program: str, replacements: Dict[str, Union[str, int, float]]) -> str:
+    def _process_parameter_replacements(
+        sequencer_program: str, replacements: Dict[str, Union[str, int, float]]
+    ) -> str:
         """
         Process parameter replacements for sequencer code.
 
         Parameters:
             sequencer_program:  Sequencer program to process.
             replacements:       Dictionary of replacements.
-        
+
         Returns:
             sequencer program with repelacements
         """
@@ -279,9 +281,11 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Check if there are any unreplaced parameters left in the source code; this will not compile.
         leftover_parameters = SEQC_PAR_PATTERN.findall(sequencer_program)
         if leftover_parameters:
-            raise KeyError("Variables left in sequencer program that were not in replacement dictionary: {}".format(
-                ', '.join(leftover_parameters)
-            ))
+            raise KeyError(
+                "Variables left in sequencer program that were not in replacement dictionary: {}".format(
+                    ", ".join(leftover_parameters)
+                )
+            )
 
         return sequencer_program
 
@@ -289,15 +293,17 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     def _check_program_not_empty(sequencer_program: str) -> None:
         """
         Check if the program is non-empty (compiler silently ignores empty programs).
-        
+
         Parameters:
             sequencer_program:  Sequencer program to check.
         """
         # Filter out lines that start with // or /* (comments) or are empty.
-        seqc_statements = list(filter(
-            lambda s: not (s.startswith("//") or s.startswith("/*") or len(s) == 0),
-            [s.strip() for s in sequencer_program.split('\n')]
-        ))
+        seqc_statements = list(
+            filter(
+                lambda s: not (s.startswith("//") or s.startswith("/*") or len(s) == 0),
+                [s.strip() for s in sequencer_program.split("\n")],
+            )
+        )
 
         # Check if there are any lines left (we do not check if that is executable code; the compiler will do that).
         if len(seqc_statements) == 0:
@@ -306,7 +312,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     def _wait_compile(self, sequencer_program: str) -> CompilerStatus:
         """
         Start a compilation of a sequencer program.
-        
+
         Parameters:
             sequencer_program:  Sequencer program to check.
 
@@ -335,7 +341,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         _logger.debug(
             "Compilation finished in %.1f seconds (status=%d)",
             compilation_end_time - compilation_start_time,
-            compilation_status
+            compilation_status,
         )
 
         return compilation_status
@@ -343,7 +349,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     def _wait_upload(self) -> UploadStatus:
         """
         Poll ELF upload progress and check result.
-        
+
         Returns:
             Upload status.
         """
@@ -364,9 +370,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                 raise RuntimeError("Upload process timed out (timeout={})".format(_UPLOAD_TIMEOUT))
         upload_end_time = time.monotonic()
         _logger.debug(
-            "ELF upload finished in %.1f seconds (status=%d)",
-            upload_end_time - upload_start_time,
-            upload_status
+            "ELF upload finished in %.1f seconds (status=%d)", upload_end_time - upload_start_time, upload_status
         )
 
         return upload_status
@@ -377,7 +381,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         Parameters:
             compilation_result: Result of the compilation.
-        
+
         Returns:
             True if compilation succeed, else False.
 
@@ -404,10 +408,10 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     def _interpret_upload_result_is_ok(self, upload_result: UploadStatus) -> bool:
         """
         Interpret upload result.
-        
+
         Parameters:
             upload_result: Result of the upload.
-        
+
         Returns:
             True if compilation succeed, else False.
 
@@ -490,10 +494,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._set_dev_double(node_path, value)
 
     @rpc_method
-    def compile_and_upload(self,
-                           sequencer_program: str,
-                           replacements: Optional[Dict[str, Union[str, int, float]]] = None
-                           ) -> None:
+    def compile_and_upload(
+        self, sequencer_program: str, replacements: Optional[Dict[str, Union[str, int, float]]] = None
+    ) -> None:
         """Compile and upload the sequencer_program, after performing textual replacements.
 
         This function combines compilation followed by upload to the AWG if compilation was successful. This is forced
@@ -551,13 +554,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return self._last_compilation_successful
 
     @rpc_method
-    def upload_waveform(self,
-                        awg_index: int,
-                        waveform_index: int,
-                        wave1: np.ndarray,
-                        wave2: Optional[np.ndarray] = None,
-                        markers: Optional[np.ndarray] = None
-                        ) -> None:
+    def upload_waveform(
+        self,
+        awg_index: int,
+        waveform_index: int,
+        wave1: np.ndarray,
+        wave2: Optional[np.ndarray] = None,
+        markers: Optional[np.ndarray] = None,
+    ) -> None:
         """
         Upload new waveform data to the AWG.
 
@@ -593,9 +597,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def upload_waveforms(
-            self,
-            unpacked_waveforms: List[Tuple[int, int, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]],
-            batch_size: int = 50
+        self,
+        unpacked_waveforms: List[Tuple[int, int, np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]],
+        batch_size: int = 50,
     ) -> None:
         """Upload a set of new waveform data to the AWG. Works as singular waveform uploading, but creating a
         list of tuple sets of waveforms, and uploading all in one command, speeds up the upload significantly.
@@ -615,7 +619,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         for wf_count, sequence in enumerate(unpacked_waveforms):
             awg_index, waveform_index, wave1, wave2, markers = sequence
             wave_raw = zhinst.utils.convert_awg_waveform(wave1, wave2, markers)
-            waveform_address = f'/{self._device_name}/awgs/{awg_index}/waveform/waves/{waveform_index}'
+            waveform_address = f"/{self._device_name}/awgs/{awg_index}/waveform/waves/{waveform_index}"
             waves_set.append((waveform_address, wave_raw))
             # Check set size against batch size
             if wf_count % batch_size == batch_size - 1:
@@ -659,16 +663,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Create the command table from the provided entries.
         command_table = {
             "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
-            "header": {
-                "version": "0.2"
-            },
-            "table": command_table_entries
+            "header": {"version": "0.2"},
+            "table": command_table_entries,
         }
 
         # Load the validation schema.
         validation_schema_file = _DEFAULT_CT_TABLE_SCHEMA_PATH
         try:
-            with open(validation_schema_file, 'r') as fhandle:
+            with open(validation_schema_file, "r") as fhandle:
                 validation_schema = json.load(fhandle)
         except json.JSONDecodeError as exc:
             _logger.exception("Error in decoding validation schema", exc_info=exc)
@@ -691,8 +693,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid value in command table") from exc
 
         self._daq_server.setVector(
-            "/{}/awgs/{}/commandtable/data".format(self._device_name, awg_index),
-            command_table_as_json
+            "/{}/awgs/{}/commandtable/data".format(self._device_name, awg_index), command_table_as_json
         )
 
     @rpc_method
