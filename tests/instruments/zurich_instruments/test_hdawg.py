@@ -1,4 +1,5 @@
 """Test cases for Zurich Instruments HDAWG."""
+
 import json
 import logging
 import unittest
@@ -40,7 +41,7 @@ class TestHDAWGInit(unittest.TestCase):
             ZurichInstruments_Hdawg,
             server_host=_DEVICE_HOST,
             server_port=_DEVICE_PORT,
-            device_name=_DEVICE_NAME
+            device_name=_DEVICE_NAME,
         )
 
     def tearDown(self):
@@ -62,7 +63,7 @@ class TestHDAWGInit(unittest.TestCase):
             call.connectDevice(_DEVICE_NAME, "1GbE"),
             call.awgModule(),
             # close()
-            call.disconnect()
+            call.disconnect(),
         ]
         self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
 
@@ -76,7 +77,7 @@ class TestHDAWGInit(unittest.TestCase):
             # close()
             call.finished(),
             call.finish(),
-            call.finished()
+            call.finished(),
         ]
         self.assertEqual(self._awg_module.mock_calls, expected_awg_module_calls)
 
@@ -87,16 +88,13 @@ class TestHDAWGInit(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self._hdawg.open()
 
-        expected_daq_server_calls = [
-            call.connectDevice(_DEVICE_NAME, "1GbE"),
-            call.awgModule()
-        ]
+        expected_daq_server_calls = [call.connectDevice(_DEVICE_NAME, "1GbE"), call.awgModule()]
         self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
 
         expected_awg_module_calls = [
             call.set("awgModule/device", _DEVICE_NAME),
             call.set("awgModule/index", 0),
-            call.finished()
+            call.finished(),
         ]
         self.assertEqual(self._awg_module.mock_calls, expected_awg_module_calls)
 
@@ -107,10 +105,7 @@ class TestHDAWGInit(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self._hdawg.open()
 
-        expected_daq_server_calls = [
-            call.connectDevice(_DEVICE_NAME, "1GbE"),
-            call.awgModule()
-        ]
+        expected_daq_server_calls = [call.connectDevice(_DEVICE_NAME, "1GbE"), call.awgModule()]
         self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
 
         expected_awg_module_calls = [
@@ -118,7 +113,7 @@ class TestHDAWGInit(unittest.TestCase):
             call.set("awgModule/index", 0),
             call.finished(),
             call.execute(),
-            call.finished()
+            call.finished(),
         ]
         self.assertEqual(self._awg_module.mock_calls, expected_awg_module_calls)
 
@@ -133,7 +128,7 @@ class TestHDAWGInit(unittest.TestCase):
         expected_daq_server_calls = [
             # open()
             call.connectDevice(_DEVICE_NAME, "1GbE"),
-            call.awgModule()
+            call.awgModule(),
         ]
         self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
 
@@ -145,7 +140,7 @@ class TestHDAWGInit(unittest.TestCase):
             call.execute(),
             call.finished(),
             # close()
-            call.finished()
+            call.finished(),
         ]
         self.assertEqual(self._awg_module.mock_calls, expected_awg_module_calls)
 
@@ -160,7 +155,7 @@ class TestHDAWGInit(unittest.TestCase):
         expected_daq_server_calls = [
             # open()
             call.connectDevice(_DEVICE_NAME, "1GbE"),
-            call.awgModule()
+            call.awgModule(),
         ]
         self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
 
@@ -174,7 +169,7 @@ class TestHDAWGInit(unittest.TestCase):
             # close()
             call.finished(),
             call.finish(),
-            call.finished()
+            call.finished(),
         ]
         self.assertEqual(self._awg_module.mock_calls, expected_awg_module_calls)
 
@@ -210,9 +205,9 @@ class TestHDAWG(unittest.TestCase):
         self._daq_server.awgModule = Mock(return_value=self._awg_module)
 
         hdawg.zhinst = Mock()
-        hdawg.zhinst.ziPython = Mock()
+        hdawg.zhinst.core = Mock()
         hdawg.zhinst.utils = Mock()
-        hdawg.zhinst.ziPython.ziDAQServer = Mock(return_value=self._daq_server)
+        hdawg.zhinst.core.ziDAQServer = Mock(return_value=self._daq_server)
         hdawg._COMPILE_TIMEOUT = 0.0
         hdawg._UPLOAD_TIMEOUT = 0.0
 
@@ -221,46 +216,34 @@ class TestHDAWG(unittest.TestCase):
             ZurichInstruments_Hdawg,
             server_host=_DEVICE_HOST,
             server_port=_DEVICE_PORT,
-            device_name=_DEVICE_NAME
+            device_name=_DEVICE_NAME,
         )
         self._hdawg.open()
         self._awg_module.reset_mock()
         self._daq_server.reset_mock()
 
     def _check_get_value_int(self, node_path):
-        expected_calls = [
-            call.getInt("/{}/{}".format(_DEVICE_NAME, node_path))
-        ]
+        expected_calls = [call.getInt("/{}/{}".format(_DEVICE_NAME, node_path))]
         self._daq_server.assert_has_calls(expected_calls)
 
     def _check_get_value_float(self, node_path):
-        expected_calls = [
-            call.getDouble("/{}/{}".format(_DEVICE_NAME, node_path))
-        ]
+        expected_calls = [call.getDouble("/{}/{}".format(_DEVICE_NAME, node_path))]
         self._daq_server.assert_has_calls(expected_calls)
 
     def _check_set_value(self, node_path, value):
-        expected_calls = [
-            call.set("/{}/{}".format(_DEVICE_NAME, node_path), value)
-        ]
+        expected_calls = [call.set("/{}/{}".format(_DEVICE_NAME, node_path), value)]
         self._daq_server.assert_has_calls(expected_calls)
 
     def _check_set_value_int(self, node_path, value):
-        expected_calls = [
-            call.setInt("/{}/{}".format(_DEVICE_NAME, node_path), value)
-        ]
+        expected_calls = [call.setInt("/{}/{}".format(_DEVICE_NAME, node_path), value)]
         self._daq_server.assert_has_calls(expected_calls)
 
     def _check_get_value_double(self, node_path):
-        expected_calls = [
-            call.getDouble("/{}/{}".format(_DEVICE_NAME, node_path))
-        ]
+        expected_calls = [call.getDouble("/{}/{}".format(_DEVICE_NAME, node_path))]
         self._daq_server.assert_has_calls(expected_calls)
 
     def _check_set_value_double(self, node_path, value):
-        expected_calls = [
-            call.setDouble("/{}/{}".format(_DEVICE_NAME, node_path), value)
-        ]
+        expected_calls = [call.setDouble("/{}/{}".format(_DEVICE_NAME, node_path), value)]
         self._daq_server.assert_has_calls(expected_calls)
 
     def tearDown(self):
@@ -317,11 +300,7 @@ class TestHDAWG(unittest.TestCase):
         }
         """
 
-        replacements = {
-            "$FILE": "w_a",
-            "$COUNT": 100,
-            "$INCR": 3.14
-        }
+        replacements = {"$FILE": "w_a", "$COUNT": 100, "$INCR": 3.14}
 
         expected_source = """
         wave w = "w_a";
@@ -379,7 +358,7 @@ class TestHDAWG(unittest.TestCase):
             ("par = $PAR$PAR", {"$PAR": "value"}, "par = valuevalue"),  # multiple replacements
             ("par = $PARAMETER + $PAR", {"$PARAMETER": 1, "$PAR": "value"}, "par = 1 + value"),  # test word boundaries
             ("par = $PARAMETER + $PAR", {"$PAR": 1, "$PARAMETER": "value"}, "par = value + 1"),
-            ("par = $PAR + $PARAMETER + $PAR", {"$PAR": 1, "$PARAMETER": "value"}, "par = 1 + value + 1")
+            ("par = $PAR + $PARAMETER + $PAR", {"$PAR": 1, "$PARAMETER": "value"}, "par = 1 + value + 1"),
         ]
 
         for source, replacements, expected_source in cases:
@@ -446,7 +425,7 @@ class TestHDAWG(unittest.TestCase):
         expected_calls = [
             call.set("awgModule/compiler/sourcestring", source),
             call.getInt("awgModule/compiler/status"),
-            call.getString("awgModule/compiler/statusstring")
+            call.getString("awgModule/compiler/statusstring"),
         ]
 
         self._hdawg.compile_and_upload(source)
@@ -522,14 +501,10 @@ class TestHDAWG(unittest.TestCase):
 
         self._hdawg.upload_waveform(0, 0, wave1, wave2, markers)
 
-        expected_utils_calls = [
-            call.convert_awg_waveform(wave1, wave2, markers)
-        ]
+        expected_utils_calls = [call.convert_awg_waveform(wave1, wave2, markers)]
         hdawg.zhinst.utils.assert_has_calls(expected_utils_calls)
 
-        expected_daq_server_calls = [
-            call.setVector(f"/{_DEVICE_NAME}/awgs/0/waveform/waves/0", "WAVEFORM")
-        ]
+        expected_daq_server_calls = [call.setVector(f"/{_DEVICE_NAME}/awgs/0/waveform/waves/0", "WAVEFORM")]
         self._daq_server.assert_has_calls(expected_daq_server_calls)
 
     def test_upload_waveforms_small_batch(self):
@@ -549,9 +524,7 @@ class TestHDAWG(unittest.TestCase):
 
         self._hdawg.upload_waveforms(unpacked_waveforms)
 
-        expected_utils_calls = [
-            call.convert_awg_waveform(unpacked_waveforms[i][:3]) for i in range(batch_size)
-        ]
+        expected_utils_calls = [call.convert_awg_waveform(unpacked_waveforms[i][:3]) for i in range(batch_size)]
         [hdawg.zhinst.utils.assert_has_calls(c[2]) for c in expected_utils_calls]
 
         expected_daq_server_calls = [
@@ -577,9 +550,7 @@ class TestHDAWG(unittest.TestCase):
 
         self._hdawg.upload_waveforms(unpacked_waveforms, batch_size=batch_size // 3)
 
-        expected_utils_calls = [
-            call.convert_awg_waveform(unpacked_waveforms[i][:3]) for i in range(batch_size)
-        ]
+        expected_utils_calls = [call.convert_awg_waveform(unpacked_waveforms[i][:3]) for i in range(batch_size)]
         [hdawg.zhinst.utils.assert_has_calls(c[2]) for c in expected_utils_calls]
 
         expected_daq_server_calls = [
@@ -605,9 +576,7 @@ class TestHDAWG(unittest.TestCase):
 
         self._hdawg.upload_waveforms(unpacked_waveforms, batch_size=batch_size // 3)
 
-        expected_utils_calls = [
-            call.convert_awg_waveform(unpacked_waveforms[i][:3]) for i in range(batch_size)
-        ]
+        expected_utils_calls = [call.convert_awg_waveform(unpacked_waveforms[i][:3]) for i in range(batch_size)]
         [hdawg.zhinst.utils.assert_has_calls(c[2]) for c in expected_utils_calls]
 
         expected_daq_server_calls = [
@@ -618,21 +587,11 @@ class TestHDAWG(unittest.TestCase):
 
     def test_upload_command_table(self):
         """Test command table upload."""
-        command_table_entries = [
-            {
-                "index": 1,
-                "waveform": {
-                    "playZero": True,
-                    "length": 128
-                }
-            }
-        ]
+        command_table_entries = [{"index": 1, "waveform": {"playZero": True, "length": 128}}]
 
         self._hdawg.upload_command_table(0, command_table_entries)
 
-        expected_daq_server_calls = [
-            call.setVector(f"/{_DEVICE_NAME}/awgs/0/commandtable/data", ANY)
-        ]
+        expected_daq_server_calls = [call.setVector(f"/{_DEVICE_NAME}/awgs/0/commandtable/data", ANY)]
         self._daq_server.assert_has_calls(expected_daq_server_calls)
 
         uploaded_ct = json.loads(self._daq_server.setVector.call_args[0][1])
@@ -645,10 +604,8 @@ class TestHDAWG(unittest.TestCase):
         # Create the command table from the provided entries.
         command_table = {
             "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
-            "header": {
-                "version": "0.2"
-            },
-            "table": table
+            "header": {"version": "0.2"},
+            "table": table,
         }
         set_vector = "/{}/awgs/{}/commandtable/data".format(_DEVICE_NAME, awg_index)
 
@@ -662,8 +619,8 @@ class TestHDAWG(unittest.TestCase):
                 "index": 1,
                 "waveform": {
                     "playZero": True,
-                    "length": 123  # must be multiple of 16
-                }
+                    "length": 123,  # must be multiple of 16
+                },
             }
         ]
 
@@ -682,9 +639,7 @@ class TestHDAWG(unittest.TestCase):
         """Test sync method."""
         self._hdawg.sync()
 
-        expected_daq_server_calls = [
-            call.sync()
-        ]
+        expected_daq_server_calls = [call.sync()]
         self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
 
     def test_set_channel_grouping(self):
@@ -711,7 +666,7 @@ class TestHDAWG(unittest.TestCase):
         self._check_get_value_int("system/clocks/referenceclock/status")
 
     def test_set_sample_clock_frequency(self):
-        """"Test sample clock setting."""
+        """ "Test sample clock setting."""
         self._hdawg.set_sample_clock_frequency(1234.5e6)
         self._check_set_value_double("system/clocks/sampleclock/freq", 1234.5e6)
 
@@ -1288,10 +1243,7 @@ class TestHDAWG(unittest.TestCase):
         self._hdawg.set_awg_module_enabled(0)
         self._hdawg.set_awg_module_enabled(1)
 
-        expected_awg_module_calls = [
-            call.set("awgModule/awg/enable", 0),
-            call.set("awgModule/awg/enable", 1)
-        ]
+        expected_awg_module_calls = [call.set("awgModule/awg/enable", 0), call.set("awgModule/awg/enable", 1)]
         self.assertEqual(self._awg_module.mock_calls, expected_awg_module_calls)
 
         with self.assertRaises(ValueError):
@@ -1301,5 +1253,5 @@ class TestHDAWG(unittest.TestCase):
             self._hdawg.set_awg_module_enabled(2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
