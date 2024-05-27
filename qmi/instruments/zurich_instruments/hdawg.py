@@ -91,7 +91,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     AWG_INDEX = "awgModule/index"
     AWG_COMPILER_SOURCE_STRING = "awgModule/compiler/sourcestring"
     AWG_COMPILER_STATUS = "awgModule/compiler/status"
-    AWG_COMPILER_STATUS_STRING = "awgModule/compiler/status"
+    AWG_COMPILER_STATUS_STRING = "awgModule/compiler/statusstring"
     AWG_ELF_STATUS = "awgModule/elf/status"
     AWG_PROGRESS = "awgModule/progress"
 
@@ -334,7 +334,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         compilation_status = CompilerStatus(self._awg_module.getInt(self.AWG_COMPILER_STATUS))
         while compilation_status == CompilerStatus.IDLE:
             time.sleep(0.1)
-            compilation_status = CompilerStatus(self._awg_module.getInt(self.AWG_COMPILER_STATUS))
+            compilation_status = CompilerStatus(self._awg_module.getInt("awgModule/compiler/status"))
             if time.monotonic() - compilation_start_time > _COMPILE_TIMEOUT:
                 raise RuntimeError("Compilation process timed out (timeout={})".format(_COMPILE_TIMEOUT))
         compilation_end_time = time.monotonic()
