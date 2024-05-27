@@ -236,7 +236,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
         """
         self._check_data_server_exists()
-        return self._daq_server.getInt("/" + self._device_name + "/" + node_path)
+        return self._daq_server.getInt(f"/{self._device_name}/{node_path}")
 
     def _get_dev_double(self, node_path: str) -> float:
         """Return a floating point value from the device node tree.
@@ -245,7 +245,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
         """
         self._check_data_server_exists()
-        return self._daq_server.getDouble("/" + self._device_name + "/" + node_path)
+        return self._daq_server.getDouble(f"/{self._device_name}/{node_path}")
 
     @staticmethod
     def _process_parameter_replacements(
@@ -334,7 +334,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         compilation_status = CompilerStatus(self._awg_module.getInt(self.AWG_COMPILER_STATUS))
         while compilation_status == CompilerStatus.IDLE:
             time.sleep(0.1)
-            compilation_status = CompilerStatus(self._awg_module.getInt("awgModule/compiler/status"))
+            compilation_status = CompilerStatus(self._awg_module.getInt(self.AWG_COMPILER_STATUS))
             if time.monotonic() - compilation_start_time > _COMPILE_TIMEOUT:
                 raise RuntimeError("Compilation process timed out (timeout={})".format(_COMPILE_TIMEOUT))
         compilation_end_time = time.monotonic()
