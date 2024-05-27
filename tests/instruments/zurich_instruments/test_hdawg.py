@@ -11,7 +11,7 @@ import numpy as np
 import qmi
 from qmi.instruments.zurich_instruments import ZurichInstruments_Hdawg
 import qmi.instruments.zurich_instruments.hdawg as hdawg
-from qmi.core.exceptions import QMI_InvalidOperationException
+from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException
 
 _DEVICE_HOST = "localhost"
 _DEVICE_PORT = 12345
@@ -32,9 +32,9 @@ class TestHDAWGInit(unittest.TestCase):
         self._daq_server.awgModule = Mock(return_value=self._awg_module)
 
         hdawg.zhinst = Mock()
-        hdawg.zhinst.ziPython = Mock()
+        hdawg.zhinst.core = Mock()
         hdawg.zhinst.utils = Mock()
-        hdawg.zhinst.ziPython.ziDAQServer = Mock(return_value=self._daq_server)
+        hdawg.zhinst.core.ziDAQServer = Mock(return_value=self._daq_server)
 
         self._hdawg = qmi.make_instrument(
             "HDAWG",
@@ -85,7 +85,7 @@ class TestHDAWGInit(unittest.TestCase):
         """Failed open sequence."""
         self._awg_module.finished.side_effect = [False]
 
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(QMI_InstrumentException):
             self._hdawg.open()
 
         expected_daq_server_calls = [call.connectDevice(_DEVICE_NAME, "1GbE"), call.awgModule()]
@@ -102,7 +102,7 @@ class TestHDAWGInit(unittest.TestCase):
         """Failed open sequence."""
         self._awg_module.finished.side_effect = [True, True]
 
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(QMI_InstrumentException):
             self._hdawg.open()
 
         expected_daq_server_calls = [call.connectDevice(_DEVICE_NAME, "1GbE"), call.awgModule()]
@@ -122,7 +122,7 @@ class TestHDAWGInit(unittest.TestCase):
         self._awg_module.finished.side_effect = [True, False, True]
 
         self._hdawg.open()
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(QMI_InstrumentException):
             self._hdawg.close()
 
         expected_daq_server_calls = [
@@ -149,7 +149,7 @@ class TestHDAWGInit(unittest.TestCase):
         self._awg_module.finished.side_effect = [True, False, False, False]
 
         self._hdawg.open()
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(QMI_InstrumentException):
             self._hdawg.close()
 
         expected_daq_server_calls = [
