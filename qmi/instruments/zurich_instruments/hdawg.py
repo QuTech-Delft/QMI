@@ -94,6 +94,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     AWG_COMPILER_STATUS_STRING = "awgModule/compiler/statusstring"
     AWG_ELF_STATUS = "awgModule/elf/status"
     AWG_PROGRESS = "awgModule/progress"
+    AWG_ENABLE = "awgModule/awg/enable"
 
     def __init__(self, context: QMI_Context, name: str, server_host: str, server_port: int, device_name: str) -> None:
         """Initialize driver.
@@ -207,7 +208,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:      Value to write.
         """
         self._check_data_server_exists()
-        self._daq_server.set("/" + self._device_name + "/" + node_path, value)
+        self._daq_server.set(f"/{self._device_name}/{node_path}", value)
 
     def _set_dev_int(self, node_path: str, value: int) -> None:
         """Set an integer value in the device node tree.
@@ -217,7 +218,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:      Integer value to write.
         """
         self._check_data_server_exists()
-        self._daq_server.setInt("/" + self._device_name + "/" + node_path, value)
+        self._daq_server.setInt(f"/{self._device_name}/{node_path}", value)
 
     def _set_dev_double(self, node_path: str, value: float) -> None:
         """Set a floating point value in the device node tree.
@@ -227,7 +228,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:      Floating point value to write.
         """
         self._check_data_server_exists()
-        self._daq_server.setDouble("/" + self._device_name + "/" + node_path, value)
+        self._daq_server.setDouble(f"/{self._device_name}/{node_path}", value)
 
     def _get_dev_int(self, node_path: str) -> int:
         """Return an integer value from the device node tree.
@@ -692,9 +693,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         except (TypeError, ValueError) as exc:
             raise ValueError("Invalid value in command table") from exc
 
-        self._daq_server.setVector(
-            "/{}/awgs/{}/commandtable/data".format(self._device_name, awg_index), command_table_as_json
-        )
+        self._daq_server.setVector(f"/{self._device_name}/awgs/{awg_index}/commandtable/data", command_table_as_json)
 
     @rpc_method
     def sync(self) -> None:
@@ -791,7 +790,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if value not in (0, 1):
             raise ValueError("Invalid impedance setting")
         self._check_is_open()
-        self._set_dev_int("triggers/in/{}/imp50".format(trigger), value)
+        self._set_dev_int(f"triggers/in/{trigger}/imp50", value)
 
     @rpc_method
     def set_trigger_level(self, trigger: int, value: float) -> None:
@@ -806,7 +805,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if not -10.0 < value < 10.0:
             raise ValueError("Invalid trigger level")
         self._check_is_open()
-        self._set_dev_double("triggers/in/{}/level".format(trigger), value)
+        self._set_dev_double(f"triggers/in/{trigger}/level", value)
 
     @rpc_method
     def set_marker_source(self, trigger: int, value: int) -> None:
@@ -839,7 +838,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if value not in range(16) and value not in (17, 18):
             raise ValueError("Invalid marker source: {}".format(value))
         self._check_is_open()
-        self._set_dev_int("triggers/out/{}/source".format(trigger), value)
+        self._set_dev_int(f"triggers/out/{trigger}/source", value)
 
     @rpc_method
     def set_marker_delay(self, trigger: int, value: float) -> None:
@@ -854,7 +853,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if trigger < 0 or trigger >= self.NUM_CHANNELS:
             raise ValueError("Invalid trigger index")
         self._check_is_open()
-        self._set_dev_double("triggers/out/{}/delay".format(trigger), value)
+        self._set_dev_double(f"triggers/out/{trigger}/delay", value)
 
     @rpc_method
     def set_dig_trigger_source(self, awg: int, trigger: int, value: int) -> None:
@@ -875,7 +874,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if value < 0 or value >= self.NUM_CHANNELS:
             raise ValueError("Invalid trigger source")
         self._check_is_open()
-        self._set_dev_int("awgs/{}/auxtriggers/{}/channel".format(awg, trigger), value)
+        self._set_dev_int(f"awgs/{awg}/auxtriggers/{trigger}/channel", value)
 
     @rpc_method
     def set_dig_trigger_slope(self, awg: int, trigger: int, value: int) -> None:
@@ -900,7 +899,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if value < 0 or value > 3:
             raise ValueError("Invalid trigger slope")
         self._check_is_open()
-        self._set_dev_int("awgs/{}/auxtriggers/{}/slope".format(awg, trigger), value)
+        self._set_dev_int(f"awgs/{awg}/auxtriggers/{trigger}/slope", value)
 
     @rpc_method
     def get_output_amplitude(self, awg: int, channel: int) -> float:
@@ -941,7 +940,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if channel < 0 or channel >= self.NUM_CHANNELS_PER_AWG:
             raise ValueError("Invalid channel index")
         self._check_is_open()
-        self._set_dev_double("awgs/{}/outputs/{}/amplitude".format(awg, channel), value)
+        self._set_dev_double(f"awgs/{awg}/outputs/{channel}/amplitude", value)
 
     @rpc_method
     def get_output_channel_hold(self, awg: int, channel: int) -> int:
@@ -995,7 +994,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if output_channel < 0 or output_channel >= self.NUM_CHANNELS:
             raise ValueError("Invalid channel index")
         self._check_is_open()
-        return self._get_dev_int("sigouts/{}/on".format(output_channel))
+        return self._get_dev_int(f"sigouts/{output_channel}/on")
 
     @rpc_method
     def set_output_channel_on(self, output_channel: int, value: int) -> None:
@@ -1025,7 +1024,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if value < 0 or value > 5.0:
             raise ValueError("Invalid output range")
         self._check_is_open()
-        self._set_dev_double("sigouts/{}/range".format(output_channel), value)
+        self._set_dev_double(f"sigouts/{output_channel}/range", value)
 
     @rpc_method
     def set_output_channel_offset(self, output_channel: int, value: float) -> None:
@@ -1042,7 +1041,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if not -1.25 <= value <= 1.25:
             raise ValueError("Invalid offset value")
         self._check_is_open()
-        self._set_dev_double("sigouts/{}/offset".format(output_channel), value)
+        self._set_dev_double(f"sigouts/{output_channel}/offset", value)
 
     @rpc_method
     def get_output_channel_delay(self, output_channel: int) -> float:
@@ -1057,7 +1056,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if output_channel < 0 or output_channel >= self.NUM_CHANNELS:
             raise ValueError("Invalid channel index")
         self._check_is_open()
-        return self._get_dev_double("sigouts/{}/delay".format(output_channel))
+        return self._get_dev_double(f"sigouts/{output_channel}/delay")
 
     @rpc_method
     def set_output_channel_delay(self, output_channel: int, value: float) -> None:
@@ -1074,7 +1073,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if not 0 <= value < 26e-9:
             raise ValueError("Invalid delay setting")
         self._check_is_open()
-        self._set_dev_double("sigouts/{}/delay".format(output_channel), value)
+        self._set_dev_double(f"sigouts/{output_channel}/delay", value)
 
     @rpc_method
     def set_output_channel_direct(self, output_channel: int, value: int) -> None:
@@ -1092,7 +1091,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if value not in (0, 1):
             raise ValueError("Invalid value")
         self._check_is_open()
-        self._set_dev_int("sigouts/{}/direct".format(output_channel), value)
+        self._set_dev_int(f"sigouts/{output_channel}/direct", value)
 
     @rpc_method
     def set_output_channel_filter(self, output_channel: int, value: int) -> None:
@@ -1107,7 +1106,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if value not in (0, 1):
             raise ValueError("Invalid value")
         self._check_is_open()
-        self._set_dev_int("sigouts/{}/filter".format(output_channel), value)
+        self._set_dev_int(f"sigouts/{output_channel}/filter", value)
 
     @rpc_method
     def set_dio_mode(self, mode: int) -> None:
@@ -1158,7 +1157,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if value < 0 or value > 31:
             raise ValueError("Invalid DIO bit index")
         self._check_is_open()
-        self._set_dev_int("awgs/{}/dio/strobe/index".format(awg), value)
+        self._set_dev_int(f"awgs/{awg}/dio/strobe/index", value)
 
     @rpc_method
     def set_dio_strobe_slope(self, awg: int, value: int) -> None:
@@ -1177,7 +1176,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if value < 0 or value > 3:
             raise ValueError("Invalid slope")
         self._check_is_open()
-        self._set_dev_int("awgs/{}/dio/strobe/slope".format(awg), value)
+        self._set_dev_int(f"awgs/{awg}/dio/strobe/slope", value)
 
     @rpc_method
     def get_user_register(self, awg: int, reg: int) -> int:
@@ -1192,7 +1191,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index")
         self._check_is_open()
-        return self._get_dev_int("awgs/{}/userregs/{}".format(awg, reg))
+        return self._get_dev_int(f"awgs/{awg}/userregs/{reg}")
 
     @rpc_method
     def set_user_register(self, awg: int, reg: int, value: int) -> None:
@@ -1208,7 +1207,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index")
         self._check_is_open()
-        self._set_dev_int("awgs/{}/userregs/{}".format(awg, reg), value)
+        self._set_dev_int(f"awgs/{awg}/userregs/{reg}", value)
 
     @rpc_method
     def get_awg_module_enabled(self, awg: int) -> int:
@@ -1224,7 +1223,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if awg < 0 or awg >= self.NUM_AWGS:
             raise ValueError("Invalid AWG index")
         self._check_is_open()
-        return self._get_dev_int("awgs/{}/enable".format(awg))
+        return self._get_dev_int(f"awgs/{awg}/enable")
 
     @rpc_method
     def set_awg_module_enabled(self, value: int) -> None:
@@ -1240,7 +1239,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid value")
         self._check_is_open()
         assert self._awg_module is not None
-        self._awg_module.set("awgModule/awg/enable", value)
+        self._awg_module.set(self.AWG_ENABLE, value)
 
     # Obsolete method names for backward compatibility.
     setChannelGrouping = set_channel_grouping
