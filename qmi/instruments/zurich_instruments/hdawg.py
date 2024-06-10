@@ -40,7 +40,7 @@ def _import_modules() -> None:
     """
     global zhinst
     if zhinst is None:
-        import zhinst.ziPython  # pylint: disable=W0621
+        import zhinst.core  # pylint: disable=W0621
         import zhinst.utils
 
 
