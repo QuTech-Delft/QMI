@@ -113,8 +113,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._server_port = server_port
         self._device_name = device_name
 
-        self._daq_server: zhinst.ziPython.ziDAQServer
-        self._awg_module: zhinst.ziPython.AwgModule
+        self._daq_server: zhinst.core.ziDAQServer
+        self._awg_module: zhinst.core.AwgModule
 
         self._last_compilation_successful = False
 
