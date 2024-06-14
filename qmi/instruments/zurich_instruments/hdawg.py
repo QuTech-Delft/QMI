@@ -3,25 +3,31 @@
 import logging
 import re
 import typing
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from qmi.core.context import QMI_Context
 from qmi.core.instrument import QMI_Instrument
 from qmi.core.rpc import rpc_method
 
 # TODO: remove
-import zhinst
-import zhinst.toolkit
-import zhinst.toolkit.driver
-import zhinst.toolkit.driver.devices
-import zhinst.toolkit.driver.nodes
-import zhinst.toolkit.driver.nodes.awg
-import zhinst.toolkit.nodetree
-import zhinst.toolkit.session
+# import zhinst
+# import zhinst.toolkit
+# import zhinst.toolkit.driver
+# import zhinst.toolkit.driver.devices
+# import zhinst.toolkit.driver.nodes
+# import zhinst.toolkit.driver.nodes.awg
+# import zhinst.toolkit.nodetree
+# import zhinst.toolkit.session
 
 # Lazy import of the zhinst module. See the function _import_modules() below.
 if typing.TYPE_CHECKING:
     import zhinst.toolkit
+    import zhinst.toolkit.driver
+    import zhinst.toolkit.driver.devices
+    import zhinst.toolkit.driver.nodes
+    import zhinst.toolkit.driver.nodes.awg
+    import zhinst.toolkit.nodetree
+    import zhinst.toolkit.session
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
@@ -105,7 +111,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         _logger.info("[%s] Opening connection to instrument", self._name)
 
         # Connect to the device.
-        self._device = self._session.connect_device(self._device_name)
+        self._device = cast(zhinst.toolkit.driver.devices.HDAWG, self._session.connect_device(self._device_name))
 
         super().open()
 
@@ -223,7 +229,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def write_to_waveform_memory(
-        self, awg_channel: int, waveforms: zhinst.toolkit.Waveforms, indexes: Optional[List[int]] = None
+        self, awg_channel: int, waveforms: zhinst.toolkit.Waveforms, indexes: Optional[List] = None
     ) -> None:
         """
         Write waveforms to the waveform memory. The waveforms must alredy be assigned in the sequencer program.
@@ -238,7 +244,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Get the AWG node/core
         awg_node = self._get_awg_node(awg_channel)
 
-        awg_node.write_to_waveform_memory(waveforms, indexes)
+        awg_node.write_to_waveform_memory(waveforms, indexes) if indexes else awg_node.write_to_waveform_memory(
+            waveforms
+        )
 
     @rpc_method
     def read_from_waveform_memory(
@@ -259,7 +267,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Get the AWG node/core
         awg_node = self._get_awg_node(awg_channel)
 
-        return awg_node.read_from_waveform_memory(indexes)
+        return awg_node.read_from_waveform_memory(indexes) if indexes else awg_node.read_from_waveform_memory()
 
     @rpc_method
     def validate_waveforms(
