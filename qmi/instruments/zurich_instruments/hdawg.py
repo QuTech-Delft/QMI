@@ -10,6 +10,7 @@ from qmi.core.instrument import QMI_Instrument
 from qmi.core.rpc import rpc_method
 
 # TODO: remove
+import zhinst
 import zhinst.toolkit
 import zhinst.toolkit.driver
 import zhinst.toolkit.driver.devices
