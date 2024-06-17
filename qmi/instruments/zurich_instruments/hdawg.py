@@ -9,16 +9,6 @@ from qmi.core.context import QMI_Context
 from qmi.core.instrument import QMI_Instrument
 from qmi.core.rpc import rpc_method
 
-# TODO: remove
-# import zhinst
-# import zhinst.toolkit
-# import zhinst.toolkit.driver
-# import zhinst.toolkit.driver.devices
-# import zhinst.toolkit.driver.nodes
-# import zhinst.toolkit.driver.nodes.awg
-# import zhinst.toolkit.nodetree
-# import zhinst.toolkit.session
-
 # Lazy import of the zhinst module. See the function _import_modules() below.
 if typing.TYPE_CHECKING:
     import zhinst.toolkit
