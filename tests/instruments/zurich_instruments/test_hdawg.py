@@ -101,7 +101,7 @@ class TestZurichInstruments_Hdawg(unittest.TestCase):
         sequencer_code = "dummy code here"
 
         # Act
-        self._instr.load_sequencer_program(1, sequencer_code)
+        self._instr.compile_and_upload(1, sequencer_code)
 
         # Assert
         self._awg_0.load_sequencer_program.assert_called_once_with(sequencer_code)
@@ -112,7 +112,7 @@ class TestZurichInstruments_Hdawg(unittest.TestCase):
         sequence = hdawg.zhinst.toolkit.Sequence()
 
         # Act
-        self._instr.load_sequencer_program(1, sequence)
+        self._instr.compile_and_upload(1, sequence)
 
         # Assert
         self._awg_0.load_sequencer_program.assert_called_once_with(sequence)

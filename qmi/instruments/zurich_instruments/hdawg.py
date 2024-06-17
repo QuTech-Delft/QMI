@@ -128,9 +128,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return self._device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
 
     @rpc_method
-    def load_sequencer_program(
-        self, awg_channel: int, sequencer_program: Union[str, "zhinst.toolkit.Sequence"]
-    ) -> None:
+    def compile_and_upload(self, awg_channel: int, sequencer_program: Union[str, "zhinst.toolkit.Sequence"]) -> None:
         """Compile and upload the sequencer program.
 
         Parameters:
