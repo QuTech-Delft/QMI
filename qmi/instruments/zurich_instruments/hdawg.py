@@ -3,7 +3,7 @@
 import logging
 import re
 import typing
-from typing import List, Optional, cast
+from typing import List, Optional, Union, cast
 
 from qmi.core.context import QMI_Context
 from qmi.core.instrument import QMI_Instrument
@@ -91,7 +91,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._session = zhinst.toolkit.Session(self._server_host, self._server_port)
 
     @staticmethod
-    def get_sequence_snippet(waveforms: zhinst.toolkit.Waveforms) -> str:
+    def get_sequence_snippet(waveforms: "zhinst.toolkit.Waveforms") -> str:
         """
         Get a sequencer code snippet that defines the given waveforms.
 
@@ -125,7 +125,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         super().close()
 
-    def _get_awg_node(self, awg_channel: int) -> zhinst.toolkit.driver.nodes.awg.AWG:
+    def _get_awg_node(self, awg_channel: int) -> "zhinst.toolkit.driver.nodes.awg.AWG":
         """
         Get the AWG node using the core index.
 
@@ -138,7 +138,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return self._device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
 
     @rpc_method
-    def load_sequencer_program(self, awg_channel: int, sequencer_program: str | zhinst.toolkit.Sequence) -> None:
+    def load_sequencer_program(
+        self, awg_channel: int, sequencer_program: Union[str, "zhinst.toolkit.Sequence"]
+    ) -> None:
         """Compile and upload the sequencer program.
 
         Parameters:
@@ -229,7 +231,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def write_to_waveform_memory(
-        self, awg_channel: int, waveforms: zhinst.toolkit.Waveforms, indexes: Optional[List] = None
+        self, awg_channel: int, waveforms: "zhinst.toolkit.Waveforms", indexes: Optional[List] = None
     ) -> None:
         """
         Write waveforms to the waveform memory. The waveforms must alredy be assigned in the sequencer program.
@@ -251,7 +253,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     @rpc_method
     def read_from_waveform_memory(
         self, awg_channel: int, indexes: Optional[List[int]] = None
-    ) -> zhinst.toolkit.Waveforms:
+    ) -> "zhinst.toolkit.Waveforms":
         """
         Read waveforms from the waveform memory.
 
@@ -271,7 +273,10 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def validate_waveforms(
-        self, awg_channel: int, waveforms: zhinst.toolkit.Waveforms, compiled_sequencer_program: Optional[bytes] = None
+        self,
+        awg_channel: int,
+        waveforms: "zhinst.toolkit.Waveforms",
+        compiled_sequencer_program: Optional[bytes] = None,
     ) -> None:
         """
         Validate if the waveforms match the sequencer program.
@@ -291,7 +296,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         )
 
     @rpc_method
-    def get_command_table(self, awg_channel: int) -> zhinst.toolkit.CommandTable:
+    def get_command_table(self, awg_channel: int) -> "zhinst.toolkit.CommandTable":
         """
         Get the command table from the device.
 
