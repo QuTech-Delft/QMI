@@ -344,6 +344,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         Parameters:
             awg_channel:    The AWG channel to get the command table for.
+
+        Returns:
+            The command table.
         """
         self._check_is_open()
         _logger.info("[%s] Getting command table for channel [%d]", self._name, awg_channel)
@@ -472,3 +475,27 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._check_is_open()
         _logger.info("[%s] Getting status of sample clock", self._name)
         return self._device.system.clocks.sampleclock.status
+
+    @rpc_method
+    def set_trigger_impedance(self, trigger: int, value: int) -> None:
+        """
+        Set the input impedance of a specific trigger input.
+
+        Parameters:
+            trigger: Trigger index in the range 0 to 7, corresponding to trigger inputs 1 to 8 on the front panel.
+            value:   Impedance setting.
+                     0 = 1 kOhm;
+                     1 = 50 Ohm.
+        """
+        if trigger < 0 or trigger >= len(self.CHANNEL_TO_CORE_MAPPING):
+            raise ValueError("Invalid trigger index")
+        if value not in (0, 1):
+            raise ValueError("Invalid impedance setting")
+        self._check_is_open()
+        _logger.info(
+            "[%s] Setting trigger impedance of channel [%d] to [%s]",
+            self._name,
+            trigger,
+            "50 Ohm" if value else "1 kOhm",
+        )
+        self._device.triggers[trigger].imp50(value)
