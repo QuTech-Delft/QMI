@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - mypy errors not failing pipeline
+- In `instruments.picoquant.support._decoders` made the lexical sorting (`numpy.lexsort`) to temporarily retype the data to signed integer, as from Numpy 2.0 the integers are not allowed anymore to overflow.
+- The same fix is applied also in unit-tests.
 
 ### Removed
 - Radon workflows as radon is no longer actively maintained. Pylint has taken over as the complexity checker.
