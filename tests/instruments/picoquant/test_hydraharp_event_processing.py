@@ -24,7 +24,7 @@ def gen_events(max_events, sync_period):
     events_in["timestamp"] = np.cumsum(np.random.randint(1, sync_period, max_events))
     # At each passing of a sync moment we need to add a sync signal
     (inds,) = np.where((
-            events_in["timestamp"] // sync_period > np.insert(events_in["timestamp"], 0, -1)[:-1] // sync_period
+            events_in["timestamp"] // sync_period > np.insert(events_in["timestamp"], 0, 0)[:-1] // sync_period
     ))
     # And then insert the sync signals and cap the length
     events_in["type"] = np.insert(events_in["type"], inds - 1, np.array([64] * len(inds)))[:max_events]
@@ -32,14 +32,14 @@ def gen_events(max_events, sync_period):
         events_in["timestamp"], inds - 1,
                                 (events_in["timestamp"] // sync_period)[inds - 1] * sync_period
     )[:max_events]
-    events_in = events_in[np.lexsort((-1 * events_in["type"], events_in["timestamp"]))]
+    events_in = events_in[np.lexsort((-1 * events_in["type"].astype("int16"), events_in["timestamp"]))]
     # This can leave the last index wrong. Check.
     last_sync_index = -(events_in["type"][::-1].tolist().index(64) + 1)
     if (events_in["timestamp"][-1] - events_in["timestamp"][last_sync_index]) > sync_period:
         # we replace the last input with a sync
         events_in["type"][-1] = 64
         events_in["timestamp"][-1] = events_in["timestamp"][last_sync_index] + sync_period
-        events_in = events_in[np.lexsort((-1 * events_in["type"], events_in["timestamp"]))]
+        events_in = events_in[np.lexsort((-1 * events_in["type"].astype("int16"), events_in["timestamp"]))]
 
     return events_in
 
@@ -68,7 +68,7 @@ def gen_random_events(num_events, event_rate, sync_rate, resolution, channels, s
     events[num_events:]["type"] = 64
     events[num_events:]["timestamp"] = sync_timestamps
     events = np.unique(events)  # Remove any duplicates
-    events = events[np.lexsort((-1 * events["type"], events["timestamp"]))]
+    events = events[np.lexsort((-1 * events["type"].astype("int16"), events["timestamp"]))]
 
     return events[:num_events]
 
@@ -396,7 +396,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
             | (events_in["type"] == 3)
         ]
         events_expected = events_expected[
-            np.lexsort((-1 * events_expected["type"], events_expected["timestamp"]))
+            np.lexsort((-1 * events_expected["type"].astype("int16"), events_expected["timestamp"]))
         ]
         # Check events.
         self.assertTrue(np.all(events == events_expected))
@@ -558,7 +558,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         sync_events["timestamp"] = cum_counts[sync_idx] * sync_period
         expected_events = np.insert(expected_events, sync_idx, sync_events)
         expected_events = expected_events[
-            np.lexsort((-1 * expected_events["type"], expected_events["timestamp"]))
+            np.lexsort((-1 * expected_events["type"].astype("int16"), expected_events["timestamp"]))
         ]
 
         # Patch the readFifo() function.
