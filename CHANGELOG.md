@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - QMI driver for TeraXion TFN in `qmi.instruments.teraxion` with CLI client.
 
+### Changed
+- In `setup.py` limited NumPy and SciPy versions to be <2. Also added missing line for Tenma 72 PSU CLI.
+
 ### Fixed
 - mypy errors not failing pipeline
 - In `instruments.picoquant.support._decoders` made the lexical sorting (`numpy.lexsort`) to temporarily retype the data to signed integer, as from Numpy 2.0 the integers are not allowed anymore to overflow.
