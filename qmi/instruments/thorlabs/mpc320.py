@@ -316,16 +316,11 @@ class Thorlabs_MPC320(QMI_Instrument):
         _logger.info("[%s] Checking if channel %d is homed", self._name, channel_number)
         self._validate_channel(channel_number)
         self._check_is_open()
-        # This command needs a workaround. Instead of returning the MOT_MOVE_HOMED message, the instrument may return
-        # its current state first. So subsequent messages may have to be read.
-        num_reads = 5
-        while num_reads > 0:
-            try:
-                # Get response.
-                resp = self._apt_protocol.ask(MOT_MOVE_HOMED, timeout)
-            except QMI_InstrumentException:
-                num_reads -= 1
-                continue
+        # This command needs a workaround. Instead of returning the MOT_MOVE_HOMED message, the instrument returns
+        # its current state first, so read that to discard the buffer
+        _ = self._apt_protocol.ask(MOT_GET_USTATUSUPDATE, timeout)
+        # then read the actual response we need
+        resp = self._apt_protocol.ask(MOT_MOVE_HOMED, timeout)
 
         # Check if the channel number in the response is equal to the one that was asked for.
         return resp.chan_ident == Thorlabs_MPC320_ChannelMap[channel_number]
@@ -376,16 +371,11 @@ class Thorlabs_MPC320(QMI_Instrument):
         )
         self._validate_channel(channel_number)
         self._check_is_open()
-        # This command needs a workaround. Instead of returning the MOT_MOVE_HOMED message, the instrument may return
-        # its current state first. So subsequent messages may have to be read.
-        num_reads = 5
-        while num_reads > 0:
-            try:
-                # Get response.
-                resp = self._apt_protocol.ask(MOT_MOVE_COMPLETED, timeout)
-            except QMI_InstrumentException:
-                num_reads -= 1
-                continue
+        # This command needs a workaround. Instead of returning the MOT_MOVE_COMPLETED message, the instrument returns
+        # its current state first, so read that to discard the buffer
+        _ = self._apt_protocol.ask(MOT_GET_USTATUSUPDATE, timeout)
+        # then read the actual response we need
+        resp = self._apt_protocol.ask(MOT_MOVE_COMPLETED, timeout)
 
         return resp.chan_ident == Thorlabs_MPC320_ChannelMap[channel_number]
 
