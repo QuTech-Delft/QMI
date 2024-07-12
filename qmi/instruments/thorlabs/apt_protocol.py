@@ -60,11 +60,15 @@ class AptStatusBits(Enum):
     P_MOT_SB_OVERLOAD = 0x01000000  # some form of motor overload
     P_MOT_SB_ENCODERFAULT = 0x02000000  # encoder fault
     P_MOT_SB_OVERCURRENT = 0x04000000  # motor exceeded continuous current limit
-    P_MOT_SB_BUSCURRENTFAULT = 0x08000000  # excessive current being drawn from motor power supply
+    P_MOT_SB_BUSCURRENTFAULT = (
+        0x08000000  # excessive current being drawn from motor power supply
+    )
     P_MOT_SB_POWEROK = 0x10000000  # controller power supplies operating normally
     P_MOT_SB_ACTIVE = 0x20000000  # controller executing motion commend
     P_MOT_SB_ERROR = 0x40000000  # indicates an error condition
-    P_MOT_SB_ENABLED = 0x80000000  # motor output enabled, with controller maintaining position
+    P_MOT_SB_ENABLED = (
+        0x80000000  # motor output enabled, with controller maintaining position
+    )
 
 
 class AptMessageId(Enum):
@@ -201,6 +205,7 @@ class AptProtocol:
         )
         # Send command.
         self._transport.write(bytearray(msg))
+        print(bytearray(msg))
 
     def write_data_command(self, message_id: int, data: T) -> None:
         """
@@ -210,7 +215,9 @@ class AptProtocol:
         data_length = sizeof(data)
 
         # Make the header.
-        msg = AptMessageHeaderForData(message_id, data_length, self._apt_device_address | 0x80, self._host_address)
+        msg = AptMessageHeaderForData(
+            message_id, data_length, self._apt_device_address | 0x80, self._host_address
+        )
 
         # Send the header and data packet.
         self._transport.write(bytearray(msg) + bytearray(data))
@@ -231,7 +238,9 @@ class AptProtocol:
             timeout = self._timeout
 
         # Read the header first.
-        header_bytes = self._transport.read(nbytes=self.HEADER_SIZE_BYTES, timeout=timeout)
+        header_bytes = self._transport.read(
+            nbytes=self.HEADER_SIZE_BYTES, timeout=timeout
+        )
         if data_type.HEADER_ONLY:
             return data_type.from_buffer_copy(header_bytes)
         header = AptMessageHeaderForData.from_buffer_copy(header_bytes)

@@ -100,7 +100,10 @@ class MOT_MOVE_ABSOLUTE(AptMessage):
     """
 
     MESSAGE_ID = AptMessageId.MOT_MOVE_ABSOLUTE.value
-    _fields_: List[Tuple[str, type]] = [("chan_ident", apt_word), ("absolute_distance", apt_long)]
+    _fields_: List[Tuple[str, type]] = [
+        ("chan_ident", apt_word),
+        ("absolute_distance", apt_long),
+    ]
 
 
 class MOT_MOVE_COMPLETED(AptMessage):

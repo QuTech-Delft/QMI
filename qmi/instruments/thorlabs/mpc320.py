@@ -70,7 +70,7 @@ class Thorlabs_MPC320_PolarisationParameters:
 Thorlabs_MPC320_ChannelMap: Dict[int, int] = {1: 0x01, 2: 0x02, 3: 0x04}
 
 
-class Thorlabs_MPC320(QMI_Instrument):
+class Thorlabs_Mpc320(QMI_Instrument):
     """
     Driver for a Thorlabs MPC320 motorised fibre polarisation controller.
     """
@@ -98,8 +98,12 @@ class Thorlabs_MPC320(QMI_Instrument):
             transport:  QMI transport descriptor to connect to the instrument.
         """
         super().__init__(context, name)
-        self._transport = create_transport(transport, default_attributes={"baudrate": 115200, "rtscts": True})
-        self._apt_protocol = AptProtocol(self._transport, default_timeout=self.DEFAULT_RESPONSE_TIMEOUT)
+        self._transport = create_transport(
+            transport, default_attributes={"baudrate": 115200, "rtscts": True}
+        )
+        self._apt_protocol = AptProtocol(
+            self._transport, default_timeout=self.DEFAULT_RESPONSE_TIMEOUT
+        )
 
     def _validate_position(self, pos: float) -> None:
         """
@@ -179,7 +183,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._apt_protocol.write_param_command(AptMessageId.HW_REQ_INFO.value)
         # Get response
         resp = self._apt_protocol.ask(HW_GET_INFO)
-        return QMI_InstrumentIdentification("Thorlabs", resp.model_number, resp.serial_number, resp.firmware_version)
+        return QMI_InstrumentIdentification(
+            "Thorlabs", resp.model_number, resp.serial_number, resp.firmware_version
+        )
 
     @rpc_method
     def identify(self) -> None:
@@ -268,7 +274,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         """
         Start automatic status updates from device.
         """
-        _logger.info("[%s] Starting automatic status updates from instrument", self._name)
+        _logger.info(
+            "[%s] Starting automatic status updates from instrument", self._name
+        )
         self._check_is_open()
         # Send message.
         self._apt_protocol.write_param_command(AptMessageId.HW_START_UPDATEMSGS.value)
@@ -278,7 +286,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         """
         Stop automatic status updates from device.
         """
-        _logger.info("[%s] Stopping automatic status updates from instrument", self._name)
+        _logger.info(
+            "[%s] Stopping automatic status updates from instrument", self._name
+        )
         self._check_is_open()
         # Send message.
         self._apt_protocol.write_param_command(AptMessageId.HW_STOP_UPDATEMSGS.value)
@@ -300,7 +310,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         )
 
     @rpc_method
-    def is_channel_homed(self, channel_number: int, timeout: float = DEFAULT_RESPONSE_TIMEOUT) -> bool:
+    def is_channel_homed(
+        self, channel_number: int, timeout: float = DEFAULT_RESPONSE_TIMEOUT
+    ) -> bool:
         """
         Check if a given channel is homed. This command should only be run after the method `home_channel`.
         Otherwise you will read bytes from other commands using this method.
@@ -348,10 +360,14 @@ class Thorlabs_MPC320(QMI_Instrument):
             absolute_distance=encoder_position,
         )
         # Send message.
-        self._apt_protocol.write_data_command(AptMessageId.MOT_MOVE_ABSOLUTE.value, data_packet)
+        self._apt_protocol.write_data_command(
+            AptMessageId.MOT_MOVE_ABSOLUTE.value, data_packet
+        )
 
     @rpc_method
-    def is_move_completed(self, channel_number: int, timeout: float = DEFAULT_RESPONSE_TIMEOUT) -> bool:
+    def is_move_completed(
+        self, channel_number: int, timeout: float = DEFAULT_RESPONSE_TIMEOUT
+    ) -> bool:
         """
         Check if a given channel has completed its move. This command should only be run after a relative or absolute
         move command. Otherwise you will read bytes from other commands.
@@ -393,9 +409,13 @@ class Thorlabs_MPC320(QMI_Instrument):
         self._check_is_open()
         self._validate_channel(channel_number)
         # Make data packet.
-        data_packet = MOT_SET_EEPROMPARAMS(chan_ident=Thorlabs_MPC320_ChannelMap[channel_number], msg_id=message_id)
+        data_packet = MOT_SET_EEPROMPARAMS(
+            chan_ident=Thorlabs_MPC320_ChannelMap[channel_number], msg_id=message_id
+        )
         # Send message.
-        self._apt_protocol.write_data_command(AptMessageId.MOT_SET_EEPROMPARAMS.value, data_packet)
+        self._apt_protocol.write_data_command(
+            AptMessageId.MOT_SET_EEPROMPARAMS.value, data_packet
+        )
 
     @rpc_method
     def get_status_update(self, channel_number: int) -> Thorlabs_MPC320_Status:
@@ -409,7 +429,9 @@ class Thorlabs_MPC320(QMI_Instrument):
         Returns:
             An instance of Thorlabs_MPC320_Status.
         """
-        _logger.info("[%s] Getting position counter of channel %d", self._name, channel_number)
+        _logger.info(
+            "[%s] Getting position counter of channel %d", self._name, channel_number
+        )
         self._check_is_open()
         self._validate_channel(channel_number)
         # Send request message.
@@ -439,7 +461,9 @@ class Thorlabs_MPC320(QMI_Instrument):
             channel_number: The channel to job.
             direction:      The direction to job. This can either be forward or backward. Default is forward.
         """
-        _logger.info("[%s] Getting position counter of channel %d", self._name, channel_number)
+        _logger.info(
+            "[%s] Getting position counter of channel %d", self._name, channel_number
+        )
         self._check_is_open()
         self._validate_channel(channel_number)
         # Send request message.
@@ -485,7 +509,9 @@ class Thorlabs_MPC320(QMI_Instrument):
             jog_step3=round(jog_step3 / self.ENCODER_CONVERSION_UNIT),
         )
         # Send message.
-        self._apt_protocol.write_data_command(AptMessageId.POL_SET_PARAMS.value, data_packet)
+        self._apt_protocol.write_data_command(
+            AptMessageId.POL_SET_PARAMS.value, data_packet
+        )
 
     @rpc_method
     def get_polarisation_parameters(self) -> Thorlabs_MPC320_PolarisationParameters:
