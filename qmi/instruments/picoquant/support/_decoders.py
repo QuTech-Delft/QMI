@@ -196,6 +196,10 @@ class _T3EventDecoder(EventDecoder):
         events[num_data_events:]["type"] = 64
         events[num_data_events:]["timestamp"] = sync_timestamps
         # Events need to be sorted by timestamp, and by type number so that sync# 64 is before channel#.
-        events = events[np.lexsort((-1 * events["type"], events["timestamp"]))]
+        # NOTE: Since numpy 2.0 overflow of values is not allowed anymore. Therefore, for the means of the lexical sort
+        # where we use the trick of setting the event types as their negatives to get the right order, now must be
+        # retyped from unsigned 8-bit integer to signed 16-bit integer. The returned array by the lexsort does
+        # re-conform to uint8 when placing it back to `events`, so no errors should be introduced.
+        events = events[np.lexsort((-1 * events["type"].astype("int16"), events["timestamp"]))]
 
         return events

@@ -56,8 +56,8 @@ setup(
         "wheel",
         "twine",
         # For scientific data processing and visualisation
-        "numpy",
-        "scipy",
+        "numpy<2",
+        "scipy<2",
         "h5py>=3.7.0",
         # For hardware interfacing
         "pyserial",
@@ -106,10 +106,11 @@ setup(
         "bin/instruments/qmi_quantum_composer_9530",
         "bin/instruments/qmi_siglent_ssa3000x",
         "bin/instruments/qmi_srs_dc205",
+        "bin/instruments/qmi_tenma_72psu",
+        "bin/instruments/qmi_teraxion_tfn",
         "bin/instruments/qmi_thorlabs_k10cr1",
         "bin/instruments/qmi_timebase_dim3000",
         "bin/instruments/qmi_wavelength_tclab",
         "bin/instruments/qmi_wieserlabs_flexdds",
-        "bin/instruments/qmi_teraxion_tfn",
     ],
 )
