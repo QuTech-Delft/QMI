@@ -205,7 +205,6 @@ class AptProtocol:
         )
         # Send command.
         self._transport.write(bytearray(msg))
-        print(bytearray(msg))
 
     def write_data_command(self, message_id: int, data: T) -> None:
         """

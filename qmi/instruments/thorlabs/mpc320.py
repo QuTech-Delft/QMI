@@ -297,6 +297,8 @@ class Thorlabs_Mpc320(QMI_Instrument):
     def home_channel(self, channel_number: int) -> None:
         """
         Start the homing sequence for a given channel.
+        After running this command, you must clear the buffer by checking if the channel
+        was homed, using is_channel_homed()
 
         Paramters:
             channel_number: The channel to home.
@@ -332,6 +334,8 @@ class Thorlabs_Mpc320(QMI_Instrument):
         # its current state first, so read that to discard the buffer
         _ = self._apt_protocol.ask(MOT_GET_USTATUSUPDATE, timeout)
         # then read the actual response we need
+        # TODO: check what happens when the channel is not homed
+        # is no response received?
         resp = self._apt_protocol.ask(MOT_MOVE_HOMED, timeout)
 
         # Check if the channel number in the response is equal to the one that was asked for.
@@ -343,12 +347,13 @@ class Thorlabs_Mpc320(QMI_Instrument):
         Move a channel to the specified position. The specified position is in degeres. A conversion is done to convert
         this into encoder counts. This means that there may be a slight mismatch in the specified position and the
         actual position. You may use the get_status_update method to get the actual position.
+        After running this command, you must clear the buffer by checking if the channel
+        move was completed, using is_move_completed()
 
         Parameters:
             channel_number: The channel to address.
             position:       Absolute position to move to in degrees.
         """
-        # TODO: check for move completed command, otherwise the that message will stay in the buffer
         _logger.info("[%s] Moving channel %d", self._name, channel_number)
         self._validate_channel(channel_number)
         self._check_is_open()

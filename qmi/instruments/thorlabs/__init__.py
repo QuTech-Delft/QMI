@@ -10,6 +10,7 @@ The qmi.instruments.thorlabs package provides support for:
 
 from qmi.instruments.thorlabs.pm100d import SensorInfo
 from qmi.instruments.thorlabs.tc200 import Tc200Status
+from qmi.instruments.thorlabs.apt_protocol import AptChannelState
 
 # Alternative, QMI naming convention approved names
 from qmi.instruments.thorlabs.k10cr1 import Thorlabs_K10CR1 as Thorlabs_K10Cr1
