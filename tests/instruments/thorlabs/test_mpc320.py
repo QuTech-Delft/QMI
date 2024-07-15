@@ -62,6 +62,28 @@ class TestThorlabsMPC320(unittest.TestCase):
             ]
         )
 
+    def test_get_idn_with_wrong_returned_msg_id_sends_command_and_throws_error(self):
+        """Test get_idn method and returns identification info."""
+        # Arrange
+        self._transport_mock.read.side_effect = [
+            b"\x11\x00\x54\x00\x00\x81",
+            b"\x89\x53\x9a\x05\x4d\x50\x43\x33\x32\x30\x20\x00\x2c\x00\x02\x01\x39\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+        ]
+
+        # Act
+        # Assert
+        with self.assertRaises(QMI_InstrumentException):
+            _ = self._instr.get_idn()
+        self._transport_mock.write.assert_called_once_with(
+            bytearray(b"\x05\x00\x00\x00P\x01")
+        )
+        self._transport_mock.read.assert_has_calls(
+            [
+                unittest.mock.call(nbytes=6, timeout=1.0),
+                unittest.mock.call(nbytes=84, timeout=1.0),
+            ]
+        )
+
     def test_identify_sends_command(self):
         """Test identify method and send relevant command."""
         # Arrange
