@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - In `setup.py` limited NumPy and SciPy versions to be <2. Also added missing line for Tenma 72 PSU CLI.
+- Refactored Newport `single_axis_motion_controller.py` to use context manager to enter and exit a configuration state.
 
 ### Fixed
 - mypy errors not failing pipeline
