@@ -356,6 +356,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         """
         _logger.info("[%s] Moving channel %d", self._name, channel_number)
         self._validate_channel(channel_number)
+        self._validate_position(position)
         self._check_is_open()
         # Convert position in degrees to encoder counts.
         encoder_position = round(position / self.ENCODER_CONVERSION_UNIT)
@@ -408,7 +409,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
 
         Parameters:
             channel_number: The channel to address.
-            message_id:     ID of message whose parameters need to be saved.
+            message_id:     ID of message whose parameters need to be saved. Must be provided as a hex number e.g. 0x04B6
         """
         _logger.info("[%s] Saving parameters of message %d", self._name, message_id)
         self._check_is_open()

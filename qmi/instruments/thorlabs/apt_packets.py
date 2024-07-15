@@ -9,6 +9,7 @@ from qmi.instruments.thorlabs.apt_protocol import (
     apt_char,
     apt_word,
     apt_byte,
+    apt_short,
 )
 
 
@@ -137,7 +138,8 @@ class MOT_GET_USTATUSUPDATE(AptMessage):
     Fields:
         chan_ident:     The channel being addressed.
         position:       The position in encoder counts.
-        velocity:       Velocity in controller units.
+        velocity:       Velocity in controller units. Note that this is reported as a 16 bit
+                        unsigned integer in the manual but it is actually signed according to the example.
         motor_current:  Motor current in mA.
         status_bits:    Status bits that provide various errors and indications.
     """
@@ -147,7 +149,7 @@ class MOT_GET_USTATUSUPDATE(AptMessage):
         ("chan_ident", apt_word),
         ("position", apt_long),
         ("velocity", apt_word),
-        ("motor_current", apt_word),
+        ("motor_current", apt_short),
         ("status_bits", apt_dword),
     ]
 
