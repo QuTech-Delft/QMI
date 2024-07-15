@@ -18,9 +18,7 @@ class TestThorlabsMPC320(unittest.TestCase):
             "qmi.instruments.thorlabs.mpc320.create_transport",
             return_value=self._transport_mock,
         ):
-            self._instr: Thorlabs_Mpc320 = qmi.make_instrument(
-                "test_mpc320", Thorlabs_Mpc320, "serial:transport_str"
-            )
+            self._instr: Thorlabs_Mpc320 = qmi.make_instrument("test_mpc320", Thorlabs_Mpc320, "serial:transport_str")
         self._instr.open()
 
     def tearDown(self):
@@ -49,9 +47,7 @@ class TestThorlabsMPC320(unittest.TestCase):
         self.assertEqual(idn.serial, expected_idn[2])
         self.assertEqual(idn.version, expected_idn[3])
 
-        self._transport_mock.write.assert_called_once_with(
-            bytearray(b"\x05\x00\x00\x00P\x01")
-        )
+        self._transport_mock.write.assert_called_once_with(bytearray(b"\x05\x00\x00\x00P\x01"))
         self._transport_mock.read.assert_has_calls(
             [
                 unittest.mock.call(nbytes=6, timeout=1.0),
@@ -67,9 +63,7 @@ class TestThorlabsMPC320(unittest.TestCase):
         self._instr.identify()
 
         # Assert
-        self._transport_mock.write.assert_called_once_with(
-            bytearray(b"\x23\x02\x01\x00\x50\x01")
-        )
+        self._transport_mock.write.assert_called_once_with(bytearray(b"\x23\x02\x01\x00\x50\x01"))
 
     def test_enable_channels_enable_four_throws_exception(self):
         """Test enable channel 4, throws exception."""
@@ -88,9 +82,7 @@ class TestThorlabsMPC320(unittest.TestCase):
         self._instr.enable_channels([1])
 
         # Assert
-        self._transport_mock.write.assert_called_once_with(
-            bytearray(b"\x10\x02\x01\x01\x50\x01")
-        )
+        self._transport_mock.write.assert_called_once_with(bytearray(b"\x10\x02\x01\x01\x50\x01"))
 
     def test_enable_channels_enable_one_and_three_sends_command(self):
         """Test enable channels 1 and 3, sends command to enable channels 1 and 3."""
@@ -100,9 +92,7 @@ class TestThorlabsMPC320(unittest.TestCase):
         self._instr.enable_channels([1, 3])
 
         # Assert
-        self._transport_mock.write.assert_called_once_with(
-            bytearray(b"\x10\x02\x05\x01\x50\x01")
-        )
+        self._transport_mock.write.assert_called_once_with(bytearray(b"\x10\x02\x05\x01\x50\x01"))
 
     def test_disable_all_channels_sends_command(self):
         """Test disable all channels, sends command to disable all channels."""
@@ -112,9 +102,7 @@ class TestThorlabsMPC320(unittest.TestCase):
         self._instr.disable_all_channels()
 
         # Assert
-        self._transport_mock.write.assert_called_once_with(
-            bytearray(b"\x10\x02\x00\x01\x50\x01")
-        )
+        self._transport_mock.write.assert_called_once_with(bytearray(b"\x10\x02\x00\x01\x50\x01"))
 
     def test_get_channel_state_for_channel_four_throws_exception(self):
         """Test get state of channel 4, throws exception."""
@@ -137,9 +125,7 @@ class TestThorlabsMPC320(unittest.TestCase):
 
         # Assert
         self.assertEqual(state, AptChannelState.DISABLE)
-        self._transport_mock.write.assert_called_once_with(
-            bytearray(b"\x11\x02\x01\x00\x50\x01")
-        )
+        self._transport_mock.write.assert_called_once_with(bytearray(b"\x11\x02\x01\x00\x50\x01"))
 
     def test_get_channel_state_for_enabled_channel_1_sends_command_and_returns_enabled_value(
         self,
@@ -153,9 +139,7 @@ class TestThorlabsMPC320(unittest.TestCase):
 
         # Assert
         self.assertEqual(state, AptChannelState.ENABLE)
-        self._transport_mock.write.assert_called_once_with(
-            bytearray(b"\x11\x02\x01\x00\x50\x01")
-        )
+        self._transport_mock.write.assert_called_once_with(bytearray(b"\x11\x02\x01\x00\x50\x01"))
 
     def test_get_channel_state_for_disabled_channel_2_sends_command_and_returns_disabled_value(
         self,
@@ -170,9 +154,7 @@ class TestThorlabsMPC320(unittest.TestCase):
 
         # Assert
         self.assertEqual(state, AptChannelState.DISABLE)
-        self._transport_mock.write.assert_called_once_with(
-            bytearray(b"\x11\x02\x01\x00\x50\x01")
-        )
+        self._transport_mock.write.assert_called_once_with(bytearray(b"\x11\x02\x01\x00\x50\x01"))
 
     def test_start_auto_status_update_sends_command(self):
         """Test start automatic status updates, sends command"""
@@ -182,9 +164,7 @@ class TestThorlabsMPC320(unittest.TestCase):
         self._instr.start_auto_status_update()
 
         # Assert
-        self._transport_mock.write.assert_called_once_with(
-            bytearray(b"\x11\x00\x00\x00\x50\x01")
-        )
+        self._transport_mock.write.assert_called_once_with(bytearray(b"\x11\x00\x00\x00\x50\x01"))
 
     def test_stop_auto_status_update_sends_command(self):
         """Test stop automatic status updates, sends command"""
@@ -194,9 +174,7 @@ class TestThorlabsMPC320(unittest.TestCase):
         self._instr.stop_auto_status_update()
 
         # Assert
-        self._transport_mock.write.assert_called_once_with(
-            bytearray(b"\x12\x00\x00\x00\x50\x01")
-        )
+        self._transport_mock.write.assert_called_once_with(bytearray(b"\x12\x00\x00\x00\x50\x01"))
 
     def test_home_channel_3_sends_command(self):
         """Test home channel 3, sends command"""
@@ -206,9 +184,7 @@ class TestThorlabsMPC320(unittest.TestCase):
         self._instr.home_channel(3)
 
         # Assert
-        self._transport_mock.write.assert_called_once_with(
-            bytearray(b"\x43\x04\x04\x00\x50\x01")
-        )
+        self._transport_mock.write.assert_called_once_with(bytearray(b"\x43\x04\x04\x00\x50\x01"))
 
     def test_is_channel_1_homed_when_channel_homed_sends_command_returns_status(self):
         """Test is_channel_homed for channel 1 when channel is homed, send command and return homed value."""
@@ -234,6 +210,56 @@ class TestThorlabsMPC320(unittest.TestCase):
                 unittest.mock.call(nbytes=6, timeout=1.0),
             ]
         )
+
+    def test_move_absolute_sends_move_command(self):
+        """Test move channel 1, sends move command."""
+        # Arrange
+        expected_position = 10
+
+        # Act
+        self._instr.move_absolute(1, expected_position)
+
+        # Assert
+        self._transport_mock.write.assert_called_once_with(
+            bytearray(b"\x53\x04\x06\x00\xd0\x01\x01\x00\x51\x00\x00\x00")
+        )
+
+    def test_is_channel_1_move_completed_when_channel_move_completed_sends_command_returns_status(self):
+        """Test is_move_completed for channel 1 when channel is moved, send command and return move completed value."""
+        # Arrange
+        # first 2 binary strings are responses from the status update command
+        # last string is the homed response
+        self._transport_mock.read.side_effect = [
+            b"\x91\x04\x0e\x00\x00\x81",
+            b"\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            b"\x64\x04\x01\x00\x00\x81",
+        ]
+
+        # Act
+        state = self._instr.is_move_completed(1)
+
+        # Assert
+        self.assertTrue(state)
+        self._transport_mock.write.assert_not_called()
+        self._transport_mock.read.assert_has_calls(
+            [
+                unittest.mock.call(nbytes=6, timeout=1.0),
+                unittest.mock.call(nbytes=14, timeout=1.0),
+                unittest.mock.call(nbytes=6, timeout=1.0),
+            ]
+        )
+
+    # def test_save_parameter_settings_for_given_command_sends_command(self):
+    #     """Test save_parameter_settings for channel 1 for a specific command, send command."""
+    #     # Arrange
+
+    #     # Act
+    #     self._instr.save_parameter_settings(1, 0000)
+
+    #     # Assert
+    #     self._transport_mock.write.assert_called_once_with(
+    #         bytearray(b"\x53\x04\x06\x00\xd0\x01\x01\x00\x51\x00\x00\x00")
+    #     )
 
 
 if __name__ == "__main__":
