@@ -90,7 +90,7 @@ class KeyboardReader:
     """A class that implements non-blocking read of single lines from the keyboard."""
 
     def __init__(self) -> None:
-        self._poll_keyboard = _PollKeyboard()  # Instantiate platform-dependant keyboard line poller.
+        self._poll_keyboard = _PollKeyboard()  # Instantiate platform-dependent keyboard line poller.
 
     def poll_line(self) -> str:
         """Read a line from the keyboard without blocking.

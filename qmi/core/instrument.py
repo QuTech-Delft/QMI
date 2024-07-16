@@ -98,7 +98,7 @@ class QMI_Instrument(QMI_RpcObject):
         via calls to instrument-specific methods.
 
         Subclasses can extend this method to implement instrument-specific
-        initialization. If they do, they should call ``super().open()`` as a last statement, and return its value.
+        initialization. If they do, they should call ``super().open()`` as a last statement.
         """
         self._check_is_closed()
         self._is_open = True

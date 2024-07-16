@@ -78,9 +78,9 @@ setup(
             "wheel",
             "twine",
             # For static code checks
-            "astroid==2.12.2",
+            "astroid",
             "coverage",
-            "pylint",
+            "pylint>=3.0",
             "mypy",
         ],
         "rtd": [

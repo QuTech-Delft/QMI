@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath('../../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'QMI'
-copyright = '2019-2023, QuTech — Delft, The Netherlands'
+copyright = '2019-2024, QuTech — Delft, The Netherlands'
 author = 'QuTech'
 
 # The full version, including alpha/beta/rc tags
