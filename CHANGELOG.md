@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+### Added
+- QMI driver for TeraXion TFN in `qmi.instruments.teraxion` with CLI client.
+- QMI driver for Thorlabs MPC320 in `qmi.instruments.thorlabs`.
+
+### Changed
+- In `setup.py` limited NumPy and SciPy versions to be <2. Also added missing line for Tenma 72 PSU CLI.
+- Refactored Newport `single_axis_motion_controller.py` to use context manager to enter and exit a configuration state.
+
+### Fixed
+- mypy errors not failing pipeline
+- In `instruments.picoquant.support._decoders` made the lexical sorting (`numpy.lexsort`) to temporarily retype the data to signed integer, as from Numpy 2.0 the integers are not allowed anymore to overflow.
+- The same fix is applied also in unit-tests.
+
+### Removed
+- Radon workflows as radon is no longer actively maintained. Pylint has taken over as the complexity checker.
+
 ## [0.44.0] - 2024-01-25
 
 ### Added

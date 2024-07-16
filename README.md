@@ -1,8 +1,6 @@
 ![pylint](.github/badges/pylint.svg)
 ![mypy](.github/badges/mypy.svg)
 [![Documentation Status](https://readthedocs.org/projects/qmi/badge/?version=latest)](https://qmi.readthedocs.io/en/latest/?badge=latest)
-![radon-cc](.github/badges/radon-cc.svg)
-![radon-mi](.github/badges/radon-mi.svg)
 ![coverage](.github/badges/coverage.svg)
 ![tests](.github/badges/tests.svg)
 
