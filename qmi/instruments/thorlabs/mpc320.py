@@ -333,7 +333,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
     @rpc_method
     def move_absolute(self, channel_number: int, position: float) -> None:
         """
-        Move a channel to the specified position. The specified position is in degeres. A conversion is done to convert
+        Move a channel to the specified position. The specified position is in degrees. A conversion is done to convert
         this into encoder counts. This means that there may be a slight mismatch in the specified position and the
         actual position. You may use the get_status_update method to get the actual position.
         After running this command, you must clear the buffer by checking if the channel
