@@ -110,7 +110,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
             pos:    Position to validate in degrees.
 
         Raises:
-            an instance of QMI_InstrumentException if the position is invalid.
+            QMI_InstrumentException: If the position is invalid.
         """
         if not self.MIN_POSITION_DEGREES <= pos <= self.MAX_POSITION_DEGREES:
             raise QMI_InstrumentException(
@@ -127,7 +127,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
             vel:    Velocity to validate in percentage.
 
         Raises:
-            an instance of QMI_InstrumentException if the velocity is invalid.
+            QMI_InstrumentException: if the velocity is invalid.
         """
         if not self.MIN_VELOCITY_PERC <= vel <= self.MAX_VELOCITY_PERC:
             raise QMI_InstrumentException(
@@ -143,10 +143,10 @@ class Thorlabs_Mpc320(QMI_Instrument):
             channel_number: Channel number to validate.
 
         Raises:
-            an instance of QMI_InstrumentException if the channel is not 1, 2 or 3
+            QMI_InstrumentException: if the channel is not 1, 2 or 3
         """
 
-        if channel_number not in [1, 2, 3]:
+        if channel_number not in range(self.MIN_CHANNEL_NUMBER, self.MAX_CHANNEL_NUMBER + 1):
             raise QMI_InstrumentException(
                 f"Given channel {channel_number} is not in the valid range \
                     [{self.MIN_CHANNEL_NUMBER}, {self.MAX_CHANNEL_NUMBER}]"
@@ -207,7 +207,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self.enable_channel([1,2])
 
         Parameters:
-            channel_number: The channnels(s) to enable.
+            channel_number: The channel(s) to enable.
         """
         _logger.info("[%s] Enabling channel(s) %s", self._name, str(channel_numbers))
         self._check_is_open()

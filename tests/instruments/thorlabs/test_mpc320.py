@@ -9,19 +9,23 @@ from qmi.instruments.thorlabs.apt_protocol import (
     AptChannelJogDirection,
     AptChannelState,
 )
+from tests.patcher import PatcherQmiContext
 
 
 class TestThorlabsMPC320(unittest.TestCase):
     def setUp(self):
         # Patch QMI context and make instrument
         self._ctx_qmi_id = f"test-tasks-{random.randint(0, 100)}"
-        qmi.start(self._ctx_qmi_id)
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start(self._ctx_qmi_id)
         self._transport_mock = unittest.mock.MagicMock(spec=QMI_SerialTransport)
         with unittest.mock.patch(
             "qmi.instruments.thorlabs.mpc320.create_transport",
             return_value=self._transport_mock,
         ):
-            self._instr: Thorlabs_Mpc320 = qmi.make_instrument("test_mpc320", Thorlabs_Mpc320, "serial:transport_str")
+            self._instr: Thorlabs_Mpc320 = self.qmi_patcher.make_instrument(
+                "test_mpc320", Thorlabs_Mpc320, "serial:transport_str"
+            )
         self._instr.open()
 
     def tearDown(self):
