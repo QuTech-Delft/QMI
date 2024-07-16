@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - QMI driver for TeraXion TFN in `qmi.instruments.teraxion` with CLI client.
+- QMI driver for Thorlabs MPC320 in `qmi.instruments.thorlabs`.
 
 ### Changed
 - In `setup.py` limited NumPy and SciPy versions to be <2. Also added missing line for Tenma 72 PSU CLI.
