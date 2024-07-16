@@ -1,7 +1,7 @@
 """
 Rohde & Schwarz, analog and vector signal generators.
 
-The qmi.instruments.picoquant package provides support for:
+The qmi.instruments.rohde_schwarz package provides support for:
 - SGS100A model
 - SMBV100A model.
 """

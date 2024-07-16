@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for functions that work the same for both protocols. Some modifications, especially for `read` functions, were required for doing this.
   Other functions were implemented separately.
 - QMI drivers for Tenma 72-series power supply units in `qmi.instruments.tenma`
+- Device driver (via network) for HighFinesse Wavemeters WS-5 up to WS-8.
 
 ### Changed
 - Refactored some unit-tests to use a QMI_Context patcher rather than the real thing, and adjusted the CI pipeline files and package requirements.
