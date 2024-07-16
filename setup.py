@@ -80,7 +80,7 @@ setup(
             # For static code checks
             "astroid==2.12.2",
             "coverage",
-            "pylint",
+            "pylint==3.2.5",
             "mypy",
         ],
         "rtd": [
