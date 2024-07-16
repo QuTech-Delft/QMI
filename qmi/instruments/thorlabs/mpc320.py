@@ -309,8 +309,8 @@ class Thorlabs_Mpc320(QMI_Instrument):
 
         Paramters:
             channel_number: The channel to check.
-            timeout:        The time to wait for a response to the homing command. This is optional
-                            and is set to a default value of DEFAULT_RESPONSE_TIMEOUT.
+            timeout:        The time to wait for a response to the homing command
+                            with default value DEFAULT_RESPONSE_TIMEOUT.
 
         Returns:
             True if the channel was homed.
