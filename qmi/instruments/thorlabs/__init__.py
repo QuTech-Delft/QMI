@@ -6,6 +6,7 @@ The qmi.instruments.thorlabs package provides support for:
 - MFF10X filter flip mounts
 - PM100D power meter
 - TSP01, TSP01B environmental sensors.
+- MPC320 Polarisation Controller.
 """
 
 from qmi.instruments.thorlabs.pm100d import SensorInfo
