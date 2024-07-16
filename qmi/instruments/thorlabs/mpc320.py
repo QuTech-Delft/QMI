@@ -390,8 +390,6 @@ class Thorlabs_Mpc320(QMI_Instrument):
             _logger.debug("[%s] Channel %d move not completed yet", self._name, channel_number)
         return False
 
-        return resp.chan_ident == Thorlabs_Mpc320_ChannelMap[channel_number]
-
     @rpc_method
     def save_parameter_settings(self, channel_number: int, message_id: int) -> None:
         """
@@ -400,7 +398,8 @@ class Thorlabs_Mpc320(QMI_Instrument):
 
         Parameters:
             channel_number: The channel to address.
-            message_id:     ID of message whose parameters need to be saved. Must be provided as a hex number e.g. 0x04B6
+            message_id:     ID of message whose parameters need to be saved.
+                            Must be provided as a hex number e.g. 0x04B6
         """
         _logger.info("[%s] Saving parameters of message %d", self._name, message_id)
         self._check_is_open()
