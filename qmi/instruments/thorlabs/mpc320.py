@@ -449,8 +449,8 @@ class Thorlabs_Mpc320(QMI_Instrument):
         Move a channel specified by its jog step.
 
         Parameters:
-            channel_number: The channel to job.
-            direction:      The direction to job. This can either be forward or backward. Default is forward.
+            channel_number: The channel to jog.
+            direction:      The direction to jog. This can either be forward or backward. Default is forward.
         """
         _logger.info("[%s] Getting position counter of channel %d", self._name, channel_number)
         self._check_is_open()
