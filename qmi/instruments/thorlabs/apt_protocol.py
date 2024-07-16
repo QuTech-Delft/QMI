@@ -180,22 +180,22 @@ class AptProtocol:
     def write_param_command(
         self,
         message_id: int,
-        param1: Optional[int] = None,
-        param2: Optional[int] = None,
+        param1: int = 0x00,
+        param2: int = 0x00,
     ) -> None:
         """
         Send an APT protocol command that is a header (i.e. 6 bytes) with params.
 
         Parameters:
             message_id: ID of message to send.
-            param1:     Optional parameter 1 to be sent.
-            param2:     Optional parameter 2 to be sent.
+            param1:     Parameter 1 to be sent with default value of 0x00.
+            param2:     Parameter 2 to be sent with default value of 0x00.
         """
         # Make the command.
         msg = AptMessageHeaderWithParams(
             message_id,
-            param1 or 0x00,
-            param2 or 0x00,
+            param1,
+            param2,
             self._apt_device_address,
             self._host_address,
         )
