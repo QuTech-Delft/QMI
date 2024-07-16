@@ -169,7 +169,7 @@ class MOT_SET_EEPROMPARAMS(AptMessage):
 
 class POL_GET_SET_PARAMS(AptMessage):
     """ "
-    Data packet structure for POL_SET_PARAMS command. It is also the data packet structure for the POL_SET_PARAMS.
+    Data packet structure for POL_SET_PARAMS command. It is also the data packet structure for the POL_GET_PARAMS.
 
     Fields:
         not_used:       This field is not used, but needs to be in the field structure to not break it.
