@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+
+## [0.45.0] - 2024-07-19
+
 ### Added
 - QMI driver for TeraXion TFN in `qmi.instruments.teraxion` with CLI client.
 - QMI driver for Thorlabs MPC320 in `qmi.instruments.thorlabs`.
