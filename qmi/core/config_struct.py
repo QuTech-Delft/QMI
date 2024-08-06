@@ -68,15 +68,14 @@ def configstruct(cls: Type[_T]) -> Type[_T]:
                 setattr(self, f.name, f.default_factory())
             elif f.init:
                 # No value specified and no default.
-                raise TypeError("{}.__init__() missing required argument {!r}"
-                                .format(cls.__name__, f.name))
+                raise TypeError(f"{cls.__name__}.__init__() missing required argument {f.name!r}")
 
         # Check for unexpected keyword parameters.
         if kwargs:
             for arg_name in kwargs:
                 raise TypeError(
-                    "{}.__init__() got an unexpected keyword argument {!r}"
-                    .format(cls.__name__, arg_name))
+                    f"{cls.__name__}.__init__() got an unexpected keyword argument {arg_name!r}"
+                )
 
     # Invoke dataclass decorator.
     cls = dataclasses.dataclass(init=False)(cls)
@@ -122,7 +121,7 @@ def _inner_config_struct_to_dict(cfg: Any) -> Any:
     elif (cfg is None) or isinstance(cfg, (int, float, bool, str)):
         return cfg
     else:
-        raise TypeError("Unsupported value type: {!r}".format(cfg))
+        raise TypeError(f"Unsupported value type: {cfg!r}")
 
 
 def _dictify_list_value(cfg_list: Union[list, tuple]) -> list:
@@ -135,7 +134,7 @@ def _dictify_dict_value(cfg_dict: dict) -> dict:
     ret: collections.OrderedDict = collections.OrderedDict()
     for (key, value) in cfg_dict.items():
         if not isinstance(key, str):
-            raise TypeError("Unsupported non-string dictionary key: {!r}".format(key))
+            raise TypeError(f"Unsupported non-string dictionary key: {key!r}")
         ret[key] = _inner_config_struct_to_dict(value)
     return ret
 
@@ -157,7 +156,7 @@ def _parse_config_value(val: Any, field_type: Any, path: List[str]) -> Any:
     optional = False
     if repr(field_type).startswith("typing.Union[") or repr(field_type).startswith("typing.Optional["):
         for t in field_type.__args__:
-            if t == type(None):
+            if t == type(None):  # This is intentional! Do not change to 't is None' as it will fail
                 optional = True
             else:
                 field_type = t
@@ -186,11 +185,11 @@ def _parse_config_value(val: Any, field_type: Any, path: List[str]) -> Any:
     elif field_type == Dict:
         field_type = dict
 
-    # Recognize untyped "list" and "dict" values.
-    if (field_type in (list, dict)) and isinstance(val, field_type):
+    # Recognize untyped "list", "tuple" and "dict" values.
+    if (field_type in (list, tuple, dict)) and isinstance(val, field_type):
         return val
 
-    # Recognize untyped "tuple" values.
+    # Recognize untyped "tuple" values that are actually list instances.
     if (field_type is tuple) and isinstance(val, list):
         return tuple(val)
 
@@ -234,25 +233,26 @@ def _parse_config_value(val: Any, field_type: Any, path: List[str]) -> Any:
     if dataclasses.is_dataclass(field_type):
         if isinstance(val, dict):
             return _parse_config_struct(val, field_type, path)
-        elif dataclasses.is_dataclass(val):
+        elif dataclasses.is_dataclass(val) and not isinstance(val, type):
             return _parse_config_struct(dataclasses.asdict(val), field_type, path)
 
     pathstr = ".".join(path)
-    raise QMI_ConfigurationException("Type mismatch in configuration item {}: got {} while expecting {}"
-                                     .format(pathstr, type(val), field_type))
+    raise QMI_ConfigurationException(
+        f"Type mismatch in configuration item {pathstr}: got {type(val)} while expecting {field_type}"
+    )
 
 
 def _parse_config_dict(val: dict, field_type: Any, path: List[str]) -> _StrDict:
     """Parse Config Dict"""
 
     (_, elem_type) = field_type.__args__
-    ret = collections.OrderedDict() # type: _StrDict
+    ret = collections.OrderedDict()  # type: _StrDict
     for (k, elem) in val.items():
         if not isinstance(k, str):
             pathstr = ".".join(path)
             raise QMI_ConfigurationException(
-                "Unsupported non-string dictionary key {!r} in configuration item {}"
-                .format(k, pathstr))
+                f"Unsupported non-string dictionary key {k!r} in configuration item {pathstr}"
+            )
         path.append("[{!r}]".format(k))
         ret[k] = _parse_config_value(elem, elem_type, path)
         path.pop()
@@ -262,7 +262,7 @@ def _parse_config_dict(val: dict, field_type: Any, path: List[str]) -> _StrDict:
 def _parse_config_struct(data: Any, cls: Any, path: List[str]) -> Any:
     """Convert dictionary to dataclass instance."""
 
-    items = collections.OrderedDict() # type: _StrDict
+    items = collections.OrderedDict()  # type: _StrDict
 
     # Walk the list of field definitions.
     for f in dataclasses.fields(cls):
@@ -271,19 +271,19 @@ def _parse_config_struct(data: Any, cls: Any, path: List[str]) -> Any:
             path.append(f.name)
             items[f.name] = _parse_config_value(data[f.name], f.type, path)
             path.pop()
-        elif f.init and (f.default is dataclasses.MISSING) \
-                    and (f.default_factory is dataclasses.MISSING): # type: ignore
+        elif f.init and (f.default is dataclasses.MISSING)\
+                and (f.default_factory is dataclasses.MISSING):  # type: ignore
             # Value not specified and no default.
             path.append(f.name)
             pathstr = ".".join(path)
-            raise QMI_ConfigurationException("Missing value for required configuration item {}".format(pathstr))
+            raise QMI_ConfigurationException(f"Missing value for required configuration item {pathstr}")
 
     # Check for left-over fields.
     for k in data.keys():
         if k not in items:
             path.append(k)
             pathstr = ".".join(path)
-            raise QMI_ConfigurationException("Unknown configuration item {}".format(pathstr))
+            raise QMI_ConfigurationException(f"Unknown configuration item {pathstr}")
 
     # Construct dataclass instance.
     return cls(**items)
@@ -298,13 +298,13 @@ def _check_config_struct_type(cls: Any, path: List[str]) -> None:
     if repr(cls).startswith("typing.Union[") or repr(cls).startswith("typing.Optional["):
         nsub = 0
         for t in cls.__args__:
-            if t == type(None):
+            if t == type(None):  # This is intentional! Do not change to 't is None' as it will fail
                 pass
             elif nsub == 0:
                 cls = t
                 nsub += 1
             else:
-                raise QMI_ConfigurationException("Unsupported Union type in configuration field {}".format(pathstr))
+                raise QMI_ConfigurationException(f"Unsupported Union type in configuration field {pathstr}")
 
     # Recognize scalar types.
     if cls in (int, float, str, bool):
@@ -346,8 +346,9 @@ def _check_config_struct_type(cls: Any, path: List[str]) -> None:
     if type_repr.startswith("typing.Dict["):
         (key_type, elem_type) = cls.__args__
         if key_type is not str:
-            raise QMI_ConfigurationException("Unsupported non-string-key dictionary type in configuration field {}"
-                                             .format(pathstr))
+            raise QMI_ConfigurationException(
+                f"Unsupported non-string-key dictionary type in configuration field {pathstr}"
+            )
         path.append("[]")
         _check_config_struct_type(elem_type, path)
         path.pop()
@@ -364,7 +365,7 @@ def _check_config_struct_type(cls: Any, path: List[str]) -> None:
         return  # accept
 
     # Reject.
-    raise QMI_ConfigurationException("Unsupported data type in configuration field {}".format(pathstr))
+    raise QMI_ConfigurationException(f"Unsupported data type in configuration field {pathstr}")
 
 
 def config_struct_from_dict(data: _StrDict, cls: Type[_T]) -> _T:
