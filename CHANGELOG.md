@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+### Fixed
+- mypy error on `config_struct.py` by adding extra logic check `and not isinstance(val, type)` on L236.
+- Also made in `config_struct.py` in L186 also tuples to be recognized as "untyped values".
 
 ## [0.45.0] - 2024-07-19
 
