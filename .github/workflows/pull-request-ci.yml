@@ -33,7 +33,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           ref: ${{ github.head_ref }}
-          repo-token: ${{ secrets.envPAT }}
+          # repo-token: ${{ secrets.envPAT }}
 
       - name: Generate and push badges
         if: ${{ matrix.python-version == '3.10' }}

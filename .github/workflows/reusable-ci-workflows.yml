@@ -9,9 +9,9 @@ on:
       ref:
         required: false
         type: string
-    secrets:
-      envPAT:
-        required: true
+#    secrets:
+#      envPAT:
+#        required: true
 
 jobs:
   ci-checks:
