@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Python-latest
         uses: actions/setup-python@v4
         with:
@@ -49,7 +49,7 @@ jobs:
           exit $( echo "$PYLINT_SCORE < $PYLINT_MIN_SCORE" | bc )
       - name: upload pylint test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: pylint-results
           path: pylint.log
@@ -62,7 +62,7 @@ jobs:
           if [[ "$RESULT" = *"pass"* ]]; then exit 0; else exit 1; fi
       - name: upload mypy test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mypy-results
           path: mypy.log
@@ -76,7 +76,7 @@ jobs:
           exit $( echo "$COVERAGE_PERC < $COVERAGE_MIN_PERC" | bc )
       - name: upload coverage results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-results
           path: coverage.log
