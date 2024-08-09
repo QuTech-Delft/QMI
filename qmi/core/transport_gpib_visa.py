@@ -47,7 +47,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
             board: Optional[int] = None,
             secondary_addr: Optional[int] = None,
             connect_timeout: float = 30.0
-    ):
+    ) -> None:
         """Initialization of the Gpib transport.
 
         Parameters:

@@ -221,6 +221,12 @@ class TestQmiTransportFactory(unittest.TestCase):
         mock.assert_called_once_with(host="2620:0:2d0:200::8", port=5000)
 
     @unittest.mock.patch("qmi.core.transport.QMI_TcpTransport")
+    def test_parse_tcp_ipv6_range(self, mock):
+        trans = create_transport("tcp:[ 2001:db8:1234::/48]:5000")
+        self.assertIs(trans, mock.return_value)
+        mock.assert_called_once_with(host=" 2001:db8:1234::/48", port=5000)
+
+    @unittest.mock.patch("qmi.core.transport.QMI_TcpTransport")
     def test_parse_tcp_attrs(self, mock):
         trans = create_transport("tcp:localhost:1234:connect_timeout=1")
         self.assertIs(trans, mock.return_value)
