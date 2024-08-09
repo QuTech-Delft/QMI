@@ -9,9 +9,13 @@ on:
       ref:
         required: false
         type: string
-#    secrets:
-#      envPAT:
-#        required: true
+
+env:
+  PYLINT_MIN_SCORE: "9.00"
+  COVERAGE_MIN_PERC: "90"
+  COMPLEXITY_MAX_SCORE: "30"
+  SOURCE_DIRS: "qmi/"
+  BADGES_DIR: ".github/badges"
 
 jobs:
   ci-checks:
