@@ -9,7 +9,9 @@ on:
       ref:
         required: false
         type: string
-    secrets: inherit
+    secrets:
+      envPAT:
+        required: true
 
 jobs:
   ci-checks:

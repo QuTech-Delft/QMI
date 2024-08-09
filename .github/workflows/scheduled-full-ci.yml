@@ -24,6 +24,7 @@ jobs:
         uses: ./.github/workflows/reusable-ci-workflows.yml
         with:
           python-version: ${{ matrix.python-version }}
+          repo-token: ${{ secrets.envPAT }}
 
       - name: Run unit tests and generate report
         if: always()
