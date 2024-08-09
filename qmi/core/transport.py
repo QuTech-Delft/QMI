@@ -1,11 +1,14 @@
 """Implementation of the QMI_Transport class."""
 
-from collections.abc import Mapping
 import logging
 import re
 import socket
 import sys
 import time
+if sys.version_info >= (3, 9):
+    from collections.abc import Mapping
+else:
+    from typing import Mapping
 from typing import Any, Dict, Optional, List, Tuple, Type
 
 import serial
