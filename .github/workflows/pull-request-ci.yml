@@ -14,10 +14,9 @@ on:
 
 jobs:
   build:
-    - name: Check out the repository
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.head_ref }}
+    uses: actions/checkout@v4
+    with:
+      ref: ${{ github.head_ref }}
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 3
