@@ -19,12 +19,12 @@ jobs:
       max-parallel: 3
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
+    - name: Check out the repository
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.head_ref }}
 
     steps:
-      - name: Check out the repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
       - name: Use reusable workflow
         uses: ./.github/workflows/reusable-ci-workflows.yml
         with:
