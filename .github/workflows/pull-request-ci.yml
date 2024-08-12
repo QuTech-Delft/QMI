@@ -21,6 +21,8 @@ jobs:
         python-version: ["3.8", "3.9", "3.10"]
 
     steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
       - name: Use reusable workflow
         uses: ./.github/workflows/reusable-ci-workflows.yml
         with:
