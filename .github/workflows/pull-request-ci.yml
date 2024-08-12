@@ -19,10 +19,10 @@ jobs:
       max-parallel: 3
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
-    uses: ./.github/workflows/reusable-ci-workflows.yml
-    with:
-      python-version: ${{ matrix.python-version }}
-      ref: ${{ github.head_ref }}
+      uses: ./.github/workflows/reusable-ci-workflows.yml
+      with:
+        python-version: ${{ matrix.python-version }}
+        ref: ${{ github.head_ref }}
 
     additional-steps:
       runs-on: ubuntu-latest
