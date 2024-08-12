@@ -23,6 +23,7 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
+        with:
           ref: ${{ github.head_ref }}
       - name: Use reusable workflow
         uses: ./.github/workflows/reusable-ci-workflows.yml
