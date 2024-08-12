@@ -48,8 +48,8 @@ jobs:
       - name: Upload pylint results
         uses: actions/upload-artifact@v4
         with:
-          name: pylint-results
-          path: pylint.log
+          name: pylint-results-${{ matrix.python-version }}
+          path: pylint-${{ matrix.python-version }}.log
 
       - name: Run mypy
         run: |
@@ -60,8 +60,8 @@ jobs:
       - name: Upload mypy results
         uses: actions/upload-artifact@v4
         with:
-          name: mypy-results
-          path: mypy.log
+          name: mypy-results-${{ matrix.python-version }}
+          path: mypy-${{ matrix.python-version }}.log
 
       - name: Run coverage
         run: |
@@ -73,5 +73,5 @@ jobs:
       - name: Upload coverage results
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-results
-          path: coverage.log
+          name: coverage-results-${{ matrix.python-version }}
+          path: coverage-${{ matrix.python-version }}.log
