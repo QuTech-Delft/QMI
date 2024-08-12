@@ -291,7 +291,7 @@ class TransportDescriptorParser:
             if k in self._keywords.keys():
                 try:
                     ty = self._keywords[k][0]
-                    if ty == int and v.startswith('0x'):
+                    if ty is int and v.startswith('0x'):
                         parameters[k] = int(v, 16)
                     else:
                         parameters[k] = ty(v)
