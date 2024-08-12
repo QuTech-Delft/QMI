@@ -6,9 +6,9 @@ import socket
 import sys
 import time
 if sys.version_info >= (3, 9):
-    from collections.abc import Mapping
+    from collections.abc import MutableMapping
 else:
-    from typing import Mapping
+    from typing import MutableMapping
 from typing import Any, Dict, Optional, List, Tuple, Type
 
 import serial
@@ -188,7 +188,7 @@ class TransportDescriptorParser:
     def __init__(self,
                  interface: str,
                  positionals: List[Tuple[str, Tuple[Type, bool]]],
-                 keywords: Mapping[str, Tuple[Type, bool]]
+                 keywords: MutableMapping[str, Tuple[Type, bool]]
     ) -> None:
         self.interface = interface
         self._positionals = positionals
@@ -196,7 +196,7 @@ class TransportDescriptorParser:
 
     def parse_parameter_strings(
             self, transport_descriptor: str, default_parameters: Optional[Dict[str, Any]] = None
-    ) -> Mapping[str, Any]:
+    ) -> MutableMapping[str, Any]:
         """Method for parsing transport descriptor strings.
 
         Parameters:
