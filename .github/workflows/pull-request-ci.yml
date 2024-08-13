@@ -12,6 +12,9 @@ on:
       - CONTRIBUTING.md
       - TESTING.md
 
+env:
+  BADGES_DIR: ".github/badges"
+
 jobs:
   build:
     strategy:
