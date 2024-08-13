@@ -196,15 +196,15 @@ class TransportDescriptorParser:
 
     def parse_parameter_strings(
             self, transport_descriptor: str, default_parameters: Optional[Dict[str, Any]] = None
-    ) -> MutableMapping[str, Any]:
+    ) -> Dict[str, Any]:
         """Method for parsing transport descriptor strings.
 
         Parameters:
             transport_descriptor: The string to parse.
-            default_parameters: Dictionary of default parameters to be used if not present in the string.
+            default_parameters:   Dictionary of default parameters to be used if not present in the string.
 
         Returns:
-            parameters: A generic [KT, VT] type mapped object.
+            parameters:           A dictionary object of the parsed parameters.
         """
         if default_parameters is None:
             parameters = {}
