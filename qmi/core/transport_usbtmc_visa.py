@@ -24,7 +24,7 @@ import pyvisa.errors
 
 class QMI_VisaUsbTmcTransport(QMI_UsbTmcTransport):
 
-    def __init__(self, vendorid: int, productid: int, serialnr: str):
+    def __init__(self, vendorid: int, productid: int, serialnr: str) -> None:
         super().__init__(vendorid, productid, serialnr)
         self._device: Optional[pyvisa.ResourceManager] = None
 
