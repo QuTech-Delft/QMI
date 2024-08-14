@@ -6,9 +6,9 @@ import socket
 import sys
 import time
 if sys.version_info >= (3, 9):
-    from collections.abc import MutableMapping
+    from collections.abc import Mapping
 else:
-    from typing import MutableMapping
+    from typing import Mapping
 from typing import Any, Dict, Optional, List, Tuple, Type
 
 import serial
@@ -188,14 +188,14 @@ class TransportDescriptorParser:
     def __init__(self,
                  interface: str,
                  positionals: List[Tuple[str, Tuple[Type, bool]]],
-                 keywords: MutableMapping[str, Tuple[Type, bool]]
+                 keywords: Mapping[str, Tuple[Type, bool]]
     ) -> None:
         self.interface = interface
         self._positionals = positionals
         self._keywords = keywords
 
     def parse_parameter_strings(
-            self, transport_descriptor: str, default_parameters: Optional[MutableMapping[str, Any]] = None
+            self, transport_descriptor: str, default_parameters: Optional[Mapping[str, Any]] = None
     ) -> Dict[str, Any]:
         """Method for parsing transport descriptor strings.
 
@@ -209,7 +209,7 @@ class TransportDescriptorParser:
         if default_parameters is None:
             parameters = {}
         else:
-            parameters = default_parameters.copy()
+            parameters = dict(default_parameters)
 
         # Drop unexpected default parameters.
         # These may be intended for a different transport interface.
@@ -1291,7 +1291,7 @@ def list_usbtmc_transports() -> List[str]:
 
 def create_transport(
         transport_descriptor: str, default_attributes: Optional[Dict[str, Any]] = None
-    ) -> QMI_Transport:
+) -> QMI_Transport:
     """Create a bidirectional communication channel.
 
     A transport_descriptor specifies all information that may be needed to open a transport, including parameters
