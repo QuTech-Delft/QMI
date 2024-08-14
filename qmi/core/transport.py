@@ -195,7 +195,7 @@ class TransportDescriptorParser:
         self._keywords = keywords
 
     def parse_parameter_strings(
-            self, transport_descriptor: str, default_parameters: Optional[Dict[str, Any]] = None
+            self, transport_descriptor: str, default_parameters: Optional[MutableMapping[str, Any]] = None
     ) -> Dict[str, Any]:
         """Method for parsing transport descriptor strings.
 
