@@ -6,9 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+### Changed
+- The CI pipelines are now using reusable workflows, placed in reusable-ci-workflows.yml.
+- The file names for the different pipeline actions were also changed to be more descriptive.
+
 ### Fixed
 - mypy error on `config_struct.py` by adding extra logic check `and not isinstance(val, type)` on L236.
 - Also made in `config_struct.py` in L186 also tuples to be recognized as "untyped values".
+- workflow artifacts to be of @v4 instead of @v3 that are to be deprecated. For `setup-python` @v5 even.
 
 ## [0.45.0] - 2024-07-19
 
