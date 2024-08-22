@@ -262,7 +262,7 @@ class QMI_Task(Generic[_SET, _STS], metaclass=_TaskMetaClass):
         to this task, this method copies the new settings to `self.settings`
         and returns True.
 
-        Otherwise the settings remain the same and this method returns False.
+        Otherwise, the settings remain the same and this method returns False.
 
         Returns:
             True if there are new settings, False if the settings are unchanged.
@@ -601,6 +601,19 @@ class QMI_TaskRunner(QMI_RpcObject):
 
         assert state == _TaskThread.State.READY_TO_RUN
         assert self._thread.task is not None
+
+    @rpc_method
+    def __enter__(self):
+        """The `__enter__` methods is decorated as `rpc_method` so that `QMI_RpcProxy` can call it when using the
+        proxy with a `with` context manager. This method also calls to start the task thread."""
+        return self.start()
+
+    @rpc_method
+    def __exit__(self, *args, **kwargs):
+        """The `__exit__` methods is decorated as `rpc_method` so that `QMI_RpcProxy` can call it when using the
+        proxy with a `with` context manager. This method also calls to stop and join the task thread."""
+        self.stop()
+        self.join()
 
     def release_rpc_object(self) -> None:
         """Ensure the task is joined before it is removed from the context."""

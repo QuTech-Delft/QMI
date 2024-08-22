@@ -83,7 +83,7 @@ The normal proxy locking is available only within the same context for the same 
 Since QMI V0.29.1 it is also possible to lock and unlock with a custom token from
 other proxies as well, as long as the contexts for the other proxies have the same name.
 
-Example 1:
+Example 1::
         # Two proxies in same context.
         proxy1 = context.make_rpc_object("my_object", MyRpcTestClass)
         proxy2 = context.get_rpc_object_by_name("my_context.my_object")
@@ -94,7 +94,7 @@ Example 1:
         proxy2.unlock(lock_token=custom_token)
         proxy2.is_locked()  # Returns False
 
-Example 2:
+Example 2::
         # Three proxies in different contexts. The first one serves as an "object provider".
         c1 = QMI_Context("c1", config)
         c1.start()
@@ -557,7 +557,20 @@ def blocking_rpc_method_call(context: "qmi.core.context.QMI_Context",
 
 
 class QMI_RpcNonBlockingProxy:
-    """Proxy class for RPC objects that performs non-blocking calls."""
+    """Proxy class for RPC objects that performs non-blocking calls. Direct instantiation is not recommended.
+
+    This is always also instantiated in `QMI_RpcProxy` as `self.rpc_nonblocking` attribute. Typically, if user wants
+    to use a non-blocking call with an RPC object `rpc_proxy`, they would do:
+    ```python
+    future = rpc_proxy.rpc_nonblocking.some_rpc_command(args)
+    # Other stuff can be done here in the meanwhile, and the `proxy` is not blocked while waiting to return
+    retval = future.wait()
+    ```
+    Instead of the usual
+    ```python
+    retval = rpc_proxy.some_rpc_commands(args)
+    ```
+    """
 
     def __init__(self, context: "qmi.core.context.QMI_Context", descriptor: RpcObjectDescriptor) -> None:
 
@@ -602,7 +615,11 @@ class QMI_RpcNonBlockingProxy:
 
 
 class QMI_RpcProxy:
-    """Proxy class for RPC objects that performs blocking calls."""
+    """Proxy class for RPC objects that performs blocking calls. All RPC objects created return this proxy class to
+    enable RPC communication between objects.
+
+    Direct instantiation of this class is not meant to be done by users; internal use only!
+    """
 
     def __init__(self, context: "qmi.core.context.QMI_Context", descriptor: RpcObjectDescriptor) -> None:
 
@@ -658,6 +675,26 @@ class QMI_RpcProxy:
 
         # Add non-blocking proxy.
         self.rpc_nonblocking = QMI_RpcNonBlockingProxy(context, descriptor)
+
+    def __enter__(self) -> "QMI_RpcProxy":
+        """The context manager definition is needed for the proxy as it will always be returned from QMI contexts,
+        instead of the actual RPC object instance. Trying to use context management directly on this class will
+        cause recursion error, but for actual RPC objects not.
+
+        The with keyword checks if the `QMI_RpcProxy` class (not instance) implements the context manager protocol,
+        i.e. `__enter__` and `__exit__`, so they exist here as stubs. These stubs make an RPC to the actual `__enter__`
+        and `__exit__` methods on the relevant RPC object. If in those classes `__enter__` and `__exit__` are
+        decorated as `rpc_methods`, we do not see a recursion error.
+
+        `rpc_method` decorated `__enter__` and `__exit__` methods are currently implemented in `QMI_Instrument` and
+        `QMI_TaskRunner` classes.
+        """
+        self.__enter__()
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        self.__exit__()
+        return
 
     def __repr__(self) -> str:
         return "<rpc proxy for {} ({})>".format(self._rpc_object_address, self._rpc_class_fqn)
@@ -891,9 +928,13 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
     def __repr__(self) -> str:
         return "{}({!r})".format(type(self).__name__, self._name)
 
+    @rpc_method
+    def __enter__(self):
+        raise NotImplementedError(f"{type(self)} is not meant to be used with context manager.")
+
     def lock(self, timeout: float = 0.0, lock_token: Optional[str] = None) -> bool:
-        """Lock the remote object. If timeout is given, try every 0.1s within the given timeout value. The remote object
-        can be locked with an optional custom lock token by giving a string into `lock_token` keyword argument.
+        """Lock the remote object. If timeout is given, try every 0.1s within the given timeout value. The remote
+        object can be locked with an optional custom lock token by giving a string into `lock_token` keyword argument.
 
         If successful, this proxy is the only proxy that can invoke RPC methods on the remote object; other proxies
         will receive an "object is locked" response. The return value indicates if the lock was granted; a denied lock
@@ -1354,7 +1395,6 @@ class RpcObjectManager(QMI_MessageHandler):
 
         # This may raise an exception!
         rpc_object = self._rpc_thread.rpc_object()
-
         return QMI_RpcProxy(self._context, rpc_object.rpc_object_descriptor)
 
     def handle_message(self, message: QMI_Message) -> None:

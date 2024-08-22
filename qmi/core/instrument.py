@@ -47,7 +47,7 @@ class QMI_Instrument(QMI_RpcObject):
     (measurements, getting and setting of parameters).
 
     Driver should implement a method `reset()` when applicable.
-    This methods returns the instrument to its default settings.
+    This method returns the instrument to its default settings.
 
     Drivers should implement a method `get_idn()` when applicable.
     This method returns an instance of `QMI_InstrumentIdentification`.
@@ -65,6 +65,19 @@ class QMI_Instrument(QMI_RpcObject):
         """
         super().__init__(context, name)
         self._is_open = False
+
+    @rpc_method
+    def __enter__(self) -> "QMI_Instrument":
+        """The `__enter__` methods is decorated as `rpc_method` so that `QMI_RpcProxy` can call it when using the
+        proxy with a `with` context manager. This method also opens the instrument."""
+        self.open()
+        return self
+
+    @rpc_method
+    def __exit__(self, *args, **kwargs) -> None:
+        """The `__exit__` methods is decorated as `rpc_method` so that `QMI_RpcProxy` can call it when using the
+        proxy with a `with` context manager. This method also closes the instrument."""
+        self.close()
 
     def release_rpc_object(self) -> None:
         """Give a warning if the instrument is removed while still open."""
