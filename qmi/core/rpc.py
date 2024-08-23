@@ -684,7 +684,8 @@ class QMI_RpcProxy:
         The with keyword checks if the `QMI_RpcProxy` class (not instance) implements the context manager protocol,
         i.e. `__enter__` and `__exit__`, so they exist here as stubs. These stubs make an RPC to the actual `__enter__`
         and `__exit__` methods on the relevant RPC object. If in those classes `__enter__` and `__exit__` are
-        decorated as `rpc_methods`, we do not see a recursion error.
+        decorated as `rpc_methods`, we do not see a recursion error. See for further details in:
+        https://docs.python.org/3/reference/datamodel.html#special-method-lookup
 
         `rpc_method` decorated `__enter__` and `__exit__` methods are currently implemented in `QMI_Instrument` and
         `QMI_TaskRunner` classes.
