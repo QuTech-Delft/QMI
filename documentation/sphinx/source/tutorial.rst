@@ -183,7 +183,7 @@ However, if you find yourself in a situation in which the locking proxy was lost
 >>> nsg2.is_locked()
 False
 
-It is also possible to unlock from another context proxy by providing the context name as well. See the example below how to connect from another context to an instrument.
+It is also possible to unlock from another instrument proxy by providing the context name as well. See the example below, how to get from another context the instrument proxy.
 
 >>> import qmi
 >>> qmi.start("client")
@@ -355,7 +355,7 @@ To set up a simple measurement script, create a file ``measure_demo.py`` with th
     #!/usr/bin/env python3
 
     import qmi
-    from qmi.utils.context_managers import start_stop, open_close
+    from qmi.utils.context_managers import start_stop
     from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
 
     def measure_data(nsg):
@@ -368,8 +368,7 @@ To set up a simple measurement script, create a file ``measure_demo.py`` with th
 
     def main():
         with start_stop(qmi, "measure_demo"):
-            nsg = qmi.make_instrument("nsg", NoisySineGenerator)
-            with open_close(nsg):
+            with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
                 measure_data(nsg)
 
     if __name__ == "__main__":
@@ -383,21 +382,8 @@ Note that the script uses :py:class:`qmi.utils.context_managers.start_stop` to
 start and stop the QMI framework.
 This is just a convenient way to make sure that ``qmi.start()`` and ``qmi.stop()``
 will always be called.
-The following code based on the ``with`` statement::
-
-    with start_stop(qmi, "name"):
-        custom_code_here ...
-
-has the same effect as::
-
-    qmi.start("name")
-    custom_code_here ...
-    qmi.stop()
-
-with the difference that the ``with`` mechanism ensures that ``qmi.stop()``
-will be called even when an error occurs in the custom code.
-Similarly, the script uses :py:class:`qmi.utils.context_managers.open_close`
-to open and close to represent the calls to ``nsg.open()`` and ``nsg.close()``.
+Similarly, the `QMI_Instrument` objects are equipped with context managers that open and close the
+the instrument, calling ``nsg.open()`` and ``nsg.close()`` at the creation and destruction of the instance.
 
 .. note::
     Some users prefer to invoke scripts from an interactive Python session,
@@ -464,14 +450,13 @@ the task and continues to perform other activities::
 
     import time
     import qmi
-    from qmi.utils.context_managers import start_stop, open_close
+    from qmi.utils.context_managers import start_stop
     from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
     from demo_task import DemoTask
 
     def main():
         with start_stop(qmi, "task_demo"):
-            nsg = qmi.make_instrument("nsg", NoisySineGenerator)
-            with open_close(nsg):
+            with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
                 task = qmi.make_task("task", DemoTask)
                 task.start()
                 print("the task has been started")
@@ -585,11 +570,10 @@ Try making the following class::
                 raise qmi.core.exceptions.QMI_TaskRunException("No such attribute in task: 'amplitude_factor'")
 
 And give it as the ``task_runner`` input when making the task, it is possible to change the value from outside the task.
-We now also switch to use the ``start_stop_join`` context manager for tasks::
+We now also switch to use the internal context manager for tasks::
 
     ...
-                task = qmi.make_task("task", DemoTask, task_runner=CustomTaskRunner)
-                with start_stop_join(task):
+                with qmi.make_task("task", DemoTask, task_runner=CustomTaskRunner) as task:
                     print("the task has been started")
                     time.sleep(1)
                     task.set_amplitude_factor(1.0)
@@ -631,7 +615,7 @@ of the task in the script instead of inside the task. We now rewrite the script 
 
     import time
     import qmi
-    from qmi.utils.context_managers import start_stop, open_close
+    from qmi.utils.context_managers import start_stop
     from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
     from demo_task import DemoTask
 
@@ -644,10 +628,8 @@ of the task in the script instead of inside the task. We now rewrite the script 
 
     def main_2():
         with start_stop(qmi, "task_demo"):
-            nsg = qmi.make_instrument("nsg", NoisySineGenerator)
-            with open_close(nsg):
-                task = qmi.make_task("task", DemoRpcControlTask, task_runner=CustomRpcControlTaskRunner)
-                with start_stop_join(task):
+            with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
+                with qmi.make_task("task", DemoRpcControlTask, task_runner=CustomRpcControlTaskRunner) as task:
                     print("the task has been started")
                     for i in range(5):
                         sample = nsg.get_sample()
