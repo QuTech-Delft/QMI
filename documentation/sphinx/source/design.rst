@@ -244,6 +244,78 @@ could lead into unexpected hardware responses and/or other kinds of issues, and 
 Further, the proxies have the possibility of *locking* their objects to be controlled by a specific context only. The use of the ``lock()``,
 ``unlock()``, ``force_unlock()`` and ``is_locked()`` methods are illustrated in the Tutorial.
 
+**Context management**
+======================
+
+QMI offers a few context managers to facilitate better control of the QMI contexts, instruments, tasks and signals.
+
+QMI contexts can be started and stopped with a `start_stop` context manager, available in ``qmi.utils.context_managers`` module.
+The following code based on the ``with`` statement::
+
+    with start_stop(qmi, "name"):
+        custom_code_here ...
+
+has the same effect as::
+
+    qmi.start("name")
+    try:
+        custom_code_here ...
+    finally:
+        qmi.stop()
+
+both ensuring that ``qmi.stop()`` will be called even when an error occurs in the custom code.
+
+We can make instruments and tasks in the QMI context. For automatic opening and closing of an instrument driver instance
+based on `QMI_Instrument`, we can do::
+
+    with qmi.make_instrument("instrument_name", InstrumentClass, ...) as instr:
+        custom_code_here...
+
+which has the same effect as::
+
+    instr = qmi.make_instrument("instrument_name", InstrumentClass)
+    instr.open()
+    try:
+        custom_code_here...
+    finally:
+        instr.close()
+
+Alternatively, the `open_close` context manager,from ``qmi.utils.context_managers`` can be used, but this context manager
+will be obsoleted. That option requires making the instrument instance first and then giving it as an input to the context manager.
+
+For tasks we can use the context management protocol to automatically start the task thread when entering a task's `QMI_LoopTask` context,
+and stopping and joining to it at exit. Similar to the instrument, we can do::
+
+    with qmi.make_task("task_name", TaskClass, ...) as task:
+         task_code_here...
+
+And the task should be stopped and joined after the task is finished. In the ``qmi.utils.context_managers`` is also context manager
+`start_stop_join` to do this, but it will be obsoleted.
+
+Further context managers in ``qmi.utils.context_managers`` are `lock_unlock` and `subscribe_unsubscribe` context managers.
+The `lock_unlock` manager is meant for RPC objects that the user wants to lock while they are used by some script or task.
+Typical use::
+
+    some_instr = qmi.get_instrument(...)
+    with lock_unlock(some_instr):
+        priviledged_code_here...
+
+The `lock_unlock` context manager accepts also extra input arguments, so that `timeout` and `lock_token` arguments can
+also be given for the context manager.
+
+And the final `subscribe_unsubscribe` context manager is meant to be used with signals. For example, a task has signal
+named `sig_send_data` in the task's class. And we want to subscribe to it to receive data updates. If a task is f.ex.
+obtained from another context, and we want to receive in `data_receiver`::
+
+    signal_task = qmi.get_task(...)
+    data_receiver = QMI_SignalReceiver()
+    with subscribe_unsubscribe(signal_task.sig_send_data, data_receiver):
+        data = data_receiver.get_next_signal()
+
+If the task is 'running' and publishing data, the receiver should receive the data from it and then unsubscribe from
+the signal again. Forgetting to unsubscribe from the signal could possibly lead to memory issues if the receiver is
+still present, because then the published data could keep accumulating into the receiver queue.
+
 **Messaging**
 =============
 

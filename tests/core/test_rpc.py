@@ -3,20 +3,23 @@
 import logging
 import math
 import time
+from typing import NamedTuple
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock
 
 from qmi.core.config_defs import CfgQmi, CfgContext
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_MessageDeliveryException, QMI_UsageException, QMI_InvalidOperationException,\
-    QMI_DuplicateNameException
-from qmi.core.rpc import QMI_RpcObject, rpc_method, QMI_RpcTimeoutException, QMI_RpcFuture
-
+from qmi.core.exceptions import (
+    QMI_MessageDeliveryException, QMI_UsageException, QMI_InvalidOperationException, QMI_DuplicateNameException
+)
+from qmi.core.rpc import (
+    QMI_RpcObject, rpc_method, QMI_RpcTimeoutException, QMI_RpcFuture, QMI_RpcProxy, QMI_RpcNonBlockingProxy
+)
 from threading import Timer
 
 
 class MyRpcTestClass(QMI_RpcObject):
-
+    """An RPC test class"""
     _rpc_constants = ["CONSTANT_NUMBER"]
 
     CONSTANT_NUMBER = 42
@@ -44,7 +47,7 @@ class MyRpcTestClass(QMI_RpcObject):
 
 
 class MyRpcSubClass(MyRpcTestClass):
-
+    """An RPC sub class"""
     _rpc_constants = ["CONSTANT_STRING"]
 
     CONSTANT_STRING = "testing"
@@ -52,6 +55,67 @@ class MyRpcSubClass(MyRpcTestClass):
     @rpc_method
     def remote_log(self, x):
         return math.log(x)
+
+
+class ProxyInterface(NamedTuple):
+    """For testing proxy descriptor."""
+    rpc_class_module: str = "SomeClass"
+    rpc_class_name: str = "ClassyName"
+    rpc_class_docstring: str = """This is Some Classy docstring."""
+    constants: list = []
+    methods: list = []
+    signals: list = []
+
+
+class ProxyDescriptor(NamedTuple):
+    """For testing proxy descriptor."""
+    address: MagicMock = MagicMock()
+    category: MagicMock = MagicMock()
+    interface: ProxyInterface = ProxyInterface()
+
+
+class TestRpcProxy(unittest.TestCase):
+    """Test instantiating QMI_RpcProxy and QMI_RpcNonBlockingProxy classes."""
+
+    def test_create_instance(self):
+        """Test creating an instance of QMI_RpcProxy."""
+        # Arrange
+        proxy_interface = ProxyInterface()
+        expected_class_fqn = ".".join([proxy_interface.rpc_class_module, proxy_interface.rpc_class_name])
+        expected_docstring = proxy_interface.rpc_class_docstring
+        # Act
+        proxy = QMI_RpcProxy(QMI_Context("test_rpcproxy"), ProxyDescriptor())
+        # Assert
+        self.assertIsInstance(proxy, QMI_RpcProxy)
+        self.assertEqual(expected_class_fqn, proxy._rpc_class_fqn)
+        self.assertEqual(expected_docstring, proxy.__doc__)
+
+    def test_context_manager_excepts(self):
+        """Test creating an instance of QMI_RpcProxy with context manager excepts with RecursionError."""
+        # Act
+        with self.assertRaises(RecursionError):
+            with QMI_RpcProxy(QMI_Context("test_rpcproxy"), ProxyDescriptor()):
+                pass
+
+    def test_create_nonblocking_instance(self):
+        """Test creating an instance of QMI_RpcNonBlockingProxy."""
+        # Arrange
+        proxy_interface = ProxyInterface()
+        expected_class_fqn = ".".join([proxy_interface.rpc_class_module, proxy_interface.rpc_class_name])
+        expected_docstring = proxy_interface.rpc_class_docstring
+        # Act
+        proxy = QMI_RpcNonBlockingProxy(QMI_Context("test_rpcnonblockingproxy"), ProxyDescriptor())
+        # Assert
+        self.assertIsInstance(proxy, QMI_RpcNonBlockingProxy)
+        self.assertEqual(expected_class_fqn, proxy._rpc_class_fqn)
+        self.assertEqual(expected_docstring, proxy.__doc__)
+
+    def test_nonblocking_context_manager_excepts(self):
+        """Test creating an instance of QMI_RpcProxy with context manager excepts with TypeError."""
+        # Act
+        with self.assertRaises((AttributeError, TypeError)):  # TypeError as no __enter__ and __exit__ present
+            with QMI_RpcNonBlockingProxy(QMI_Context("test_rpcproxy"), ProxyDescriptor()):
+                pass
 
 
 class TestRPC(unittest.TestCase):
@@ -63,7 +127,6 @@ class TestRPC(unittest.TestCase):
         logging.getLogger("qmi.core.messaging").setLevel(logging.ERROR)
 
         # Start two contexts.
-
         config = CfgQmi(
             contexts={
                 "c1": CfgContext(tcp_server_port=0),
@@ -97,11 +160,10 @@ class TestRPC(unittest.TestCase):
         logging.getLogger("qmi.core.messaging").setLevel(logging.NOTSET)
 
     def test_blocking_rpc(self):
-
+        """Test for blocking RPC calls."""
         # Instantiate the class, as a thing to be serviced from context c1.
         # This gives us a proxy to the instance.
         proxy1 = self.c1.make_rpc_object("tc1", MyRpcTestClass)
-
         # Check nominal behavior.
         result = proxy1.remote_sqrt(256.0)
         self.assertEqual(result, 16.0)
@@ -116,6 +178,9 @@ class TestRPC(unittest.TestCase):
         # Check nominal behavior.
         result = proxy2.remote_sqrt(256.0)
         self.assertEqual(result, 16.0)
+        # Assert also that docstring gets passed to proxy.
+        self.assertEqual(MyRpcTestClass.__doc__, proxy1.__doc__)
+        self.assertEqual(proxy1.__doc__, proxy2.__doc__)
 
         # Check exception behavior.
         with self.assertRaises(ValueError):
@@ -163,6 +228,9 @@ class TestRPC(unittest.TestCase):
         assert isinstance(future, QMI_RpcFuture)
         result = future.wait()
         self.assertEqual(result, 16.0)
+        # Assert also that docstring gets passed to proxy.
+        self.assertEqual(MyRpcTestClass.__doc__, proxy1.__doc__)
+        self.assertEqual(proxy1.__doc__, proxy2.__doc__)
 
         # Check exception behavior.
         with self.assertRaises(ValueError):
@@ -255,6 +323,9 @@ class TestRPC(unittest.TestCase):
         # Make an RPC call to a method defined by the base class.
         result = proxy2.remote_sqrt(100.0)
         self.assertAlmostEqual(result, 10.0)
+        # Assert also that docstring gets passed to proxy.
+        self.assertEqual(MyRpcSubClass.__doc__, proxy1.__doc__)
+        self.assertEqual(proxy1.__doc__, proxy2.__doc__)
 
     def test_constants(self):
 
@@ -396,6 +467,12 @@ class TestRPC(unittest.TestCase):
         # Assert the addresses are as expected
         self.assertEqual(expected, address1)
         self.assertEqual(expected, address2)
+
+    def test_no_context_manager_allowed(self):
+        """Making an RPC object with context manager is not allowed."""
+        with self.assertRaises(NotImplementedError):
+            with self.c1.make_rpc_object("tc1", MyRpcSubClass):
+                pass
 
 
 class TestRpcMethodDecorator(unittest.TestCase):
