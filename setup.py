@@ -17,7 +17,7 @@ setup(
     name="qmi",
     version="0.46.0-beta.0",
     description="The Quantum Measurement Infrastructure framework",
-    long_description="{}\n{}".format(read("README.md"), read("CHANGELOG.md")),
+    long_description="{}\n".format(read('README.md')),
     long_description_content_type='text/markdown',
     author="QuTech",
     author_email="",
