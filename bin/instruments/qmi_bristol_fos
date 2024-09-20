@@ -1,0 +1,66 @@
+#! /usr/bin/env python3
+
+"""Command line client for the Bristol FOS Fiber-optic switch."""
+
+import argparse
+from contextlib import nullcontext, AbstractContextManager
+import sys
+
+import qmi
+from qmi.instruments.bristol import Bristol_Fos
+from qmi.utils.context_managers import start_stop
+
+
+def main() -> int:
+
+    parser = argparse.ArgumentParser()
+    parser.description = "Command line client for the Bristol FOS Fiber-optic switch."
+
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--rpc", help="QMI RPC address of device.")
+    source.add_argument("--unique_id", help="Unique ID of the device")
+
+    parser.add_argument("--board_id", type=int, help="Board number for the device. Windows only!")
+    parser.add_argument("--channel", type=int, help="Channel number to set")
+
+    args = parser.parse_args()
+
+    instr: Bristol_Fos
+    with start_stop(qmi, "bristol_fos_client", console_loglevel="WARNING"), parse_source(args) as instr:
+        if args.channel is None:
+            print(f"Bristol FOS with unique ID {args.unique_id} found. No channel selected.")
+
+        else:
+            print(f"Selecting channel {args.channel} for Bristol FOS with unique ID {args.unique_id}.")
+            instr.select_channel(args.channel)
+
+
+def parse_source(args) -> AbstractContextManager:
+    # make the instrument
+    if args.unique_id is not None and args.board_id is not None:
+        with qmi.make_instrument(
+                instrument_name="FOS",
+                instrument_class=Bristol_Fos,
+                unique_id=args.unique_id,
+                board_id=int(args.board_id)
+        ) as fos:
+            return fos
+
+    if args.unique_id is not None:
+        with qmi.make_instrument(
+                instrument_name="FOS",
+                instrument_class=Bristol_Fos,
+                unique_id=args.unique_id
+        ) as fos:
+            return fos
+
+    if args.rpc is not None:
+        # get the instrument
+        qmi.context().connect_to_peer(args.rpc.split('.')[0])
+        return nullcontext(qmi.get_instrument(args.rpc))
+
+    raise ValueError("Expected an unique ID or RPC address for the instrument!")
+
+
+if __name__ == "__main__":
+    sys.exit(main())
