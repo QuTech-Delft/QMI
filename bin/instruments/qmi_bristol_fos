@@ -8,10 +8,10 @@ import sys
 
 import qmi
 from qmi.instruments.bristol import Bristol_Fos
-from qmi.utils.context_managers import start_stop
+from qmi.utils.context_managers import start_stop, open_close
 
 
-def main() -> int:
+def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.description = "Command line client for the Bristol FOS Fiber-optic switch."
@@ -38,23 +38,21 @@ def main() -> int:
 def parse_source(args) -> AbstractContextManager:
     # make the instrument
     if args.unique_id is not None and args.board_id is not None:
-        with qmi.make_instrument(
+        return open_close(qmi.make_instrument(
                 instrument_name="FOS",
                 instrument_class=Bristol_Fos,
                 unique_id=args.unique_id,
                 board_id=int(args.board_id)
-        ) as fos:
-            return fos
+        ))
 
-    if args.unique_id is not None:
-        with qmi.make_instrument(
+    elif args.unique_id is not None:
+        return open_close(qmi.make_instrument(
                 instrument_name="FOS",
                 instrument_class=Bristol_Fos,
                 unique_id=args.unique_id
-        ) as fos:
-            return fos
+        ))
 
-    if args.rpc is not None:
+    elif args.rpc is not None:
         # get the instrument
         qmi.context().connect_to_peer(args.rpc.split('.')[0])
         return nullcontext(qmi.get_instrument(args.rpc))

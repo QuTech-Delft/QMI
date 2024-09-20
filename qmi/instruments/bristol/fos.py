@@ -123,7 +123,7 @@ class _Bristol_FosWindows:
 
     def __init__(self, unique_id: str, board_id: int) -> None:
         self._unique_id = unique_id
-        self.board_id = board_id
+        self._board_id = board_id
 
     @property
     def board_id(self) -> int:

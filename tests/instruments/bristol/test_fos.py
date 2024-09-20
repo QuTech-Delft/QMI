@@ -168,12 +168,8 @@ class TestFosWindows(unittest.TestCase):
         # Substitute a mock object in place of the "mcculw" module.
         # This must be done BEFORE the FOS driver runs "import mcculw".
         self.mcculw_mock = MagicMock(autospec=mcculw)
-        self.mcculw_mock.ul = MagicMock()
-        self.mcculw_mock.structs = MagicMock()
         with patch.dict("sys.modules", {
             "mcculw": self.mcculw_mock,
-            "ul": self.mcculw_mock.ul,
-            "structs": self.mcculw_mock.structs
         }):
             # Trigger lazy import of the mcculw module.
             qmi.instruments.bristol.fos._import_modules()
@@ -238,7 +234,9 @@ class TestFosWindows(unittest.TestCase):
         for bid in invalid_bids:
             # Assert
             with self.assertRaises(AssertionError):
-                Bristol_Fos(self.qmi_ctx, "fosser", self.UNIQUE_ID, board_id=bid)
+                fos = Bristol_Fos(self.qmi_ctx, "fosser", self.UNIQUE_ID, board_id=bid)
+                fos._is_open = True
+                fos.close()
 
             fos: Bristol_Fos = Bristol_Fos(self.qmi_ctx, "fosser", self.UNIQUE_ID)
             with self.assertRaises(AssertionError):
