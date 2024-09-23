@@ -25,7 +25,6 @@ def main() -> None:
     args = parser.parse_args()
 
     instr: Bristol_Fos
-    # with start_stop(qmi, "bristol_fos_client", console_loglevel="WARNING"), parse_source(args) as instr:
     with start_stop(qmi, "bristol_fos_client", console_loglevel="WARNING"):
         with ExitStack() as stack:
             instr = stack.enter_context(parse_source(args))
@@ -66,7 +65,6 @@ def parse_source(args) -> AbstractContextManager:
     # get the instrument
     elif args.rpc is not None:
         host_port = [ctx[1] for ctx in qmi.context().discover_peer_contexts() if ctx[0] == args.rpc.split('.')[0]][0]
-        # return qmi.get_instrument(args.rpc, auto_connect=True, host_port=host_port)
         return nullcontext(qmi.get_instrument(args.rpc, auto_connect=True, host_port=host_port))
 
     raise ValueError("Expected an unique ID or RPC address for the instrument!")
