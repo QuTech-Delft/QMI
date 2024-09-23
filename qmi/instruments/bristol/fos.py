@@ -77,6 +77,7 @@ class _Bristol_FosUnix:
         for device_descriptor in device_descriptors:
             if device_descriptor.unique_id == unique_id:
                 return device_descriptor
+
         return None  # Device not found.
 
     @rpc_method
@@ -93,9 +94,11 @@ class _Bristol_FosUnix:
             try:
                 dio_device = device.get_dio_device()
                 dio_device.d_config_port(uldaq.DigitalPortType.FIRSTPORTA, uldaq.DigitalDirection.OUTPUT)
+
             except Exception as exc:
                 device.disconnect()
                 raise Exception from exc
+
         except Exception as exc:
             device.release()
             _logger.error("Bristol FOS device connection failed with: %s", str(exc))
@@ -151,8 +154,10 @@ class _Bristol_FosWindows:
         assert ul is not None and enums is not None
         device_descriptors = ul.get_daq_device_inventory(enums.InterfaceType.ANY)
         for device_descriptor in device_descriptors:
+            print(device_descriptor.unique_id)
             if device_descriptor.unique_id == unique_id:
                 return device_descriptor
+
         return None  # Device not found.
 
     @rpc_method
@@ -170,6 +175,7 @@ class _Bristol_FosWindows:
                 device_descriptor
             ), f"{self.board_id} != {ul.get_board_number(device_descriptor)}"
             ul.d_config_port(self.board_id, enums.DigitalPortType.FIRSTPORTA, enums.DigitalIODirection.OUT)
+
         except Exception as exc:
             _logger.error("Bristol FOS device configuration failed with: %s", str(exc))
             ul.release_daq_device(self.board_id)
@@ -179,7 +185,6 @@ class _Bristol_FosWindows:
     def close(self) -> None:
         assert ul is not None
         ul.release_daq_device(self.board_id)
-        self._board_id = None
 
     @rpc_method
     def select_channel(self, channel: int) -> None:
