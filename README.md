@@ -34,6 +34,7 @@ when necessary for the use of a specific QMI driver:
 - [RPi.GPIO](https://pypi.org/project/RPi.GPIO/)
 - [Silicon Labs CP210x USB to UART Bridge](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers)
 - [uldaq.py](https://pypi.org/project/uldaq/)
+- [mcculw.py](https://pypi.org/project/mcculw/)
 - [usbdll.dll](https://www.newport.com/software-and-drivers)
 - [VCP driver](https://ftdichip.com/Drivers/vcp-drivers/)
 - [stmcdc.inf](https://www.wieserlabs.com/products/radio-frequency/flexdds-ng-dual/FlexDDS-NG-ad9910_standalone.zip)
