@@ -44,7 +44,7 @@ Usage of the third-party software, drivers or libraries can be subject to copyri
 
 ## Installation
 
-Currently, no PIP installation is possible. Please clone and setup with `python setup.py install`.
+`qmi` can now be installed from PyPi by simply calling `pip install qmi`. Alternatively, clone and setup with `python setup.py install`.
 
 ## Documentation
 
