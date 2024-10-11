@@ -161,7 +161,7 @@ class TestThorlabsMFF10x(unittest.TestCase):
                 baudrate=self.baudrate,  # The rest are defaults
                 bytesize=8,
                 parity='N',
-                rtscts=False,
+                rtscts=True,
                 stopbits=1.0,
                 timeout=0.04
                 )

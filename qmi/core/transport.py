@@ -293,6 +293,10 @@ class TransportDescriptorParser:
                     ty = self._keywords[k][0]
                     if ty is int and v.startswith('0x'):
                         parameters[k] = int(v, 16)
+                    elif ty == bool:
+                        if v not in ("True", "False"):
+                            raise ValueError()
+                        parameters[k] = (v == "True")
                     else:
                         parameters[k] = ty(v)
                 except ValueError:
@@ -318,7 +322,8 @@ SerialTransportDescriptorParser = TransportDescriptorParser(
     [("device", (str, True))],
     {'baudrate': (int, False), 'bytesize': (int, False),
      'parity': (str, False),
-     'stopbits': (float, False)}
+     'stopbits': (float, False),
+     'rtscts': (bool, False)}
 )
 
 TcpTransportDescriptorParser = TransportDescriptorParser(
@@ -400,6 +405,7 @@ class QMI_SerialTransport(QMI_Transport):
         self._validate_bytesize(bytesize)
         self._validate_parity(parity)
         self._validate_stopbits(stopbits)
+        self._validate_rstcts(rtscts)
 
         self.device = device
         self._baudrate = baudrate
@@ -434,6 +440,11 @@ class QMI_SerialTransport(QMI_Transport):
     def _validate_device_name(device: str) -> None:
         if not (device.upper().startswith("COM") or device.startswith("/")):
             raise QMI_TransportDescriptorException("Unknown serial port device path ({})".format(device))
+
+    @staticmethod
+    def _validate_rstcts(rtscts: bool) -> None:
+        if rtscts not in (True, False):
+            raise QMI_TransportDescriptorException("Invalid rtscts ({})".format(rtscts))
 
     @property
     def _safe_serial(self) -> serial.Serial:
