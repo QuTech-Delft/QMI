@@ -20,8 +20,8 @@ if typing.TYPE_CHECKING:
         import uldaq  # type: ignore
 
     if sys.platform.startswith("win"):
-        import ul  # type: ignore
-        import enums  # type: ignore
+        from mcculw import ul  # type: ignore
+        from mcculw import enums  # type: ignore
 
 
 # Global variable holding the logger for this module.
@@ -31,7 +31,7 @@ _logger = logging.getLogger(__name__)
 def _import_modules() -> None:
     """Import the "uldaq" library or "mcculw" modules.
 
-    This import is done in a function, instead of at the top-level, to avoid an unnecessary
+    This import is done in a function, instead of at the top-level, to avoid unnecessary
     dependencies for programs that do not access the instrument directly.
     """
     global uldaq, ul, enums
@@ -154,7 +154,6 @@ class _Bristol_FosWindows:
         assert ul is not None and enums is not None
         device_descriptors = ul.get_daq_device_inventory(enums.InterfaceType.ANY)
         for device_descriptor in device_descriptors:
-            print(device_descriptor.unique_id)
             if device_descriptor.unique_id == unique_id:
                 return device_descriptor
 
