@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## \[x.y.z] - Unreleased
 
+
+## [0.46.0] - 2024-10-14
+
 ### Added
 - The `QMI_Instrument` and `QMI_TaskRunner` (which inherit from `QMI_RpcObject`) are now equipped with specific `__enter__` and `__exit__` methods, which in the case of `QMI_Instrument`
   also open and close the instrument when run with a `with` context manager protocol. Meanwhile `QMI_TaskRunner` starts and stops then joins a QMI task thread. In practise, these context managers
