@@ -389,12 +389,11 @@ class QMI_SerialTransport(QMI_Transport):
         """Create a bidirectional byte stream via a serial port.
 
         Parameters:
-            device: the device name, e.g. COM3 on Windows or
-                /dev/ttyS1 or /dev/ttyUSB1 on Linux.
-            baudrate: the baud rate in bits per second.
-            bytesize: the number of bits per character (5, 6, 7 or 8).
-            parity:   the parity mode (valid values are 'N','E','O').
-            stopbits: the number of stop bits (1.0, 1.5 or 2.0).
+            device:   The device name, e.g. COM3 on Windows or /dev/ttyS1 or /dev/ttyUSB1 on Linux.
+            baudrate: The baud rate in bits per second.
+            bytesize: The number of bits per character (5, 6, 7 or 8).
+            parity:   The parity mode (valid values are 'N','E','O').
+            stopbits: The number of stop bits (1.0, 1.5 or 2.0).
             rtscts:   True to enable RTS/CTS flow control.
         """
         super().__init__()

@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - mypy error on `config_struct.py` by adding extra logic check `and not isinstance(val, type)` on L236.
 - Also made in `config_struct.py` in L186 also tuples to be recognized as "untyped values".
 - workflow artifacts to be of @v4 instead of @v3 that are to be deprecated. For `setup-python` @v5 even.
+- Implemented the rtscts keyword in TransportDescriptorParser for the (serial) transport factory.
 
 ## [0.45.0] - 2024-07-19
 
@@ -58,7 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Improved PicoQuant unit-testing modules and comment line fixes on some other modules.
 - Bug in Newport Single Axis Motion Controller that did not allow for negative relative moves.
-- Implemented the rtscts keyword in TransportDescriptorParser for the (serial) transport factory.
 
 ## [0.43.0] - 2023-11-23
 

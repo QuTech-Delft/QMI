@@ -75,7 +75,6 @@ class Agiltron_FF1x4(QMI_Instrument):
 
     @rpc_method
     def open(self) -> None:
-        """ Open the connection to the instrument using the transport. """
         _logger.info("Opening connection to %s", self._name)
         self._transport.open()
         self._transport.discard_read()
@@ -83,7 +82,6 @@ class Agiltron_FF1x4(QMI_Instrument):
 
     @rpc_method
     def close(self) -> None:
-        """ Close the connection to the instrument. """
         _logger.info("Closing connection to %s", self._name)
         super().close()
         self._transport.close()

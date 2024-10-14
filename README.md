@@ -28,13 +28,13 @@ when necessary for the use of a specific QMI driver:
 - [libhh400.so](https://www.picoquant.com/dl_software/HydraHarp400/HydraHarp400_SW_and_DLL_v3_0_0_3.zip)
 - [libph300.so](https://www.picoquant.com/dl_software/PicoHarp300/PicoHarp300_SW_and_DLL_v3_0_0_3.zip)
 - [libusb](https://libusb.info/)
+- [mcculw](https://pypi.org/project/mcculw/)
 - [Picotech PicoSDK ps3000a, PicoSDK ps4000a](https://www.picotech.com/downloads)
 - [PyGObject](https://pypi.org/project/PyGObject/)
 - [tcdbase.dll](https://www.qutools.com/files/quTAU_release/quTAU_Setup_4.3.3_win.exe), libtcdbase.so
 - [RPi.GPIO](https://pypi.org/project/RPi.GPIO/)
 - [Silicon Labs CP210x USB to UART Bridge](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers)
-- [uldaq.py](https://pypi.org/project/uldaq/)
-- [mcculw.py](https://pypi.org/project/mcculw/)
+- [uldaq](https://pypi.org/project/uldaq/)
 - [usbdll.dll](https://www.newport.com/software-and-drivers)
 - [VCP driver](https://ftdichip.com/Drivers/vcp-drivers/)
 - [stmcdc.inf](https://www.wieserlabs.com/products/radio-frequency/flexdds-ng-dual/FlexDDS-NG-ad9910_standalone.zip)
@@ -44,7 +44,7 @@ Usage of the third-party software, drivers or libraries can be subject to copyri
 
 ## Installation
 
-`qmi` can now be installed from PyPi by simply calling `pip install qmi`. Alternatively, clone and setup with `python setup.py install`.
+Install with Pip from https://pypi.org/project/qmi/: `pip install qmi`.
 
 ## Documentation
 

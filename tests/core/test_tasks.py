@@ -860,19 +860,27 @@ class TestQMITasks(unittest.TestCase):
             # LoopTestTask does 3x 1 second loops --> should be finished after 3 seconds
             for n in range(nr_of_loops):
                 # Test that the status changes at the end of each loop, after receiver signal increments
-                while task_proxy.get_status().value == status_signals_received[-1]:
+                while True:
+                    status = task_proxy.get_status()
+                    if status.value != status_signals_received[-1]:
+                        break
+
                     time.sleep(0.1 * loop_period)
 
                 settings_signals_received.append(
                     receiver.get_next_signal(timeout=2 * loop_period).args[-1]
                 )
-                status_signals_received.append(task_proxy.get_status().value)
+                status_signals_received.append(status.value)
 
             # Test that finalize_loop sets status back to 1
-            while task_proxy.get_status().value == status_signals_received[-1]:
+            while True:
+                status = task_proxy.get_status()
+                if status.value != status_signals_received[-1]:
+                    break
+
                 time.sleep(0.1 * loop_period)
 
-            status_signals_received.append(task_proxy.get_status().value)
+            status_signals_received.append(status.value)
 
         # Assert
         self.assertListEqual(status_signals_expected, status_signals_received)

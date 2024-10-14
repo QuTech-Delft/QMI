@@ -42,11 +42,11 @@ class QMI_VisaGpibTransport(QMI_Transport):
     """
 
     def __init__(
-            self,
-            primary_addr: int,
-            board: Optional[int] = None,
-            secondary_addr: Optional[int] = None,
-            connect_timeout: float = 30.0
+        self,
+        primary_addr: int,
+        board: Optional[int] = None,
+        secondary_addr: Optional[int] = None,
+        connect_timeout: float = 30.0
     ) -> None:
         """Initialization of the Gpib transport.
 
