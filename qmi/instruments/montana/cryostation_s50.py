@@ -133,13 +133,16 @@ class Montana_CryostationS50(QMI_Instrument):
         try:
             with urllib.request.urlopen(req) as response:
                 status = response.status
-                res = response.read() if request_type == 'GET' else None
-            if status != http.HTTPStatus.OK:
-                raise QMI_InstrumentException(f"HTTP error code: {status}")
+                if status != http.HTTPStatus.OK:
+                    raise QMI_InstrumentException(f"HTTP error code: {status}")
+
+                if request_type == 'GET':
+                    return json.loads(response.read())
+
         except urllib.error.HTTPError as exc:
             raise QMI_InstrumentException("Error in communication with device") from exc
 
-        return json.loads(res) if request_type == 'GET' else None
+        return None
 
     def _set_property(self, subsystem: str, key: str, value: Union[str, float, bool]) -> None:
         """

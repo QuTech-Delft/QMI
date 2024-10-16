@@ -1115,7 +1115,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             if current_limit < 0.05 or current_limit > peak_current_limit_f:
                 self._exit_configuration_state()
                 raise QMI_InstrumentException(
-                        f"Current limit value not in valid range 0.05 <= current_limit <= {peak_current_limit_f}")
+                        f"Current limit value not in valid range 0.05 <= current_limit <= {peak_current_limit_f}"
+                )
 
             _logger.info(
                 "Setting RMS current limit of controller [%s] instrument [%s] to [%f]",
