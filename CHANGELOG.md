@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Removed
+- Python 3.8 support, numpy and scipy version restrictions in dependencies.
 
 
 ## [0.46.0] - 2024-10-14

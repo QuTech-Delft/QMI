@@ -56,8 +56,8 @@ setup(
         "wheel",
         "twine",
         # For scientific data processing and visualisation
-        "numpy<2",
-        "scipy<2",
+        "numpy",
+        "scipy",
         "h5py>=3.7.0",
         # For hardware interfacing
         "pyserial",
