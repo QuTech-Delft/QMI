@@ -17,8 +17,8 @@ setup(
     name="qmi",
     version="0.47.0-beta.0",
     description="The Quantum Measurement Infrastructure framework",
-    long_description="{}\n".format(read('README.md')),
-    long_description_content_type='text/markdown',
+    long_description="{}\n".format(read("README.md")),
+    long_description_content_type="text/markdown",
     author="QuTech",
     author_email="",
     url="https://github.com/QuTech-Delft/QMI",
@@ -35,7 +35,6 @@ setup(
         "Operating System :: Microsoft :: Windows",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
@@ -50,15 +49,15 @@ setup(
     keywords=[
         # eg: 'keyword1', 'keyword2', 'keyword3',
     ],
-    python_requires=">=3.8, <4",
+    python_requires=">=3.9, <4",
     install_requires=[
         # For generating an installable package and deploying
         "setuptools",
         "wheel",
         "twine",
         # For scientific data processing and visualisation
-        "numpy<2",
-        "scipy<2",
+        "numpy",
+        "scipy",
         "h5py>=3.7.0",
         # For hardware interfacing
         "pyserial",
