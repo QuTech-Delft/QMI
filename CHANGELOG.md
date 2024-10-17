@@ -7,13 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## \[x.y.z] - Unreleased
 
 ### Added
+- Python 3.12 support
 
 ### Changed
 
 ### Fixed
 
 ### Removed
-- Python 3.8 support, numpy and scipy version restrictions in dependencies.
+- Python 3.8 and 3.9 support, numpy and scipy version restrictions in dependencies.
 
 
 ## [0.46.0] - 2024-10-14
