@@ -68,7 +68,7 @@ jobs:
 
       - name: Run coverage
         run: |
-          if [[ ${{ matrix.python-version }} == "3.13" ]]; \
+          if [[ ${{ inputs.python-version }} == "3.13" ]]; \
             then pip install https://github.com/da4089/py-xdrlib/archive/refs/heads/main.zip; fi
           coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage-${{ inputs.python-version }}.log
