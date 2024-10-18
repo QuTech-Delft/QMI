@@ -1,0 +1,107 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=75", "wheel", "setuptools_scm>=8"]
+
+[project.urls]
+Homepage = "https://github.com/QuTech-Delft/QMI"
+Repository = "https://github.com/QuTech-Delft/QMI.git"
+Changelog = "https://github.com/QuTech-Delft/QMI/blob/main/CHANGELOG.md"
+Issues = "https://github.com/QuTech-Delft/QMI/issues"
+
+[project]
+name="qmi"
+version="0.47.0-beta.0"
+description="The Quantum Measurement Infrastructure framework"
+readme = {file = "README.md", content-type = "text/markdown"}
+license = {file = "LICENSE.md"}
+authors=[{name = "QuTech", email="F.J.Grooteman@tudelft.nl"}]
+requires-python=">=3.11, <4"
+classifiers=[
+    # complete classifier list: http://pypi.python.org/pypi?%3Aaction=list_classifiers
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: Unix",
+    "Operating System :: POSIX",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic:: Scientific/Engineering:: Physics",
+    "Natural Language :: English",
+]
+keywords=["qmi", "hardware", "software", "interface", "laboratory", "physics"]
+dependencies = [
+    # For generating an installable package and deploying
+    "setuptools",
+    "wheel",
+    "twine",
+    # For scientific data processing and visualisation
+    "numpy",
+    "scipy",
+    "h5py>=3.7.0",
+    # For hardware interfacing
+    "pyserial",
+    "pyusb",
+    "python-vxi11",
+    # For miscellaneous functionality
+    "pytz",
+    "psutil",
+    "colorama",
+    "jsonschema",
+    # Instrument AD2
+    "pydwf",
+]
+
+[project.optional-dependencies]
+dev = [
+    # For generating an installable package and deploying
+    "setuptools",
+    "wheel",
+    "twine",
+    # For static code checks
+    "astroid",
+    "coverage",
+    "pylint>=3.0",
+    "mypy",
+    # For generating documentation
+    "sphinx",
+    "sphinx_rtd_theme",
+    # version bump
+    "bump2version"
+]
+
+[project.scripts]
+# main scripts
+qmi_proc = "qmi.tools.proc:main"
+qmi_adbasic_parser = "qmi.utils.adbasic_parser:main"
+qmi_adbasic_compiler = "qmi.utils.adbasic_compiler:main"
+# tool and instrument scripts
+qmi_tool = "bin.qmi_tool:main"
+qmi_hdf5_to_mat = "bin.qmi_hdf5_to_mat:main"
+qmi_anapico_apsin = "bin.instruments.qmi_anapico_apsin:main"
+qmi_mcc_usb1808x = "bin.instruments.qmi_mcc_usb1808x:main"
+qmi_newport_ag_uc8 = "bin.instruments.qmi_newport_ag_uc8:main"
+qmi_quantum_composer_9530 = "bin.instruments.qmi_quantum_composer_9530:main"
+qmi_siglent_ssa3000x = "bin.instruments.qmi_siglent_ssa3000x:main"
+qmi_srs_dc205 = "bin.instruments.qmi_srs_dc205:main"
+qmi_tenma_72psu = "bin.instruments.qmi_tenma_72psu:main"
+qmi_teraxion_tfn = "bin.instruments.qmi_teraxion_tfn:main"
+qmi_thorlabs_k10cr1 = "bin.instruments.qmi_thorlabs_k10cr1:main"
+qmi_timebase_dim3000 = "bin.instruments.qmi_timebase_dim3000:main"
+qmi_wavelength_tclab = "bin.instruments.qmi_wavelength_tclab:main"
+qmi_wieserlabs_flexdds = "bin.instruments.qmi_wieserlabs_flexdds:main"
+
+[tool.setuptools]
+include-package-data = true
+zip-safe = false
+
+[tool.setuptools.packages.find]
+where = ["qmi/"]
+
+[tool.setuptools.package-data]
+qmi = ["py.typed"]
+"qmi.instruments.zurich_instruments" = ["hdawg_command_table.schema"]
