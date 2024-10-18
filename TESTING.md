@@ -26,7 +26,7 @@ In any case, both tools can be run from the command line:
 Unit tests
 ----------
 
-Unit tests are executed in the CI environment against different Python versions: 3.10, 3.11 and 3.12. Code coverage of
+Unit tests are executed in the CI environment against different Python versions: 3.11, 3.12 and 3.13. Code coverage of
 the tests is computed using [Coverage.py](https://coverage.readthedocs.io/en/coverage-5.3.1/). To run the tests
 locally, use:
 ```zsh
@@ -44,10 +44,10 @@ to the repository.
 
 The pipelines are configured in `.github\workflows` and consists of four files:
 
-  1. push-ci.yml
-  2. pull_request-ci.yml
-  3. scheduled-full-ci.yml
-  4. pypi_publish.yml
+  1. `push-ci.yml`
+  2. `pull_request-ci.yml`
+  3. `scheduled-full-ci.yml`
+  4. `pypi_publish.yml`
 
 with a support file `reusable-ci-workflows.yml`.
 
@@ -55,7 +55,7 @@ In the first three workflows, the following tests are performed:
 - The code quality and maintainability analyses and unit-test coverage are performed, as these metrics are considered as quality indicators for the code base (which includes
 tests).
 - Unit-tests are performed and the coverage is calculated.
-- On push to a branch, tests are executing only with Python 3.11. When changes are pushed to a pull request, the tests are rerun parallel also with Python 3.10, 3.11 and 3.12. With the 3.11 version, the quality badges are created.
+- On push to a branch, tests are executing only with Python 3.11. When changes are pushed to a pull request, the tests are rerun parallel also with Python 3.12 and 3.13. With the 3.11 version, the quality badges are created.
 
 The fourth workflow packages the source code into an installable Python package.
 

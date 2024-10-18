@@ -15,7 +15,7 @@ Dependencies
 
 .. rubric:: Python version
 
-QMI depends on Python 3.10 or newer.
+QMI depends on Python 3.11 or newer.
 
 .. rubric:: Python packages
 

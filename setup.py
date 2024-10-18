@@ -35,9 +35,9 @@ setup(
         "Operating System :: Microsoft :: Windows",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
         "Topic :: Scientific/Engineering :: Physics",
@@ -49,7 +49,7 @@ setup(
     keywords=[
         # eg: 'keyword1', 'keyword2', 'keyword3',
     ],
-    python_requires=">=3.10, <4",
+    python_requires=">=3.11, <4",
     install_requires=[
         # For generating an installable package and deploying
         "setuptools",
@@ -98,7 +98,6 @@ setup(
     },
     scripts=[
         "bin/qmi_tool",
-        "bin/qmi_run_contexts",
         "bin/qmi_hdf5_to_mat",
         "bin/instruments/qmi_anapico_apsin",
         "bin/instruments/qmi_mcc_usb1808x",

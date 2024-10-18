@@ -7,14 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## \[x.y.z] - Unreleased
 
 ### Added
-- Python 3.12 support
+- Python 3.12, 3.13 support.
+- installing of `py-xdrlib` from Github source for Python 3.13 unit-tests.
 
 ### Changed
+- `qmi_tool` script entry point to be at `main` function.
 
 ### Fixed
 
 ### Removed
-- Python 3.8 and 3.9 support, numpy and scipy version restrictions in dependencies.
+- Python 3.8, 3.9 and 3.10 support, numpy and scipy version restrictions in dependencies.
+- `qmi_run_contexts` script as unused.
 
 
 ## [0.46.0] - 2024-10-14
