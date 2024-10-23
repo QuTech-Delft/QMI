@@ -26,7 +26,7 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Check py-xdrlib installation for Python 3.13
+      - name: Check py-xdrlib installation for Python 3-13
         if: [[ ${{ matrix.python-version }} == "3.13" ]]
         run:
             pip install https://github.com/da4089/py-xdrlib/archive/refs/heads/main.zip
