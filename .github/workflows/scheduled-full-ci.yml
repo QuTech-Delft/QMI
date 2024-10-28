@@ -28,8 +28,7 @@ jobs:
 
       - name: Check py-xdrlib installation for Python 3.13
         if: ${{ matrix.python-version }} == "3.13"
-        run:
-          pip install py-xdrlib
+        run: pip install py-xdrlib
 
       - name: Run unit tests and generate report
         if: always()
