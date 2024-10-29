@@ -214,7 +214,6 @@ class LoopTestTask(QMI_LoopTask):
 
         if self._increase_loop:
             self._status_value += 1  # increase status value
-            # update also settings
             time.sleep(self._loop_period / 2.0)
 
         if self._error:
@@ -808,10 +807,11 @@ class TestQMITasks(unittest.TestCase):
         # LoopTestTask does 3x 1 second loops --> should be finished after 3 seconds
         for n in range(nr_of_loops):
             while not receiver.has_signal_ready():
-                time.sleep(loop_period - (time.monotonic() % loop_period))  # synchronize
                 status = task_proxy.get_status().value
                 if status > status_signals_received[-1]:
                     status_signals_received.append(status)
+
+                time.sleep(loop_period - (time.monotonic() % loop_period))  # synchronize
 
             # Test that the status changes at the end of each loop, after receiver signal increments
             settings_signals_received.append(receiver.get_next_signal(timeout=loop_period).args[-1])
@@ -914,9 +914,10 @@ class TestQMITasks(unittest.TestCase):
         task_proxy.start()
         for n in range(len(my_signals_expected)):
             # Test that the my_signal is sent at each loop with increasing value
-            my_signals_received.append(
-                receiver.get_next_signal(timeout=2 * loop_period).args[-1]
-            )
+            while not receiver.has_signal_ready():
+                time.sleep(loop_period - (time.monotonic() % loop_period))  # synchronize
+
+            my_signals_received.append(receiver.get_next_signal(timeout=loop_period).args[-1])
 
         # Assert
         self.assertListEqual(my_signals_expected, my_signals_received)
