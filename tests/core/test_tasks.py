@@ -862,6 +862,10 @@ class TestQMITasks(unittest.TestCase):
                     time.sleep(loop_period - (time.monotonic() % loop_period))  # Synchronize
 
                 status = status_receiver.get_next_signal(timeout=loop_period).args[-1]
+                if status == status_init:
+                    time.sleep(loop_period - (time.monotonic() % loop_period))  # Synchronize
+                    status = status_receiver.get_next_signal(timeout=loop_period).args[-1]
+
                 while not settings_receiver.has_signal_ready():
                     time.sleep(loop_period - (time.monotonic() % loop_period))
 
