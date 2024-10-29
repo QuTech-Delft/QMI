@@ -804,24 +804,20 @@ class TestQMITasks(unittest.TestCase):
         task_proxy.start()
         # Test that prepare has done its job
         status_signals_received.append(task_proxy.get_status().value)
-        settings_signals_received.append(
-            receiver.get_next_signal(timeout=2 * loop_period).args[-1]
-        )
+        settings_signals_received.append(receiver.get_next_signal(timeout=loop_period).args[-1])
         # LoopTestTask does 3x 1 second loops --> should be finished after 3 seconds
         for n in range(nr_of_loops):
-            # Test that the status changes at the end of each loop, after receiver signal increments
-            while task_proxy.get_status().value == status_signals_received[-1]:
-                time.sleep(0.1 * loop_period)
+            while not receiver.has_signal_ready():
+                time.sleep(loop_period - (time.monotonic() % loop_period))  # synchronize
+                status = task_proxy.get_status().value
+                if status > status_signals_received[-1]:
+                    status_signals_received.append(status)
 
-            settings_signals_received.append(
-                receiver.get_next_signal(timeout=2 * loop_period).args[-1]
-            )
-            status_signals_received.append(task_proxy.get_status().value)
+            # Test that the status changes at the end of each loop, after receiver signal increments
+            settings_signals_received.append(receiver.get_next_signal(timeout=loop_period).args[-1])
 
         # Test that finalize_loop sets status back to 1
-        while task_proxy.get_status().value == status_signals_received[-1]:
-            time.sleep(0.1 * loop_period)
-
+        time.sleep(loop_period)
         status_signals_received.append(task_proxy.get_status().value)
         task_proxy.join()  # Give time to finalize
         # Assert
@@ -845,7 +841,7 @@ class TestQMITasks(unittest.TestCase):
         status_receiver = QMI_SignalReceiver()
 
         with qmi.make_task(
-            "loop_task_finish2",
+            "loop_task_finish_with",
             LoopTestTask,
             increase_loop=increase_loop,
             nr_of_loops=nr_of_loops,
@@ -854,7 +850,7 @@ class TestQMITasks(unittest.TestCase):
             policy=policy,
         ) as task_proxy:
             # Act
-            publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task_finish2")
+            publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task_finish_with")
             publisher_proxy.sig_status_updated.subscribe(status_receiver)
             publisher_proxy.sig_settings_updated.subscribe(settings_receiver)
             # Test that prepare has done its job
@@ -863,22 +859,19 @@ class TestQMITasks(unittest.TestCase):
             for n in range(nr_of_loops):
                 # Test that the status changes at the end of each loop, after receiver signal increments
                 while not status_receiver.has_signal_ready():
-                    time.sleep(0.1 * loop_period)
+                    time.sleep(loop_period - (time.monotonic() % loop_period))  # Synchronize
 
-                status = status_receiver.get_next_signal(timeout=2 * loop_period).args[-1]
-
+                status = status_receiver.get_next_signal(timeout=loop_period).args[-1]
                 while not settings_receiver.has_signal_ready():
-                    time.sleep(0.1 * loop_period)
+                    time.sleep(loop_period - (time.monotonic() % loop_period))
 
-                setting = settings_receiver.get_next_signal(timeout=2 * loop_period).args[-1]
+                setting = settings_receiver.get_next_signal(timeout=loop_period).args[-1]
                 status_signals_received.append(status)
                 settings_signals_received.append(setting)
 
             # Test that finalize_loop sets status back to 1
             time.sleep(loop_period)
-
-            status = task_proxy.get_status()
-            status_signals_received.append(status.value)
+            status_signals_received.append(task_proxy.get_status().value)
 
         # Assert
         self.assertEqual(initial_status_value, status_init)
