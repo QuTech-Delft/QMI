@@ -26,11 +26,13 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - name: Check py-xdrlib installation for Python 3.13
+        if: ${{ matrix.python-version }} == "3.13"
+        run: pip install py-xdrlib
+
       - name: Run unit tests and generate report
         if: always()
         run: |
-          if [[ ${{ matrix.python-version }} == "3.13" ]]; \
-            then pip install https://github.com/da4089/py-xdrlib/archive/refs/heads/main.zip; fi
           pip install .
           pip install unittest-xml-reporting
           python -m xmlrunner --output-file testresults.xml discover --start-directory=tests --pattern="test_*.py"

@@ -214,7 +214,6 @@ class LoopTestTask(QMI_LoopTask):
 
         if self._increase_loop:
             self._status_value += 1  # increase status value
-            # update also settings
             time.sleep(self._loop_period / 2.0)
 
         if self._error:
@@ -804,24 +803,21 @@ class TestQMITasks(unittest.TestCase):
         task_proxy.start()
         # Test that prepare has done its job
         status_signals_received.append(task_proxy.get_status().value)
-        settings_signals_received.append(
-            receiver.get_next_signal(timeout=2 * loop_period).args[-1]
-        )
+        settings_signals_received.append(receiver.get_next_signal(timeout=loop_period).args[-1])
         # LoopTestTask does 3x 1 second loops --> should be finished after 3 seconds
         for n in range(nr_of_loops):
-            # Test that the status changes at the end of each loop, after receiver signal increments
-            while task_proxy.get_status().value == status_signals_received[-1]:
-                time.sleep(0.1 * loop_period)
+            while not receiver.has_signal_ready():
+                status = task_proxy.get_status().value
+                if status > status_signals_received[-1]:
+                    status_signals_received.append(status)
 
-            settings_signals_received.append(
-                receiver.get_next_signal(timeout=2 * loop_period).args[-1]
-            )
-            status_signals_received.append(task_proxy.get_status().value)
+                time.sleep(loop_period - (time.monotonic() % loop_period))  # synchronize
+
+            # Test that the status changes at the end of each loop, after receiver signal increments
+            settings_signals_received.append(receiver.get_next_signal(timeout=loop_period).args[-1])
 
         # Test that finalize_loop sets status back to 1
-        while task_proxy.get_status().value == status_signals_received[-1]:
-            time.sleep(0.1 * loop_period)
-
+        time.sleep(loop_period)
         status_signals_received.append(task_proxy.get_status().value)
         task_proxy.join()  # Give time to finalize
         # Assert
@@ -839,12 +835,13 @@ class TestQMITasks(unittest.TestCase):
         initial_status_value = -1
         loop_period = 0.1
         policy = QMI_LoopTaskMissedLoopPolicy.IMMEDIATE
-        status_signals_expected = list(range(initial_status_value, nr_of_loops, 1)) + [1]
+        status_signals_expected = list(range(initial_status_value + 1, nr_of_loops, 1)) + [1]
         settings_signals_expected = list(range(1, 4))
-        receiver = QMI_SignalReceiver()
+        settings_receiver = QMI_SignalReceiver()
+        status_receiver = QMI_SignalReceiver()
 
         with qmi.make_task(
-            "loop_task_finish2",
+            "loop_task_finish_with",
             LoopTestTask,
             increase_loop=increase_loop,
             nr_of_loops=nr_of_loops,
@@ -853,36 +850,35 @@ class TestQMITasks(unittest.TestCase):
             policy=policy,
         ) as task_proxy:
             # Act
-            publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task_finish2")
-            publisher_proxy.sig_settings_updated.subscribe(receiver)
+            publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task_finish_with")
+            publisher_proxy.sig_status_updated.subscribe(status_receiver)
+            publisher_proxy.sig_settings_updated.subscribe(settings_receiver)
             # Test that prepare has done its job
-            status_signals_received.append(task_proxy.get_status().value)
+            status_init = task_proxy.get_status().value
             # LoopTestTask does 3x 1 second loops --> should be finished after 3 seconds
             for n in range(nr_of_loops):
                 # Test that the status changes at the end of each loop, after receiver signal increments
-                while True:
-                    status = task_proxy.get_status()
-                    if status.value != status_signals_received[-1]:
-                        break
+                while not status_receiver.has_signal_ready():
+                    time.sleep(loop_period - (time.monotonic() % loop_period))  # Synchronize
 
-                    time.sleep(0.1 * loop_period)
+                status = status_receiver.get_next_signal(timeout=loop_period).args[-1]
+                if status == status_init:
+                    time.sleep(loop_period - (time.monotonic() % loop_period))  # Synchronize
+                    status = status_receiver.get_next_signal(timeout=loop_period).args[-1]
 
-                settings_signals_received.append(
-                    receiver.get_next_signal(timeout=2 * loop_period).args[-1]
-                )
-                status_signals_received.append(status.value)
+                while not settings_receiver.has_signal_ready():
+                    time.sleep(loop_period - (time.monotonic() % loop_period))
+
+                setting = settings_receiver.get_next_signal(timeout=loop_period).args[-1]
+                status_signals_received.append(status)
+                settings_signals_received.append(setting)
 
             # Test that finalize_loop sets status back to 1
-            while True:
-                status = task_proxy.get_status()
-                if status.value != status_signals_received[-1]:
-                    break
-
-                time.sleep(0.1 * loop_period)
-
-            status_signals_received.append(status.value)
+            time.sleep(loop_period)
+            status_signals_received.append(task_proxy.get_status().value)
 
         # Assert
+        self.assertEqual(initial_status_value, status_init)
         self.assertListEqual(status_signals_expected, status_signals_received)
         self.assertListEqual(settings_signals_expected, settings_signals_received)
         self.assertFalse(task_proxy.is_running())
@@ -918,9 +914,10 @@ class TestQMITasks(unittest.TestCase):
         task_proxy.start()
         for n in range(len(my_signals_expected)):
             # Test that the my_signal is sent at each loop with increasing value
-            my_signals_received.append(
-                receiver.get_next_signal(timeout=2 * loop_period).args[-1]
-            )
+            while not receiver.has_signal_ready():
+                time.sleep(loop_period - (time.monotonic() % loop_period))  # synchronize
+
+            my_signals_received.append(receiver.get_next_signal(timeout=loop_period).args[-1])
 
         # Assert
         self.assertListEqual(my_signals_expected, my_signals_received)
