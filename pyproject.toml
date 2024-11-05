@@ -97,7 +97,6 @@ qmi_wieserlabs_flexdds = "bin.instruments.qmi_wieserlabs_flexdds:main"
 
 [tool.setuptools]
 include-package-data = true
-zip-safe = false
 
 [tool.setuptools.packages.find]
 where = ["qmi/"]
