@@ -4,6 +4,12 @@ on:
   schedule:
     # Schedule for every Monday at 7am
     - cron: "0 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to run workflow on'
+        required: true
+        default: 'main'
 
 jobs:
   full-test:
@@ -24,7 +30,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ github.event.inputs.branch || inputs.ref }}
 
       - name: Check py-xdrlib installation for Python 3.13
         if: ${{ matrix.python-version }} == "3.13"
