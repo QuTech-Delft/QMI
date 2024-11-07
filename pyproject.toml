@@ -73,6 +73,14 @@ dev = [
     # version bump
     "bump2version"
 ]
+unittest = [
+    # unit-test dependencies re-introduced
+    "numpy",
+    "h5py>=3.7.0",
+    "pyserial",
+    "pyusb",
+    "python-vxi11"
+]
 
 [project.scripts]
 # main scripts

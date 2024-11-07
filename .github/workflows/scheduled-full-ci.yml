@@ -39,7 +39,7 @@ jobs:
       - name: Run unit tests and generate report
         if: always()
         run: |
-          python -m pip install .
+          pip install '.[unittest]'
           python -m pip install unittest-xml-reporting
           python -m xmlrunner --output-file testresults.xml discover --start-directory=tests --pattern="test_*.py"
 
