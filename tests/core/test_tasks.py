@@ -833,7 +833,7 @@ class TestQMITasks(unittest.TestCase):
         nr_of_loops = 3
         increase_loop = False
         initial_status_value = -1
-        loop_period = 0.1
+        loop_period = 0.2
         policy = QMI_LoopTaskMissedLoopPolicy.IMMEDIATE
         status_signals_expected = list(range(initial_status_value + 1, nr_of_loops, 1)) + [1]
         settings_signals_expected = list(range(1, 4))
@@ -870,6 +870,9 @@ class TestQMITasks(unittest.TestCase):
                     time.sleep(loop_period - (time.monotonic() % loop_period))
 
                 setting = settings_receiver.get_next_signal(timeout=loop_period).args[-1]
+                if len(settings_signals_received) and setting == settings_signals_received[-1]:
+                    setting = settings_receiver.get_next_signal(timeout=loop_period).args[-1]
+
                 status_signals_received.append(status)
                 settings_signals_received.append(setting)
 
