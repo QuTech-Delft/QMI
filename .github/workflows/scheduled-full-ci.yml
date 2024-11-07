@@ -32,6 +32,11 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch || inputs.ref }}
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Check py-xdrlib installation for Python 3.13
         if: ${{ matrix.python-version }} == "3.13"
         run: python -m pip install py-xdrlib
@@ -39,8 +44,8 @@ jobs:
       - name: Run unit tests and generate report
         if: always()
         run: |
-          pip install '.[unittest]'
-          python -m pip install unittest-xml-reporting
+          pip install .
+          pip install unittest-xml-reporting
           python -m xmlrunner --output-file testresults.xml discover --start-directory=tests --pattern="test_*.py"
 
       - name: Upload unit test results
