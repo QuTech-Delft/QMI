@@ -15,9 +15,7 @@ class InstruTech_AGC302(QMI_Instrument):
     def __init__(self, context: QMI_Context, name: str, transport: Union[str, QMI_Transport], timeout: float = 1):
         """Initialize the pressure gauge Agc302 driver.
 
-        Args:
-            context: QMI context.
-            name: Name for this instrument instance.
+        Parameters:
             transport:  Either a transport string (see create_transport) or a QMI_Transport.
             timeout: Maximum time [s] to wait before transport timeout occurs.
         """
@@ -30,13 +28,11 @@ class InstruTech_AGC302(QMI_Instrument):
 
     @rpc_method
     def open(self) -> None:
-        """See base class."""
         self._transport.open()
         super().open()
 
     @rpc_method
     def close(self) -> None:
-        """See base class."""
         super().close()
         self._transport.close()
 

@@ -62,6 +62,10 @@ class QMI_Instrument(QMI_RpcObject):
 
         The `__init__()` method should not yet attempt to access the instrument
         hardware. That should be done in the `open()` method.
+
+        Parameters:
+            context: QMI_Context instance in where the instrument is to be instantiated.
+            name: Name for this instrument instance.
         """
         super().__init__(context, name)
         self._is_open = False
