@@ -38,7 +38,7 @@ class Nenion_ValveController(QMI_Instrument):
         # Communication defaults
         self.message_terminator = b"\r"
         # Position tracking
-        self._current_position = None  # TODO: Always 'null' at start to be able to track from 0%?
+        self._current_position: int | None = None  # TODO: Always 'Null' at start to be able to track from 0%?
 
     def _set(self, command: str):
         """Helper function for inspecting commands and their return values."""
