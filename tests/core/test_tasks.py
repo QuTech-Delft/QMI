@@ -806,11 +806,11 @@ class TestQMITasks(unittest.TestCase):
         settings_signals_received.append(receiver.get_next_signal(timeout=loop_period).args[-1])
         # LoopTestTask does 3x 1 second loops --> should be finished after 3 seconds
         for n in range(nr_of_loops):
-            while not receiver.has_signal_ready():
-                status = task_proxy.get_status().value
-                if status > status_signals_received[-1]:
-                    status_signals_received.append(status)
+            while (status := task_proxy.get_status().value) == status_signals_received[-1]:
+                time.sleep(loop_period - (time.monotonic() % loop_period))  # synchronize
 
+            status_signals_received.append(status)
+            if not receiver.has_signal_ready():
                 time.sleep(loop_period - (time.monotonic() % loop_period))  # synchronize
 
             # Test that the status changes at the end of each loop, after receiver signal increments
