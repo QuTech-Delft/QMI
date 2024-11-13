@@ -22,7 +22,7 @@ def main() -> int:
     conn_param.add_argument("--port", type=str, help="IP address port number.", default=1512)
     conn_param.add_argument("--baud", type=str, help="Baud rate of the device connection.", default=115200)
 
-    # parser.add_argument("--status", action="store_true", help="Get instrument status")
+    parser.add_argument("--status", action="store_true", help="Get instrument status")
     # setters/getters
     motor_current = parser.add_mutually_exclusive_group(required=False)
     motor_current.add_argument("--enable", action="store_true", help="Enable motor current")
@@ -55,6 +55,10 @@ def main() -> int:
 
         print(transport, transport.startswith("tcp"), transport.startswith("serial"))
         with Nenion_ValveController(qmi.context(), "Nenion_Valve_Controller", transport) as instr:
+            if args.status:
+                status = instr.get_status()
+                print(status)
+
             if args.halt:
                 print("Halting motor.")
                 instr.halt_motor()
@@ -91,7 +95,6 @@ def main() -> int:
                 instr.step_close(args.step_close)
 
     return 0
-
 
 
 if __name__ == "__main__":
