@@ -1,22 +1,20 @@
 """QMI_Instrument driver for Nenion stepper motor driver leak valve controllers."""
 
-from dataclasses import dataclass
+from enum import Enum
 import logging
 import time
 
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_TransportDescriptorException, QMI_InstrumentException
-from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
+from qmi.core.exceptions import QMI_TransportDescriptorException, QMI_InstrumentException, QMI_TimeoutException
+from qmi.core.instrument import QMI_Instrument
 from qmi.core.rpc import rpc_method
 from qmi.core.transport import create_transport
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
-# The status info query and return is not clear. Could be a string with several values or just one. Options:
-@dataclass
-class Status:
-    """A dataclass for Nenion status info.
+class Status(Enum):
+    """An enumerator of Nenion statuses.
 
     Attributes:
         run_position: RP<a>, The motor is driving, return actual position <a>.
@@ -26,22 +24,23 @@ class Status:
         analog:       AP<p>, Analog mode, return actual position <p>.
         disabled:     DP<p>, Disable was pressed, return actual position <p>.
     """
-    run_position: int
-    in_position: int
-    stands: int
-    local: int
-    analog: int
-    disabled: int
+    RP = "run_position"
+    IP = "in_position"
+    SP = "stands"
+    LP = "local"
+    AP = "analog"
+    DP = "disabled"
 
-    def __str__(self) -> str:
-        """Make the string nice and readable."""
-        return "\n".join([k + f"={v}" for k, v in self.__dict__.items()])
+    def __init__(self, position: int):
+        """Initialize with a position value."""
+        self.position = position
 
 
 class Nenion_ValveController(QMI_Instrument):
     """QMI_Instrument driver class for Nenion valve controllers."""
 
-    DEFAULT_RESPONSE_TIMEOUT = 5.0  # default response timeout in seconds
+    DEFAULT_RESPONSE_TIMEOUT = 1.0  # default response timeout in seconds
+    MAX_RESPONSE_BYTES = 7  # For status queries, eg. 'RP12345', no message terminator.
     VALVE_RANGE = [1, 40000]  # Serial/TCP interface valve range.
     VALVE_RESOLUTION = VALVE_RANGE[1] // 100  # The valve range is divided into 0-100%, resolution is 1%.
     STEP_RESOLUTION = VALVE_RESOLUTION // 10 # The step resolution is 0.1%.
@@ -69,18 +68,25 @@ class Nenion_ValveController(QMI_Instrument):
         """Helper function for inspecting commands and their return values."""
         self._transport.write(command.encode('ascii') + self.message_terminator)
         response = self._transport.read_until(self.message_terminator, self._timeout).decode()
-        print(f"Controller command {command} resulted in response {response}.")  # For testing with HW
-        _logger.debug("Controller command %s resulted in response %s." % command, response)
+        print(f"Controller command {command} resulted in response {repr(response)}.")  # For testing with HW
+        _logger.debug("Controller command %s resulted in response %s.", command, repr(response))
         # TODO: Depending on responses, create conditional behaviour
 
     def _get(self, command: str) -> str:
         """Helper function to get responses from the controller."""
         self._transport.write(command.encode('ascii') + self.message_terminator)
-        response = self._transport.read_until(self.message_terminator, self._timeout).decode()
-        print(f"Controller command {command} resulted in response {response}.")  # For testing with HW
-        _logger.debug("Controller command %s resulted in response %s." % command, response)
+        response = ""
+        while True:
+            try:
+                response += self._transport.read(1, self._timeout).decode()
 
-        return response
+            except QMI_TimeoutException:
+                break
+
+        print(f"Controller command {command} resulted in response {repr(response)}.")  # For testing with HW
+        _logger.debug("Controller command %s resulted in response %s.", command, repr(response))
+
+        return response.rstrip(self.message_terminator.decode())
 
     @rpc_method
     def open(self) -> None:
@@ -96,27 +102,20 @@ class Nenion_ValveController(QMI_Instrument):
     def get_status(self) -> Status:
         """Get status info from the controller.
 
-        Returns:
-            status: Status information as a dataclass.
-        """
-        status = self._get("S")
-        # TODO: It is not clear what this returns. We might have to follow
-        #  it with other calls like
-        run_position = self._get("RP")
-        in_position = self._get("IP")
-        stands = self._get("SP")
-        local = self._get("LP")
-        analog = self._get("AP")
-        disabled = self._get("DP")
+        Raises:
+            QMI_InstrumentException: If an invalid response was received.
 
-        return Status(
-            run_position,
-            in_position,
-            stands,
-            local,
-            analog,
-            disabled
-        )
+        Returns:
+            status: Status information enumerator with position.
+        """
+        response = self._get("S")
+        if response[:2] in Status.__members__.keys():
+            Status[response[:2]].position = int(response[2:])
+
+        else:
+            raise QMI_InstrumentException(f"Got invalid response '{response}' for status query!")
+
+        return Status[response[:2]]
 
     @rpc_method
     def enable_motor_current(self) -> None:
@@ -209,4 +208,3 @@ class Nenion_ValveController(QMI_Instrument):
 
             self._set("P")  # TODO: Need some sleep between steps?
             # time.sleep(self.STEP_RESOLUTION / self.MOVE_SPEED)
-

@@ -53,11 +53,10 @@ def main() -> int:
             if args.baud != 115200:
                 transport += f":baudrate={args.baud}:parity=E"
 
-        print(transport, transport.startswith("tcp"), transport.startswith("serial"))
         with Nenion_ValveController(qmi.context(), "Nenion_Valve_Controller", transport) as instr:
             if args.status:
                 status = instr.get_status()
-                print(status)
+                print(status.value, status.position)
 
             if args.halt:
                 print("Halting motor.")
