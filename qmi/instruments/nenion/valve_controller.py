@@ -62,7 +62,7 @@ class Nenion_ValveController(QMI_Instrument):
         # Communication defaults
         self.message_terminator = b"\r"
         # Position tracking
-        self._current_position: int | None = None  # TODO: Always 'Null' at start to be able to track from 0%?
+        self._current_position: int = 0
 
     def _set(self, command: str):
         """Helper function for inspecting commands and their return values."""
@@ -111,6 +111,7 @@ class Nenion_ValveController(QMI_Instrument):
         response = self._get("S")
         if response[:2] in Status.__members__.keys():
             Status[response[:2]].position = int(response[2:])
+            self._current_position = Status[response[:2]].position
 
         else:
             raise QMI_InstrumentException(f"Got invalid response '{response}' for status query!")
@@ -157,12 +158,14 @@ class Nenion_ValveController(QMI_Instrument):
     def fully_close(self) -> None:
         """Special command that calls "Null" to close the valve at 1/3rd of max speed."""
         self._set("N")
-        self._current_position = 0  # Actually it is 1, but to avoid shift by 1 for consecutive steps, set to 0.
 
     @rpc_method
     def halt_motor(self) -> None:
-        """Call to halt motor immediately."""
+        """Call to halt motor immediately and update current position to halted position."""
         self._set("H")
+        response = self._get("S")
+        if response[:2] in Status.__members__.keys():
+            self._current_position = int(response[2:])
 
     @rpc_method
     def step_close(self, steps: int = 1):
@@ -178,12 +181,16 @@ class Nenion_ValveController(QMI_Instrument):
         if steps not in range(1, 10):
             raise ValueError(f"Invalid steps, {steps}, given for controller.")
 
-        for _ in range(steps):
-            if self._current_position is not None:
-                if self._current_position - self.STEP_RESOLUTION < self.VALVE_RANGE[0]:
-                    raise QMI_InstrumentException("Target position will be beyond limits. Excepting!")
+        # Update position first
+        response = self._get("S")
+        if response[:2] in Status.__members__.keys():
+            self._current_position = int(response[2:])
 
-                self._current_position -= self.STEP_RESOLUTION
+        for _ in range(steps):
+            if self._current_position - self.STEP_RESOLUTION < self.VALVE_RANGE[0]:
+                raise QMI_InstrumentException("Target position will be beyond limits. Excepting!")
+
+            self._current_position -= self.STEP_RESOLUTION
 
             self._set("M")  # TODO: Need some sleep between steps?
             # time.sleep(self.STEP_RESOLUTION / self.MOVE_SPEED)
@@ -199,12 +206,16 @@ class Nenion_ValveController(QMI_Instrument):
         if steps not in range(1, 10):
             raise ValueError(f"Invalid steps, {steps}, given for controller.")
 
-        for _ in range(steps):
-            if self._current_position is not None:
-                if self._current_position + self.STEP_RESOLUTION > self.VALVE_RANGE[1]:
-                    raise QMI_InstrumentException("Target position will be beyond limits. Excepting!")
+        # Update position first
+        response = self._get("S")
+        if response[:2] in Status.__members__.keys():
+            self._current_position = int(response[2:])
 
-                self._current_position += self.STEP_RESOLUTION
+        for _ in range(steps):
+            if self._current_position + self.STEP_RESOLUTION > self.VALVE_RANGE[1]:
+                raise QMI_InstrumentException("Target position will be beyond limits. Excepting!")
+
+            self._current_position += self.STEP_RESOLUTION
 
             self._set("P")  # TODO: Need some sleep between steps?
             # time.sleep(self.STEP_RESOLUTION / self.MOVE_SPEED)
