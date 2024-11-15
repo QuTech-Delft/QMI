@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Package management to be done via `pyproject.toml` instead of `setup.py`.
 
 ### Fixed
+- Full CI-test to install qmi package correctly and run unit-tests with all supported Python versions.
 
 ### Removed
 - Python 3.8, 3.9 and 3.10 support, numpy and scipy version restrictions in dependencies.
