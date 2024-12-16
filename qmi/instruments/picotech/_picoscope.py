@@ -351,7 +351,7 @@ class PicoTech_PicoScope(QMI_Instrument):
         # Convert data to Numpy array.
         samples: np._typing.NDArray[np.int16] = np.empty((len(channels), self._num_samples), dtype=np.int16)
         for (i, chan) in enumerate(channels):
-            samples[i] = buffers[chan]
+            samples[i] = np.ctypeslib.as_array(buffers[chan])
 
         # Extract overrange markers.
         overrange = [bool((par_overflow.value >> chan) & 1) for chan in channels]
