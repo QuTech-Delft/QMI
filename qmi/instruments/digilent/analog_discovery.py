@@ -383,4 +383,4 @@ class AnalogDiscovery2(QMI_Instrument):
         except pydwf.DwfLibraryError as library_error:
             raise QMI_InstrumentException(str(library_error)) from library_error
 
-        return sample_record.tolist()
+        return list(sample_record)
