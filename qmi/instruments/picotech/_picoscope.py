@@ -2,7 +2,7 @@ import importlib
 import logging
 import time
 import enum
-from typing import Optional, Dict, List, Tuple, Union, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 import ctypes
 
 import numpy as np
@@ -15,13 +15,13 @@ from qmi.core.rpc import rpc_method
 if TYPE_CHECKING:
     from picosdk.ps3000a import ps3000a
     from picosdk.ps4000a import ps4000a
-    _ps: Union[ps3000a, ps4000a, None] = None
+    _ps: ps3000a | ps4000a | None = None
 
 else:
     _ps = None
 
 # Global dictionary for the imported library commands.
-COMMAND_DICT: Dict = dict()
+COMMAND_DICT: dict[str, Any] = dict()
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
@@ -88,14 +88,14 @@ class PicoTech_PicoScope(QMI_Instrument):
     NUM_INPUT_RANGES = 0
 
     @staticmethod
-    def list_instruments(library: str) -> List[str]:
+    def list_instruments(library: str) -> list[str]:
         """Return a list of serial numbers of detected PicoScope instruments of a specific library type.
 
         Parameters:
             library: The library type to list, e.g. "3000a"
 
         Returns:
-            A list of serial numbers of devices found which use input library type.
+            serials: A list of serial numbers of devices found which use input library type.
         """
         _import_modules(library)
         max_len = 1024
@@ -113,13 +113,13 @@ class PicoTech_PicoScope(QMI_Instrument):
     def __init__(self, context: QMI_Context, name: str, serial_number: str) -> None:
         """Initialize the instrument driver.
 
-        Arguments:
-            name: Name for this instrument instance.
+        Parameters:
+            name:          Name for this instrument instance.
             serial_number: Serial number of the Picoscope.
         """
         super().__init__(context, name)
         self._serial_number = serial_number
-        self._handle: Optional[ctypes.c_int16] = None
+        self._handle: ctypes.c_int16 | None = None
         self._num_samples: int = 0
         self._time_base_interval_ns: float = 0.0
         self._library: str = ""  # The sw library name, e.g. 3000a
@@ -130,10 +130,11 @@ class PicoTech_PicoScope(QMI_Instrument):
         return _ps
 
     @rpc_method
-    def get_input_ranges(self) -> Dict[int, float]:
+    def get_input_ranges(self) -> dict[int, float]:
         """Return a dictionary mapping supported input range indexes to the corresponding input range in Volt."""
         self._check_is_open()
-        return dict((sel, volt) for (sel, volt) in self._ps_attr.PICO_VOLTAGE_RANGE.items() if sel < self.NUM_INPUT_RANGES)
+        return dict((sel, volt) for (sel, volt) in self._ps_attr.PICO_VOLTAGE_RANGE.items()
+                    if sel < self.NUM_INPUT_RANGES)
 
     @rpc_method
     def open(self) -> None:
@@ -265,6 +266,7 @@ class PicoTech_PicoScope(QMI_Instrument):
             timeout: Maximum time to wait in seconds.
 
         Raises:
+            ValueError:           If the timeout input value is negative.
             QMI_TimeoutException: If the timeout expires before a block is ready.
         """
         self._check_is_open()
@@ -282,7 +284,7 @@ class PicoTech_PicoScope(QMI_Instrument):
             time.sleep(0.01)
 
     @rpc_method
-    def get_block_data(self, channels: List[int]) -> Tuple[np.ndarray, float, List[bool]]:
+    def get_block_data(self, channels: list[int]) -> tuple[np.ndarray, float, list[bool]]:
         """Retrieve a block of data, previously acquired via `run_block()`.
 
         Samples are returned as 16-bit signed integers, where the value
@@ -296,10 +298,13 @@ class PicoTech_PicoScope(QMI_Instrument):
             channels: List of channels for which to retrieve samples and overrange indications.
 
         Returns:
-            Tuple `(samples, time_base_interval_ns, overrange)`:
-            `samples` is a 2D Numpy array with shape (num_channels, num_samples) containing signed 16-bit samples.
-            `time_base_interval_ns` is the time interval between samples as a floating point number in nanoseconds.
-            `overrange` is a list of booleans indicating whether overvoltage occurred on the selected channels.
+            samples:   A 2D Numpy array with shape (num_channels, num_samples) containing signed 16-bit samples.
+            time_base_interval_ns: The time interval between samples as a floating point number in nanoseconds.
+            overrange: A list of booleans indicating whether overvoltage occurred on the selected channels.
+
+        Raises:
+            ValueError:              If a channel number in 'channels' is invalid.
+            QMI_InstrumentException: If unexpected number of samples were obtained.
         """
         self._check_is_open()
 
@@ -308,7 +313,7 @@ class PicoTech_PicoScope(QMI_Instrument):
                 raise ValueError("Invalid channel index")
 
         # Allocate data buffers.
-        buffers = []
+        buffers: list[ctypes.Array[ctypes.c_int16]] = []
         for chan in range(self.NUM_CHANNELS):
 
             # Allocate real buffer for selected channels, zero-length buffer for non-selected channels.
