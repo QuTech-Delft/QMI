@@ -352,7 +352,7 @@ class AnalogDiscovery2(QMI_Instrument):
             raise QMI_UsageException("Device should be opened before use.")
 
         analog_in = self._device.analogIn
-        sample_record: np.ndarray = np.array([])
+        sample_record: np._typing.NDArray[np.float64] = np.array([])
         try:
             if amount_samples is None:
                 amount_samples_rational = analog_in.recordLengthGet() // analog_in.frequencyGet()

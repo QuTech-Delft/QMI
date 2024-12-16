@@ -349,7 +349,7 @@ class PicoTech_PicoScope(QMI_Instrument):
             )
 
         # Convert data to Numpy array.
-        samples = np.empty((len(channels), self._num_samples), dtype=np.int16)
+        samples: np._typing.NDArray[np.int16] = np.empty((len(channels), self._num_samples), dtype=np.int16)
         for (i, chan) in enumerate(channels):
             samples[i] = buffers[chan]
 
