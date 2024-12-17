@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `qmi_tool` script entry point to be at `main` function.
 - Package management to be done via `pyproject.toml` instead of `setup.py`.
+- Digilent and PicoTech devices' typing fixed and modernized.
 
 ### Fixed
 - Full CI-test to install qmi package correctly and run unit-tests with all supported Python versions.

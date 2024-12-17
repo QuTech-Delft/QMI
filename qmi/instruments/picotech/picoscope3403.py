@@ -8,7 +8,7 @@ https://github.com/picotech/picosdk-python-wrappers.
 
 import ctypes
 import logging
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 import warnings
 
 import numpy as np
@@ -42,8 +42,8 @@ class PicoTech_PicoScope3403(PicoTech_PicoScope):
     def __init__(self, context: QMI_Context, name: str, serial_number: str) -> None:
         """Initialize the instrument driver.
 
-        Arguments:
-            name: Name for this instrument instance.
+        Parameters:
+            name:          Name for this instrument instance.
             serial_number: Serial number of the Picoscope.
         """
         super().__init__(context, name, serial_number)
@@ -123,14 +123,14 @@ class PicoTech_PicoScope3403(PicoTech_PicoScope):
     @rpc_method
     def acquire_by_trigger_and_get_data(
         self,
-        channels: List[int],
-        max_val: List[float],
-        couplings: List[ChannelCoupling],
-        trigger_channel: Optional[int],
+        channels: list[int],
+        max_val: list[float],
+        couplings: list[ChannelCoupling],
+        trigger_channel: int | None,
         trigger_level: float,
         sampling_interval: int,
         time_span: int,
-            ) -> object:
+    ) -> object:
         """Acquires data from a specific channel, which is triggered, and returns the data.
 
         It is assumed that the trigger level is set to (almost) the highest point of
@@ -156,8 +156,8 @@ class PicoTech_PicoScope3403(PicoTech_PicoScope):
             time_span:         Time span of data acquiring in nanoseconds.
 
         Returns:
-            (times, voltages): `times` is a 1D Numpy array containing the sampling times in ns.
-                               `voltages` is a 1D Numpy array containing the measured voltages in V.
+            times:    A 1D Numpy array containing the sampling times in ns.
+            voltages: A 1D Numpy array containing the measured voltages in V.
         """
         warnings.warn(
             f"{self.acquire_by_trigger_and_get_data.__name__} will be deprecated in the future as it is not a base "
@@ -249,8 +249,7 @@ class PicoTech_PicoScope3403(PicoTech_PicoScope):
                          The effective time resolution is (timebase-2)/(125000000) for timebase > 2.
 
         Returns:
-            resolution:  Scope's time resolution in nanoseconds.
-                         0 is returned for invalid time_base.
+            resolution:  Scope's time resolution in nanoseconds. 0 is returned for invalid time_base.
         """
         if 0 <= time_base <= 2:
             return 2.0 ** time_base
