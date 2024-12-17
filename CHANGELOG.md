@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Python 3.12, 3.13 support.
 - installing of `py-xdrlib` from Github source for Python 3.13 unit-tests.
+- HighFinesse Wavelenght Meter (Wlm) driver with unittests, and license terms in wlmConst.py and wlmData.py.
 
 ### Changed
 - `qmi_tool` script entry point to be at `main` function.
