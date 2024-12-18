@@ -287,11 +287,11 @@ class HighFinesse_Wlm(QMI_Instrument):
         Parameters:
             channel:  The signal number (1 to 8) in case of a WLM with multichannel switch or with double pulse
                       option (MLC). For WLMs without these options 1 should be overhanded.
-            index:    Index number to get the data pattern from. Must be in range [0 .. 5].
+            index:    Index number to get the data pattern from. Must be in range [0 .. 5]. See also 'set_data_pattern'.
             arr_size: A batch size for reading data pattern.
 
         Returns:
-            data:     Data array from the data pattern.
+            pattern_array: Data array from the data pattern.
 
         Raises:
             ValueError: With invalid index number.
@@ -306,7 +306,7 @@ class HighFinesse_Wlm(QMI_Instrument):
         ret_val = self._lib.dll.GetPatternDataNum(channel, index, pattern_array.ctypes.data_as(c_short_ptr))
         if ret_val == 0:
             # The channel and/or index was not (correctly) enabled.
-            _logger.debug("[%s] GetPatternDataNum error %i", self._name, ret_val)
+            _logger.debug("[%s] GetPatternDataNum error, perhaps SetPattern was not run first?", self._name)
 
         elif ret_val not in [0, 1]:
             # Return value is an error code.
