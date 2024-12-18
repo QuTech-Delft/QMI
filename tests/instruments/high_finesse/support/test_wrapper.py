@@ -83,5 +83,6 @@ class TestHighFinesse_WS_Unknown(TestCase):
         """The LoadDLL function should be called once."""
         with self.assertRaises(OSError) as exc:
             _ = _LibWrapper()
+
         self.assertEqual("Unsupported platform", str(exc.exception))
         mocker.assert_not_called()

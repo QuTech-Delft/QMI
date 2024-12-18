@@ -7,45 +7,86 @@ https://www.highfinesse.com/en/support/downloads.html.
 This driver has been tested on the WS-6 model.
 """
 
-from __future__ import annotations
-
+import ctypes
 import logging
+from time import time
+
+import numpy as np
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
+from qmi.instruments.bristol.bristol_871a import Measurement
 from qmi.instruments.high_finesse.support import wlmConst
-from qmi.instruments.high_finesse.support._library_wrapper import _LibWrapper, WS8_ERR
+from qmi.instruments.high_finesse.support._library_wrapper import _LibWrapper, WlmGetErr
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
 
-class HighFinesse_WS(QMI_Instrument):
+class HighFinesse_Wlm(QMI_Instrument):
     """A network based driver for the High Finesse Wavelength meter.
 
     This driver automatically detects the platform of the client and will load the respective driver library
     (wlmData.dll for Windows, libwlmData.so for Linux, and libwlmData.dylib for MacOS). Make sure that the library is
     available on your system and that the wlmData.ini file contains the IP address of the server.
     """
-
+    # TODO: This could set with GetChannelsCount call after super().open().
     MAX_CHANNEL_NUMBER = 8
 
     def __init__(self, context: QMI_Context, name: str) -> None:
         """Initialize the instrument driver.
 
-        :param context: QMI_Context object for the instrument driver.
-        :param name:    Name for this instrument instance.
+        Parameters:
+            context: QMI_Context object for the instrument driver.
+            name:    Name for this instrument instance.
         """
         self._lib: _LibWrapper = _LibWrapper()
         super().__init__(context, name)
 
+    def _check_channel(self, channel: int) -> None:
+        """A method for checking the channel number.
+
+        Raises:
+            QMI_InstrumentException: In case of instrument error or channel out of range.
+        """
+        self._check_is_open()
+        if not (0 < channel <= self.MAX_CHANNEL_NUMBER):
+            raise QMI_InstrumentException(f"Channel number out of range: {channel}")
+
+    def _check_for_error_code(self, value: float | int, method: str) -> float | int:
+        """A method for checking error codes returned by the device.
+
+        Parameters:
+            value:  Value to check for an error code.
+            method: The called method to check the value for.
+
+        Returns:
+            value:  If value is larger than 0, or NaN, it cannot be an error code but a result value.
+
+        Raises:
+            QMI_InstrumentException: If the value to check is an error code, raise.
+        """
+        # TODO: Expand in future also for other error types, which are call dependent. Now only WlmGetErr.
+        if value > 0 or value is np.nan:
+            return value
+
+        i_val = int(value)
+        err_msg = WlmGetErr(i_val) if i_val in [error.value for error in WlmGetErr] else str(value)
+        _logger.error("[%s] %s error: %s", self._name, method, err_msg)
+
+        raise QMI_InstrumentException(f"Error received from library call '{method}': {err_msg}")
+
     @rpc_method
     def open(self) -> None:
-        """Connect to the WLM hardware."""
         _logger.debug("[%s] Opening connection to instrument", self._name)
         super().open()
+
+    @rpc_method
+    def close(self) -> None:
+        _logger.info("[%s] Closing connection to instrument", self._name)
+        super().close()
 
     @rpc_method
     def start_server(self) -> bool:
@@ -62,6 +103,7 @@ class HighFinesse_WS(QMI_Instrument):
             status = self._lib.dll.Operation(wlmConst.cCtrlStartMeasurement)
             _logger.debug("[%s] Started measurement with status = %d", self._name, status)
             return True
+
         return False
 
     @rpc_method
@@ -82,6 +124,7 @@ class HighFinesse_WS(QMI_Instrument):
         Returns:
             str: The version in the format "WLM Version: [{type}.{version}.{revision}.{build}]"
         """
+        self._check_is_open()
         version_type = self._lib.dll.GetWLMVersion(0)
         version_ver = self._lib.dll.GetWLMVersion(1)
         version_rev = self._lib.dll.GetWLMVersion(2)
@@ -95,25 +138,44 @@ class HighFinesse_WS(QMI_Instrument):
     @rpc_method
     def get_idn(self) -> QMI_InstrumentIdentification:
         """Read instrument type and version and return QMI_InstrumentIdentification instance."""
+        version_str = self.get_version()
+        model, version, revision = version_str[14:].split(".")[:3]
+        return QMI_InstrumentIdentification(
+            vendor="HighFinesse",
+            model=f"WLM-{model}",
+            serial=None,
+            version=".".join([version, revision])
+        )
+
+    @rpc_method
+    def get_operation_state(self) -> int:
+        """Get the instrument operation state. Possible return values are:
+        - 0 : cStop. Wlm active but stopped,
+        - 1 : cAdjustment. Wlm active and program is adjusting,
+        - 2 : cMeasurement. Wlm active and measuring, recording or replaying.
+
+        Returns:
+            op_state: The operation state integer.
+        """
         self._check_is_open()
-        version_type = self._lib.dll.GetWLMVersion(0)
-        version_ver = self._lib.dll.GetWLMVersion(1)
-        version_rev = self._lib.dll.GetWLMVersion(2)
-        return QMI_InstrumentIdentification(vendor="HighFinesse",
-                                            model=f"WLM-{version_type}",
-                                            serial=str(version_ver),
-                                            version=str(version_rev))
+        op_state = self._lib.dll.GetOperationState(0)
+        return op_state
 
     @rpc_method
     def get_frequency(self, channel: int) -> float:
         """Get the main results of the measurement of a specified signal.
 
-        :param channel: The signal number (1 to 8) in case of a WLM with multi channel switch or with double pulse
-            option (MLC). For WLMs without these options 1 should be overhanded.
-        :return: The last measured frequency value in THz.
-        :raises QMI_InstrumentException: In case of instrument error.
+        Parameters:
+            channel: The signal number (1 to 8) in case of a WLM with multichannel switch or with double pulse
+                     option (MLC). For WLMs without these options 1 should be overhanded.
+
+        Returns:
+            frequency: The last measured frequency value in THz.
+
+        Raises:
+            QMI_InstrumentException: In case of instrument error.
         """
-        _logger.info("[%s] Getting frequency on channel %d", self._name, channel)
+        _logger.debug("[%s] Getting frequency on channel %d", self._name, channel)
         self._check_channel(channel)
 
         frequency = self._lib.dll.GetFrequencyNum(channel, 0.0)
@@ -124,12 +186,14 @@ class HighFinesse_WS(QMI_Instrument):
     def get_wavelength(self, channel: int) -> float:
         """Get the main results of the measurement of a specified signal.
 
-        :param channel: The signal number (1 to 8) in case of a WLM with multichannel switch or with double pulse
-            option (MLC). For WLMs without these options 1 should be overhanded.
-        :return: The last measured wavelength in nm.
-        :raises QMI_InstrumentException: In case of instrument error or channel out of range.
+        Parameters:
+            channel: The signal number (1 to 8) in case of a WLM with multichannel switch or with double pulse
+                     option (MLC). For WLMs without these options 1 should be overhanded.
+
+        Returns:
+            wavelength: The last measured wavelength in nm.
         """
-        _logger.info("[%s] Getting wavelength on channel %d", self._name, channel)
+        _logger.debug("[%s] Getting wavelength on channel %d", self._name, channel)
         self._check_channel(channel)
 
         wavelength = self._lib.dll.GetWavelengthNum(channel, 0.0)
@@ -137,22 +201,115 @@ class HighFinesse_WS(QMI_Instrument):
         return self._check_for_error_code(wavelength, "GetWavelengthNum")
 
     @rpc_method
-    def close(self) -> None:
-        """Close the connection to the instrument hardware and release associated resources."""
-        _logger.info("[%s] Closing connection to instrument", self._name)
+    def get_power(self, channel: int) -> float:
+        """Get the power of the current measurement shot of a specified signal.
 
-        super().close()
+        Parameters:
+            channel: The signal number (1 to 8) in case of a WLM with multichannel switch or with double pulse
+                     option (MLC). For WLMs without these options 1 should be overhanded.
 
-    def _check_channel(self, channel: int) -> None:
-        if not (0 < channel <= self.MAX_CHANNEL_NUMBER):
-            raise QMI_InstrumentException(f"Channel number out of range: {channel}")
+        Returns:
+            power:   The power of the last measured cw or quasi cw signal in uW or the energy in uJ.
+        """
+        _logger.debug("[%s] Getting power on channel %d", self._name, channel)
+        self._check_channel(channel)
 
-    def _check_for_error_code(self, value: float, method: str) -> float:
-        if value > 0:
-            return value
+        power = self._lib.dll.GetPowerNum(channel, 0.0)
 
-        err_msg = WS8_ERR(value) if value in [error.value for error in WS8_ERR] else str(value)
+        return self._check_for_error_code(power, "GetPowerNum")
 
-        _logger.warning("[%s] %s error: %s", self._name, method, err_msg)
+    @rpc_method
+    def read_measurement(self, channel: int) -> Measurement:
+        """This is to make compatibility with the Bristol wavemeter Measurement namedtuple.
 
-        raise QMI_InstrumentException(f"Error received from library call '{method}': {err_msg}")
+        Parameters:
+            channel: The channel number to read the data from. Not used for HighFinesse, which
+                     returns the status of the device, not just channel.
+
+        Returns:
+            measurement: Measurement instance with timestamp, index, status, wavelength and power.
+        """
+        self._check_channel(channel)
+
+        timestamp = time()
+        index = 0  # Currently not used
+        status = self.get_operation_state()
+        wavelength = self.get_wavelength(channel)
+        power = self.get_power(channel)
+
+        return Measurement(timestamp, index, status, wavelength, power)
+
+    @rpc_method
+    def set_data_pattern(self, index: int = 1, enable: bool = True) -> None:
+        """Enable or disable a pattern index to export data from instrument.
+
+        Parameters:
+            index:  Index number for export control. Index values have the following meanings:
+                    - 0 : cSignal1Interferometers. The array received by the Fizeau interferometers or
+                      diffraction grating.
+                    - 1 : cSignal1WideInterferometer. Additional long interferometer or grating array.
+                    - 1 : cSignal1Grating. Only in Grating analyzing versions! The array received
+                      by spectrum analysis (grating precision).
+                    - 2 : cSignal2Interferometers. Only in Double Pulse versions! The array received by
+                      the Fizeau interferometers for the 2nd pulse.
+                    - 3 : cSignal2WideInterferometer. Only in Double Pulse versions! Additional long
+                      interferometer array for 2nd pulse.
+
+                    With SetAnalysis only the following value is possible (with LSA and resolver versions):
+                    - 4 : cSignalAnalysis[X]. The [X] array[s] of the spectral analysis data.
+                    - 5 : cSignalAnalysisY. The Y array of the spectral analysis data.
+
+            enable: True to enable data pattern (default), False to disable.
+
+        Raises:
+            ValueError: With invalid index number.
+        """
+        if index not in range(6):
+            raise ValueError(f"Invalid data pattern index number {index}")
+
+        if enable:
+            _logger.debug("[%s] Enabling data pattern with index %d", self._name, index)
+            i_enable = wlmConst.cPatternEnable
+
+        else:
+            _logger.debug("[%s] Disabling data pattern with index %d", self._name, index)
+            i_enable = wlmConst.cPatternDisable
+
+        ret_val = self._lib.dll.SetPattern(index, i_enable)
+        self._check_for_error_code(ret_val, "SetPattern")
+
+    @rpc_method
+    def get_data_pattern_data(
+        self, channel: int, index: int, arr_size: int
+    ) -> np.typing.NDArray[np.int16]:
+        """Get data from the given data pattern. It must be set first with `set_data_pattern`.
+
+        Parameters:
+            channel:  The signal number (1 to 8) in case of a WLM with multichannel switch or with double pulse
+                      option (MLC). For WLMs without these options 1 should be overhanded.
+            index:    Index number to get the data pattern from. Must be in range [0 .. 5].
+            arr_size: A batch size for reading data pattern.
+
+        Returns:
+            data:     Data array from the data pattern.
+
+        Raises:
+            ValueError: With invalid index number.
+        """
+        _logger.debug("[%s] Getting data pattern data on channel %d and index %i", self._name, channel, index)
+        if index not in range(6):
+            raise ValueError(f"Invalid data pattern index number {index}")
+
+        self._check_channel(channel)
+        pattern_array = np.zeros(arr_size, dtype=ctypes.c_short)
+        c_short_ptr = ctypes.POINTER(ctypes.c_short)
+        ret_val = self._lib.dll.GetPatternDataNum(channel, index, pattern_array.ctypes.data_as(c_short_ptr))
+        if ret_val == 0:
+            # The channel and/or index was not (correctly) enabled.
+            _logger.debug("[%s] GetPatternDataNum error %i", self._name, ret_val)
+
+        elif ret_val not in [0, 1]:
+            # Return value is an error code.
+            self._check_for_error_code(ret_val, "GetPatternDataNum")
+
+        return pattern_array

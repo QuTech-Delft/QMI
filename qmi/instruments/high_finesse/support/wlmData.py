@@ -47,7 +47,6 @@ use in order to rule out errors and avoid any damage.
 HighFinesse would be grateful for any information on errors and any suggestions for
 improvement sent to info@highfinesse.de.
 """
-
 #
 # wlmData API function bindings generated from wlmData.h
 #
@@ -86,7 +85,7 @@ def LoadDLL(path):
     # int32_t WaitForNextWLMEventEx(int32_t* Ver, int32_t* Mode, int32_t* IntVal, double* DblVal, int32_t* Res1)
     dll.WaitForNextWLMEventEx.argtypes = [ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_int32), ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_int32)]
     dll.WaitForNextWLMEventEx.restype = ctypes.c_int32
-
+    
     # void ClearWLMEvents(void)
     dll.ClearWLMEvents.argtypes = []
     dll.ClearWLMEvents.restype = None

@@ -21,7 +21,7 @@ from typing import Callable
 
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException
-from qmi.instruments.high_finesse.wlm import HighFinesse_WS
+from qmi.instruments.high_finesse.wlm import HighFinesse_Wlm
 from qmi.utils.context_managers import start_stop, open_close
 
 
@@ -57,7 +57,7 @@ def main() -> int:
 
 
 def _do_server(args: argparse.Namespace):
-    instr: HighFinesse_WS
+    instr: HighFinesse_Wlm
     with (start_stop(qmi, "highfinesse_wlm", console_loglevel="WARNING", config_file=args.config),
           _parse_instrument_source() as instr):
         started_server = instr.start_server()
@@ -73,7 +73,7 @@ def _do_server(args: argparse.Namespace):
 
 
 def _do_client(args: argparse.Namespace):
-    instr: HighFinesse_WS
+    instr: HighFinesse_Wlm
     with start_stop(qmi, "highfinesse_client", config_file=args.config):
         qmi.context().connect_to_peer("highfinesse_wlm")
         instr = qmi.get_instrument("highfinesse_wlm.wlm")
@@ -82,7 +82,7 @@ def _do_client(args: argparse.Namespace):
 
 
 def _do_standalone(args: argparse.Namespace):
-    instr: HighFinesse_WS
+    instr: HighFinesse_Wlm
     with (start_stop(qmi, "highfinesse_wlm", console_loglevel="INFO"),
           _parse_instrument_source() as instr):
         started_server = instr.start_server()
@@ -112,17 +112,17 @@ def _perform_actions(instr, args: argparse.Namespace):
 def _parse_instrument_source() -> AbstractContextManager:
     instr = open_close(qmi.make_instrument(
         instrument_name="wlm",
-        instrument_class=HighFinesse_WS)
+        instrument_class=HighFinesse_Wlm)
     )
     return instr
 
 
-def _show_instrument_version(instr: HighFinesse_WS):
+def _show_instrument_version(instr: HighFinesse_Wlm):
     version = instr.get_version()
     print(version)
 
 
-def _show_instrument_idn(instr: HighFinesse_WS):
+def _show_instrument_idn(instr: HighFinesse_Wlm):
     idn = instr.get_idn()
     print(idn)
 
