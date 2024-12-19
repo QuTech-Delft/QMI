@@ -9,7 +9,6 @@ This driver has been tested on the WS-6 model.
 
 import ctypes
 import logging
-from time import time
 
 import numpy as np
 
@@ -17,7 +16,6 @@ from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
-from qmi.instruments.bristol.bristol_871a import Measurement
 from qmi.instruments.high_finesse.support import wlmConst
 from qmi.instruments.high_finesse.support._library_wrapper import _LibWrapper, WlmGetErr
 
@@ -217,27 +215,6 @@ class HighFinesse_Wlm(QMI_Instrument):
         power = self._lib.dll.GetPowerNum(channel, 0.0)
 
         return self._check_for_error_code(power, "GetPowerNum")
-
-    @rpc_method
-    def read_measurement(self, channel: int) -> Measurement:
-        """This is to make compatibility with the Bristol wavemeter Measurement namedtuple.
-
-        Parameters:
-            channel: The channel number to read the data from. Not used for HighFinesse, which
-                     returns the status of the device, not just channel.
-
-        Returns:
-            measurement: Measurement instance with timestamp, index, status, wavelength and power.
-        """
-        self._check_channel(channel)
-
-        timestamp = time()
-        index = 0  # Currently not used
-        status = self.get_operation_state()
-        wavelength = self.get_wavelength(channel)
-        power = self.get_power(channel)
-
-        return Measurement(timestamp, index, status, wavelength, power)
 
     @rpc_method
     def set_data_pattern(self, index: int = 1, enable: bool = True) -> None:

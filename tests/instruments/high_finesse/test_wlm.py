@@ -6,7 +6,6 @@ import numpy.testing
 from numpy import nan
 
 from qmi.core.exceptions import QMI_InvalidOperationException, QMI_InstrumentException
-from qmi.instruments.bristol.bristol_871a import Measurement
 from qmi.instruments.high_finesse import HighFinesse_Wlm
 from qmi.instruments.high_finesse.support import (
     wlmData,
@@ -218,33 +217,6 @@ class TestHighFinesse_Wlm(TestCase):
              power = wlm.get_power(1)
 
         numpy.testing.assert_equal(nan, power)
-
-    def test_read_measurement(self, dll_patcher):
-        """The driver should return the frequency and power values with a timestamp."""
-        expected_time = 12.34
-        expected_power = 1.23
-        expected_wavelength = 673
-        expected_state = 2
-        expected_measurement = Measurement(
-            timestamp=expected_time,
-            index=0,
-            status=expected_state,
-            wavelength=expected_wavelength,
-            power=expected_power
-        )
-        wlmData.dll = dll_patcher.return_value
-        wlmData.dll.GetWLMCount.side_effect = {0: 1}.get
-        wlmData.dll.GetPowerNum.return_value = expected_power
-        wlmData.dll.GetWavelengthNum.return_value = expected_wavelength
-        wlmData.dll.GetOperationState.return_value = expected_state
-
-        with patch("qmi.instruments.high_finesse.wlm.time", return_value=expected_time):
-            with HighFinesse_Wlm(self.ctx, "wlm") as wlm:
-                self.assertEqual(expected_measurement, wlm.read_measurement(1))
-
-        wlm._lib.dll.GetWavelengthNum.assert_called_once_with(1, 0.0)
-        wlm._lib.dll.GetPowerNum.assert_called_once_with(1, 0.0)
-        wlm._lib.dll.GetOperationState.assert_called_once_with(0)
 
     def test_set_data_pattern_defaults(self, dll_patcher):
         """Test the set_data_patterns calls SetPattern with default index and i_enable."""
