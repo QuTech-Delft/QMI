@@ -119,8 +119,8 @@ class _T2EventDecoder(EventDecoder):
 
         # Copy the non-overflow records to a result array.
         events = np.empty(len(event_types), dtype=EventDataType)
-        events["type"] = event_types
-        events["timestamp"] = event_timestamps
+        events["type"] = event_types  # type: ignore[call-overload]
+        events["timestamp"] = event_timestamps  # type: ignore[call-overload]
 
         return events
 
@@ -191,10 +191,10 @@ class _T3EventDecoder(EventDecoder):
         num_data_events = len(event_types)
         num_events = num_data_events + len(sync_timestamps)
         events = np.empty(num_events, dtype=EventDataType)
-        events[:num_data_events]["type"] = event_types
-        events[:num_data_events]["timestamp"] = event_timestamps
-        events[num_data_events:]["type"] = 64
-        events[num_data_events:]["timestamp"] = sync_timestamps
+        events[:num_data_events]["type"] = event_types  # type: ignore[call-overload]
+        events[:num_data_events]["timestamp"] = event_timestamps  # type: ignore[call-overload]
+        events[num_data_events:]["type"] = 64  # type: ignore[call-overload]
+        events[num_data_events:]["timestamp"] = sync_timestamps  # type: ignore[call-overload]
         # Events need to be sorted by timestamp, and by type number so that sync# 64 is before channel#.
         # NOTE: Since numpy 2.0 overflow of values is not allowed anymore. Therefore, for the means of the lexical sort
         # where we use the trick of setting the event types as their negatives to get the right order, now must be

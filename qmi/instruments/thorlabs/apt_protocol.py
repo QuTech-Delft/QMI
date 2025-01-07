@@ -14,7 +14,7 @@ from ctypes import (
     sizeof,
 )
 from enum import Enum
-from typing import List, Optional, Tuple, Type, TypeVar
+from typing import ClassVar, Type, TypeVar
 
 from qmi.core.transport import QMI_Transport
 from qmi.core.exceptions import QMI_InstrumentException
@@ -111,7 +111,7 @@ class AptMessageHeaderWithParams(LittleEndianStructure):
     """
 
     _pack_ = True
-    _fields_: List[Tuple[str, type]] = [
+    _fields_: ClassVar[list[tuple[str, type]]] = [
         ("message_id", c_uint16),
         ("param1", c_uint8),
         ("param2", c_uint8),
@@ -126,7 +126,7 @@ class AptMessageHeaderForData(LittleEndianStructure):
     """
 
     _pack_ = True
-    _fields_: List[Tuple[str, type]] = [
+    _fields_: ClassVar[list[tuple[str, type]]] = [
         ("message_id", c_uint16),
         ("data_length", c_uint16),
         ("dest", c_uint8),
@@ -159,7 +159,7 @@ class AptProtocol:
         transport: QMI_Transport,
         apt_device_address: int = 0x50,
         host_address: int = 0x01,
-        default_timeout: Optional[float] = None,
+        default_timeout: float | None = None,
     ):
         """Initialize the Thorlabs APT protocol handler.
 
@@ -215,7 +215,7 @@ class AptProtocol:
         # Send the header and data packet.
         self._transport.write(bytearray(msg) + bytearray(data))
 
-    def ask(self, data_type: Type[T], timeout: Optional[float] = None) -> T:
+    def ask(self, data_type: Type[T], timeout: float | None = None) -> T:
         """
         Ask for a response.
 
