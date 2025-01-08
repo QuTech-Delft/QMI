@@ -15,7 +15,7 @@ import contextlib
 import enum
 import logging
 import time
-from typing import Any, Dict, List, NamedTuple, Tuple, Type
+from typing import Any, ClassVar, NamedTuple, Type
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
@@ -48,17 +48,21 @@ class _AptMessage(ctypes.LittleEndianStructure):
         if message_size > 6:
             # This is a long APT message (header + data).
             # Long APT messages are identified by bit 7 in the destination field.
-            return cls(message_id=cls.MESSAGE_ID,
-                       data_length=(message_size - 6),
-                       dest=(_APT_DEVICE_ADDRESS | 0x80),
-                       source=_APT_HOST_ADDRESS,
-                       **kwargs)
+            return cls(
+                message_id=cls.MESSAGE_ID,
+                data_length=(message_size - 6),
+                dest=(_APT_DEVICE_ADDRESS | 0x80),
+                source=_APT_HOST_ADDRESS,
+                **kwargs
+            )
         else:
             # This is a short APT message (header only).
-            return cls(message_id=cls.MESSAGE_ID,
-                       dest=_APT_DEVICE_ADDRESS,
-                       source=_APT_HOST_ADDRESS,
-                       **kwargs)
+            return cls(
+                message_id=cls.MESSAGE_ID,
+                dest=_APT_DEVICE_ADDRESS,
+                source=_APT_HOST_ADDRESS,
+                **kwargs
+            )
 
 
 class _AptMessageHeader(_AptMessage):
@@ -67,7 +71,7 @@ class _AptMessageHeader(_AptMessage):
     This is also the base class for long messages (header + data).
     """
     _pack_ = 1
-    _fields_: List[Tuple[str, type]] = [
+    _fields_: ClassVar[list[tuple[str, type]]] = [
         ('message_id',  ctypes.c_uint16),
         ('data_length', ctypes.c_uint16),
         ('dest',        ctypes.c_uint8),
@@ -75,7 +79,7 @@ class _AptMessageHeader(_AptMessage):
     ]
 
 
-def _apt_short_message_fields(fields: List[Tuple[str, type]]) -> List[Tuple[str, type]]:
+def _apt_short_message_fields(fields: list[tuple[str, type]]) -> list[tuple[str, type]]:
     """Helper function to create the field list for a short APT message.
 
     The message consists of only a 6-byte header, including 2 bytes space
@@ -97,7 +101,7 @@ def _apt_short_message_fields(fields: List[Tuple[str, type]]) -> List[Tuple[str,
     assert data_length <= 2
 
     # Build field list for ctypes structure.
-    all_fields: List[Tuple[str, type]] = []
+    all_fields: list[tuple[str, type]] = []
     all_fields.append(("message_id", ctypes.c_uint16))
     all_fields += fields
     if data_length < 2:
@@ -256,7 +260,7 @@ class _AptMsgGetStatusBits(_AptMessageHeader):
 
 
 # Build a table, mapping message ID to the corresponding Python class.
-_apt_message_type_table: Dict[int, Type["_AptMessage"]] = {
+_apt_message_type_table: dict[int, Type["_AptMessage"]] = {
     _AptMsgIdentify.MESSAGE_ID:             _AptMsgIdentify,
     _AptMsgSetChanEnableState.MESSAGE_ID:   _AptMsgSetChanEnableState,
     _AptMsgReqChanEnableState.MESSAGE_ID:   _AptMsgReqChanEnableState,
@@ -369,17 +373,13 @@ class Thorlabs_K10CR1(QMI_Instrument):
     # Internal velocity setting for 1 degree/second.
     VELOCITY_FACTOR = 7329109.0
 
-    # Internal accleration setting for 1 degree/second/second.
+    # Internal acceleration setting for 1 degree/second/second.
     ACCELERATION_FACTOR = 1502.0
 
-    def __init__(self,
-                 context: QMI_Context,
-                 name: str,
-                 transport: str
-                 ) -> None:
+    def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize driver.
 
-        The motorized mount presents itself as an USB serial port.
+        The motorized mount presents itself as a USB serial port.
         The transport descriptor should refer to the serial port device,
         e.g. "serial:/dev/ttyUSB1"
 
@@ -419,23 +419,30 @@ class Thorlabs_K10CR1(QMI_Instrument):
             except QMI_TimeoutException:
                 # Discard pending data after receiving a partial message.
                 self._transport.discard_read()
-                raise QMI_InstrumentException("Received partial message (message_id=0x{:04x}, data_length={})"
-                                              .format(hdr.message_id, hdr.data_length))
+                raise QMI_InstrumentException(
+                    "Received partial message (message_id=0x{:04x}, data_length={})".format(
+                        hdr.message_id, hdr.data_length
+                    )
+                )
 
         # Decode the complete message.
         message_type = _apt_message_type_table.get(hdr.message_id)
         if message_type is None:
             # Discard pending data after receiving a bad message.
             self._transport.discard_read()
-            raise QMI_InstrumentException("Received unknown message id 0x{:04x} from instrument"
-                                          .format(hdr.message_id))
+            raise QMI_InstrumentException(
+                "Received unknown message id 0x{:04x} from instrument".format(hdr.message_id)
+            )
 
         if len(data) != ctypes.sizeof(message_type):
             # Discard pending data after receiving a bad message.
             self._transport.discard_read()
-            raise QMI_InstrumentException(("Received incorrect message length for message id 0x{:04x} "
-                                           + "(got {} bytes while expecting {} bytes)")
-                                          .format(hdr.message_id, len(data), ctypes.sizeof(message_type)))
+            raise QMI_InstrumentException(
+                ("Received incorrect message length for message id 0x{:04x} "
+                + "(got {} bytes while expecting {} bytes)").format(
+                    hdr.message_id, len(data), ctypes.sizeof(message_type)
+                )
+            )
 
         # Decode received message.
         return message_type.from_buffer_copy(data)
@@ -508,8 +515,9 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # Check that this is a K10CR1 device.
         model_str = reply_msg.model_number.decode("iso8859-1")
         if model_str != "K10CR1":
-            raise QMI_InstrumentException("Driver only supports K10CR1 but instrument identifies as {!r}"
-                                          .format(model_str))
+            raise QMI_InstrumentException(
+                "Driver only supports K10CR1 but instrument identifies as {!r}".format(model_str)
+            )
 
     @rpc_method
     def open(self) -> None:
@@ -558,12 +566,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # Receive reply message.
         reply_msg = self._wait_message(_AptMsgHwGetInfo, timeout=self._reply_timeout)
 
-        return QMI_InstrumentIdentification(vendor="Thorlabs",
-                                            model=reply_msg.model_number.decode("iso8859-1"),
-                                            serial=reply_msg.serial_number,
-                                            version="{}.{}.{}".format(reply_msg.fw_version[2],
-                                                                      reply_msg.fw_version[1],
-                                                                      reply_msg.fw_version[0]))
+        return QMI_InstrumentIdentification(
+            vendor="Thorlabs",
+            model=reply_msg.model_number.decode("iso8859-1"),
+            serial=reply_msg.serial_number,
+            version="{}.{}.{}".format(reply_msg.fw_version[2], reply_msg.fw_version[1], reply_msg.fw_version[0])
+        )
 
     @rpc_method
     def get_motor_status(self) -> MotorStatus:
@@ -579,19 +587,21 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Decode motor status bits.
         status_bits = reply_msg.status_bits
-        return MotorStatus(forward_limit=((status_bits & 0x01) != 0),
-                           reverse_limit=((status_bits & 0x02) != 0),
-                           moving_forward=((status_bits & 0x10) != 0),
-                           moving_reverse=((status_bits & 0x20) != 0),
-                           jogging_forward=((status_bits & 0x40) != 0),
-                           jogging_reverse=((status_bits & 0x80) != 0),
-                           homing=((status_bits & 0x200) != 0),
-                           homed=((status_bits & 0x400) != 0),
-                           tracking=((status_bits & 0x1000) != 0),
-                           settled=((status_bits & 0x2000) != 0),
-                           motion_error=((status_bits & 0x4000) != 0),
-                           current_limit=((status_bits & 0x01000000) != 0),
-                           channel_enabled=((status_bits & 0x80000000) != 0))
+        return MotorStatus(
+            forward_limit=((status_bits & 0x01) != 0),
+            reverse_limit=((status_bits & 0x02) != 0),
+            moving_forward=((status_bits & 0x10) != 0),
+            moving_reverse=((status_bits & 0x20) != 0),
+            jogging_forward=((status_bits & 0x40) != 0),
+            jogging_reverse=((status_bits & 0x80) != 0),
+            homing=((status_bits & 0x200) != 0),
+            homed=((status_bits & 0x400) != 0),
+            tracking=((status_bits & 0x1000) != 0),
+            settled=((status_bits & 0x2000) != 0),
+            motion_error=((status_bits & 0x4000) != 0),
+            current_limit=((status_bits & 0x01000000) != 0),
+            channel_enabled=((status_bits & 0x80000000) != 0)
+        )
 
     @rpc_method
     def identify(self) -> None:
@@ -613,7 +623,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Receive reply message.
         reply_msg = self._wait_message(_AptMsgGetChanEnableState, timeout=self._reply_timeout)
-        return (reply_msg.enable_state == 0x01)
+        return reply_msg.enable_state == 0x01
 
     @rpc_method
     def set_chan_enable_state(self, enable: bool) -> None:
@@ -628,8 +638,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Send command message.
         enable_state = 0x01 if enable else 0x02
-        req_msg = _AptMsgSetChanEnableState.create(chan_ident=self._channel,
-                                                   enable_state=enable_state)
+        req_msg = _AptMsgSetChanEnableState.create(chan_ident=self._channel, enable_state=enable_state)
         self._send_message(req_msg)
 
     @rpc_method
@@ -668,8 +677,10 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Receive reply message.
         reply_msg = self._wait_message(_AptMsgGetVelParams, timeout=self._reply_timeout)
-        return VelocityParams(max_velocity=(reply_msg.max_vel / self.VELOCITY_FACTOR),
-                              acceleration=(reply_msg.accel / self.ACCELERATION_FACTOR))
+        return VelocityParams(
+            max_velocity=(reply_msg.max_vel / self.VELOCITY_FACTOR),
+            acceleration=(reply_msg.accel / self.ACCELERATION_FACTOR)
+        )
 
     @rpc_method
     def set_velocity_params(self, max_velocity: float, acceleration: float) -> None:
@@ -692,10 +703,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # Send command message.
         max_vel = int(round(max_velocity * self.VELOCITY_FACTOR))
         accel = int(round(acceleration * self.ACCELERATION_FACTOR))
-        req_msg = _AptMsgSetVelParams.create(chan_ident=self._channel,
-                                             min_vel=0,
-                                             accel=accel,
-                                             max_vel=max_vel)
+        req_msg = _AptMsgSetVelParams.create(
+            chan_ident=self._channel,
+            min_vel=0,
+            accel=accel,
+            max_vel=max_vel
+        )
         self._send_message(req_msg)
 
     @rpc_method
@@ -732,8 +745,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send command message.
-        req_msg = _AptMsgSetGenMoveParams.create(chan_ident=self._channel,
-                                                 backlash_dist=raw_dist)
+        req_msg = _AptMsgSetGenMoveParams.create(chan_ident=self._channel, backlash_dist=raw_dist)
         self._send_message(req_msg)
 
     @rpc_method
@@ -748,18 +760,21 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Receive reply message.
         reply_msg = self._wait_message(_AptMsgGetHomeParams, timeout=self._reply_timeout)
-        return HomeParams(home_direction=HomeDirection(reply_msg.home_dir),
-                          limit_switch=HomeLimitSwitch(reply_msg.limit_switch),
-                          home_velocity=(reply_msg.home_velocity / self.VELOCITY_FACTOR),
-                          offset_distance=(reply_msg.offset_dist / self.MICROSTEPS_PER_DEGREE))
+        return HomeParams(
+            home_direction=HomeDirection(reply_msg.home_dir),
+            limit_switch=HomeLimitSwitch(reply_msg.limit_switch),
+            home_velocity=(reply_msg.home_velocity / self.VELOCITY_FACTOR),
+            offset_distance=(reply_msg.offset_dist / self.MICROSTEPS_PER_DEGREE)
+        )
 
     @rpc_method
-    def set_home_params(self,
-                        home_direction: HomeDirection,
-                        limit_switch: HomeLimitSwitch,
-                        home_velocity: float,
-                        offset_distance: float
-                        ) -> None:
+    def set_home_params(
+        self,
+        home_direction: HomeDirection,
+        limit_switch: HomeLimitSwitch,
+        home_velocity: float,
+        offset_distance: float
+    ) -> None:
         """Set the homing parameters.
 
         WARNING: The K10CR1 manual recommends that these settings should
@@ -788,11 +803,13 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Send command message.
         raw_velocity = int(round(home_velocity * self.VELOCITY_FACTOR))
-        req_msg = _AptMsgSetHomeParams.create(chan_ident=self._channel,
-                                              home_dir=int(home_direction),
-                                              limit_switch=int(limit_switch),
-                                              home_velocity=raw_velocity,
-                                              offset_dist=raw_dist)
+        req_msg = _AptMsgSetHomeParams.create(
+            chan_ident=self._channel,
+            home_dir=int(home_direction),
+            limit_switch=int(limit_switch),
+            home_velocity=raw_velocity,
+            offset_dist=raw_dist
+        )
         self._send_message(req_msg)
 
     @rpc_method
@@ -809,8 +826,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Send command message.
         stop_mode = 0x01 if immediate_stop else 0x02
-        req_msg = _AptMsgMoveStop.create(chan_ident=self._channel,
-                                         stop_mode=stop_mode)
+        req_msg = _AptMsgMoveStop.create(chan_ident=self._channel, stop_mode=stop_mode)
         self._send_message(req_msg)
 
     @rpc_method
@@ -845,8 +861,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send command message.
-        req_msg = _AptMsgMoveRelative.create(chan_ident=self._channel,
-                                             rel_dist=raw_dist)
+        req_msg = _AptMsgMoveRelative.create(chan_ident=self._channel, rel_dist=raw_dist)
         self._send_message(req_msg)
 
     @rpc_method
@@ -878,8 +893,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send command message.
-        req_msg = _AptMsgMoveAbsolute.create(chan_ident=self._channel,
-                                             abs_position=raw_pos)
+        req_msg = _AptMsgMoveAbsolute.create(chan_ident=self._channel, abs_position=raw_pos)
         self._send_message(req_msg)
 
     @rpc_method
