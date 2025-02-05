@@ -227,7 +227,7 @@ def is_local_host(host: str) -> bool:
     # Get list of IP addresses for the specified host.
     host_ips: set[str] = set()
     for addr in addrs:
-        host_ips.add(addr[4][0])
+        host_ips.add(str(addr[4][0]))
 
     # Return True if the specified host refers to a loopback address.
     for ip_address in host_ips:
