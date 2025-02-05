@@ -225,7 +225,7 @@ def is_local_host(host: str) -> bool:
         return False
 
     # Get list of IP addresses for the specified host.
-    host_ips = set()
+    host_ips: set[str] = set()
     for addr in addrs:
         host_ips.add(addr[4][0])
 
