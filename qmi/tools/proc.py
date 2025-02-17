@@ -241,7 +241,7 @@ def is_local_host(host: str) -> bool:
     # Return True if a local IP address matches the specified host.
     for addrs in if_addrs.values():
         for addr in addrs:
-            if hasattr(addr, "address") and addr.address in host_ips:
+            if addr.address in host_ips:  # type: ignore
                 return True
 
     # Specified host does not refer to the local computer.
