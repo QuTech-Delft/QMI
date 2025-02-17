@@ -310,13 +310,6 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         self.assertTrue(proc.is_local_host("::1"))
         self.assertFalse(proc.is_local_host("INVALID"))
 
-        # c0 = QMI_Context("ContextName0", CfgQmi(
-        #     contexts={
-        #         "ContextName0": CfgContext(host=self._config["config0"]["ip"], tcp_server_port=self._config["config0"]["port"], enabled=True)
-        #     }
-        # ))
-        # c0.start()
-        # c0.connect_to_peer("ContextName2", c0.discover_peer_contexts()[0][1])
         # Collect a local ip address that is not a loopback address.
         test_addr = None
         for addr in psutil.net_if_addrs().values():
@@ -329,6 +322,37 @@ class ProcessManagementClientTestCase(unittest.TestCase):
 
         if test_addr:
             self.assertTrue(proc.is_local_host(test_addr.address))
+
+    @patch("qmi.tools.proc.socket")
+    @patch("qmi.tools.proc.psutil", autospec=psutil)
+    def test_is_local_host_assert_exceptions(self, psutil_patch, socket_patch):
+        """Test is_local_host raises assertion exceptions."""
+        getaddrinfo = unittest.mock.Mock(side_effect=[
+            ([["a", "b", "c", "d", ["271.0.0.1"]]]),
+            ([["a", "b", "c", "d", [127,0,0.1]]]),
+            OSError("Test error")
+        ])
+        socket_patch.getaddrinfo = getaddrinfo
+        net_if_addrs = unittest.mock.Mock(return_value={
+            "some_if": ["foute_addr"]
+        })
+        psutil_patch.net_if_addrs = net_if_addrs
+        psutil_patch._common.snicaddr = psutil._common.snicaddr
+        # Except first the second assertion
+        with self.assertRaises(AssertionError) as ass_err_2:
+            proc.is_local_host("123.45.67.89")
+
+        # Then except the first assertion
+        with patch("qmi.tools.proc.str", spec_set=str, new=lambda x: 127) as str_patch:
+            with self.assertRaises(AssertionError) as ass_err_1:
+                proc.is_local_host("123.45.67.89")
+
+        # As final step exception at getting address info returns False
+        self.assertFalse(proc.is_local_host("123.45.67.89"))
+
+        # Assert
+        self.assertEqual("", str(ass_err_2.exception))
+        self.assertEqual("AssertionError(\"'ip_address' unexpectedly not a string!\")", repr(ass_err_1.exception))
 
     def test_start_local_process(self):
         """Test start_local_process, happy flow."""

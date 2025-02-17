@@ -3,7 +3,7 @@
 
 This tool starts or stops background QMI processes.
 """
-
+import builtins
 import sys
 import argparse
 import logging
@@ -231,7 +231,7 @@ def is_local_host(host: str) -> bool:
 
     # Return True if the specified host refers to a loopback address.
     for ip_address in host_ips:
-        assert isinstance(ip_address, str), "'ip_address' unexpectedly not a string!"
+        assert isinstance(ip_address, builtins.str), "'ip_address' unexpectedly not a string!"
         if ip_address.startswith("127.") or ip_address == "::1":
             return True
 
@@ -241,7 +241,7 @@ def is_local_host(host: str) -> bool:
     # Return True if a local IP address matches the specified host.
     for addrs in if_addrs.values():
         for addr in addrs:
-            assert hasattr(addr, "address")
+            assert isinstance(addr, psutil._common.snicaddr)
             if addr.address in host_ips:
                 return True
 
