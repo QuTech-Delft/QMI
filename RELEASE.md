@@ -12,68 +12,52 @@ If you are using e.g. Git Bash on Windows, the `bump2version` command probably n
     ```shell script
     git checkout -b stable-{major}-{minor}
     ```
-2. Replace in `CHANGELOG.md` the `## \[x.y.z] - Unreleased` line with `## [<major>.<minor>.<patch>] - <yyyy>-<mm>-<dd>` line.
-3. Commit the CHANGELOG.md change:
+2. Run `bump2version` to update the files which contain references to `main` to the new stable branch.
     ```shell script
-    git add CHANGELOG.md
-    git commit -m "Update the CHANGELOG.md release header"
+    bump2version release --config-file=.bumpversion_switch.cfg --commit
     ```
-4. Run `bump2version` to increment to release version and to create a tag:
+3. Run `bump2version` to create a release version and a tag:
     ```shell script
-    bump2version release --commit --tag --tag_name v<major>.<minor>.<patch>
+    bump2version release --config-file=.bumpversion_release.cfg --commit --tag
     ```
-5. Push these files and see that the pipelines pass.
+4. Push the branch to origin and see that it passes the workflow.
     ```shell script
     git push --set-upstream origin stable-<major>-<minor>
     ```
-6. Push the tag:
+5. Push the tag to origin:
     ```shell script
-    git push origin v{major}.{minor}.{patch}
+    git push origin v{major}.{minor}.{patch} 
     ```
-7. Find the tag in the GitHub page, and make a release with as comments the latest `CHANGELOG.md` notes.
-8. See that the tag has created the package and uploaded it into Pypi.
-9. Revert the badges to point back to `main` branch:
-    ```shell script
-    bump2version minor --config-file .bumpreadme_rel.cfg --allow-dirty
-    ```
-10. Git add, commit and push to branch:
-    ```shell script
-    git add README.md
-    git commit -m "Update README.md"
-    git push origin
-    ```
-11. Checkout `main` branch:
+6. If the tag passes the workflow, do the following:
+  - Find the tag in GitHub and make a release with the latest `CHANGELOG.md` entry.
+  - See that the release has created a package and upload it to Pypi.
+7. Checkout `main` branch:
     ```shell script
     git checkout main
     ```
-12. Obtain the CHANGELOG.md from the stable branch:
+8. Checkout a new branch named `bump-minor-on-main` and check it out locally:
     ```shell script
-    git checkout stable-{major}-{minor} -- CHANGELOG.md
+    git checkout -b bump-minor-on-main
     ```
-13. Add `## \[x.y.z] - Unreleased` line back into the `CHANGELOG.md` file.
-14. Checkout a new branch named `stable-to-main` and check it out locally:
+9. Obtain the CHANGELOG.md from the tagged release:
     ```shell script
-    git checkout -b stable-to-main
+    git checkout v{major}.{minor}.{patch} -- CHANGELOG.md
     ```
-15. Bump the version to next beta version with:
+10. Add `## [VERSION] - Unreleased` at the top of the `CHANGELOG.md` to prepare it for the new beta minor version and stage it.
     ```shell script
-    bump2version minor --commit
+    git add CHANGELOG.md
     ```
-16. Update the `README.md` to point back to `main` branch for badges:
+11. Run `bump2version` to create the beta minor version on main:
     ```shell script
-    bump2version minor --config-file .bumpreadme_min.cfg --allow-dirty
+    bump2version patch --config-file=.bumpversion_main.cfg --allow-dirty --commit
     ```
-17. Amend the CHANGELOG.md and README.md to the previous minor bump commit:
+12. Push the branch to origin:
     ```shell script
-    git add CHANGELOG.md README.md
-    git commit --amend
+    git push origin bump-minor-on-main
     ```
-18. Push these files and see that the pipelines pass:
-    ```shell script
-    git push
-    ```
-19. After the pipeline has passed, in the GitHub page create a pull request for this new branch with `main` as target.
-20. Get the PR approved and then merge to `main`.
+13. If the branch passes the workflow, do the following:
+  - Create a pull request for this new branch with `main` as target.
+  - Get the PR approved and then merge to `main`.
 
 ## Patch release
 
@@ -83,37 +67,31 @@ the `main` branch) and that the `CHANGELOG.md` has been updated in that commit.
     ```shell script
     git checkout stable-{major}-{minor}
     ```
-2. Increase the patch number:
-    ```shell script
-    bump2version patch --commit
-    ```
-3. Cherry-pick the patch into the stable branch:
-    ```shell script
-    git cherry-pick -x {commit-hash}
-    ```
-4. Clean up the `CHANGELOG.md`, removing references to changes that were not in the history of this stable branch.
-5. Git add the changed `CHANGELOG.md`:
+2. Add `## [VERSION] - Unreleased` at the top of the `CHANGELOG.md` to prepare it for the new beta patch version and stage it.
     ```shell script
     git add CHANGELOG.md
     ```
-6.  Increment the release:
+3. Run `bump2version` to create the beta patch version on stable:
     ```shell script
-    bump2version release --commit --tag --tag_name v<major>.<minor>.<patch+1>
+    bump2version patch --config-file=.bumpversion_stable.cfg --allow-dirty --commit
     ```
-7.  Push everything:
+4. Cherry-pick the patch into the stable branch:
     ```shell script
-    git push origin
-    git push origin v{major}.{minor}.{patch+1}
+    git cherry-pick -x {commit-hash}
     ```
-8.  Find the tag in the GitHub page, and make a release with as comments the latest `CHANGELOG.md` notes.
-9.  See that the tag has created the package and uploaded it into Pypi.
-10. Revert the badges to point back to `main` branch:
+5. Restore the `CHANGELOG.md` and update it with the relevent change/fix, and stage it.
     ```shell script
-    bump2version minor --config-file .bumpreadme_rel.cfg --allow-dirty
+    git restore CHANGELOG.md
+    git add CHANGELOG.md
     ```
-11. Git add, commit and push to branch:
+6. Run `bump2version` to create a release version and a tag:
     ```shell script
-    git add README.md
-    git commit -m "Update README.md"
-    git push origin
+    bump2version release --config-file=.bumpversion_release.cfg  --allow-dirty --commit --tag
     ```
+7. Push the branch and tag to origin:
+    ```shell script
+    git push origin stable-{major}-{minor} v{major}.{minor}.{patch} 
+    ```
+8. If the tag passes the workflow, do the following:
+  - Find the tag in GitHub and make a release with the latest `CHANGELOG.md` entry.
+  - See that the release has created a package and upload it to Pypi.
