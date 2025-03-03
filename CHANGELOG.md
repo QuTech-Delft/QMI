@@ -4,12 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## \[x.y.z] - Unreleased
+## [0.47.0-beta.0] - Unreleased
 
 ### Added
 - Python 3.12, 3.13 support.
-- installing of `py-xdrlib` from Github source for Python 3.13 unit-tests.
-- HighFinesse Wavelenght Meter (Wlm) driver with unittests, and license terms in wlmConst.py and wlmData.py.
+- installing of `py-xdrlib` from GitHub source for Python 3.13 unit-tests.
+- HighFinesse Wavelength Meter (Wlm) driver with unittests, and license terms in wlmConst.py and wlmData.py.
+- `RELEASE.md` release procedure using `bump2version` with multiple configuration files.
 
 ### Changed
 - `qmi_tool` script entry point to be at `main` function.
@@ -18,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Full CI-test to install qmi package correctly and run unit-tests with all supported Python versions.
+- Some new typing issues, due to Mypy and Numpy updates, were fixed and respective modules were updated to 3.10+ Python style.
+- Possible fix on the badges not showing on Pypi page.
 
 ### Removed
 - Python 3.8, 3.9 and 3.10 support, numpy and scipy version restrictions in dependencies.
