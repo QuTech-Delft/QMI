@@ -1,8 +1,8 @@
-[![pylint](.github/badges/pylint.svg)](https://github.com/QuTech-Delft/QMI/blob/stable-0-47/.github/badges/pylint.svg)
-[![mypy](.github/badges/mypy.svg)](https://github.com/QuTech-Delft/QMI/blob/stable-0-47/.github/badges/mypy.svg)
+[![pylint](.github/badges/pylint.svg)](https://github.com/QuTech-Delft/QMI/blob/v0.47.0/.github/badges/pylint.svg)
+[![mypy](.github/badges/mypy.svg)](https://github.com/QuTech-Delft/QMI/blob/v0.47.0/.github/badges/mypy.svg)
 [![Documentation Status](https://readthedocs.org/projects/qmi/badge/?version=latest)](https://qmi.readthedocs.io/en/latest/?badge=latest)
-[![coverage](.github/badges/coverage.svg)](https://github.com/QuTech-Delft/QMI/blob/stable-0-47/.github/badges/coverage.svg)
-[![tests](.github/badges/tests.svg)](https://github.com/QuTech-Delft/QMI/blob/stable-0-47/.github/badges/test.svg)
+[![coverage](.github/badges/coverage.svg)](https://github.com/QuTech-Delft/QMI/blob/v0.47.0/.github/badges/coverage.svg)
+[![tests](.github/badges/tests.svg)](https://github.com/QuTech-Delft/QMI/blob/v0.47.0/.github/badges/test.svg)
 
 # Quantum Measurement Infrastructure
 
