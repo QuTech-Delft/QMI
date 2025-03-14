@@ -72,8 +72,11 @@ def hard_kill():
         udp_socket.close()
 
 
-def main():
+def main() -> None | str:
     for e, arg in enumerate(sys.argv[1:]):
+        if arg not in ["ls", "hard-kill", "hard-kill-yes-really-i-am-sure"]:
+            return f"Invalid argument {arg}."
+
         if arg == "ls":
             if len(sys.argv) == (e + 3):
                 # we have one input and need to check if it is timeout or workgroup name
