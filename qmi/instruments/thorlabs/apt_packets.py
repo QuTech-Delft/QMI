@@ -1,6 +1,6 @@
 """Module containing the packets for the APT protocol."""
 
-from typing import List, Tuple
+from typing import ClassVar
 from qmi.instruments.thorlabs.apt_protocol import (
     AptMessage,
     AptMessageId,
@@ -28,7 +28,7 @@ class HW_GET_INFO(AptMessage):
     """
 
     MESSAGE_ID = AptMessageId.HW_GET_INFO.value
-    _fields_: List[Tuple[str, type]] = [
+    _fields_: ClassVar[list[tuple[str, type]]] = [
         ("serial_number", apt_long),
         ("model_number", apt_char * 8),
         ("type", apt_word),
@@ -58,7 +58,7 @@ class MOD_GET_CHANENABLESTATE(AptMessage):
 
     MESSAGE_ID = AptMessageId.MOD_GET_CHANENABLESTATE.value
     HEADER_ONLY = True
-    _fields_: List[Tuple[str, type]] = [
+    _fields_: ClassVar[list[tuple[str, type]]] = [
         ("message_id", apt_word),
         ("chan_ident", apt_byte),
         ("enable_state", apt_byte),
@@ -82,7 +82,7 @@ class MOT_MOVE_HOMED(AptMessage):
 
     MESSAGE_ID = AptMessageId.MOT_MOVE_HOMED.value
     HEADER_ONLY = True
-    _fields_: List[Tuple[str, type]] = [
+    _fields_: ClassVar[list[tuple[str, type]]] = [
         ("message_id", apt_word),
         ("chan_ident", apt_byte),
         ("param2", apt_byte),
@@ -101,7 +101,7 @@ class MOT_MOVE_ABSOLUTE(AptMessage):
     """
 
     MESSAGE_ID = AptMessageId.MOT_MOVE_ABSOLUTE.value
-    _fields_: List[Tuple[str, type]] = [
+    _fields_: ClassVar[list[tuple[str, type]]] = [
         ("chan_ident", apt_word),
         ("absolute_distance", apt_long),
     ]
@@ -122,7 +122,7 @@ class MOT_MOVE_COMPLETED(AptMessage):
 
     MESSAGE_ID = AptMessageId.MOT_MOVE_COMPLETED.value
     HEADER_ONLY = True
-    _fields_: List[Tuple[str, type]] = [
+    _fields_: ClassVar[list[tuple[str, type]]] = [
         ("message_id", apt_word),
         ("chan_ident", apt_byte),
         ("param2", apt_byte),
@@ -145,7 +145,7 @@ class MOT_GET_USTATUSUPDATE(AptMessage):
     """
 
     MESSAGE_ID = AptMessageId.MOT_GET_USTATUSUPDATE.value
-    _fields_: List[Tuple[str, type]] = [
+    _fields_: ClassVar[list[tuple[str, type]]] = [
         ("chan_ident", apt_word),
         ("position", apt_long),
         ("velocity", apt_word),
@@ -164,7 +164,7 @@ class MOT_SET_EEPROMPARAMS(AptMessage):
     """
 
     MESSAGE_ID = AptMessageId.MOT_SET_EEPROMPARAMS.value
-    _fields_: List[Tuple[str, type]] = [("chan_ident", apt_word), ("msg_id", apt_word)]
+    _fields_: ClassVar[list[tuple[str, type]]] = [("chan_ident", apt_word), ("msg_id", apt_word)]
 
 
 class POL_GET_SET_PARAMS(AptMessage):
@@ -181,7 +181,7 @@ class POL_GET_SET_PARAMS(AptMessage):
     """
 
     MESSAGE_ID = AptMessageId.POL_GET_PARAMS.value
-    _fields_: List[Tuple[str, type]] = [
+    _fields_: ClassVar[list[tuple[str, type]]] = [
         ("not_used", apt_word),
         ("velocity", apt_word),
         ("home_position", apt_word),

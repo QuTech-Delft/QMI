@@ -30,13 +30,11 @@ class InstruTech_AGC302(QMI_Instrument):
 
     @rpc_method
     def open(self) -> None:
-        """See base class."""
         self._transport.open()
         super().open()
 
     @rpc_method
     def close(self) -> None:
-        """See base class."""
         super().close()
         self._transport.close()
 

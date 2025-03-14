@@ -8,7 +8,7 @@ https://github.com/picotech/picosdk-python-wrappers .
 
 import ctypes
 import logging
-import typing
+from typing import TYPE_CHECKING
 
 from qmi.core.context import QMI_Context
 from qmi.core.rpc import rpc_method
@@ -16,7 +16,7 @@ from qmi.core.rpc import rpc_method
 from qmi.instruments.picotech._picoscope import PicoTech_PicoScope, _check_error
 
 # Lazy import of the "picosdk" module. See the function _import_modules() in _picoscope.py.
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from picosdk.ps4000a import ps4000a as _ps
 else:
     _ps = None
