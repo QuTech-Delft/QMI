@@ -75,26 +75,26 @@ dev = [
 ]
 
 [project.scripts]
-# v0.47.0 scripts
-qmi_proc = "qmi.tools.proc:v0.47.0"
-qmi_adbasic_parser = "qmi.utils.adbasic_parser:v0.47.0"
-qmi_adbasic_compiler = "qmi.utils.adbasic_compiler:v0.47.0"
+# main scripts
+qmi_proc = "qmi.tools.proc:main"
+qmi_adbasic_parser = "qmi.utils.adbasic_parser:main"
+qmi_adbasic_compiler = "qmi.utils.adbasic_compiler:main"
 # tool and instrument scripts
-qmi_tool = "bin.qmi_tool:v0.47.0"
-qmi_hdf5_to_mat = "bin.qmi_hdf5_to_mat:v0.47.0"
-qmi_anapico_apsin = "bin.instruments.qmi_anapico_apsin:v0.47.0"
-qmi_highfinesse_ws = "bin.instruments.qmi_highfinesse_ws:v0.47.0"
-qmi_mcc_usb1808x = "bin.instruments.qmi_mcc_usb1808x:v0.47.0"
-qmi_newport_ag_uc8 = "bin.instruments.qmi_newport_ag_uc8:v0.47.0"
-qmi_quantum_composer_9530 = "bin.instruments.qmi_quantum_composer_9530:v0.47.0"
-qmi_siglent_ssa3000x = "bin.instruments.qmi_siglent_ssa3000x:v0.47.0"
-qmi_srs_dc205 = "bin.instruments.qmi_srs_dc205:v0.47.0"
-qmi_tenma_72psu = "bin.instruments.qmi_tenma_72psu:v0.47.0"
-qmi_teraxion_tfn = "bin.instruments.qmi_teraxion_tfn:v0.47.0"
-qmi_thorlabs_k10cr1 = "bin.instruments.qmi_thorlabs_k10cr1:v0.47.0"
-qmi_timebase_dim3000 = "bin.instruments.qmi_timebase_dim3000:v0.47.0"
-qmi_wavelength_tclab = "bin.instruments.qmi_wavelength_tclab:v0.47.0"
-qmi_wieserlabs_flexdds = "bin.instruments.qmi_wieserlabs_flexdds:v0.47.0"
+qmi_tool = "bin.qmi_tool:main"
+qmi_hdf5_to_mat = "bin.qmi_hdf5_to_mat:main"
+qmi_anapico_apsin = "bin.instruments.qmi_anapico_apsin:main"
+qmi_highfinesse_ws = "bin.instruments.qmi_highfinesse_ws:main"
+qmi_mcc_usb1808x = "bin.instruments.qmi_mcc_usb1808x:main"
+qmi_newport_ag_uc8 = "bin.instruments.qmi_newport_ag_uc8:main"
+qmi_quantum_composer_9530 = "bin.instruments.qmi_quantum_composer_9530:main"
+qmi_siglent_ssa3000x = "bin.instruments.qmi_siglent_ssa3000x:main"
+qmi_srs_dc205 = "bin.instruments.qmi_srs_dc205:main"
+qmi_tenma_72psu = "bin.instruments.qmi_tenma_72psu:main"
+qmi_teraxion_tfn = "bin.instruments.qmi_teraxion_tfn:main"
+qmi_thorlabs_k10cr1 = "bin.instruments.qmi_thorlabs_k10cr1:main"
+qmi_timebase_dim3000 = "bin.instruments.qmi_timebase_dim3000:main"
+qmi_wavelength_tclab = "bin.instruments.qmi_wavelength_tclab:main"
+qmi_wieserlabs_flexdds = "bin.instruments.qmi_wieserlabs_flexdds:main"
 
 [tool.setuptools]
 include-package-data = true
