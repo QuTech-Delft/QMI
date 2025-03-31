@@ -198,8 +198,12 @@ def _init_logging() -> None:
         logfile = logfile % attrs
 
         # Make absolute file name.
-        qmi_home = _qmi_context.get_qmi_home_dir()
-        logfile = os.path.join(qmi_home, logfile)
+        qmi_log_dir = _qmi_context.get_log_dir()
+        qmi_log_dir = qmi_log_dir.replace("~", os.path.expanduser("~")) if qmi_log_dir.startswith("~") else qmi_log_dir
+        if not os.path.isdir(qmi_log_dir):
+            os.makedirs(qmi_log_dir, exist_ok=True)
+
+        logfile = os.path.join(qmi_log_dir, logfile)
 
     # Initialize logging.
     qmi.core.logging_init.start_logging(loglevel=loglevel,

@@ -442,7 +442,7 @@ class QMI_Context:
         if self._file_name_resolves_keyword(file_name, "datastore"):
             mapping["datastore"] = self.get_datastore_dir()
 
-        return string.Template(file_name).substitute(mapping)
+        return os.path.normpath(string.Template(file_name).substitute(mapping))
 
     def start(self) -> None:
         """Start the context.
