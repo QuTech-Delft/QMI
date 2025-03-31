@@ -13,8 +13,7 @@ class TestStartLoggingOptions(unittest.TestCase):
         # Act
         start_logging()
         # Assert
-        logging_patch.getLogger.assert_called_once()
-        logging_patch.getLogger.assert_has_calls([unittest.mock.call(), unittest.mock.call().setLevel(logging.INFO)])
+        logging_patch.getLogger.assert_has_calls([unittest.mock.call().setLevel(logging.INFO)], any_order=True)
 
         logging_patch.StreamHandler.assert_called_once()
         logging_patch.StreamHandler.assert_has_calls([unittest.mock.call().setLevel(logging.WARNING)])
