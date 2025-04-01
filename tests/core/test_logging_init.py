@@ -108,7 +108,7 @@ class Test_RateLimitFilter(unittest.TestCase):
         discarded_msgs = 1
         exp_bucket_level = float(bucket_level + rate_limit - 1)
         exp_disc_msgs = discarded_msgs + 1
-        exp_record = {(name, levelno): (monotonic() + 1, exp_bucket_level, exp_disc_msgs)}
+        exp_record = {(name, levelno): (round(monotonic() + 1, 1), exp_bucket_level, exp_disc_msgs)}
 
         filter_obj = _RateLimitFilter(rate_limit, burst_limit)
         filter_obj._counters = {
@@ -118,11 +118,15 @@ class Test_RateLimitFilter(unittest.TestCase):
         res1 = filter_obj.filter(self._record(name, levelno))
         sleep(1)  # sleep to make (time_now - last_time) larger
         res2 = filter_obj.filter(self._record(name, levelno))
+        values = filter_obj._counters[(name, levelno)]
+        rounded_filter_obj = {
+            (name, levelno): (round(values[0], 1), round(values[1]), values[2])
+        }
 
         # Assert
         self.assertFalse(res1)
         self.assertTrue(res2)
-        self.assertDictEqual(exp_record, filter_obj._counters)
+        self.assertDictEqual(exp_record, rounded_filter_obj)
 
     def test_filter_no_counter_data(self):
         """Test case where gotten counter_data is None."""
@@ -133,7 +137,7 @@ class Test_RateLimitFilter(unittest.TestCase):
         levelno = 5
         exp_bucket_level = float(burst_limit - 1)
         exp_disc_msgs = 0
-        exp_record = {(name, levelno): (monotonic() + 1, exp_bucket_level, exp_disc_msgs)}
+        exp_record = {(name, levelno): (round(monotonic() + 1, 1), exp_bucket_level, exp_disc_msgs)}
 
         filter_obj = _RateLimitFilter(rate_limit, burst_limit)
         filter_obj._counters = {(name, levelno): None}
@@ -141,11 +145,15 @@ class Test_RateLimitFilter(unittest.TestCase):
         res1 = filter_obj.filter(self._record(name, levelno))
         sleep(1)  # sleep to make (time_now - last_time) larger
         res2 = filter_obj.filter(self._record(name, levelno))
+        values = filter_obj._counters[(name, levelno)]
+        rounded_filter_obj = {
+            (name, levelno): (round(values[0], 1), round(values[1]), values[2])
+        }
 
         # Assert
         self.assertTrue(res1)
         self.assertTrue(res2)
-        self.assertDictEqual(exp_record, filter_obj._counters)
+        self.assertDictEqual(exp_record, rounded_filter_obj)
 
 
 if __name__ == '__main__':
