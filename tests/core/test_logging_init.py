@@ -1,22 +1,29 @@
 import unittest
 import unittest.mock
-
+import sys
 import logging
 from collections import namedtuple
 from time import monotonic, sleep
 
-from qmi.core.logging_init import start_logging, _RateLimitFilter
+import qmi.core.logging_init
+from qmi.core.logging_init import start_logging, _RateLimitFilter, _log_excepthook
 
 
 class TestStartLoggingOptions(unittest.TestCase):
 
+    def setUp(self):
+        qmi.core.logging_init._file_handler = None
+
     @unittest.mock.patch("qmi.core.logging_init.logging")
     def test_logging_default(self, logging_patch):
         """Test that a logger is created with default options."""
+        # Arrange
+        qmi.core.logging_init._file_handler = unittest.mock.MagicMock()
         # Act
         start_logging()
         # Assert
         logging_patch.getLogger.assert_has_calls([unittest.mock.call().setLevel(logging.INFO)], any_order=True)
+        self.assertEqual(2, logging_patch.getLogger.call_count)
 
         logging_patch.StreamHandler.assert_called_once()
         logging_patch.StreamHandler.assert_has_calls([unittest.mock.call().setLevel(logging.WARNING)])
@@ -74,7 +81,7 @@ class TestStartLoggingOptions(unittest.TestCase):
             start_logging(logfile=logfile, rate_limit=rate_limit, burst_limit=burst_limit)
 
         # Assert
-        self.assertEqual(3, logging_patch.getLogger.call_count)
+        self.assertEqual(2, logging_patch.getLogger.call_count)
         logging_patch.getLogger.assert_has_calls([unittest.mock.call(), unittest.mock.call().setLevel(logging.INFO)])
 
         logging_patch.StreamHandler.assert_called_once()
@@ -88,6 +95,29 @@ class TestStartLoggingOptions(unittest.TestCase):
         rlf_patch.assert_called_once_with(rate_limit, burst_limit)
 
         logging_patch.captureWarnings.assert_called_with(True)
+
+    @unittest.mock.patch("qmi.core.logging_init.logging")
+    @unittest.mock.patch("qmi.core.logging_init.sys", autospec=sys)
+    def test_log_excepthook(self, sys_patch, logging_patch):
+        """Test that an excepthook is set and can be called with and exception."""
+        # Arrange
+        qmi.core.logging_init._saved_except_hook = None
+        sys_patch.excepthook = None
+        # set the excepthook
+        start_logging()
+        # Act
+        self.assertEqual(_log_excepthook, sys_patch.excepthook)
+        with self.assertRaises(TypeError) as terr:
+            qmi.core.logging_init._saved_except_hook = unittest.mock.MagicMock()
+            qmi.core.logging_init._file_handler = unittest.mock.MagicMock()
+            # Cause exception.
+            start_logging(1, 2, 3, 4, 5, 6, 7)
+
+        # Test excepthook with the above exception
+        sys_patch.excepthook(TypeError, terr.exception, terr)
+        # Assert
+        assert unittest.mock.call.Logger("exception") in logging_patch.method_calls
+        logging_patch.assert_has_calls([unittest.mock.call.Logger("exception")])
 
 
 class Test_RateLimitFilter(unittest.TestCase):
