@@ -10,7 +10,7 @@ from qmi.instruments.bristol import Bristol_Fos
 from qmi.utils.context_managers import start_stop
 
 
-def main() -> None:
+def run() -> None:
 
     parser = argparse.ArgumentParser()
     parser.description = "Command line client for the Bristol FOS Fiber-optic switch."
@@ -71,4 +71,4 @@ def parse_source(args) -> AbstractContextManager:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

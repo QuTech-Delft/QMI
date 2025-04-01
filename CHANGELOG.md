@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- All entry point functions in `bin` scripts from `main` to `run` to avoid unintended modifications of `pyproject.toml` when executing release procedure.
 
 ### Fixed
 

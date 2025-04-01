@@ -12,7 +12,7 @@ from qmi.instruments.wavelength.tclab import Wavelength_TC_Lab
 from qmi.utils.context_managers import start_stop, open_close
 
 
-def main() -> int:
+def run() -> int:
 
     parser = argparse.ArgumentParser()
     parser.description = "Command line client for the Wavelength Electronics TC Lab temperature controller."
@@ -177,4 +177,4 @@ def log_temperature(instr: Wavelength_TC_Lab, n: int):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

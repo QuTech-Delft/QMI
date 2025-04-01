@@ -72,7 +72,7 @@ def hard_kill():
         udp_socket.close()
 
 
-def main() -> None | str:
+def run() -> None | str:
     for e, arg in enumerate(sys.argv[1:]):
         if arg not in ["ls", "hard-kill", "hard-kill-yes-really-i-am-sure"]:
             return f"Invalid argument {arg}."
@@ -107,4 +107,4 @@ def main() -> None | str:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

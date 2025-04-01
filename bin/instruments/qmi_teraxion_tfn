@@ -10,7 +10,7 @@ from qmi.instruments.teraxion.tfn import Teraxion_TFN, Teraxion_TFNElement
 from qmi.utils.context_managers import start_stop, open_close
 
 
-def main() -> int:
+def run() -> int:
 
     parser = argparse.ArgumentParser()
     parser.description = "Command line client for the TeraXion TFN filter."
@@ -74,4 +74,4 @@ def parse_instrument_source(args) -> AbstractContextManager:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

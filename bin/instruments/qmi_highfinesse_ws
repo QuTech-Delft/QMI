@@ -25,7 +25,7 @@ from qmi.instruments.high_finesse.wlm import HighFinesse_Wlm
 from qmi.utils.context_managers import start_stop, open_close
 
 
-def main() -> int:
+def run() -> int:
     parser = argparse.ArgumentParser()
     parser.description = "Command line client for the High Finesse Wavelength Meter."
 
@@ -146,4 +146,4 @@ def _log_values(n: int, func_list: list[Callable], channel=1):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())
