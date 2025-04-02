@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Unit tests for ADbasic compiler."""
 
@@ -26,7 +26,7 @@ with mock.patch("sys.platform", "win32"):
 
 from qmi.utils.adbasic_compiler import (
     AdbasicResult, AdbasicCompilerException, check_compiler_result, run_adbasic_compiler, print_adbasic_compiler_help,
-    compile_program, main
+    compile_program, run
     )
 
 
@@ -470,8 +470,8 @@ class TestCheckCompilerResult(unittest.TestCase):
 
 class TestMain(unittest.TestCase):
 
-    def test_main_T11(self):
-        """Test that the argument parsing and running on main() method works both on linux and windows"""
+    def test_run_T11(self):
+        """Test that the argument parsing and running on run() method works both on linux and windows"""
         # Arrange
         default_adwindir = {"linux1": "/opt/adwin", "win32": r"C:\ADwin"}
         exec_dir = {"linux1": "/bin/adbasic", "win32": r"\ADbasic\ADbasicCompiler.exe"}
@@ -502,7 +502,7 @@ class TestMain(unittest.TestCase):
             )):
                 with io.StringIO() as buf:
                     with contextlib.redirect_stdout(buf):
-                        main()
+                        run()
 
                     linux_prints = buf.getvalue()
 
@@ -529,7 +529,7 @@ class TestMain(unittest.TestCase):
             )):
                 with io.StringIO() as buf:
                     with contextlib.redirect_stdout(buf):
-                        main()
+                        run()
 
                     win_prints = buf.getvalue()
 
@@ -539,8 +539,8 @@ class TestMain(unittest.TestCase):
         for e, prt in enumerate(win_prints.split("\n\n")):
             self.assertTrue(fnmatch.fnmatch(prt.strip(), expected_stdout_win[e]))
 
-    def test_main_T12(self):
-        """Test that the argument parsing and running on main() method works both on linux and windows"""
+    def test_run_T12(self):
+        """Test that the argument parsing and running on run() method works both on linux and windows"""
         # Arrange
         default_adwindir = {"linux1": "/opt/adwin", "win32": r"C:\ADwin"}
         exec_dir = {"linux1": "/bin/adbasic", "win32": r"\ADbasic\ADbasic_C.exe"}
@@ -571,7 +571,7 @@ class TestMain(unittest.TestCase):
             )):
                 with io.StringIO() as buf:
                     with contextlib.redirect_stdout(buf):
-                        main()
+                        run()
 
                     linux_prints = buf.getvalue()
 
@@ -598,7 +598,7 @@ class TestMain(unittest.TestCase):
             )):
                 with io.StringIO() as buf:
                     with contextlib.redirect_stdout(buf):
-                        main()
+                        run()
 
                     win_prints = buf.getvalue()
 
