@@ -10,7 +10,7 @@ functions directly, for example::
 
     import qmi
     qmi.start("my_context")
-    proxy = qmi.make_instrument("my_instrument", InstrumentClass, ...)
+    proxy = qmi.make_instrument("my_instrument", InstrumentClass, class_args)
     qmi.stop()
 """
 
@@ -65,7 +65,8 @@ def start(
         config_file: str | None = None,
         init_logging: bool = True,
         console_loglevel: str | None = None,
-        context_cfg: dict | None = None) -> None:
+        context_cfg: dict | None = None
+) -> None:
     """Create and start a global QMI_Context instance.
 
     This function should be called exactly once by the top-level code of
@@ -307,11 +308,12 @@ def make_rpc_object(
     return _qmi_context.make_rpc_object(rpc_object_name, rpc_object_class, *args, **kwargs)
 
 
-def make_instrument(instrument_name: str,
-                    instrument_class: type[QMI_Instrument],
-                    *args: Any,
-                    **kwargs: Any
-                    ) -> Any:
+def make_instrument(
+    instrument_name: str,
+    instrument_class: type[QMI_Instrument],
+    *args: Any,
+    **kwargs: Any
+) -> Any:
     """Create an instance of a `QMI_Instrument` subclass and make it accessible via RPC.
 
     The actual instrument instance will be created in a separate background thread.

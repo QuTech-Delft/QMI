@@ -179,6 +179,9 @@ class _ContextRpcObject(QMI_RpcObject):
 
         A hard shutdown will almost always succeed but may leave instruments
         and data files in an unclean state.
+
+        Parameters:
+            hard: Set to True if process should be exited immediately. Otherwise, normal shutdown.
         """
 
         if hard:
@@ -215,7 +218,6 @@ class QMI_Context:
 
     Attributes:
         DEFAULT_UDP_RESPONDER_PORT: Default port number for UDP responses.
-        workgroup_name: Name of the QMI workgroup (read-only).
     """
 
     DEFAULT_UDP_RESPONDER_PORT = 35999
@@ -225,6 +227,8 @@ class QMI_Context:
 
         This is normally done automatically by ``qmi.start(...)``.
         Most applications should not explicitly create a `QMI_Context` instance.
+
+        The class attribute workgroup_name contains the name of the QMI workgroup (read-only).
 
         Parameters:
             name:   Name of the context.
