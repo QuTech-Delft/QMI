@@ -1,5 +1,4 @@
-#! /usr/bin/env python3
-
+#! /usr/bin/env python
 """Command line client for the Anapico APSIN signal source."""
 
 import argparse
@@ -163,7 +162,7 @@ def parse_instrument_source(args) -> AbstractContextManager:
         raise ValueError("Expected a source for the instrument!")
 
 
-def show_instrument_state(instr: Anapico_APSIN):
+def show_instrument_state(instr: Anapico_APSIN) -> None:
     """Show instrument state."""
 
     print("Instrument state:")

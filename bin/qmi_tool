@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Swiss army knife for QMI command line monitoring and control."""
 
@@ -16,7 +16,7 @@ from qmi.core.udp_responder_packets import QMI_UdpResponderKillRequestPacket
 UDP_RESPONDER_PORT = 35999
 
 
-def lsqmi(workgroup_name: str = CfgQmi.workgroup, timeout: float = 0.1):
+def lsqmi(workgroup_name: str = CfgQmi.workgroup, timeout: float = 0.1) -> None:
     """List all QMI contexts on the network.
 
     Parameters:
@@ -50,7 +50,7 @@ def lsqmi(workgroup_name: str = CfgQmi.workgroup, timeout: float = 0.1):
         ))
 
 
-def hard_kill():
+def hard_kill() -> None:
     """Broadcast a hard-kill request."""
     # Preparing outgoing socket.
     udp_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)

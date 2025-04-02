@@ -1,5 +1,4 @@
-#! /usr/bin/env python3
-
+#! /usr/bin/env python
 """Command line client for the Tenma 72-series power supplies."""
 
 import argparse

@@ -1,5 +1,4 @@
-#! /usr/bin/env python3
-
+#! /usr/bin/env python
 """Command line client for the HighFinesse WaveLength Meter (wlm).
 
 Example uses:
@@ -17,7 +16,7 @@ import argparse
 import sys
 import time
 from contextlib import AbstractContextManager
-from typing import Callable
+from collections.abc import Callable
 
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException

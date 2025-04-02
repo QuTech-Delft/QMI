@@ -13,7 +13,7 @@ import sys
 import shutil
 import subprocess
 import time
-from typing import List, NamedTuple, Optional, Tuple
+from typing import NamedTuple
 
 import colorama
 
@@ -71,14 +71,14 @@ class AdbasicResult(NamedTuple):
     duration: float
     returncode: int
     success: bool
-    errors: List[AdbasicError]
-    warnings: List[AdbasicError]
+    errors: list[AdbasicError]
+    warnings: list[AdbasicError]
 
 
 class AdbasicCompilerException(QMI_RuntimeException):
     """Raised when an error occurs while compiling ADbasic code."""
 
-    def __init__(self, message: str, errors: List[AdbasicError]) -> None:
+    def __init__(self, message: str, errors: list[AdbasicError]) -> None:
         super().__init__([message, errors])
         self.adbasic_errors = errors
         self.message = message
@@ -93,7 +93,7 @@ class AdbasicCompilerException(QMI_RuntimeException):
         return (AdbasicCompilerException, (self.message, self.adbasic_errors))
 
 
-def _extract_lines(lines_bin: bytes) -> List[str]:
+def _extract_lines(lines_bin: bytes) -> list[str]:
     """Extract lines from compiler output stream."""
     lines = lines_bin.decode("ascii", errors='replace').split("\r\n")
     while len(lines) > 0 and lines[-1] in ["", "\n"]:
@@ -101,7 +101,7 @@ def _extract_lines(lines_bin: bytes) -> List[str]:
     return lines
 
 
-def _parse_stderr_lines(stderr_lines: List[str]) -> Tuple[List[AdbasicError], List[AdbasicError]]:
+def _parse_stderr_lines(stderr_lines: list[str]) -> tuple[list[AdbasicError], list[AdbasicError]]:
     """Parse stderr output from the compiler."""
 
     error_line_v1_pattern_string = r"Error: No: ([0-9]+) (.*?) line: (.*?) file: (.*?) line no\.: ([0-9]+) "
@@ -122,8 +122,8 @@ def _parse_stderr_lines(stderr_lines: List[str]) -> Tuple[List[AdbasicError], Li
     fixme_line_pattern_string = r"([0-9a-fA-F]+):fixme:([:a-zA-Z]+) .+"
     fixme_warning_count_line_pattern = re.compile(fixme_line_pattern_string, re.DOTALL)
 
-    errors: List[AdbasicError] = []
-    warnings: List[AdbasicError] = []
+    errors: list[AdbasicError] = []
+    warnings: list[AdbasicError] = []
 
     for line in stderr_lines:
 
@@ -188,7 +188,7 @@ def _parse_stderr_lines(stderr_lines: List[str]) -> Tuple[List[AdbasicError], Li
     return errors, warnings
 
 
-def _library_path_arguments(adwin_dir: str) -> List[str]:
+def _library_path_arguments(adwin_dir: str) -> list[str]:
     """Return ADbasic command-line arguments to specify the include path and library path."""
 
     # The Linux version of the compiler needs an explicit path to the standard library.
@@ -202,30 +202,31 @@ def _library_path_arguments(adwin_dir: str) -> List[str]:
         return []
 
 
-def run_adbasic_compiler(adwin_dir: str,
-                         processor_type: str,
-                         adbasic_arguments: List[str],
-                         working_dir: Optional[str] = None,
-                         parse_stderr: bool = True,
-                         remove_c_directory: bool = False,
-                         pretty_print: bool = False
-                         ) -> AdbasicResult:
+def run_adbasic_compiler(
+    adwin_dir: str,
+    processor_type: str,
+    adbasic_arguments: list[str],
+    working_dir: str | None = None,
+    parse_stderr: bool = True,
+    remove_c_directory: bool = False,
+    pretty_print: bool = False
+) -> AdbasicResult:
     """Run the ADbasic compiler.
 
     Parameters:
-        adwin_dir:      Base directory of ADwin software installation (e.g. /opt/adwin).
-        processor_type: The type of processor the command is run for.
-        adbasic_arguments: List of command-line options for the ADbasic compiler.
-        working_dir:    Working directory when running the compiler.
-        parse_stderr:   True to parse error messages from the ADbasic compiler and return them.
-                        False to ignore error messages from the compiler.
+        adwin_dir:          Base directory of ADwin software installation (e.g. /opt/adwin).
+        processor_type:     The type of processor the command is run for.
+        adbasic_arguments:  List of command-line options for the ADbasic compiler.
+        working_dir:        Working directory when running the compiler.
+        parse_stderr:       True to parse error messages from the ADbasic compiler and return them.
+                            False to ignore error messages from the compiler.
         remove_c_directory: True to remove the directory with intermediate C files from the compiler.
-        pretty_print:   True to print compiler messages in pretty colors.
-                        False to log messages via the Python log system.
+        pretty_print:       True to print compiler messages in pretty colors.
+                            False to log messages via the Python log system.
 
     Returns:
-        AdbasicResult tuple containing results from the compilation process.
-        If `parse_stderr` is True, this result will contain parsed compiler error messages.
+        AdbasicResult: Tuple containing results from the compilation process.
+                       If `parse_stderr` is True, this result will contain parsed compiler error messages.
 
     Raises:
         AdbasicCompilerException: If an unexpected error occurs while interacting with the ADbasic compiler.
@@ -248,9 +249,7 @@ def run_adbasic_compiler(adwin_dir: str,
     t1 = time.monotonic()
 
     # pylint: disable=subprocess-run-check
-    completed_process = subprocess.run(args=run_args,
-                                       capture_output=True,
-                                       cwd=working_dir)
+    completed_process = subprocess.run(args=run_args, capture_output=True, cwd=working_dir)
 
     t2 = time.monotonic()
     duration = (t2 - t1)
@@ -313,26 +312,29 @@ def run_adbasic_compiler(adwin_dir: str,
 def print_adbasic_compiler_help(adwin_dir: str, processor_type: str) -> AdbasicResult:
     # The /<processor_type> is needed to select the ADbasic-to-C compile path.
     adbasic_arguments = [f"/P{processor_type.lstrip('T').replace('.', '')}", "/H"]
-    return run_adbasic_compiler(adwin_dir,
-                                processor_type,
-                                adbasic_arguments,
-                                working_dir=None,
-                                parse_stderr=False,
-                                remove_c_directory=False,
-                                pretty_print=True)
+    return run_adbasic_compiler(
+        adwin_dir,
+        processor_type,
+        adbasic_arguments,
+        working_dir=None,
+        parse_stderr=False,
+        remove_c_directory=False,
+        pretty_print=True
+    )
 
 
-def compile_program(basic_filename: str,
-                    trigger: str,
-                    process_number: int,
-                    processor_type: str,
-                    hardware_type: str,
-                    priority: int = PRIO_HIGH,
-                    working_dir: Optional[str] = None,
-                    keep_c_files: bool = False,
-                    adwin_dir: str = DEFAULT_ADWINDIR,
-                    pretty_print: bool = False
-                    ) -> AdbasicResult:
+def compile_program(
+    basic_filename: str,
+    trigger: str,
+    process_number: int,
+    processor_type: str,
+    hardware_type: str,
+    priority: int = PRIO_HIGH,
+    working_dir: str | None = None,
+    keep_c_files: bool = False,
+    adwin_dir: str = DEFAULT_ADWINDIR,
+    pretty_print: bool = False
+) -> AdbasicResult:
     """Compile an ADbasic program.
 
     The ADbasic compiler expects that include files can be found relative
@@ -361,10 +363,10 @@ def compile_program(basic_filename: str,
                         False to log messages via the Python log system.
 
     Returns:
-        AdbasicResult tuple containing results and error messages (if any) from the compilation process.
-        If compilation is successful, the `success` field of this tuple will be True.
-        If compilation fails, the `success` field will be False and the `errors` field will contain
-        a list of error messages from the compiler.
+        AdbasicResult: Tuple containing results and error messages (if any) from the compilation process.
+                        If compilation is successful, the `success` field of this tuple will be True.
+                        If compilation fails, the `success` field will be False and the `errors` field will contain
+                        a list of error messages from the compiler.
 
     Raises:
         AdbasicCompilerException: If an unexpected error occurs while interacting with the ADbasic compiler.
@@ -387,33 +389,38 @@ def compile_program(basic_filename: str,
     process_number_argument = "/PN{}".format(process_number)
     optimization_level_argument = "/O2"
 
-    adbasic_arguments = ["/M",
-                         f"/P{processor_type.lstrip('T').replace('.', '')}",
-                         f"/S{hardware_type}",  # Adwin type, SPII for Pro II, SGII for Gold II
-                         trigger_argument,
-                         process_number_argument,
-                         priority_argument,
-                         optimization_level_argument]
+    adbasic_arguments = [
+        "/M",
+        f"/P{processor_type.lstrip('T').replace('.', '')}",
+        f"/S{hardware_type}",  # Adwin type, SPII for Pro II, SGII for Gold II
+        trigger_argument,
+        process_number_argument,
+        priority_argument,
+        optimization_level_argument
+    ]
     adbasic_arguments += _library_path_arguments(adwin_dir)
     adbasic_arguments.append(basic_filename)
 
-    return run_adbasic_compiler(adwin_dir,
-                                processor_type,
-                                adbasic_arguments,
-                                working_dir,
-                                parse_stderr=True,
-                                remove_c_directory=not keep_c_files,
-                                pretty_print=pretty_print)
+    return run_adbasic_compiler(
+        adwin_dir,
+        processor_type,
+        adbasic_arguments,
+        working_dir,
+        parse_stderr=True,
+        remove_c_directory=not keep_c_files,
+        pretty_print=pretty_print
+    )
 
 
-def compile_library(basic_filename: str,
-                    processor_type: str,
-                    hardware_type: str,
-                    working_dir: Optional[str] = None,
-                    keep_c_files: bool = False,
-                    adwin_dir: str = DEFAULT_ADWINDIR,
-                    pretty_print: bool = False
-                    ) -> AdbasicResult:
+def compile_library(
+    basic_filename: str,
+    processor_type: str,
+    hardware_type: str,
+    working_dir: str | None = None,
+    keep_c_files: bool = False,
+    adwin_dir: str = DEFAULT_ADWINDIR,
+    pretty_print: bool = False
+) -> AdbasicResult:
 
     # The /L instructs the compiler to produce a library.
     # The /<processor_type> is needed to select the ADbasic-to-C compile path.
@@ -429,13 +436,15 @@ def compile_library(basic_filename: str,
     adbasic_arguments += _library_path_arguments(adwin_dir)
     adbasic_arguments.append(basic_filename)
 
-    return run_adbasic_compiler(adwin_dir,
-                                processor_type,
-                                adbasic_arguments,
-                                working_dir,
-                                parse_stderr=True,
-                                remove_c_directory=not keep_c_files,
-                                pretty_print=pretty_print)
+    return run_adbasic_compiler(
+        adwin_dir,
+        processor_type,
+        adbasic_arguments,
+        working_dir,
+        parse_stderr=True,
+        remove_c_directory=not keep_c_files,
+        pretty_print=pretty_print
+    )
 
 
 def check_compiler_result(basic_filename: str, result: AdbasicResult) -> None:
@@ -449,9 +458,11 @@ def check_compiler_result(basic_filename: str, result: AdbasicResult) -> None:
         AdbasicCompilerException: If the compiler was not successful.
     """
     if not result.success:
-        raise AdbasicCompilerException("ADbasic compiler reported error when compiling {!r} (exit status {})"
-                                       .format(basic_filename, result.returncode),
-                                       result.errors)
+        raise AdbasicCompilerException(
+            "ADbasic compiler reported error when compiling {!r} (exit status {})".format(
+                basic_filename, result.returncode
+            ), result.errors
+        )
 
 
 def run():
@@ -496,26 +507,30 @@ def run():
         elif args.filename is None:
             parser.print_usage()
         elif args.library:
-            result = compile_library(args.filename,
-                                     processor_type=args.processor_type,
-                                     hardware_type=args.hardware_type,
-                                     working_dir=None,
-                                     keep_c_files=args.keep_c_files,
-                                     adwin_dir=args.adwin_dir,
-                                     pretty_print=True)
+            result = compile_library(
+                args.filename,
+                processor_type=args.processor_type,
+                hardware_type=args.hardware_type,
+                working_dir=None,
+                keep_c_files=args.keep_c_files,
+                adwin_dir=args.adwin_dir,
+                pretty_print=True
+            )
             if not result.success:
                 exitcode = 1
         else:
-            result = compile_program(args.filename,
-                                     args.trigger,
-                                     args.process_number,
-                                     args.processor_type,
-                                     hardware_type=args.hardware_type,
-                                     priority=PRIO_HIGH,
-                                     working_dir=None,
-                                     keep_c_files=args.keep_c_files,
-                                     adwin_dir=args.adwin_dir,
-                                     pretty_print=True)
+            result = compile_program(
+                args.filename,
+                args.trigger,
+                args.process_number,
+                args.processor_type,
+                hardware_type=args.hardware_type,
+                priority=PRIO_HIGH,
+                working_dir=None,
+                keep_c_files=args.keep_c_files,
+                adwin_dir=args.adwin_dir,
+                pretty_print=True
+            )
             if not result.success:
                 exitcode = 1
 

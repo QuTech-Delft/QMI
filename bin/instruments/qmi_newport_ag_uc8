@@ -1,5 +1,4 @@
-#! /usr/bin/env python3
-
+#! /usr/bin/env python
 """Command line client for the Newport AG-UC8 piezo motor controller."""
 
 import argparse

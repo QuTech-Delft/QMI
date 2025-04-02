@@ -1,5 +1,4 @@
-#! /usr/bin/env python3
-
+#! /usr/bin/env python
 """Command line client for the Quantum Composers 9530 pulse generator."""
 
 import argparse
