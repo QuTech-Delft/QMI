@@ -102,13 +102,14 @@ def _makeLogFormatter(log_process: bool) -> logging.Formatter:
     return fmt
 
 
-def start_logging(loglevel: Union[int, str] = logging.INFO,
-                  console_loglevel: Union[int, str] = logging.WARNING,
-                  logfile: Optional[str] = None,
-                  loglevels: Optional[Mapping[str, Union[int, str]]] = None,
-                  rate_limit: Optional[float] = None,
-                  burst_limit: int = 1
-                  ) -> None:
+def start_logging(
+    loglevel: Union[int, str] = logging.INFO,
+    console_loglevel: Union[int, str] = logging.WARNING,
+    logfile: Optional[str] = None,
+    loglevels: Optional[Mapping[str, Union[int, str]]] = None,
+    rate_limit: Optional[float] = None,
+    burst_limit: int = 1
+) -> None:
     """Initialize the Python logging framework for use by QMI.
 
     This function sets up logging to `stderr` and optional logging to a file.
@@ -118,17 +119,16 @@ def start_logging(loglevel: Union[int, str] = logging.INFO,
     This function is normally called automatically by ``qmi.start()``.
 
     Parameters:
-        loglevel: Default log level (level of the root logger).
-            Only log messages with at least this priority will be processed.
+        loglevel:         Default log level (level of the root logger).
+                          Only log messages with at least this priority will be processed.
         console_loglevel: Log level for logging to console.
-            Only log messages with at least this priority will be logged to screen.
-        logfile: Optional file name of the log file.
-            When omitted, logging to file will be disabled.
-        loglevels: Optional initial log levels for specific loggers.
-            When specified, this is a dictionary mapping logger names to
-            their initial log levels.
-        rate_limit: Maximum number of log messages per second per logger.
-        burst_limit: Maximum number of messages that can be "saved up" for a short burst of messages.
+                          Only log messages with at least this priority will be logged to screen.
+        logfile:          Optional file name of the log file.
+                          When omitted, logging to file will be disabled.
+        loglevels:        Optional initial log levels for specific loggers.
+                          When specified, this is a dictionary mapping logger names to their initial log levels.
+        rate_limit:       Maximum number of log messages per second per logger.
+        burst_limit:      Maximum number of messages that can be "saved up" for a short burst of messages.
     """
 
     global _file_handler
