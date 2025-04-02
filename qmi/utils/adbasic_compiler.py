@@ -454,7 +454,7 @@ def check_compiler_result(basic_filename: str, result: AdbasicResult) -> None:
                                        result.errors)
 
 
-def main():
+def run():
 
     exitcode = 0
 
@@ -536,4 +536,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

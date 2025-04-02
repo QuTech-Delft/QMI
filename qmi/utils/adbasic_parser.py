@@ -391,7 +391,7 @@ def print_parameter_info(param_info: ParameterInfo) -> None:
         print("DATA_{:32} = Data_{}".format(name, index))
 
 
-def main():
+def run():
 
     parser = argparse.ArgumentParser(description="Parse ADbasic program and extract #Define'd constants.")
     parser.add_argument("filename", help="toplevel ADbasic file to be analyzed")
@@ -405,4 +405,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run()
