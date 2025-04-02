@@ -34,7 +34,7 @@ more fields.
 import collections
 import dataclasses
 
-from typing import Any, Dict, List, Tuple, TypeVar, Type, Union
+from typing import Any
 
 from qmi.core.exceptions import QMI_ConfigurationException
 
@@ -152,9 +152,9 @@ def _dictify_dataclass(cfg_dataclass: Any) -> dict:
 def _parse_config_value(val: Any, field_type: Any, path: List[str]) -> Any:
     """Convert JSON value to expected type."""
 
-    # Recognize Optional[T]
+    # Recognize union of types, including None
     optional = False
-    if repr(field_type).startswith("typing.Union[") or repr(field_type).startswith("typing.Optional["):
+    if " | " in repr(field_type):
         for t in field_type.__args__:
             if t == type(None):  # This is intentional! Do not change to 't is None' as it will fail
                 optional = True
@@ -195,7 +195,7 @@ def _parse_config_value(val: Any, field_type: Any, path: List[str]) -> Any:
 
     # Recognize List[T].
     type_repr = repr(field_type)
-    if type_repr.startswith("typing.List["):
+    if type_repr.startswith("list["):
         (elem_type,) = field_type.__args__
         if isinstance(val, list):
             ret = []
@@ -206,7 +206,7 @@ def _parse_config_value(val: Any, field_type: Any, path: List[str]) -> Any:
             return ret
 
     # Recognize Tuple[...].
-    if type_repr.startswith("typing.Tuple["):
+    if type_repr.startswith("tuple["):
         if (len(field_type.__args__) == 2) and (field_type.__args__[1] is Ellipsis):
             elem_type = field_type.__args__[0]
             if isinstance(val, (list, tuple)):
@@ -226,7 +226,7 @@ def _parse_config_value(val: Any, field_type: Any, path: List[str]) -> Any:
                 return tuple(ret)
 
     # Recognize Dict[str, T].
-    if type_repr.startswith("typing.Dict[") and isinstance(val, dict):
+    if type_repr.startswith("dict[") and isinstance(val, dict):
         return _parse_config_dict(val, field_type, path)
 
     # Recognize data class.
@@ -294,8 +294,8 @@ def _check_config_struct_type(cls: Any, path: List[str]) -> None:
 
     pathstr = ".".join(path)
 
-    # Recognize Optional[T]
-    if repr(cls).startswith("typing.Union[") or repr(cls).startswith("typing.Optional["):
+    # Recognize a union of types, including None.
+    if " | " in repr(cls):
         nsub = 0
         for t in cls.__args__:
             if t == type(None):  # This is intentional! Do not change to 't is None' as it will fail
@@ -315,20 +315,20 @@ def _check_config_struct_type(cls: Any, path: List[str]) -> None:
         return  # accept
 
     # Recognize untyped aggregates.
-    if cls in (list, dict, Any, List, Tuple, Dict):
+    if cls in (list, dict, Any, tuple):
         return  # accept
 
-    # Recognize List[T].
+    # Recognize list[T].
     type_repr = repr(cls)
-    if type_repr.startswith("typing.List["):
+    if type_repr.startswith("list["):
         (elem_type,) = cls.__args__
         path.append("[]")
         _check_config_struct_type(elem_type, path)
         path.pop()
         return  # accept
 
-    # Recognize Tuple[...].
-    if type_repr.startswith("typing.Tuple["):
+    # Recognize tuple[...].
+    if type_repr.startswith("tuple["):
         if (len(cls.__args__) == 2) and (cls.__args__[1] is Ellipsis):
             elem_type = cls.__args__[0]
             path.append("[]")
@@ -342,8 +342,8 @@ def _check_config_struct_type(cls: Any, path: List[str]) -> None:
                 path.pop()
             return  # accept
 
-    # Recognize Dict[str, T].
-    if type_repr.startswith("typing.Dict["):
+    # Recognize dict[str, T].
+    if type_repr.startswith("dict["):
         (key_type, elem_type) = cls.__args__
         if key_type is not str:
             raise QMI_ConfigurationException(
