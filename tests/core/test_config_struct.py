@@ -4,7 +4,7 @@
 
 import unittest
 from dataclasses import field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from qmi.core.config_struct import configstruct, config_struct_from_dict, config_struct_to_dict
 from qmi.core.exceptions import QMI_ConfigurationException
@@ -140,7 +140,7 @@ class TestConfigStruct(unittest.TestCase):
         """configstruct dictionary inputs allow only dictionaries with keys as strings."""
         @configstruct
         class MyConfig:
-            d:  Dict[str, int]
+            d:  dict[str, int]
 
         dict1 = {"d": {"0": 5, 1: 3.0}}
         exp_error = "Unsupported non-string dictionary key 1 in configuration item d"
@@ -160,7 +160,7 @@ class TestConfigStruct(unittest.TestCase):
     def test_08_init_missing_argument(self):
         """The configstruct misses an argument"""
         class MyConfig:
-            d:  Dict[str, int]
+            d:  dict[str, int]
 
         exp_error = "MyConfig.__init__() missing required argument 'd'"
         cs = configstruct(MyConfig)
@@ -186,12 +186,12 @@ class TestConfigStruct(unittest.TestCase):
         self.assertEqual(exp_error, str(type_err.exception))
 
     def test_10_unsupported_data_type_in_config(self):
-        """Unsupported data type in configstruct excepts."""
+        """Unsupported data type in configstruct excepts (expecting tuple, got list)."""
         @configstruct
         class MyConfig:
             t:  tuple
 
-        exp_error = "Unsupported data type in configuration field t"
+        exp_error = "Type mismatch in configuration item t: got <class 'list'> while expecting <class 'tuple'>"
 
         data1 = {"t": [5,]}
         with self.assertRaises(QMI_ConfigurationException) as cfg_err:
@@ -264,11 +264,11 @@ class TestConfigStruct(unittest.TestCase):
         class MyConfig:
             v:  list
             d:  dict
-            vs: List[str]
-            di: Dict[str, int]
-            t:  Tuple[int, str]
+            vs: list[str]
+            di: dict[str, int]
+            t:  tuple[int, str]
             a:  Any
-            opt: Optional[int]
+            opt: int | None
 
         data1 = {
             "v": [101, 102, 103],
@@ -301,11 +301,11 @@ class TestConfigStruct(unittest.TestCase):
         class MyConfig:
             v:  list            = field(default_factory=list)
             d:  dict            = field(default_factory=dict)
-            vs: List[str]       = field(default_factory=list)
-            di: Dict[str, int]  = field(default_factory=dict)
-            t:  Tuple[int, str] = (0, "")
+            vs: list[str]       = field(default_factory=list)
+            di: dict[str, int]  = field(default_factory=dict)
+            t:  tuple[int, str] = (0, "")
             a:  Any             = False
-            opt: Optional[int]  = None
+            opt: int | None  = None
 
         data1 = {
             "v": [101, 102, 103],
@@ -365,9 +365,9 @@ class TestConfigStruct(unittest.TestCase):
 
         @configstruct
         class MyConfig:
-            vvi: List[List[int]]
-            dvs: Dict[str, List[str]]
-            optv: Optional[List[float]] = None
+            vvi: list[list[int]]
+            dvs: dict[str, list[str]]
+            optv: list[float] | None = None
 
         data1 = {
             "vvi": [[], [1], [2, 3]],
@@ -400,11 +400,11 @@ class TestConfigStruct(unittest.TestCase):
         self.assertEqual(q2, data2)
 
     def test_16_tuple_t_dotdotdot(self):
-        """Test a Tuple[T, ...] structure field type."""
+        """Test a tuple[T, ...] structure field type."""
 
         @configstruct
         class MyConfig:
-            t:  Tuple[int, ...]
+            t:  tuple[int, ...]
 
         data1 = {
             "t": [5, 4, 3, 2, 1],
@@ -422,9 +422,9 @@ class TestConfigStruct(unittest.TestCase):
 
         @configstruct
         class MyConfig:
-            vs: List
-            di: Dict
-            t: Tuple
+            vs: list
+            di: dict
+            t: tuple
 
         data1 = {
             "vs": ["one", "two"],
@@ -455,7 +455,7 @@ class TestConfigStruct(unittest.TestCase):
         @configstruct
         class MyConfig:
             s: MySub
-            v: List[MySub]
+            v: list[MySub]
 
         data1 = {
             "s": {"x": 100, "y": 3.1415},
@@ -536,7 +536,7 @@ class TestConfigStruct(unittest.TestCase):
         @configstruct
         class MyConfig:
             x: int
-            y: Optional[float]  # NOTE : this field is not optional because it has no default
+            y: float | None  # NOTE : this field is not optional because it has no default
             d: MySub
 
         data1 = {}
@@ -588,10 +588,10 @@ class TestConfigStruct(unittest.TestCase):
 
         @configstruct
         class MyConfig:
-            v: List[int]
+            v: list[int]
             s: str
             d: MySub
-            m: Dict[str, int] = field(default_factory=dict)
+            m: dict[str, int] = field(default_factory=dict)
 
         data1 = {"v": 5, "s": "hello", "d": {"b": False}}
         with self.assertRaises(QMI_ConfigurationException):
@@ -618,7 +618,7 @@ class TestConfigStruct(unittest.TestCase):
 
         @configstruct
         class MyConfig1:
-            x: Union[list, tuple]  # union not supported
+            x: list | tuple  # union not supported
 
         data1 = {"x": []}
         with self.assertRaises(QMI_ConfigurationException):
@@ -626,7 +626,7 @@ class TestConfigStruct(unittest.TestCase):
 
         @configstruct
         class MyConfig2:
-            x: Dict[int, int]  # integer dict key not supported
+            x: dict[int, int]  # integer dict key not supported
 
         data2 = {"x": {}}
         with self.assertRaises(QMI_ConfigurationException):
@@ -658,7 +658,7 @@ class TestConfigStruct(unittest.TestCase):
         @configstruct
         class MyConfig2:
             v: MyConfig1
-            w: Dict[str, MyConfig1]
+            w: dict[str, MyConfig1]
 
         x_val1 = 1
         x_val2 = 2
@@ -680,7 +680,7 @@ class TestConfigStruct(unittest.TestCase):
         @configstruct
         class MyConfig:
             x: int
-            y: Optional[str] = None
+            y: str | None = None
 
         x_val = 3
         my_config = MyConfig(x=x_val)
