@@ -178,7 +178,7 @@ class TestStartLoggingOptions(unittest.TestCase):
         logger.info("Writing some stuff into log file.2.")
         logger.info("Writing some stuff into log file.1.")
         logger.info("Writing some stuff into log.")
-        log_files = [l for l in os.listdir(os.path.dirname(os.path.abspath(__file__))) if l.startswith(self.logfile)]
+        log_files = [l for l in os.listdir(os.path.split(logger.handlers[1].baseFilename)[0]) if l.startswith(logfile)]
         # Assert
         self.assertEqual(backups + 1, len(log_files))
         size_total = 0
@@ -196,7 +196,7 @@ class TestStartLoggingOptions(unittest.TestCase):
         logger.info("Writing more stuff into log file.5.")
         logger.info("Writing more stuff into log.")
 
-        log_files = [l for l in os.listdir(os.path.dirname(os.path.abspath(__file__))) if l.startswith(self.logfile)]
+        log_files = [l for l in os.listdir(os.path.split(logger.handlers[1].baseFilename)[0]) if l.startswith(logfile)]
         self.assertEqual(backups + 1, len(log_files))
         size_total = 0
         # See that the total file size stays contained
