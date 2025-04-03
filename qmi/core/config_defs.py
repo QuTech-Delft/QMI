@@ -31,6 +31,7 @@ class CfgLogging:
     max_bytes:        int            = 10 * 2**30
     backup_count:     int            = 5
 
+
 @configstruct
 class CfgContext:
     """Configuration of a QMI context.

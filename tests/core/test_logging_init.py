@@ -18,10 +18,17 @@ class TestStartLoggingOptions(unittest.TestCase):
 
     def tearDown(self):
         logging.shutdown()  # Close all log files
-        files = os.listdir(os.path.dirname(os.path.abspath(__file__)))
+        path_1 = os.path.dirname(os.path.abspath(__file__))
+        path_2 = os.getcwd()
+        files = os.listdir(path_1)
         for f in files:
             if f.startswith(self.logfile):
-                os.remove(f)
+                os.remove(os.path.join(path_1, f))
+
+        files = os.listdir(path_2)
+        for f in files:
+            if f.startswith(self.logfile):
+                os.remove(os.path.join(path_2, f))
 
     @unittest.mock.patch("qmi.core.logging_init.logging")
     def test_logging_default(self, logging_patch):
@@ -65,7 +72,6 @@ class TestStartLoggingOptions(unittest.TestCase):
             unittest.mock.call("logger1"), unittest.mock.call("logger2"),
             unittest.mock.call("logger1").setLevel(logging.CRITICAL),
             unittest.mock.call("logger2").setLevel(logging.DEBUG),
-
         ], any_order=True)
 
         logging_patch.StreamHandler.assert_called_once()
@@ -171,14 +177,19 @@ class TestStartLoggingOptions(unittest.TestCase):
         backups = 3
         logfile = self.logfile
         # set the logger
+        logger = logging.getLogger()
+        logger.handlers.clear()
         start_logging(logfile=logfile, max_bytes=max_log_size, backup_count=backups)
-        logger = logging.getLogger(qmi.core.logging_init._file_handler.name)
         # Act
         logger.info("Start log")
         logger.info("Writing some stuff into log file.2.")
         logger.info("Writing some stuff into log file.1.")
         logger.info("Writing some stuff into log.")
-        log_files = [l for l in os.listdir(os.path.split(logger.handlers[1].baseFilename)[0]) if l.startswith(logfile)]
+        log_files = [l for l in os.listdir(
+            # os.path.split(logger.handlers[1].baseFilename)[0]
+            # os.path.split(qmi.core.logging_init._file_handler.baseFilename)[0]
+            os.getcwd()
+        ) if l.startswith(logfile)]
         # Assert
         self.assertEqual(backups + 1, len(log_files))
         size_total = 0
@@ -196,7 +207,11 @@ class TestStartLoggingOptions(unittest.TestCase):
         logger.info("Writing more stuff into log file.5.")
         logger.info("Writing more stuff into log.")
 
-        log_files = [l for l in os.listdir(os.path.split(logger.handlers[1].baseFilename)[0]) if l.startswith(logfile)]
+        log_files = [l for l in os.listdir(
+            # os.path.split(logger.handlers[1].baseFilename)[0]
+            # os.path.split(qmi.core.logging_init._file_handler.baseFilename)[0]
+            os.getcwd()
+        ) if l.startswith(logfile)]
         self.assertEqual(backups + 1, len(log_files))
         size_total = 0
         # See that the total file size stays contained

@@ -23,7 +23,9 @@ if os.path.isfile(QMI_ENV_CONFIG_FILE):
 CONFIG_FILE_CONTEXT = """{
     # Log level for messages to the console.
     "logging": {
-        "console_loglevel": "INFO"
+        "console_loglevel": "INFO",
+        "max_bytes": 100,
+        "backup_count": 2
     },
     # Directory to write various log files.
     "log_dir": "${qmi_home}/log_dir",
