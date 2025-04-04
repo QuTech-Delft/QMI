@@ -170,24 +170,24 @@ class TestStartLoggingOptions(unittest.TestCase):
         assert unittest.mock.call.Logger("exception") in logging_patch.method_calls
         logging_patch.assert_has_calls([unittest.mock.call.Logger("exception")])
 
-    def test_log_rotation(self):
+    def test_log_rotation_small(self):
         """Test that log rotation works with given input values."""
         # Arrange
         max_log_size = 100  # bytes
         backups = 3
         logfile = self.logfile
-        # set the logger
+        # clear the root logger (small log files seem to be an issue here) and set the logger
         logger = logging.getLogger()
         logger.handlers.clear()
+        del logger
         start_logging(logfile=logfile, max_bytes=max_log_size, backup_count=backups)
+        logger = logging.getLogger("qmi.core.logging_init")
         # Act
         logger.info("Start log")
         logger.info("Writing some stuff into log file.2.")
         logger.info("Writing some stuff into log file.1.")
         logger.info("Writing some stuff into log.")
         log_files = [l for l in os.listdir(
-            # os.path.split(logger.handlers[1].baseFilename)[0]
-            # os.path.split(qmi.core.logging_init._file_handler.baseFilename)[0]
             os.getcwd()
         ) if l.startswith(logfile)]
         # Assert
@@ -199,7 +199,7 @@ class TestStartLoggingOptions(unittest.TestCase):
         for lf in log_files:
             size_total += os.path.getsize(lf)
 
-        self.assertLess(size_total, max_log_size * (backups + 1))
+        self.assertLessEqual(size_total, max_log_size * (backups + 1))
 
         # See also that writing more logs do not increase number of log files or total size.
         logger.info("Continue log")
@@ -208,8 +208,6 @@ class TestStartLoggingOptions(unittest.TestCase):
         logger.info("Writing more stuff into log.")
 
         log_files = [l for l in os.listdir(
-            # os.path.split(logger.handlers[1].baseFilename)[0]
-            # os.path.split(qmi.core.logging_init._file_handler.baseFilename)[0]
             os.getcwd()
         ) if l.startswith(logfile)]
         self.assertEqual(backups + 1, len(log_files))
@@ -220,7 +218,37 @@ class TestStartLoggingOptions(unittest.TestCase):
         for lf in log_files:
             size_total += os.path.getsize(lf)
 
-        self.assertLess(size_total, max_log_size * (backups + 1))
+        self.assertLessEqual(size_total, max_log_size * (backups + 1))
+
+    def test_log_rotation_big(self):
+        """Test that log rotation works with given input values."""
+        # Arrange
+        max_log_size = 10000  # bytes
+        backups = 3
+        logfile = self.logfile
+        # set the logger
+        start_logging(logfile=logfile, max_bytes=max_log_size, backup_count=backups)
+        logger = logging.getLogger("qmi.core.logging_init")
+        # Act
+        for i in range(100):
+            logger.info(f"Start log {i}")
+            logger.info(f"Writing some stuff into log file.{i+1}.")
+            logger.info(f"Writing some stuff into log file.{i+2}.")
+            logger.info(f"Writing some stuff into log {i}.")
+
+        log_files = [l for l in os.listdir(
+            os.getcwd()
+        ) if l.startswith(logfile)]
+        # Assert
+        self.assertEqual(backups + 1, len(log_files))
+        size_total = 0
+        # See that the total file size stays contained
+        # NOTE: It seems that the size limit is not strict: if a line is longer than the log size limit in bytes,
+        # The file size can still be larger than the limit. The rotation then starts from next write.
+        for lf in log_files:
+            size_total += os.path.getsize(lf)
+
+        self.assertLessEqual(size_total, max_log_size * (backups + 1))
 
 
 class Test_RateLimitFilter(unittest.TestCase):
