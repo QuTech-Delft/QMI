@@ -177,8 +177,7 @@ def start_logging(
         # Use the custom WatchedRotatingFileHandler class for logging to file[s].
         # This handler will automatically create or re-open the log file if the underlying
         # file is removed, renamed or reached its maximum size, for example as part of log rotation.
-        _file_handler = WatchedRotatingFileHandler(logfile, maxBytes=max_bytes, backupCount=backup_count)
-        # _file_handler.setLevel(loglevel)
+        _file_handler = WatchedRotatingFileHandler(logfile, delay=True, maxBytes=max_bytes, backupCount=backup_count)
         fmt = _makeLogFormatter(log_process=True)
         _file_handler.setFormatter(fmt)
         # Configure rate limiting.
