@@ -217,6 +217,7 @@ Let's create a configuration file with the following contents::
 This configuration file changes the log level for messages that appear on the screen.
 By default, QMI prints only warnings and error messages.
 Our new configuration also enables printing of informational messages.
+For further details about logging options, see documentation on ``qmi.core.logging_init`` module.
 
 Test the new configuration file in a new Python session:
 

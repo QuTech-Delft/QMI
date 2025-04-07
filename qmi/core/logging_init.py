@@ -1,4 +1,32 @@
-"""Initialization of the Python logging framework for QMI."""
+"""Initialization of the Python logging framework for QMI.
+
+Logging framework can be configured using the "logging" and "log_dir" sections of the QMI configuration file, e.g.:
+```json
+{
+    # Log level for messages to the console.
+    "logging": {
+        "console_loglevel": "DEBUG",
+        "logfile": "debug.log",
+        "loglevels": {
+            "qmi.core.rpc": "ERROR",
+            "qmi.core.task": "ERROR"
+        },
+        "max_bytes": 1000000,
+        "backup_count": 2
+    },
+    # Directory to write various log files.
+    "log_dir": "${qmi_home}/log_dir",
+
+    "contexts": ...
+}
+```
+to show DEBUG info on the console, and to write into max three log files (the latest log and two backups) of max size
+of 1MB. The location of the log file named 'debug.log' is in 'log_dir' folder of the QMI home directory.  The loglevel
+setting is overridden with module-specific settings, for modules `qmi.core.rpc` and `qmi.core.task`, to be "ERROR".
+
+The default `log levels <https://docs.python.org/3/library/logging.html#logging-levels>` for QMI are "INFO" for the
+log file and "WARNING" for the console. The standard log file name is 'qmi.log'.
+"""
 
 import sys
 import logging
