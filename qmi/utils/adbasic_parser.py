@@ -11,7 +11,7 @@ import argparse
 import logging
 import os.path
 import re
-from typing import Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import NamedTuple
 
 from qmi.core.exceptions import QMI_Exception
 
@@ -53,7 +53,7 @@ class ArrayElemDesc(NamedTuple):
         return "Data_{}[{}]".format(self.data_index, self.elem_index)
 
 
-ParameterDesc = Union[ParDesc, FParDesc, ArrayElemDesc]
+ParameterDesc = ParDesc | FParDesc | ArrayElemDesc
 
 
 class ParameterInfo(NamedTuple):
@@ -63,8 +63,8 @@ class ParameterInfo(NamedTuple):
         param:  Mapping from parameter name to a `ParDesc`, `FParDesc` or `ArrayElemDesc` instance.
         data:   Mapping from data name to the index of the global `Data_nnn` array.
     """
-    param: Dict[str, ParameterDesc]
-    data: Dict[str, int]
+    param: dict[str, ParameterDesc]
+    data: dict[str, int]
 
 
 class ParseException(QMI_Exception):
@@ -80,7 +80,7 @@ class ParseException(QMI_Exception):
         return "{}, line {}: {}".format(self.filename, self.line_nr, self.message)
 
 
-def _resolve_include_path(include_path: str, source_file: str, include_dir: str) -> Optional[str]:
+def _resolve_include_path(include_path: str, source_file: str, include_dir: str) -> str | None:
     """Resolve the OS path name of an ADbasic include file.
 
     Only local include paths are processed.
@@ -93,7 +93,7 @@ def _resolve_include_path(include_path: str, source_file: str, include_dir: str)
 
     Returns:
         Path name of the OS-level location of the include file, or None if
-        this include file should not be processed.
+        this include-file should not be processed.
     """
 
     # Separate include path into components.
@@ -121,15 +121,15 @@ def _resolve_include_path(include_path: str, source_file: str, include_dir: str)
     return os.path.join(include_dir, *path_components)
 
 
-def _parse_single_adbasic_file(filename: str) -> Tuple[List[SymbolInfo], List[str]]:
+def _parse_single_adbasic_file(filename: str) -> tuple[list[SymbolInfo], list[str]]:
     """Parse a single ADBasic source file and return a tuple of defined symbols and included files.
 
     Parameters:
         filename: File name of ADBasic source to parse.
 
     Returns:
-        Tuple `(defined_symbols, include_paths)`
-        where `defined_symbols` is a list of defined symbols and `include_paths` is a list of included files.
+        defined_symbols, include_paths: `defined_symbols` is a list of defined symbols and
+                                        `include_paths` is a list of included files.
     """
 
     _logger.debug("Parsing %s", filename)
@@ -166,16 +166,16 @@ def _parse_single_adbasic_file(filename: str) -> Tuple[List[SymbolInfo], List[st
     return (defined_symbols, include_paths)
 
 
-def parse_adbasic_program(filename: str, include_dir: str) -> List[SymbolInfo]:
+def parse_adbasic_program(filename: str, include_dir: str) -> list[SymbolInfo]:
     """Parse an ADbasic program (and, recursively, its include files) to find #Define lines.
 
     Parameters:
-        filename: File name of ADBasic source to parse.
+        filename:    File name of ADBasic source to parse.
         include_dir: Base directory for resolving relative include paths.
                      May be empty to use the current working directory.
 
     Returns:
-        List of SymbolInfo objects to describe defined symbols.
+        all_defined_symbols: List of SymbolInfo objects to describe defined symbols.
     """
 
     files_remaining = [filename]
@@ -196,15 +196,22 @@ def parse_adbasic_program(filename: str, include_dir: str) -> List[SymbolInfo]:
     return all_defined_symbols
 
 
-def _extract_data_defines(symbols: List[SymbolInfo]) -> Dict[str, int]:
-    """Extract data array information from symbol definitions."""
+def _extract_data_defines(symbols: list[SymbolInfo]) -> dict[str, int]:
+    """Extract data array information from symbol definitions.
+
+    Parameters:
+        symbols: List of SymbolInfo objects to describe defined symbols.
+
+    Returns:
+        data_info: Data names with respective data indexes as dictionary.
+    """
 
     # Maintain a mapping from uppercase parameter name to the actual case of the name.
     # This is used to check for duplicate definitions because identifiers are case-insensitive in ADbasic.
-    name_case_map: Dict[str, str] = {}
+    name_case_map: dict[str, str] = {}
 
-    data_info: Dict[str, int] = {}
-    ref_to_name: Dict[int, str] = {}
+    data_info: dict[str, int] = {}
+    ref_to_name: dict[int, str] = {}
 
     for symbol in symbols:
 
@@ -237,7 +244,8 @@ def _extract_data_defines(symbols: List[SymbolInfo]) -> Dict[str, int]:
             raise ParseException(
                 filename=symbol.filename,
                 line_nr=symbol.line_nr,
-                message="Duplicate definition of symbol {} for different data array".format(symbol.label))
+                message="Duplicate definition of symbol {} for different data array".format(symbol.label)
+            )
 
         # Check for duplicate use of the same Data_nnn array under different names.
         prev_name = ref_to_name.get(data_index)
@@ -245,7 +253,8 @@ def _extract_data_defines(symbols: List[SymbolInfo]) -> Dict[str, int]:
             raise ParseException(
                 filename=symbol.filename,
                 line_nr=symbol.line_nr,
-                message="Symbol {} is a duplicate reference to {}".format(symbol.label, symbol.value))
+                message="Symbol {} is a duplicate reference to {}".format(symbol.label, symbol.value)
+            )
 
         # Store new symbol definition.
         data_info[data_name] = data_index
@@ -255,18 +264,26 @@ def _extract_data_defines(symbols: List[SymbolInfo]) -> Dict[str, int]:
     return data_info
 
 
-def _extract_par_defines(symbols: List[SymbolInfo], data_info: Dict[str, int]) -> Dict[str, ParameterDesc]:
-    """Extract scalar parameter information from symbol definitions."""
+def _extract_par_defines(symbols: list[SymbolInfo], data_info: dict[str, int]) -> dict[str, ParameterDesc]:
+    """Extract scalar parameter information from symbol definitions.
+
+    Parameters:
+        symbols:   List of SymbolInfo objects to describe defined symbols.
+        data_info: Data names with respective data indexes as dictionary.
+
+    Returns:
+        param_info: Parameter names with parameter description objects as dictionary.
+    """
 
     # Rebuild Data_nnn index using uppercase parameter names for case-insensitive lookup.
     data_info_upper = dict((name.upper(), value) for (name, value) in data_info.items())
 
     # Maintain a mapping from uppercase parameter name to the actual case of the name.
     # This is used to check for duplicate definitions because identifiers are case-insensitive in ADbasic.
-    name_case_map: Dict[str, str] = {}
+    name_case_map: dict[str, str] = {}
 
-    param_info: Dict[str, ParameterDesc] = {}
-    ref_to_name: Dict[str, str] = {}
+    param_info: dict[str, ParameterDesc] = {}
+    ref_to_name: dict[str, str] = {}
 
     for symbol in symbols:
 
@@ -277,7 +294,7 @@ def _extract_par_defines(symbols: List[SymbolInfo], data_info: Dict[str, int]) -
         # Extract parameter name.
         (_prefix, param_name) = symbol.label.split("_", maxsplit=1)
 
-        param_desc: Optional[ParameterDesc] = None
+        param_desc: ParameterDesc | None = None
 
         # Try to match parameter in global Par variable.
         if param_desc is None:
@@ -304,7 +321,8 @@ def _extract_par_defines(symbols: List[SymbolInfo], data_info: Dict[str, int]) -
                     raise ParseException(
                         filename=symbol.filename,
                         line_nr=symbol.line_nr,
-                        message="Symbol {} refers to unknown array {}".format(symbol.label, data_name))
+                        message="Symbol {} refers to unknown array {}".format(symbol.label, data_name)
+                    )
                 data_index = data_info_upper[data_name.upper()]
                 param_desc = ArrayElemDesc(data_index, elem_index)
 
@@ -318,7 +336,8 @@ def _extract_par_defines(symbols: List[SymbolInfo], data_info: Dict[str, int]) -
             raise ParseException(
                 filename=symbol.filename,
                 line_nr=symbol.line_nr,
-                message="Duplicate definition of symbol {} with different case".format(symbol.label))
+                message="Duplicate definition of symbol {} with different case".format(symbol.label)
+            )
 
         # Check for duplicate definition of this symbol with different data index.
         prev_desc = param_info.get(param_name)
@@ -326,7 +345,8 @@ def _extract_par_defines(symbols: List[SymbolInfo], data_info: Dict[str, int]) -
             raise ParseException(
                 filename=symbol.filename,
                 line_nr=symbol.line_nr,
-                message="Duplicate definition of symbol {} for different parameter".format(symbol.label))
+                message="Duplicate definition of symbol {} for different parameter".format(symbol.label)
+            )
 
         # Check for duplicate use of the same parameter under different names.
         prev_name = ref_to_name.get(repr(param_desc))
@@ -334,7 +354,8 @@ def _extract_par_defines(symbols: List[SymbolInfo], data_info: Dict[str, int]) -
             raise ParseException(
                 filename=symbol.filename,
                 line_nr=symbol.line_nr,
-                message="Symbol {} is a duplicate reference to {}".format(symbol.label, symbol.value))
+                message="Symbol {} is a duplicate reference to {}".format(symbol.label, symbol.value)
+            )
 
         # Store new symbol definition.
         param_info[param_name] = param_desc
@@ -344,7 +365,7 @@ def _extract_par_defines(symbols: List[SymbolInfo], data_info: Dict[str, int]) -
     return param_info
 
 
-def analyze_parameter_info(symbols: List[SymbolInfo]) -> ParameterInfo:
+def analyze_parameter_info(symbols: list[SymbolInfo]) -> ParameterInfo:
     """Analyze a set of ADbasic symbol definitions to extract parameter information.
 
     Only the following types of symbol definitions are processed:
@@ -357,7 +378,7 @@ def analyze_parameter_info(symbols: List[SymbolInfo]) -> ParameterInfo:
         symbols: List of symbol definitions (as produced by `parse_adbasic_program`).
 
     Returns:
-        ParameterInfo instance containing a description of all named parameters and named arrays.
+        ParameterInfo: Instance containing a description of all named parameters and named arrays.
     """
 
     data_info = _extract_data_defines(symbols)
@@ -365,7 +386,7 @@ def analyze_parameter_info(symbols: List[SymbolInfo]) -> ParameterInfo:
     return ParameterInfo(param_info, data_info)
 
 
-def print_symbol_info(symbols: List[SymbolInfo]) -> None:
+def print_symbol_info(symbols: list[SymbolInfo]) -> None:
     """Print the result of parse_adbasic_program()."""
 
     for symbol in symbols:
@@ -391,18 +412,17 @@ def print_parameter_info(param_info: ParameterInfo) -> None:
         print("DATA_{:32} = Data_{}".format(name, index))
 
 
-def main():
+def run():
 
     parser = argparse.ArgumentParser(description="Parse ADbasic program and extract #Define'd constants.")
     parser.add_argument("filename", help="toplevel ADbasic file to be analyzed")
     args = parser.parse_args()
 
     symbols = parse_adbasic_program(args.filename, os.path.dirname(args.filename))
-    #print_symbol_info(symbols)
 
     param_info = analyze_parameter_info(symbols)
     print_parameter_info(param_info)
 
 
 if __name__ == "__main__":
-    main()
+    run()
