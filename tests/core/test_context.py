@@ -11,10 +11,10 @@ class TestQMIContext(unittest.TestCase):
 
     def setUp(self):
         # Start two contexts.
-        self.log_dir = "~/log"
-        self.datastore_dir = "~/datastore"
-        self.config_file = "~/config/qmi.conf"
-        self.qmi_home = "~/home"
+        self.log_dir = os.path.join("~", "log_dir")
+        self.datastore_dir = os.path.join("~","datastore")
+        self.config_file = os.path.join("~", "config", "qmi.conf")
+        self.qmi_home = os.path.join("~", "home")
         config1 = CfgQmi(
             contexts={"c1": CfgContext(tcp_server_port=0)},
             log_dir=self.log_dir,
@@ -200,7 +200,7 @@ class TestQMIContext(unittest.TestCase):
         ctx_tmp.start()
         datastore_dir = ctx_tmp.get_datastore_dir()
         ctx_tmp.stop()
-        self.assertEqual(datastore_dir, self.qmi_home + "/datastore")
+        self.assertEqual(datastore_dir, os.path.join(self.qmi_home, "datastore"))
 
     def test_resolve_recursive_datastore(self):
         """Test an attempt to recursively define the datastore path."""

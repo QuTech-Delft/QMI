@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.48.0-beta.0] - Unreleased
 
 ### Added
+- The log file existence is checked and necessary folder structure is created if needed.
 
 ### Changed
 - All entry point functions in `bin` scripts from `main` to `run` to avoid unintended modifications of `pyproject.toml` when executing release procedure.
 
 ### Fixed
+- In context_singleton.py, the QMI log_dir path is now correctly retrieved from qmi.conf, if it is defined. 
+- The path is made OS-independent and the `~` character, if at start of the path, is replaced with actual path.
 
 ### Removed
 

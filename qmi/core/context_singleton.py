@@ -10,7 +10,7 @@ functions directly, for example::
 
     import qmi
     qmi.start("my_context")
-    proxy = qmi.make_instrument("my_instrument", InstrumentClass, ...)
+    proxy = qmi.make_instrument("my_instrument", InstrumentClass, class_args)
     qmi.stop()
 """
 
@@ -20,7 +20,7 @@ import os
 import os.path
 import time
 
-from typing import Any, Optional, Type, Dict, List, cast
+from typing import Any
 
 import qmi.core.config
 import qmi.core.logging_init
@@ -62,10 +62,11 @@ def context() -> QMI_Context:
 
 def start(
         context_name: str,
-        config_file: Optional[str] = None,
+        config_file: str | None = None,
         init_logging: bool = True,
-        console_loglevel: Optional[str] = None,
-        context_cfg: Optional[dict] = None) -> None:
+        console_loglevel: str | None = None,
+        context_cfg: dict | None = None
+) -> None:
     """Create and start a global QMI_Context instance.
 
     This function should be called exactly once by the top-level code of
@@ -101,11 +102,11 @@ def start(
     and/or values will raise an exception.
 
     Parameters:
-        context_name: Name of the QMI context.
-        config_file: Optional path to the QMI configuration file.
-        init_logging: Optional flag; set False to skip logging initialization.
+        context_name:     Name of the QMI context.
+        config_file:      Optional path to the QMI configuration file.
+        init_logging:     Optional flag; set False to skip logging initialization.
         console_loglevel: Optionally override `console_loglevel` from config file.
-        context_cfg: Optionally insert or override context(s) in config.contexts
+        context_cfg:      Optionally insert or override context(s) in config.contexts.
     """
 
     global _qmi_context
@@ -126,8 +127,10 @@ def start(
     if console_loglevel is not None:
         valid_levels = ["INFO", "WARNING", "DEBUG", "CRITICAL", "FATAL", "ERROR", "WARN", "NOTSET"]
         if console_loglevel not in valid_levels:
-            raise QMI_ConfigurationException(f"Trying to use non-valid console loglevel {console_loglevel}. " +
-                                             f"Valid values are {valid_levels}.")
+            raise QMI_ConfigurationException(
+                f"Trying to use non-valid console loglevel {console_loglevel}. " +
+                f"Valid values are {valid_levels}."
+            )
 
         config.logging.console_loglevel = console_loglevel.upper()
 
@@ -137,8 +140,10 @@ def start(
     if init_logging:
         _init_logging()
 
-    _logger.info("QMI starting (prog=%r, context=%r, pid=%d, config=%r)",
-                 sys.argv[0], context_name, os.getpid(), config_file)
+    _logger.info(
+        "QMI starting (prog=%r, context=%r, pid=%d, config=%r)",
+        sys.argv[0], context_name, os.getpid(), config_file
+    )
 
     # Start QMI context.
     _qmi_context.start()
@@ -147,7 +152,7 @@ def start(
     _connect_to_peers()
 
 
-def create_config_from_file(config_file: Optional[str]) -> CfgQmi:
+def create_config_from_file(config_file: str | None) -> CfgQmi:
     """Create configuration from a file.
 
     Parameters:
@@ -198,16 +203,22 @@ def _init_logging() -> None:
         logfile = logfile % attrs
 
         # Make absolute file name.
-        qmi_home = _qmi_context.get_qmi_home_dir()
-        logfile = os.path.join(qmi_home, logfile)
+        qmi_log_dir = _qmi_context.get_log_dir()
+        qmi_log_dir = qmi_log_dir.replace("~", os.path.expanduser("~")) if qmi_log_dir.startswith("~") else qmi_log_dir
+        if not os.path.isdir(qmi_log_dir):
+            os.makedirs(qmi_log_dir, exist_ok=True)
+
+        logfile = os.path.join(qmi_log_dir, logfile)
 
     # Initialize logging.
-    qmi.core.logging_init.start_logging(loglevel=loglevel,
-                                        console_loglevel=console_loglevel,
-                                        logfile=logfile,
-                                        loglevels=loglevels,
-                                        rate_limit=cfg.logging.rate_limit,
-                                        burst_limit=cfg.logging.burst_limit)
+    qmi.core.logging_init.start_logging(
+        loglevel=loglevel,
+        console_loglevel=console_loglevel,
+        logfile=logfile,
+        loglevels=loglevels,
+        rate_limit=cfg.logging.rate_limit,
+        burst_limit=cfg.logging.burst_limit
+    )
 
 
 def _connect_to_peers() -> None:
@@ -243,7 +254,7 @@ def stop() -> None:
     This function should be called exactly once when the application exits.
 
     Raises:
-        QMI_NoActiveContextException: If there is no active context.
+        QMI_NoActiveContextException: If there is no active QMI context present.
     """
 
     global _qmi_context
@@ -266,11 +277,12 @@ def info() -> str:
         return _qmi_context.info()
 
 
-def make_rpc_object(rpc_object_name: str,
-                    rpc_object_class: Type[QMI_RpcObject],
-                    *args: Any,
-                    **kwargs: Any
-                    ) -> Any:
+def make_rpc_object(
+    rpc_object_name: str,
+    rpc_object_class: type[QMI_RpcObject],
+    *args: Any,
+    **kwargs: Any
+) -> Any:
     """Create an instance of a `QMI_RpcObject` subclass and make it accessible via RPC.
 
     The actual object instance will be created in a separate background thread.
@@ -278,13 +290,17 @@ def make_rpc_object(rpc_object_name: str,
     a thread might require casting it first: proxy = cast(proxy, rpc_object_class)(qmi.context(), rpc_object_name).
 
     Parameters:
-        object_name: Unique name for the new object instance.
-            This name will also be used to access the object via RPC.
-        object_class: Class that implements this object (must be a subclass of `QMI_RpcObject`).
-        args: Optional arguments for the object class constructor.
+        rpc_object_name:  Unique name for the new object instance.
+                          This name will also be used to access the object via RPC.
+        rpc_object_class: Class that implements this object (must be a subclass of `QMI_RpcObject`).
+        args:             Optional arguments for the object class constructor.
+        kwargs:           Optional keyword arguments for the object class constructor.
 
     Returns:
         An RPC proxy that provides access to the new object instance.
+
+    Raises:
+        QMI_NoActiveContextException: If there is no active QMI context present.
     """
     if _qmi_context is None:
         raise QMI_NoActiveContextException()
@@ -292,24 +308,29 @@ def make_rpc_object(rpc_object_name: str,
     return _qmi_context.make_rpc_object(rpc_object_name, rpc_object_class, *args, **kwargs)
 
 
-def make_instrument(instrument_name: str,
-                    instrument_class: Type[QMI_Instrument],
-                    *args: Any,
-                    **kwargs: Any
-                    ) -> Any:
+def make_instrument(
+    instrument_name: str,
+    instrument_class: type[QMI_Instrument],
+    *args: Any,
+    **kwargs: Any
+) -> Any:
     """Create an instance of a `QMI_Instrument` subclass and make it accessible via RPC.
 
     The actual instrument instance will be created in a separate background thread.
     To access the instrument, you can call its methods via RPC.
 
     Parameters:
-        instrument_name: Unique name for the new instrument instance.
-            This name will also be used to access the instrument via RPC.
+        instrument_name:  A unique name for the new instrument instance.
+                          This name will also be used to access the instrument via RPC.
         instrument_class: Class that implements this instrument (must be a subclass of `QMI_Instrument`).
-        args: Optional arguments for the instrument class constructor.
+        args:             Optional arguments for the instrument class constructor.
+        kwargs:           Optional keyword arguments for the instrument class constructor.
 
     Returns:
         An RPC proxy that provides access to the new instrument instance.
+
+    Raises:
+        QMI_NoActiveContextException: If there is no active QMI context present.
     """
     if _qmi_context is None:
         raise QMI_NoActiveContextException()
@@ -317,12 +338,13 @@ def make_instrument(instrument_name: str,
     return _qmi_context.make_instrument(instrument_name, instrument_class, *args, **kwargs)
 
 
-def make_task(task_name: str,
-              task_class: Type[QMI_Task],
-              *args: Any,
-              task_runner: Type[QMI_TaskRunner] = QMI_TaskRunner,
-              **kwargs: Any
-              ) -> Any:
+def make_task(
+    task_name: str,
+    task_class: type[QMI_Task],
+    *args: Any,
+    task_runner: type[QMI_TaskRunner] = QMI_TaskRunner,
+    **kwargs: Any
+) -> Any:
     """Create an instance of a `QMI_Task` subclass and make it accessible via RPC.
 
     The actual task instance will be created in a separate thread.
@@ -333,14 +355,18 @@ def make_task(task_name: str,
     To start the task, perform an explicit call to the `start()` method of the returned task.
 
     Parameters:
-        task_name: Unique name for the new task instance.
-            This name will also be used to access the task runner via RPC.
-        task_class: Class that implements this task (must be a subclass of `QMI_Task`).
+        task_name:   Unique name for the new task instance.
+                     This name will also be used to access the task runner via RPC.
+        task_class:  Class that implements this task (must be a subclass of `QMI_Task`).
+        args:        Optional arguments for the task class constructor.
         task_runner: Class that implements the managing of the task (must be a subclass of `QMI_Taskrunner`)
-        args: Optional arguments for the task class constructor.
+        kwargs:      Optional keyword arguments for the task class constructor.
 
     Returns:
         An RPC proxy that provides access to the new task.
+
+    Raises:
+        QMI_NoActiveContextException: If there is no active QMI context present.
     """
     if _qmi_context is None:
         raise QMI_NoActiveContextException()
@@ -348,7 +374,7 @@ def make_task(task_name: str,
     return _qmi_context.make_task(task_name, task_class, *args, task_runner=task_runner, **kwargs)
 
 
-def list_rpc_objects(rpc_object_baseclass=None) -> List:
+def list_rpc_objects(rpc_object_baseclass=None) -> list:
     """Show a list of RPC objects in the local context and peer contexts."""
 
     if _qmi_context is None:
@@ -398,18 +424,21 @@ def show_network_contexts() -> None:
     return _qmi_context.show_network_contexts()
 
 
-def get_rpc_object(rpc_object_name: str, auto_connect: bool = False, host_port: Optional[str] = None) -> Any:
+def get_rpc_object(rpc_object_name: str, auto_connect: bool = False, host_port: str | None = None) -> Any:
     """Return a proxy for the specified object.
 
     The object may exist either in the local context, or in a peer context.
 
     Parameters:
-        object_name: Object name, formatted as ``"<context_name>.<object_name>"``.
-        auto_connect: if True, connect automatically to the object peer.
-        host_port: Optional host:port string pattern to guide the auto_connect.
+        rpc_object_name: Object name, formatted as ``"<context_name>.<object_name>"``.
+        auto_connect:    If True, connect automatically to the object peer.
+        host_port:       Optional host:port string pattern to guide the auto_connect.
 
     Returns:
         A proxy for the specified object.
+
+    Raises:
+        QMI_NoActiveContextException: If there is no active QMI context present.
     """
     if _qmi_context is None:
         raise QMI_NoActiveContextException()
@@ -417,18 +446,21 @@ def get_rpc_object(rpc_object_name: str, auto_connect: bool = False, host_port: 
     return _qmi_context.get_rpc_object_by_name(rpc_object_name, auto_connect=auto_connect, host_port=host_port)
 
 
-def get_instrument(instrument_name: str, auto_connect: bool = False, host_port: Optional[str] = None) -> Any:
+def get_instrument(instrument_name: str, auto_connect: bool = False, host_port: str | None = None) -> Any:
     """Return a proxy for the specified instrument.
 
     The instrument may exist either in the local context, or in a peer context.
 
     Parameters:
         instrument_name: Instrument name, formatted as ``"<context_name>.<instrument_name>"``.
-        auto_connect: if True, connect automatically to the instrument peer.
-        host_port: Optional host:port string pattern to guide the auto_connect.
+        auto_connect:    If True, connect automatically to the instrument peer.
+        host_port:       Optional host:port string pattern to guide the auto_connect.
 
     Returns:
         A proxy for the specified instrument.
+
+    Raises:
+        QMI_NoActiveContextException: If there is no active QMI context present.
     """
     if _qmi_context is None:
         raise QMI_NoActiveContextException()
@@ -436,7 +468,7 @@ def get_instrument(instrument_name: str, auto_connect: bool = False, host_port: 
     return _qmi_context.get_instrument(instrument_name, auto_connect, host_port)
 
 
-def get_task(task_name: str, auto_connect: bool = False, host_port: Optional[str] = None) -> Any:
+def get_task(task_name: str, auto_connect: bool = False, host_port: str | None = None) -> Any:
     """Return a proxy for the specified task.
 
     The task may exist either in the local context, or in a peer context.
@@ -448,6 +480,9 @@ def get_task(task_name: str, auto_connect: bool = False, host_port: Optional[str
 
     Returns:
         A proxy for the specified task.
+
+    Raises:
+        QMI_NoActiveContextException: If there is no active QMI context present.
     """
     if _qmi_context is None:
         raise QMI_NoActiveContextException()
@@ -455,11 +490,14 @@ def get_task(task_name: str, auto_connect: bool = False, host_port: Optional[str
     return _qmi_context.get_task(task_name, auto_connect, host_port)
 
 
-def get_configured_contexts() -> Dict[str, CfgContext]:
+def get_configured_contexts() -> dict[str, CfgContext]:
     """Return a dictionary of active QMI contexts.
 
     Returns:
         An OrderedDict object of all active QMI contexts.
+
+    Raises:
+        QMI_NoActiveContextException: If there is no active QMI context present.
     """
     if _qmi_context is None:
         raise QMI_NoActiveContextException()
