@@ -30,7 +30,7 @@ classifiers=[
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
-    "Topic:: Scientific/Engineering:: Physics",
+    "Topic :: Scientific/Engineering :: Physics",
     "Natural Language :: English",
 ]
 keywords=["qmi", "hardware", "software", "interface", "laboratory", "physics"]
@@ -98,9 +98,6 @@ qmi_wieserlabs_flexdds = "bin.instruments.qmi_wieserlabs_flexdds:run"
 
 [tool.setuptools]
 include-package-data = true
-
-[tool.setuptools.packages.find]
-where = ["qmi/"]
 
 [tool.setuptools.package-data]
 qmi = ["py.typed"]
