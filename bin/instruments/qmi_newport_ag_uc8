@@ -1,5 +1,4 @@
-#! /usr/bin/env python3
-
+#! /usr/bin/env python
 """Command line client for the Newport AG-UC8 piezo motor controller."""
 
 import argparse
@@ -15,7 +14,7 @@ CHANNELS = [1, 2, 3, 4]
 AXES = [1, 2]
 
 
-def main() -> int:
+def run() -> int:
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.description = "Command line client for the Newport AG-UC8 piezo motor controller."
 
@@ -118,4 +117,4 @@ def parse_instrument_source(args) -> AbstractContextManager:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

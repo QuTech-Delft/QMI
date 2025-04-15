@@ -1,5 +1,4 @@
-#! /usr/bin/env python3
-
+#! /usr/bin/env python
 """Command line client for the Measurement Computing USB-1808X DAQ device."""
 
 import argparse
@@ -11,7 +10,7 @@ from qmi.instruments.mcc.usb1808x import MCC_USB1808X
 from qmi.utils.context_managers import start_stop, open_close
 
 
-def main() -> int:
+def run() -> int:
 
     parser = argparse.ArgumentParser()
     parser.description = """Command line client for the Measurement Computing USB-1808X DAQ device."""
@@ -104,4 +103,4 @@ def parse_instrument_source(args) -> AbstractContextManager:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

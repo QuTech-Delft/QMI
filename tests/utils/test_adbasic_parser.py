@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Unit tests for ADbasic parser."""
 import logging
@@ -12,7 +12,7 @@ import contextlib
 
 from qmi.utils.adbasic_parser import (
     ParDesc, FParDesc, ArrayElemDesc, ParseException, SymbolInfo,
-    parse_adbasic_program, analyze_parameter_info, main)
+    parse_adbasic_program, analyze_parameter_info, run)
 
 
 TEST_PROGRAM_FILE = "program.bas"
@@ -301,8 +301,8 @@ class TestMain(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def test_main(self):
-        """Test that the main function parses the input files correctly and the print statement prints symbols of type
+    def test_run(self):
+        """Test that the run function parses the input files correctly and the print statement prints symbols of type
         symbol_name only (so, not symbols without '_')."""
         # Arrange
         expected = [
@@ -319,7 +319,7 @@ class TestMain(unittest.TestCase):
             # Act
             with io.StringIO() as buf:
                 with contextlib.redirect_stdout(buf):
-                    main()
+                    run()
 
                 stdout_result = buf.getvalue()
 
@@ -337,13 +337,13 @@ class TestNoIncludeFilesMain(unittest.TestCase):
     def tearDown(self) -> None:
         self.tempdir.cleanup()
 
-    def test_main(self):
+    def test_run(self):
         """Test that no include file creates a logger warning"""
         # Arrange
         with mock.patch("argparse.ArgumentParser.parse_args", return_value=argparse.Namespace(filename=self.filename)):
             with mock.patch("logging.Logger.warning") as warn:
                 # Act
-                main()
+                run()
                 # Assert
                 warn.assert_called_once_with("Absolute include path not supported: %r", r"/")
 

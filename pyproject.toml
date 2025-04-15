@@ -5,12 +5,12 @@ requires = ["setuptools>=75", "wheel", "setuptools_scm>=8"]
 [project.urls]
 Homepage = "https://github.com/QuTech-Delft/QMI"
 Repository = "https://github.com/QuTech-Delft/QMI.git"
-Changelog = "https://github.com/QuTech-Delft/QMI/blob/v0.47.0/CHANGELOG.md"
+Changelog = "https://github.com/QuTech-Delft/QMI/blob/main/CHANGELOG.md"
 Issues = "https://github.com/QuTech-Delft/QMI/issues"
 
 [project]
 name="qmi"
-version="0.47.0"
+version="0.48.0-beta.0"
 description="The Quantum Measurement Infrastructure framework"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {file = "LICENSE.md"}
@@ -76,25 +76,25 @@ dev = [
 
 [project.scripts]
 # main scripts
-qmi_proc = "qmi.tools.proc:main"
-qmi_adbasic_parser = "qmi.utils.adbasic_parser:main"
-qmi_adbasic_compiler = "qmi.utils.adbasic_compiler:main"
+qmi_proc = "qmi.tools.proc:run"
+qmi_adbasic_parser = "qmi.utils.adbasic_parser:run"
+qmi_adbasic_compiler = "qmi.utils.adbasic_compiler:run"
 # tool and instrument scripts
-qmi_tool = "bin.qmi_tool:main"
-qmi_hdf5_to_mat = "bin.qmi_hdf5_to_mat:main"
-qmi_anapico_apsin = "bin.instruments.qmi_anapico_apsin:main"
-qmi_highfinesse_ws = "bin.instruments.qmi_highfinesse_ws:main"
-qmi_mcc_usb1808x = "bin.instruments.qmi_mcc_usb1808x:main"
-qmi_newport_ag_uc8 = "bin.instruments.qmi_newport_ag_uc8:main"
-qmi_quantum_composer_9530 = "bin.instruments.qmi_quantum_composer_9530:main"
-qmi_siglent_ssa3000x = "bin.instruments.qmi_siglent_ssa3000x:main"
-qmi_srs_dc205 = "bin.instruments.qmi_srs_dc205:main"
-qmi_tenma_72psu = "bin.instruments.qmi_tenma_72psu:main"
-qmi_teraxion_tfn = "bin.instruments.qmi_teraxion_tfn:main"
-qmi_thorlabs_k10cr1 = "bin.instruments.qmi_thorlabs_k10cr1:main"
-qmi_timebase_dim3000 = "bin.instruments.qmi_timebase_dim3000:main"
-qmi_wavelength_tclab = "bin.instruments.qmi_wavelength_tclab:main"
-qmi_wieserlabs_flexdds = "bin.instruments.qmi_wieserlabs_flexdds:main"
+qmi_tool = "bin.qmi_tool:run"
+qmi_hdf5_to_mat = "bin.qmi_hdf5_to_mat:run"
+qmi_anapico_apsin = "bin.instruments.qmi_anapico_apsin:run"
+qmi_highfinesse_ws = "bin.instruments.qmi_highfinesse_ws:run"
+qmi_mcc_usb1808x = "bin.instruments.qmi_mcc_usb1808x:run"
+qmi_newport_ag_uc8 = "bin.instruments.qmi_newport_ag_uc8:run"
+qmi_quantum_composer_9530 = "bin.instruments.qmi_quantum_composer_9530:run"
+qmi_siglent_ssa3000x = "bin.instruments.qmi_siglent_ssa3000x:run"
+qmi_srs_dc205 = "bin.instruments.qmi_srs_dc205:run"
+qmi_tenma_72psu = "bin.instruments.qmi_tenma_72psu:run"
+qmi_teraxion_tfn = "bin.instruments.qmi_teraxion_tfn:run"
+qmi_thorlabs_k10cr1 = "bin.instruments.qmi_thorlabs_k10cr1:run"
+qmi_timebase_dim3000 = "bin.instruments.qmi_timebase_dim3000:run"
+qmi_wavelength_tclab = "bin.instruments.qmi_wavelength_tclab:run"
+qmi_wieserlabs_flexdds = "bin.instruments.qmi_wieserlabs_flexdds:run"
 
 [tool.setuptools]
 include-package-data = true
