@@ -5,12 +5,12 @@ requires = ["setuptools>=75", "wheel", "setuptools_scm>=8"]
 [project.urls]
 Homepage = "https://github.com/QuTech-Delft/QMI"
 Repository = "https://github.com/QuTech-Delft/QMI.git"
-Changelog = "https://github.com/QuTech-Delft/QMI/blob/stable-0-47/CHANGELOG.md"
+Changelog = "https://github.com/QuTech-Delft/QMI/blob/v0.47.1/CHANGELOG.md"
 Issues = "https://github.com/QuTech-Delft/QMI/issues"
 
 [project]
 name="qmi"
-version="0.47.0"
+version="0.47.1-beta.0"
 description="The Quantum Measurement Infrastructure framework"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {file = "LICENSE.md"}

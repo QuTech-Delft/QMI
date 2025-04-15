@@ -63,6 +63,8 @@ If you are using e.g. Git Bash on Windows, the `bump2version` command probably n
 
 The following steps assume that the patch to be applied is in a single upstream commit (either in feature branch or on
 the `main` branch) and that the `CHANGELOG.md` has been updated in that commit.
+``NOTE: if the patch involves any of the files containing version of the release, the cherry-pick might cause issues and 
+need another commit to fix the version numbering, or file-specific checkouts from main might have to be done, again with manual edits.``
 1. Checkout the stable branch that you want to patch:
     ```shell script
     git checkout stable-{major}-{minor}
@@ -79,7 +81,7 @@ the `main` branch) and that the `CHANGELOG.md` has been updated in that commit.
     ```shell script
     git cherry-pick -x {commit-hash}
     ```
-5. Restore the `CHANGELOG.md` and update it with the relevent change/fix, and stage it.
+5. Restore the `CHANGELOG.md` and update it with the relevant change/fix, and stage it.
     ```shell script
     git restore CHANGELOG.md
     git add CHANGELOG.md

@@ -4,7 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.47.1-beta.0] - Unreleased
+## [0.47.1] - 2025-04-15
+
+### Fixed
+- Fixed `pyproject.toml` not to point to incorrect qmi location for package installation, but to root by removing [tool.setuptools.packages.find] lines.
 
 ## [0.47.0] - 2025-03-14
 
