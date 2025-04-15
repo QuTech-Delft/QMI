@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+## [0.47.1] - 2025-04-16
+
+### Fixed
+- Fixed `pyproject.toml` not to point to incorrect qmi location for package installation, but to root by removing [tool.setuptools.packages.find] lines.
+
+
 ## [0.47.0] - 2025-03-14
 
 ### Added
