@@ -1,5 +1,4 @@
-#! /usr/bin/env python3
-
+#! /usr/bin/env python
 """Command line client for the Anapico APSIN signal source."""
 
 import argparse
@@ -12,7 +11,7 @@ from qmi.instruments.anapico.apsin import Anapico_APSIN
 from qmi.utils.context_managers import start_stop, open_close
 
 
-def main() -> int:
+def run() -> int:
 
     parser = argparse.ArgumentParser()
     parser.description = "Command line client for the Anapico APSIN signal source."
@@ -163,7 +162,7 @@ def parse_instrument_source(args) -> AbstractContextManager:
         raise ValueError("Expected a source for the instrument!")
 
 
-def show_instrument_state(instr: Anapico_APSIN):
+def show_instrument_state(instr: Anapico_APSIN) -> None:
     """Show instrument state."""
 
     print("Instrument state:")
@@ -198,4 +197,4 @@ def show_instrument_state(instr: Anapico_APSIN):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

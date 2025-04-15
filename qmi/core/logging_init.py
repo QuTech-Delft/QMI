@@ -7,15 +7,15 @@ import threading
 import time
 import warnings
 
+from collections.abc import Callable, Mapping
 from types import TracebackType
-from typing import Dict, Callable, Mapping, Optional, Tuple, Type, Union
 
 
 # Global variable holding the file log handler (if any).
-_file_handler: Optional[logging.FileHandler] = None
+_file_handler: logging.FileHandler | None = None
 
 # Global variable holding the saved exception hook.
-_saved_except_hook: Optional[Callable] = None
+_saved_except_hook: Callable | None = None
 
 
 class _RateLimitFilter(logging.Filter):
@@ -34,7 +34,7 @@ class _RateLimitFilter(logging.Filter):
         """Initialize a rate limiting log filter.
 
         Parameters:
-            rate_limit: Maximum number of log messages per second.
+            rate_limit:  Maximum number of log messages per second.
             burst_limit: Maximum number of messages that can be "saved up" for a short burst of messages.
                          This must be at least 1.
         """
@@ -47,7 +47,7 @@ class _RateLimitFilter(logging.Filter):
         # combination of logger and log level:
         #    self._counters[(logger_name, log_level)] returns a tuple
         #      (last_update_time, bucket_level, nr_discarded_messages)
-        self._counters: Dict[Tuple[str, int], Tuple[float, float, int]] = {}
+        self._counters: dict[tuple[str, int], tuple[float, float, int]] = {}
 
     def filter(self, record: logging.LogRecord) -> bool:
 
@@ -86,7 +86,7 @@ class _RateLimitFilter(logging.Filter):
 
 
 def _makeLogFormatter(log_process: bool) -> logging.Formatter:
-    """Create a log formatter instance."""
+    """Create and return a log formatter instance."""
 
     if log_process:
         format_spec = "%(asctime)-23s | %(process)5d | %(levelname)-8s | %(name)-22s | %(message)s"
@@ -102,13 +102,14 @@ def _makeLogFormatter(log_process: bool) -> logging.Formatter:
     return fmt
 
 
-def start_logging(loglevel: Union[int, str] = logging.INFO,
-                  console_loglevel: Union[int, str] = logging.WARNING,
-                  logfile: Optional[str] = None,
-                  loglevels: Optional[Mapping[str, Union[int, str]]] = None,
-                  rate_limit: Optional[float] = None,
-                  burst_limit: int = 1
-                  ) -> None:
+def start_logging(
+    loglevel: int | str = logging.INFO,
+    console_loglevel: int | str = logging.WARNING,
+    logfile: str | None = None,
+    loglevels: Mapping[str, int | str] | None = None,
+    rate_limit: float | None = None,
+    burst_limit: int = 1
+) -> None:
     """Initialize the Python logging framework for use by QMI.
 
     This function sets up logging to `stderr` and optional logging to a file.
@@ -118,17 +119,16 @@ def start_logging(loglevel: Union[int, str] = logging.INFO,
     This function is normally called automatically by ``qmi.start()``.
 
     Parameters:
-        loglevel: Default log level (level of the root logger).
-            Only log messages with at least this priority will be processed.
+        loglevel:         Default log level (level of the root logger).
+                          Only log messages with at least this priority will be processed.
         console_loglevel: Log level for logging to console.
-            Only log messages with at least this priority will be logged to screen.
-        logfile: Optional file name of the log file.
-            When omitted, logging to file will be disabled.
-        loglevels: Optional initial log levels for specific loggers.
-            When specified, this is a dictionary mapping logger names to
-            their initial log levels.
-        rate_limit: Maximum number of log messages per second per logger.
-        burst_limit: Maximum number of messages that can be "saved up" for a short burst of messages.
+                          Only log messages with at least this priority will be logged to screen.
+        logfile:          Optional file name of the log file.
+                          When omitted, logging to file will be disabled.
+        loglevels:        Optional initial log levels for specific loggers.
+                          When specified, this is a dictionary mapping logger names to their initial log levels.
+        rate_limit:       Maximum number of log messages per second per logger.
+        burst_limit:      Maximum number of messages that can be "saved up" for a short burst of messages.
     """
 
     global _file_handler
@@ -153,7 +153,7 @@ def start_logging(loglevel: Union[int, str] = logging.INFO,
     # Create log file handler.
     # This must be done as a separate step (separate from basicConfig())
     # because basicConfig() ignores subsequent calls once logging is configured.
-    # However we must support the case where logging is configured during
+    # However, we must support the case where logging is configured during
     # early initialization via QMI_DEBUG, then later re-configured to add
     # a log file after the configuration is processed.
     if logfile:
@@ -181,17 +181,18 @@ def start_logging(loglevel: Union[int, str] = logging.INFO,
     # Redirect warnings through the logging system.
     logging.captureWarnings(True)
 
-    # By default the Python interpreter disables many types of warnings.
+    # By default, the Python interpreter disables many types of warnings.
     # We change that here, unless explicit warning options have been specified via "python -W ...".
     if not sys.warnoptions:
         # Enable all warnings but log only the first occurrence.
         warnings.simplefilter("default")
 
 
-def _log_excepthook(type_: Type[BaseException],
-                    value: BaseException,
-                    traceback: Optional[TracebackType] = None
-                    ) -> None:
+def _log_excepthook(
+    type_: type[BaseException],
+    value: BaseException,
+    traceback: TracebackType | None = None
+) -> None:
     """Called when an uncaught exception occurs.
 
     This function logs the exception to the QMI log file (if any),

@@ -49,7 +49,7 @@ If you are using e.g. Git Bash on Windows, the `bump2version` command probably n
     ```
 11. Run `bump2version` to create the beta minor version on main:
     ```shell script
-    bump2version patch --config-file=.bumpversion_main.cfg --allow-dirty --commit
+    bump2version minor --config-file=.bumpversion_main.cfg --allow-dirty --commit
     ```
 12. Push the branch to origin:
     ```shell script

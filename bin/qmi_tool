@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Swiss army knife for QMI command line monitoring and control."""
 
@@ -16,7 +16,7 @@ from qmi.core.udp_responder_packets import QMI_UdpResponderKillRequestPacket
 UDP_RESPONDER_PORT = 35999
 
 
-def lsqmi(workgroup_name: str = CfgQmi.workgroup, timeout: float = 0.1):
+def lsqmi(workgroup_name: str = CfgQmi.workgroup, timeout: float = 0.1) -> None:
     """List all QMI contexts on the network.
 
     Parameters:
@@ -50,7 +50,7 @@ def lsqmi(workgroup_name: str = CfgQmi.workgroup, timeout: float = 0.1):
         ))
 
 
-def hard_kill():
+def hard_kill() -> None:
     """Broadcast a hard-kill request."""
     # Preparing outgoing socket.
     udp_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
@@ -72,8 +72,11 @@ def hard_kill():
         udp_socket.close()
 
 
-def main():
+def run() -> None | str:
     for e, arg in enumerate(sys.argv[1:]):
+        if arg not in ["ls", "hard-kill", "hard-kill-yes-really-i-am-sure"]:
+            return f"Invalid argument {arg}."
+
         if arg == "ls":
             if len(sys.argv) == (e + 3):
                 # we have one input and need to check if it is timeout or workgroup name
@@ -104,4 +107,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

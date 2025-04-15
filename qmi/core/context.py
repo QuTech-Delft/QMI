@@ -13,7 +13,9 @@ import threading
 import time
 import warnings
 import atexit
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Type
+
+from collections.abc import Callable
+from typing import Any, NamedTuple
 
 import qmi
 
@@ -60,19 +62,21 @@ def _check_active_contexts() -> None:
 class _UdpPingResponse(NamedTuple):
     """Ping response descriptor."""
     received_timestamp: float
-    incoming_address: Tuple[str, int]
+    incoming_address: tuple[str, int]
     response_packet: QMI_UdpResponderContextInfoResponsePacket
 
 
-def ping_qmi_contexts(workgroup_name_filter: str,
-                      context_name_filter: str = "*",
-                      timeout: float = 0.1) -> List[_UdpPingResponse]:
+def ping_qmi_contexts(
+    workgroup_name_filter: str,
+    context_name_filter: str = "*",
+    timeout: float = 0.1
+) -> list[_UdpPingResponse]:
     """Broadcast an info request message to discover all QMI contexts on the network.
 
     Parameters:
-        workgroup_name_filter:  filter on workgroup name.
-        context_name_filter:    filter on context name (default: "*").
-        timeout:                time to wait for answers (default: 0.1).
+        workgroup_name_filter: Filter on workgroup name.
+        context_name_filter:   Filter on context name (default: "*").
+        timeout:               Time to wait for answers (default: 0.1).
     """
     responses = []
 
@@ -127,7 +131,8 @@ def ping_qmi_contexts(workgroup_name_filter: str,
                         response = _UdpPingResponse(
                             received_timestamp=response_received_timestamp,
                             incoming_address=incoming_address,
-                            response_packet=unpacked_response_packet)
+                            response_packet=unpacked_response_packet
+                        )
                         responses.append(response)
 
     finally:
@@ -140,7 +145,7 @@ class _ContextRpcObject(QMI_RpcObject):
     """Internal class, used to provide information about the local context via RPC."""
 
     @classmethod
-    def get_category(cls) -> Optional[str]:
+    def get_category(cls) -> str | None:
         return "context"
 
     @rpc_method
@@ -149,12 +154,12 @@ class _ContextRpcObject(QMI_RpcObject):
         return self._context.get_version()
 
     @rpc_method
-    def get_rpc_object_descriptors(self) -> List[RpcObjectDescriptor]:
+    def get_rpc_object_descriptors(self) -> list[RpcObjectDescriptor]:
         """Get a list RPC descriptors of the objects in this context."""
         return self._context.get_rpc_object_descriptors()
 
     @rpc_method
-    def get_rpc_object_descriptor(self, rpc_object_name: str) -> Optional[RpcObjectDescriptor]:
+    def get_rpc_object_descriptor(self, rpc_object_name: str) -> RpcObjectDescriptor | None:
         """Get an RPC descriptor for the object with the given name."""
         return self._context.get_rpc_object_descriptor(rpc_object_name)
 
@@ -174,6 +179,9 @@ class _ContextRpcObject(QMI_RpcObject):
 
         A hard shutdown will almost always succeed but may leave instruments
         and data files in an unclean state.
+
+        Parameters:
+            hard: Set to True if process should be exited immediately. Otherwise, normal shutdown.
         """
 
         if hard:
@@ -209,24 +217,25 @@ class QMI_Context:
     calls ``qmi.start(...)`` and destroyed when the application calls ``qmi.stop()``.
 
     Attributes:
-        name: Name of the context (read-only).
-        workgroup_name: Name of the QMI workgroup (read-only).
+        DEFAULT_UDP_RESPONDER_PORT: Default port number for UDP responses.
     """
 
     DEFAULT_UDP_RESPONDER_PORT = 35999
 
-    def __init__(self, name: str, config: Optional[CfgQmi] = None) -> None:
+    def __init__(self, name: str, config: CfgQmi | None = None) -> None:
         """Create a new `QMI_Context` instance.
 
         This is normally done automatically by ``qmi.start(...)``.
         Most applications should not explicitly create a `QMI_Context` instance.
 
+        The class attribute workgroup_name contains the name of the QMI workgroup (read-only).
+
         Parameters:
-            name: Name of the context.
-                This must be a short string without spaces or strange characters.
-                If other contexts will connect to this context, its name must
-                be unique within the workgroup (i.e. among all Python processes
-                that work together via QMI).
+            name:   Name of the context.
+                    This must be a short string without spaces or strange characters.
+                    If other contexts will connect to this context, its name must
+                    be unique within the workgroup (i.e. among all Python processes
+                    that work together via QMI).
             config: QMI configuration data.
         """
 
@@ -241,16 +250,16 @@ class QMI_Context:
         # Event which is set to true when the context receives a shutdown request via RPC.
         self._context_shutdown_requested = threading.Event()
 
-        # Program start time (may be used to create log file names etc.).
+        # Program start time (can be used to create log file names etc.).
         self._start_time = time.time()
 
         if not is_valid_object_name(name):
             raise QMI_UsageException("Invalid context name {!r}".format(name))
 
         self.name = name
-        self._unique_counters = {}  # type: Dict[str, int]
+        self._unique_counters: dict[str, int] = {}
         self._unique_counters_lock = threading.Lock()
-        self._rpc_object_map = {}  # type: Dict[str, Optional[RpcObjectManager]]
+        self._rpc_object_map: dict[str, RpcObjectManager | None] = {}
         self._rpc_object_map_lock = threading.Lock()
 
         # Remember in which thread this context was created.
@@ -263,10 +272,10 @@ class QMI_Context:
         self._config = config
 
         # Determine workgroup name from configuration.
-        self.workgroup_name = self._config.workgroup
+        self._workgroup_name = self._config.workgroup
 
         # Create message router.
-        self._message_router = MessageRouter(self.name, self.workgroup_name)
+        self._message_router = MessageRouter(self.name, self._workgroup_name)
 
         # Create signal manager.
         self._signal_manager = SignalManager(self)
@@ -276,7 +285,7 @@ class QMI_Context:
         self._internal_make_rpc_object("$context", _ContextRpcObject)
 
         # List of callback function to be invoked when the context stops.
-        self._stop_handlers: List[Callable[[], None]] = []
+        self._stop_handlers: list[Callable[[], None]] = []
 
         # Set object ID.
         self._oid = qmi.object_registry.register(self)
@@ -293,6 +302,11 @@ class QMI_Context:
     def suppress_version_mismatch_warnings(self, value: bool) -> None:
 
         self._message_router.suppress_version_mismatch_warnings = value
+
+    @property
+    def workgroup_name(self) -> str:
+        """Make '_workgroup_name' as read-only property."""
+        return self._workgroup_name
 
     def __repr__(self) -> str:
         return "QMI_Context(name={!r})".format(self.name)
@@ -318,7 +332,7 @@ class QMI_Context:
         returned by this function.
 
         Returns:
-            The QMI configuration data.
+            self._config: The QMI configuration data.
         """
         return self._config
 
@@ -328,7 +342,7 @@ class QMI_Context:
         The QMI configuration contains a mapping that applies to this context.
 
         Returns:
-            The QMI configuration subset specific for this context.
+            ctxcfg: The QMI configuration subset specific for this context.
         """
         ctxcfg = self._config.contexts.get(self.name)
         if ctxcfg is None:
@@ -347,7 +361,7 @@ class QMI_Context:
         Otherwise, the user home directory will be used as QMI home directory.
 
         Returns:
-            The QMI home directory.
+            qmi_home: The QMI home directory.
         """
 
         # Try to get home directory from configuration.
@@ -408,6 +422,9 @@ class QMI_Context:
           ${config_dir} -> directory of QMI configuration file
           ${date}       -> date of program start, UTC, formatted as YYYY-mm-dd
           ${datetime}   -> time of program start, UTC, formatted as YYYY-mm-ddTHH-MM-SS
+
+        Returns:
+            The substituted file name if any of the supported substitutions were present. Else, the file name.
         """
 
         # Fast path.
@@ -442,7 +459,7 @@ class QMI_Context:
         if self._file_name_resolves_keyword(file_name, "datastore"):
             mapping["datastore"] = self.get_datastore_dir()
 
-        return string.Template(file_name).substitute(mapping)
+        return os.path.normpath(string.Template(file_name).substitute(mapping))
 
     def start(self) -> None:
         """Start the context.
@@ -543,8 +560,8 @@ class QMI_Context:
             duration: Maximum wait time in seconds.
 
         Returns:
-            True if a shutdown request is received, False if the wait
-            duration expires before a shutdown request is received.
+            True:  If a shutdown request is received.
+            False: If the wait duration expires before a shutdown request is received.
         """
         return self._context_shutdown_requested.wait(duration)
 
@@ -571,19 +588,20 @@ class QMI_Context:
         """
         self._message_router.send_message(message)
 
-    def connect_to_peer(self,
-                        peer_context_name: str,
-                        peer_address: Optional[str] = None,
-                        ignore_duplicate: bool = False
-                        ) -> None:
+    def connect_to_peer(
+        self,
+        peer_context_name: str,
+        peer_address: str | None = None,
+        ignore_duplicate: bool = False
+    ) -> None:
         """Connect to the specified peer context.
 
         Parameters:
             peer_context_name: Name of the peer context to connect to.
-            peer_address: IP address and TCP port of the peer context, formatted as ``"<addr>:<port>"``.
-                When not specified, the peer address will be taken from the QMI configuration.
-            ignore_duplicate: When True, nothing will happen if a connection
-                to the specified context already exists.
+            peer_address:      IP address and TCP port of the peer context, formatted as ``"<addr>:<port>"``.
+                               When not specified, the peer address will be taken from the QMI configuration.
+            ignore_duplicate:  When True, nothing will happen if a connection
+                               to the specified context already exists.
         """
         self._check_in_context_thread()
         if not self._active:
@@ -627,20 +645,23 @@ class QMI_Context:
         context_names = self._message_router.get_peer_context_names()
         return peer_context_name in context_names
 
-    def discover_peer_contexts(self,
-                               workgroup_name_filter: Optional[str] = None,
-                               context_name_filter: str = "*") -> List[Tuple[str, str]]:
+    def discover_peer_contexts(
+        self,
+        workgroup_name_filter: str | None = None,
+        context_name_filter: str = "*"
+    ) -> list[tuple[str, str]]:
         """Discover QMI contexts on the network.
-
-        Returns a list of (context_name, address:port)-pairs that can be passed to `connect_to_peer`.
 
         You can filter on workgroup name and/or context name via the optional arguments. Use a "*" to match any
         sequence of characters (e.g. "ba*" matches "bar", "baz" and "ball") and a "?" to match a single character (e.g.
         "ba?" matches "bar" and "baz", but not "ball"). Filters are case-sensitive.
 
         Parameters:
-            workgroup_name_filter:  filter on workgroup name (None: use the workgroup name of this context's config).
-            context_name_filter:    filter on context name (default: "*").
+            workgroup_name_filter: Filter on workgroup name (None: use the workgroup name of this context's config).
+            context_name_filter:   Filter on context name (default: "*").
+
+        Returns:
+             contexts: A list of (context_name, address:port)-pairs that can be passed to `connect_to_peer`.
         """
         if workgroup_name_filter is None:
             workgroup_name_filter = self._config.workgroup
@@ -649,7 +670,7 @@ class QMI_Context:
             workgroup_name_filter=workgroup_name_filter,
             context_name_filter=context_name_filter
         )
-        contexts: List[Tuple[str, str]] = []
+        contexts: list[tuple[str, str]] = []
         for resp in responses:
             address = resp.incoming_address[0]
             port = resp.response_packet.context.port
@@ -692,12 +713,11 @@ class QMI_Context:
 
     def info(self) -> str:
         """Return information about the context."""
-
-        ret = []
-        ret.append("*** QMI_Context info: name={!r}, workgroup={!r}, pid={!r} ***".format(
-            self.name, self.workgroup_name, os.getpid()))
-        ret.append("")
-        ret.append("*** end of QMI_Context info ***")
+        ret: list[str] = [
+            "*** QMI_Context info: name={!r}, workgroup={!r}, pid={!r} ***".format(
+                self.name, self.workgroup_name, os.getpid()
+            ), "", "*** end of QMI_Context info ***"
+        ]
         return "\n".join(ret)
 
     def get_version(self) -> str:
@@ -711,7 +731,7 @@ class QMI_Context:
         else:
             return 0
 
-    def get_rpc_object_descriptors(self) -> List[RpcObjectDescriptor]:
+    def get_rpc_object_descriptors(self) -> list[RpcObjectDescriptor]:
         """Return a list of descriptors for all local RPC objects."""
         ret = []
         with self._rpc_object_map_lock:
@@ -721,8 +741,8 @@ class QMI_Context:
                     ret.append(rpc_object.rpc_object_descriptor)
         return ret
 
-    def get_rpc_object_descriptor(self, rpc_object_name: str) -> Optional[RpcObjectDescriptor]:
-        """Return a descriptor for the specified local RPC object."""
+    def get_rpc_object_descriptor(self, rpc_object_name: str) -> RpcObjectDescriptor | None:
+        """Return a descriptor for the specified local RPC object if object is managed, else None."""
         with self._rpc_object_map_lock:
             manager = self._rpc_object_map.get(rpc_object_name)
             if manager is not None:
@@ -738,51 +758,50 @@ class QMI_Context:
         return QMI_MessageHandlerAddress(self.name, prefix + str(nr))
 
     def make_unique_token(self, prefix: str = "$lock_") -> QMI_LockTokenDescriptor:
-        """Generate a unique token descriptor."""
+        """Generate and return a unique token descriptor."""
         with self._unique_counters_lock:
             nr = self._unique_counters.get(prefix, 0) + 1
             self._unique_counters[prefix] = nr
         return QMI_LockTokenDescriptor(self.name, prefix + str(nr))
 
-    def make_rpc_object(self,
-                        rpc_object_name: str,
-                        rpc_object_class: Type[QMI_RpcObject],
-                        *args: Any,
-                        **kwargs: Any
-                        ) -> Any:
+    def make_rpc_object(
+        self,
+        rpc_object_name: str,
+        rpc_object_class: type[QMI_RpcObject],
+        *args: Any,
+        **kwargs: Any
+    ) -> Any:
         """Create an instance of a `QMI_RpcObject` and return a proxy for the new object instance.
 
         The actual object instance will be created in a separate background thread.
         You can call its methods via RPC, using the proxy object returned by this function.
 
+        The return type of the make_XXX() methods is not annotated.
+        It is not possible to provide a precise annotation, because the actual return type is "rpc_object_class.Proxy"
+        which is a programmatically constructed class and thus not available for static type checking.
+
         Parameters:
-            rpc_object_name: Name for the new object instance, unique within the local context.
+            rpc_object_name:  Name for the new object instance, unique within the local context.
             rpc_object_class: Class that implements this object (must be a subclass of `QMI_RpcObject`).
-            args: Optional arguments for the class constructor.
+            args:             Optional arguments for the class constructor.
+            kwargs:           Optional keyword arguments for the class constructor.
 
         Returns:
             An RPC proxy that provides access to the new object instance.
         """
-
-        # The return type of the make_XXX() methods is not annotated.
-        # It is not possible to provide a precise annotation, because
-        # the actual return type is "rpc_object_class.Proxy" which is
-        # a programmatically constructed class and thus not available
-        # for static type checking.
-
         if not is_valid_object_name(rpc_object_name):
             raise QMI_UsageException("Invalid object name {!r}".format(rpc_object_name))
 
         return self._internal_make_rpc_object(rpc_object_name, rpc_object_class, *args, **kwargs)
 
-    def _internal_make_rpc_object(self,
-                                  rpc_object_name: str,
-                                  rpc_object_class: Type[QMI_RpcObject],
-                                  *args: Any,
-                                  **kwargs: Any,
-                                  ) -> QMI_RpcProxy:
-
-        # Helper function to create the actual RPC object instance.
+    def _internal_make_rpc_object(
+        self,
+        rpc_object_name: str,
+        rpc_object_class: type[QMI_RpcObject],
+        *args: Any,
+        **kwargs: Any,
+    ) -> QMI_RpcProxy:
+        """Helper function to create the actual RPC object instance."""
         def rpc_object_maker() -> QMI_RpcObject:
             return rpc_object_class(self, rpc_object_name, *args, **kwargs)
 
@@ -790,7 +809,6 @@ class QMI_Context:
         proxy = None
 
         with self._rpc_object_map_lock:
-
             # Check that context is active.
             # Only internal RPC objects may be created when the context is not active.
             if (not self._active) and (not rpc_object_name.startswith("$")):
@@ -880,35 +898,38 @@ class QMI_Context:
         # Shut down the object manager.
         manager.stop()
 
-    def make_instrument(self,
-                        instrument_name: str,
-                        instrument_class: Type[QMI_Instrument],
-                        *args: Any,
-                        **kwargs: Any
-                        ) -> Any:
+    def make_instrument(
+        self,
+        instrument_name: str,
+        instrument_class: type[QMI_Instrument],
+        *args: Any,
+        **kwargs: Any
+    ) -> Any:
         """Create an instance of a `QMI_Instrument` subclass and make it accessible via RPC.
 
         The actual instrument instance will be created in a separate background thread.
         To access the instrument, you can call its methods via RPC.
 
         Parameters:
-            instrument_name: Unique name for the new instrument instance.
-                This name will also be used to access the instrument via RPC.
+            instrument_name:  Unique name for the new instrument instance.
+                              This name will also be used to access the instrument via RPC.
             instrument_class: Class that implements this instrument (must be a subclass of `QMI_Instrument`).
-            args: Optional arguments for the instrument class constructor.
+            args:             Optional arguments for the instrument class constructor.
+            kwargs:           Optional keyword arguments for the instrument class constructor.
 
         Returns:
             An RPC proxy that provides access to the new instrument instance.
         """
         return self.make_rpc_object(instrument_name, instrument_class, *args, **kwargs)
 
-    def make_task(self,
-                  task_name: str,
-                  task_class: Type[QMI_Task],
-                  *args: Any,
-                  task_runner: Type[QMI_TaskRunner] = QMI_TaskRunner,
-                  **kwargs: Any
-                  ) -> Any:
+    def make_task(
+        self,
+        task_name: str,
+        task_class: type[QMI_Task],
+        *args: Any,
+        task_runner: type[QMI_TaskRunner] = QMI_TaskRunner,
+        **kwargs: Any
+    ) -> Any:
         """Create an instance of a `QMI_Task` subclass and make it accessible via RPC.
 
         The task instance will be created in a separate thread.
@@ -919,11 +940,12 @@ class QMI_Context:
         To start the task, perform an explicit call to the `start()` method of the returned task.
 
         Parameters:
-            task_name: Unique name for the new task instance.
-                This name will also be used to access the task runner via RPC.
-            task_class: Class that implements this task (must be a subclass of `QMI_Task`).
+            task_name:   Unique name for the new task instance.
+                         This name will also be used to access the task runner via RPC.
+            task_class:  Class that implements this task (must be a subclass of `QMI_Task`).
+            args:        Optional arguments for the task class constructor.
             task_runner: Class that implements the managing of the task (must be a subclass of `QMI_Taskrunner`)
-            args: Optional arguments for the task class constructor.
+            kwargs:      Optional keyword arguments for the task class constructor.
 
         Returns:
             An RPC proxy that provides access to the new task.
@@ -966,7 +988,7 @@ class QMI_Context:
         descriptor = self._make_peer_context_descriptor(context_name)
         return self.make_proxy(descriptor)
 
-    def _get_context_descriptors(self, include_self: bool = True) -> List[RpcObjectDescriptor]:
+    def _get_context_descriptors(self, include_self: bool = True) -> list[RpcObjectDescriptor]:
         context_names = []
         if include_self:
             context_names.append(self.name)
@@ -1009,7 +1031,7 @@ class QMI_Context:
 
             print("{} {} {}".format("-" * name_wdt, "-" * addr_wdt, "-" * conn_wdt))
 
-    def list_rpc_objects(self, category: Optional[str] = None) -> List[Tuple[str, str]]:
+    def list_rpc_objects(self, category: str | None = None) -> list[tuple[str, str]]:
         """Returns a list of tuple strings of RPC objects addresses in the local context and in peer context."""
         rpc_objects = []
         for peer_context_descriptor in self._get_context_descriptors():
@@ -1025,7 +1047,7 @@ class QMI_Context:
         rpc_objects.sort()
         return rpc_objects
 
-    def show_rpc_objects(self, category: Optional[str] = None) -> None:
+    def show_rpc_objects(self, category: str | None = None) -> None:
         """Show a list of RPC objects in the local context and peer contexts."""
 
         rpc_objects = self.list_rpc_objects(category)
@@ -1056,8 +1078,12 @@ class QMI_Context:
         """Show a list of currently connected contexts (including the local context)."""
         self.show_rpc_objects(_ContextRpcObject.get_category())
 
-    def get_rpc_object_by_name(self, rpc_object_name: str, auto_connect: bool = False,
-                               host_port: Optional[str] = None) -> Any:
+    def get_rpc_object_by_name(
+        self,
+        rpc_object_name: str,
+        auto_connect: bool = False,
+        host_port: str | None = None
+    ) -> Any:
         """Return a proxy for the specified RPC object.
 
         The object may exist either in the local context, or in a peer context. Note that when using auto_connect
@@ -1066,11 +1092,14 @@ class QMI_Context:
 
         Parameters:
             rpc_object_name: Object name, formatted as ``"<context_name>.<object_id>"``.
-            auto_connect: if True, connect automatically to the RPC object peer.
-            host_port: Optional host:port string pattern to guide the auto_connect.
+            auto_connect:    If True, connect automatically to the RPC object peer.
+            host_port:       Optional host:port string pattern to guide the auto_connect.
 
         Returns:
             A proxy for the specified object.
+
+        Raises:
+            ValueError: If the given RPC object descriptor was not found.
         """
         if auto_connect:
             self.connect_to_peer(rpc_object_name.split(".")[0], peer_address=host_port, ignore_duplicate=True)
@@ -1082,39 +1111,40 @@ class QMI_Context:
             assert (rpc_object_descriptor.address.context_id == context_id) and \
                    (rpc_object_descriptor.address.object_id == object_id)
             return self.make_proxy(rpc_object_descriptor)
+
         raise ValueError("Unknown RPC object '{}'.".format(rpc_object_name))
 
-    def get_instrument(self, instrument_name: str, auto_connect: bool = False, host_port: Optional[str] = None) -> Any:
+    def get_instrument(self, instrument_name: str, auto_connect: bool = False, host_port: str | None = None) -> Any:
         """Return a proxy for the specified instrument.
 
         The instrument may exist either in the local context, or in a peer context.
 
         Parameters:
             instrument_name: Instrument name, formatted as ``"<context_name>.<instrument_name>"``.
-            auto_connect: if True, connect automatically to the instrument peer.
-            host_port: Optional host:port string pattern to guide the auto_connect.
+            auto_connect:    If True, connect automatically to the instrument peer.
+            host_port:       Optional host:port string pattern to guide the auto_connect.
 
         Returns:
             A proxy for the specified instrument.
         """
         return self.get_rpc_object_by_name(instrument_name, auto_connect=auto_connect, host_port=host_port)
 
-    def get_task(self, task_name: str, auto_connect: bool = False, host_port: Optional[str] = None) -> Any:
+    def get_task(self, task_name: str, auto_connect: bool = False, host_port: str | None = None) -> Any:
         """Return a proxy for the specified task.
 
         The task may exist either in the local context, or in a peer context.
 
         Parameters:
-            task_name: Task name, formatted as ``"<context_name>.<task_name>"``.
-            auto_connect: if True, connect automatically to the task peer.
-            host_port: Optional host:port string pattern to guide the auto_connect.
+            task_name:    Task name, formatted as ``"<context_name>.<task_name>"``.
+            auto_connect: If True, connect automatically to the task peer.
+            host_port:    Optional host:port string pattern to guide the auto_connect.
 
         Returns:
             A proxy for the specified task.
         """
         return self.get_rpc_object_by_name(task_name, auto_connect=auto_connect, host_port=host_port)
 
-    def get_configured_contexts(self) -> Dict[str, CfgContext]:
+    def get_configured_contexts(self) -> dict[str, CfgContext]:
         """ Get active QMI contexts.
 
         Returns:
@@ -1122,11 +1152,13 @@ class QMI_Context:
         """
         return self._config.contexts
 
-    def subscribe_signal(self,
-                         publisher_context: str,
-                         publisher_name: str,
-                         signal_name: str,
-                         receiver: QMI_SignalReceiver) -> None:
+    def subscribe_signal(
+        self,
+        publisher_context: str,
+        publisher_name: str,
+        signal_name: str,
+        receiver: QMI_SignalReceiver
+    ) -> None:
         """Subscribe to a specified signal.
 
         While subscribed, the SignalReceiver object will receive and queue
@@ -1134,7 +1166,7 @@ class QMI_Context:
 
         A SignalReceiver object can be simultaneously subscribed to multiple
         signals (from different publishers). Similarly, multiple receivers
-        can be simultaneously subscribed to the same signal. However it
+        can be simultaneously subscribed to the same signal. However, it
         is an error to try to subscribe a receiver to a signal to which it
         is already subscribed.
 
@@ -1142,18 +1174,20 @@ class QMI_Context:
 
         Parameters:
             publisher_context: Name of the context that publishes the signal.
-                An empty string may be used to refer to the local context.
-            publisher_name: Name of the publisher of the signal (e.g. instrument name).
-            signal_name: Name of the signal to subscribe to.
-            receiver: A SignalReceiver object which will receive the published signals.
+                               An empty string may be used to refer to the local context.
+            publisher_name:    Name of the publisher of the signal (e.g. instrument name).
+            signal_name:       Name of the signal to subscribe to.
+            receiver:          A SignalReceiver object which will receive the published signals.
         """
         self._signal_manager.subscribe_signal(publisher_context, publisher_name, signal_name, receiver)
 
-    def unsubscribe_signal(self,
-                           publisher_context: str,
-                           publisher_name: str,
-                           signal_name: str,
-                           receiver: QMI_SignalReceiver) -> None:
+    def unsubscribe_signal(
+        self,
+        publisher_context: str,
+        publisher_name: str,
+        signal_name: str,
+        receiver: QMI_SignalReceiver
+    ) -> None:
         """Unsubscribe from a specified signal.
 
         It is an error to unsubscribe a receiver from a signal to which is not currently subscribed.
@@ -1162,9 +1196,9 @@ class QMI_Context:
 
         Parameters:
             publisher_context: Name of the context that publishes the signal, or empty string for local context.
-            publisher_name: Name of the publisher of the signal.
-            signal_name: Name of the signal to unsubscribe from.
-            receiver: The SignalReceiver object to unsubscribe from the signal.
+            publisher_name:    Name of the publisher of the signal.
+            signal_name:       Name of the signal to unsubscribe from.
+            receiver:          The SignalReceiver object to unsubscribe from the signal.
         """
         self._signal_manager.unsubscribe_signal(publisher_context, publisher_name, signal_name, receiver)
 
@@ -1176,7 +1210,7 @@ class QMI_Context:
 
         Parameters:
             publisher_name: Name of the publisher of the signal.
-            signal_name: Name of the signal.
-            args: Additional data to send along with the signal.
+            signal_name:    Name of the signal.
+            args:           Additional data to send along with the signal.
         """
         self._signal_manager.publish_signal(publisher_name, signal_name, args)
