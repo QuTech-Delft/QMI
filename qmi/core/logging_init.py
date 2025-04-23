@@ -27,7 +27,7 @@ setting is overridden with module-specific settings, for modules `qmi.core.rpc` 
 The default `log levels <https://docs.python.org/3/library/logging.html#logging-levels>` for QMI are "INFO" for the
 log file and "WARNING" for the console. The standard log file name is 'qmi.log'.
 """
-
+import os.path
 import sys
 import logging
 import logging.handlers
@@ -118,10 +118,14 @@ class WatchedRotatingFileHandler(logging.handlers.RotatingFileHandler, logging.h
         super().__init__(filename, **kwargs)
         self.dev, self.ino = -1, -1
         self._statstream()
+        self._basedir = os.path.split(self.baseFilename)[0]
 
     def emit(self, record):
-        self.reopenIfNeeded()
-        super().emit(record)
+        self.reopenIfNeeded()  # WatchedFileHandler, makes sure the log file will be present.
+        if not os.path.isdir(self._basedir):
+            os.makedirs(self._basedir)
+
+        super().emit(record)  # RotatingFileHandler, handles the log file rotation if log file full.
 
 
 def _makeLogFormatter(log_process: bool) -> logging.Formatter:
