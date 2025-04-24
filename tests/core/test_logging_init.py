@@ -15,15 +15,16 @@ class TestStartLoggingOptions(unittest.TestCase):
     def setUp(self):
         qmi.core.logging_init._file_handler = None
         self.logfile = "log.file"
+        self.log_dir = ""
 
     def tearDown(self):
         logging.shutdown()  # Close all log files
         path_1 = os.path.dirname(os.path.abspath(__file__))
         path_2 = os.getcwd()
-        path_3 = os.path.expanduser("~")
+        path_3 = self.log_dir
         # Delete all log files from all possible locations in these tests
         for p in [path_1, path_2, path_3]:
-            files = os.listdir(p)
+            files = os.listdir(p) if p else []
             for f in files:
                 if f.startswith(self.logfile):
                     os.remove(os.path.join(p, f))
@@ -58,8 +59,8 @@ class TestStartLoggingOptions(unittest.TestCase):
         expected_backup_count = start_logging.__defaults__[method_inputs.index("backup_count")]
         # Note that the logfile is supposed to be given as relative to the log_dir directory. In the absence
         # of that, it is relative to the `QMI_HOME` env directory, or as last option, the user's home directory.
-        qmi_log_dir = os.path.expanduser("~")
-        logfile = os.path.join(qmi_log_dir, self.logfile)
+        log_dir = os.path.expanduser("~")
+        logfile = os.path.join(log_dir, self.logfile)
         loglevels = {
             "logger1": logging.CRITICAL,
             "logger2": logging.DEBUG
@@ -94,8 +95,8 @@ class TestStartLoggingOptions(unittest.TestCase):
         # Arrange
         # Note that the logfile is supposed to be given as relative to the log_dir directory. In the absence
         # of that, it is relative to the `QMI_HOME` env directory, or as last option, the user's home directory.
-        qmi_log_dir = os.path.expanduser("~")
-        logfile = os.path.join(qmi_log_dir, self.logfile)
+        log_dir = os.path.expanduser("~")
+        logfile = os.path.join(log_dir, self.logfile)
         rate_limit = 20
         burst_limit = 5
         # Act
@@ -127,8 +128,8 @@ class TestStartLoggingOptions(unittest.TestCase):
         # Arrange
         # Note that the logfile is supposed to be given as relative to the log_dir directory. In the absence
         # of that, it is relative to the `QMI_HOME` env directory, or as last option, the user's home directory.
-        qmi_log_dir = os.path.expanduser("~")
-        logfile = os.path.join(qmi_log_dir, self.logfile)
+        log_dir = os.path.expanduser("~")
+        logfile = os.path.join(log_dir, self.logfile)
         rate_limit = 5
         burst_limit = 20
         # Act
@@ -184,22 +185,29 @@ class TestStartLoggingOptions(unittest.TestCase):
         backups = 3
         # Note that the logfile is supposed to be given as relative to the log_dir directory. In the absence
         # of that, it is relative to the `QMI_HOME` env directory, or as last option, the user's home directory.
-        qmi_log_dir = os.path.expanduser("~")
-        logfile = os.path.join(qmi_log_dir, self.logfile)
+        log_dir = os.path.expanduser("~")
+        logfile = os.path.join(log_dir, self.logfile)
         # clear the root logger (small log files seem to be an issue here) and set the logger
         logger = logging.getLogger()
         logger.handlers.clear()
         del logger
         start_logging(logfile=logfile, max_bytes=max_log_size, backup_count=backups)
         logger = logging.getLogger("qmi.core.logging_init")
+        # The logging might be set to level NOTSET to avoid excess printouts, polluting the unit-test
+        # view. "Force" the log level to be INFO for this logger.
+        logger.setLevel(logging.INFO)
+        logger.manager.disable = logging.DEBUG  # allows log levels above DEBUG
+        self.log_dir = os.path.split(logger.root.handlers[1].baseFilename)[0]
         # Act
         logger.info("Start log")
         logger.info("Writing some stuff into log file.2.")
         logger.info("Writing some stuff into log file.1.")
         logger.info("Writing some stuff into log.")
         log_files = [l for l in os.listdir(
-            qmi_log_dir
+            self.log_dir
         ) if l.startswith(self.logfile)]
+        logger.setLevel(logging.NOTSET)
+        logger.manager.disable = logging.CRITICAL
         # Assert
         self.assertEqual(backups + 1, len(log_files))
         size_total = 0
@@ -207,7 +215,7 @@ class TestStartLoggingOptions(unittest.TestCase):
         # NOTE: It seems that the size limit is not strict: if a line is longer than the log size limit in bytes,
         # The file size can still be larger than the limit. The rotation then starts from next write.
         for lf in log_files:
-            size_total += os.path.getsize(os.path.join(qmi_log_dir, lf))
+            size_total += os.path.getsize(os.path.join(self.log_dir, lf))
 
         self.assertLessEqual(size_total, max_log_size * (backups + 1))
 
@@ -218,7 +226,7 @@ class TestStartLoggingOptions(unittest.TestCase):
         logger.info("Writing more stuff into log.")
 
         log_files = [l for l in os.listdir(
-            qmi_log_dir
+            self.log_dir
         ) if l.startswith(self.logfile)]
         self.assertEqual(backups + 1, len(log_files))
         size_total = 0
@@ -226,7 +234,7 @@ class TestStartLoggingOptions(unittest.TestCase):
         # NOTE: It seems that the size limit is not strict: if a line is longer than the log size limit in bytes,
         # The file size can still be larger than the limit. The rotation then starts from next write.
         for lf in log_files:
-            size_total += os.path.getsize(os.path.join(qmi_log_dir, lf))
+            size_total += os.path.getsize(os.path.join(self.log_dir, lf))
 
         self.assertLessEqual(size_total, max_log_size * (backups + 1))
 
@@ -237,11 +245,20 @@ class TestStartLoggingOptions(unittest.TestCase):
         backups = 3
         # Note that the logfile is supposed to be given as relative to the log_dir directory. In the absence
         # of that, it is relative to the `QMI_HOME` env directory, or as last option, the user's home directory.
-        qmi_log_dir = os.path.expanduser("~")
-        logfile = os.path.join(qmi_log_dir, self.logfile)
+        log_dir = os.path.expanduser("~")
+        logfile = os.path.join(log_dir, self.logfile)
+        # clear the root logger (small log files seem to be an issue here) and set the logger
+        logger = logging.getLogger()
+        logger.handlers.clear()
+        del logger
         # set the logger
         start_logging(logfile=logfile, max_bytes=max_log_size, backup_count=backups)
         logger = logging.getLogger("qmi.core.logging_init")
+        # The logging might be set to level NOTSET to avoid excess printouts, polluting the unit-test
+        # view. "Force" the log level to be INFO for this logger.
+        logger.setLevel(logging.INFO)
+        logger.manager.disable = logging.DEBUG
+        self.log_dir = os.path.split(logger.root.handlers[1].baseFilename)[0]
         # Act
         for i in range(100):
             logger.info(f"Start log {i}")
@@ -250,8 +267,10 @@ class TestStartLoggingOptions(unittest.TestCase):
             logger.info(f"Writing some stuff into log {i}.")
 
         log_files = [l for l in os.listdir(
-            qmi_log_dir
+            self.log_dir
         ) if l.startswith(self.logfile)]
+        logger.setLevel(logging.NOTSET)
+        logger.manager.disable = logging.CRITICAL
         # Assert
         self.assertEqual(backups + 1, len(log_files))
         size_total = 0
@@ -259,7 +278,7 @@ class TestStartLoggingOptions(unittest.TestCase):
         # NOTE: It seems that the size limit is not strict: if a line is longer than the log size limit in bytes,
         # The file size can still be larger than the limit. The rotation then starts from next write.
         for lf in log_files:
-            size_total += os.path.getsize(os.path.join(qmi_log_dir, lf))
+            size_total += os.path.getsize(os.path.join(self.log_dir, lf))
 
         self.assertLessEqual(size_total, max_log_size * (backups + 1))
 
