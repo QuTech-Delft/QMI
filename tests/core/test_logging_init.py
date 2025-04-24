@@ -20,15 +20,13 @@ class TestStartLoggingOptions(unittest.TestCase):
         logging.shutdown()  # Close all log files
         path_1 = os.path.dirname(os.path.abspath(__file__))
         path_2 = os.getcwd()
-        files = os.listdir(path_1)
-        for f in files:
-            if f.startswith(self.logfile):
-                os.remove(os.path.join(path_1, f))
-
-        files = os.listdir(path_2)
-        for f in files:
-            if f.startswith(self.logfile):
-                os.remove(os.path.join(path_2, f))
+        path_3 = os.path.expanduser("~")
+        # Delete all log files from all possible locations in these tests
+        for p in [path_1, path_2, path_3]:
+            files = os.listdir(p)
+            for f in files:
+                if f.startswith(self.logfile):
+                    os.remove(os.path.join(p, f))
 
     @unittest.mock.patch("qmi.core.logging_init.logging")
     def test_logging_default(self, logging_patch):
@@ -200,7 +198,6 @@ class TestStartLoggingOptions(unittest.TestCase):
         logger.info("Writing some stuff into log file.1.")
         logger.info("Writing some stuff into log.")
         log_files = [l for l in os.listdir(
-            # os.getcwd()
             qmi_log_dir
         ) if l.startswith(self.logfile)]
         # Assert
@@ -221,7 +218,6 @@ class TestStartLoggingOptions(unittest.TestCase):
         logger.info("Writing more stuff into log.")
 
         log_files = [l for l in os.listdir(
-            # os.getcwd()
             qmi_log_dir
         ) if l.startswith(self.logfile)]
         self.assertEqual(backups + 1, len(log_files))
@@ -254,7 +250,6 @@ class TestStartLoggingOptions(unittest.TestCase):
             logger.info(f"Writing some stuff into log {i}.")
 
         log_files = [l for l in os.listdir(
-            # os.getcwd()
             qmi_log_dir
         ) if l.startswith(self.logfile)]
         # Assert

@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - In `context_singleton.py`, the QMI 'log_dir' path is now correctly retrieved from QMI configuration file, if it is defined.
-- The path is made OS-independent and the `~` character, if at start of the path, is replaced with actual path.
+- For QMI configuration and log file locations, the path is made OS-independent and the `~` character, if at start of the path, is replaced with full path.
 
 ### Removed
 - The support for most old `typing.<Type>` types for `configstruct` wrapper.
