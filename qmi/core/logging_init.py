@@ -122,7 +122,7 @@ class WatchedRotatingFileHandler(logging.handlers.RotatingFileHandler, logging.h
 
     def emit(self, record):
         self.reopenIfNeeded()  # WatchedFileHandler, makes sure the log file will be present.
-        if not os.path.isdir(self._basedir):
+        if not os.path.isdir(self._basedir):  # Prevents errors if directory is also removed by chance.
             os.makedirs(self._basedir)
 
         super().emit(record)  # RotatingFileHandler, handles the log file rotation if log file full.

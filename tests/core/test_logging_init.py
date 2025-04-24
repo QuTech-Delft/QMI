@@ -58,7 +58,10 @@ class TestStartLoggingOptions(unittest.TestCase):
         method_inputs = list(start_logging.__annotations__.keys())
         expected_max_bytes = start_logging.__defaults__[method_inputs.index("max_bytes")]
         expected_backup_count = start_logging.__defaults__[method_inputs.index("backup_count")]
-        logfile = self.logfile
+        # Note that the logfile is supposed to be given as relative to the log_dir directory. In the absence
+        # of that, it is relative to the `QMI_HOME` env directory, or as last option, the user's home directory.
+        qmi_log_dir = os.path.expanduser("~")
+        logfile = os.path.join(qmi_log_dir, self.logfile)
         loglevels = {
             "logger1": logging.CRITICAL,
             "logger2": logging.DEBUG
@@ -80,7 +83,7 @@ class TestStartLoggingOptions(unittest.TestCase):
         logging_patch.basicConfig.assert_called_once()
 
         self.assertIsInstance(qmi.core.logging_init._file_handler, WatchedRotatingFileHandler)
-        self.assertTrue(qmi.core.logging_init._file_handler.baseFilename.endswith(logfile))
+        self.assertTrue(qmi.core.logging_init._file_handler.baseFilename.endswith(self.logfile))
         self.assertEqual(expected_max_bytes, qmi.core.logging_init._file_handler.maxBytes)
         self.assertEqual(expected_backup_count, qmi.core.logging_init._file_handler.backupCount)
         logging_patch.getLogger().addHandler.assert_called_once()
@@ -91,7 +94,10 @@ class TestStartLoggingOptions(unittest.TestCase):
     def test_logging_rate_limit(self, logging_patch):
         """Test that a logger is created with default options."""
         # Arrange
-        logfile = self.logfile
+        # Note that the logfile is supposed to be given as relative to the log_dir directory. In the absence
+        # of that, it is relative to the `QMI_HOME` env directory, or as last option, the user's home directory.
+        qmi_log_dir = os.path.expanduser("~")
+        logfile = os.path.join(qmi_log_dir, self.logfile)
         rate_limit = 20
         burst_limit = 5
         # Act
@@ -121,7 +127,10 @@ class TestStartLoggingOptions(unittest.TestCase):
     def test_logging_max_bytes_backup_count(self, logging_patch):
         """Test that a logger is created with default options."""
         # Arrange
-        logfile = self.logfile
+        # Note that the logfile is supposed to be given as relative to the log_dir directory. In the absence
+        # of that, it is relative to the `QMI_HOME` env directory, or as last option, the user's home directory.
+        qmi_log_dir = os.path.expanduser("~")
+        logfile = os.path.join(qmi_log_dir, self.logfile)
         rate_limit = 5
         burst_limit = 20
         # Act
@@ -175,7 +184,10 @@ class TestStartLoggingOptions(unittest.TestCase):
         # Arrange
         max_log_size = 100  # bytes
         backups = 3
-        logfile = self.logfile
+        # Note that the logfile is supposed to be given as relative to the log_dir directory. In the absence
+        # of that, it is relative to the `QMI_HOME` env directory, or as last option, the user's home directory.
+        qmi_log_dir = os.path.expanduser("~")
+        logfile = os.path.join(qmi_log_dir, self.logfile)
         # clear the root logger (small log files seem to be an issue here) and set the logger
         logger = logging.getLogger()
         logger.handlers.clear()
@@ -188,8 +200,9 @@ class TestStartLoggingOptions(unittest.TestCase):
         logger.info("Writing some stuff into log file.1.")
         logger.info("Writing some stuff into log.")
         log_files = [l for l in os.listdir(
-            os.getcwd()
-        ) if l.startswith(logfile)]
+            # os.getcwd()
+            qmi_log_dir
+        ) if l.startswith(self.logfile)]
         # Assert
         self.assertEqual(backups + 1, len(log_files))
         size_total = 0
@@ -197,7 +210,7 @@ class TestStartLoggingOptions(unittest.TestCase):
         # NOTE: It seems that the size limit is not strict: if a line is longer than the log size limit in bytes,
         # The file size can still be larger than the limit. The rotation then starts from next write.
         for lf in log_files:
-            size_total += os.path.getsize(lf)
+            size_total += os.path.getsize(os.path.join(qmi_log_dir, lf))
 
         self.assertLessEqual(size_total, max_log_size * (backups + 1))
 
@@ -208,15 +221,16 @@ class TestStartLoggingOptions(unittest.TestCase):
         logger.info("Writing more stuff into log.")
 
         log_files = [l for l in os.listdir(
-            os.getcwd()
-        ) if l.startswith(logfile)]
+            # os.getcwd()
+            qmi_log_dir
+        ) if l.startswith(self.logfile)]
         self.assertEqual(backups + 1, len(log_files))
         size_total = 0
         # See that the total file size stays contained
         # NOTE: It seems that the size limit is not strict: if a line is longer than the log size limit in bytes,
         # The file size can still be larger than the limit. The rotation then starts from next write.
         for lf in log_files:
-            size_total += os.path.getsize(lf)
+            size_total += os.path.getsize(os.path.join(qmi_log_dir, lf))
 
         self.assertLessEqual(size_total, max_log_size * (backups + 1))
 
@@ -225,7 +239,10 @@ class TestStartLoggingOptions(unittest.TestCase):
         # Arrange
         max_log_size = 10000  # bytes
         backups = 3
-        logfile = self.logfile
+        # Note that the logfile is supposed to be given as relative to the log_dir directory. In the absence
+        # of that, it is relative to the `QMI_HOME` env directory, or as last option, the user's home directory.
+        qmi_log_dir = os.path.expanduser("~")
+        logfile = os.path.join(qmi_log_dir, self.logfile)
         # set the logger
         start_logging(logfile=logfile, max_bytes=max_log_size, backup_count=backups)
         logger = logging.getLogger("qmi.core.logging_init")
@@ -237,8 +254,9 @@ class TestStartLoggingOptions(unittest.TestCase):
             logger.info(f"Writing some stuff into log {i}.")
 
         log_files = [l for l in os.listdir(
-            os.getcwd()
-        ) if l.startswith(logfile)]
+            # os.getcwd()
+            qmi_log_dir
+        ) if l.startswith(self.logfile)]
         # Assert
         self.assertEqual(backups + 1, len(log_files))
         size_total = 0
@@ -246,7 +264,7 @@ class TestStartLoggingOptions(unittest.TestCase):
         # NOTE: It seems that the size limit is not strict: if a line is longer than the log size limit in bytes,
         # The file size can still be larger than the limit. The rotation then starts from next write.
         for lf in log_files:
-            size_total += os.path.getsize(lf)
+            size_total += os.path.getsize(os.path.join(qmi_log_dir, lf))
 
         self.assertLessEqual(size_total, max_log_size * (backups + 1))
 
