@@ -1,13 +1,17 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Test qmi/tools/proc.py"""
-import unittest
-from unittest.mock import MagicMock, patch, call
-import socket
-import os, sys
-import psutil
-import subprocess
 from argparse import Namespace, ArgumentError
+import psutil
+import os, sys
+import pathlib
+from shutil import rmtree
+import socket
+import subprocess
+import sysconfig
+import unittest
+from unittest.mock import Mock, MagicMock, patch, call
+import _posixsubprocess_mock as _posixsubprocess
 
 import qmi
 import qmi.tools.proc as proc
@@ -54,12 +58,20 @@ CONTEXT_CFG = {
             "connect_to_peers": ["ContextName1"],
             "enabled": True,
         }
-    }
+}
+VENV_PATH = os.path.join(os.path.dirname(__file__), ".venv")
+CONTEXT_CFG_VENV = {
+        "ContextName": {
+            "host": CONFIG["ip"],
+            "program_module": "test_venv_module",
+            "virtualenv_path": VENV_PATH,
+        }
+}
 
 
-def _start_qmi_context():
+def _start_qmi_context(context_name, context_cfg):
     """Start qmi and initialize the context with a configuration. Returns the configuration."""
-    qmi.start("ContextName2", context_cfg=CONTEXT_CFG)
+    qmi.start(context_name, context_cfg=context_cfg)
     return {"config": CONFIG, "config0": CONFIG0}
 
 
@@ -87,7 +99,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         proc.subprocess = MagicMock(spec=subprocess)
         proc.subprocess.SubprocessError = subprocess.SubprocessError
         proc.open = MagicMock()
-        self._config = _start_qmi_context()
+        self._config = _start_qmi_context("ContextName2", CONTEXT_CFG)
         proc.print = MagicMock()
         proc._logger = MagicMock()
 
@@ -387,6 +399,7 @@ class QmiProcMethodsTestCase(unittest.TestCase):
         self.assertEqual("", str(ass_err_2.exception))
         self.assertEqual("AssertionError(\"'ip_address' unexpectedly not a string!\")", repr(ass_err_1.exception))
 
+    @unittest.mock.patch("sys.platform", "linux")
     def test_start_local_process(self):
         """Test start_local_process, happy flow."""
         with patch(
@@ -421,8 +434,9 @@ class QmiProcMethodsTestCase(unittest.TestCase):
                 env=os.environ.copy(),
             )
 
+    @unittest.mock.patch("sys.platform", "win32")
     def test_start_local_process_winenv(self):
-        """Test start_local_process, happy flow, windows environment."""
+        """Test start_local_process, happy flow, Windows environment."""
         mock_pid_parent = MagicMock()
         mock_pid_parent.children = MagicMock(return_value=[(mock_pid:=MagicMock())])
         with patch(
@@ -436,7 +450,7 @@ class QmiProcMethodsTestCase(unittest.TestCase):
             "sys.executable", (exec := MagicMock())
         ), patch(
             "os.environ.copy", MagicMock()
-        ), patch("qmi.tools.proc.WINENV", True), patch('qmi.tools.proc.psutil.Process', MagicMock(return_value=mock_pid_parent)):
+        ), patch("qmi.tools.proc.WINENV", True), patch("qmi.tools.proc.psutil.Process", MagicMock(return_value=mock_pid_parent)):
             _, _, ctxcfg = _build_mock_config()
             popen.poll = MagicMock(return_value=None)
             rt_val = proc.start_local_process("ContextName1")
@@ -1273,6 +1287,152 @@ class QmiProcMethodsTestCase(unittest.TestCase):
             self.assertEqual(rt_val, 1)
 
 
+class QmiProcVenvTestCase(unittest.TestCase):
+
+    @patch("qmi.core.context.pathlib", autospec=pathlib)  # return_value=os.path.expanduser('~'))
+    def setUp(self, path_patch):
+        if not os.path.isdir(VENV_PATH):
+            os.makedirs(VENV_PATH)
+
+        path_patch.Path.home.return_value = os.path.expanduser('~')
+        self.original_import = __import__
+        self.system_site_packages = sysconfig.get_paths()["purelib"]
+        self.context_name = "ContextName"
+        _start_qmi_context(self.context_name, CONTEXT_CFG_VENV)
+        config = CfgQmi()
+        for key in CONTEXT_CFG_VENV.keys():
+            config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG_VENV[key], CfgContext)})
+
+        QMI_Context.get_config = MagicMock(return_value=config)
+
+    def tearDown(self):
+        __import__ = self.original_import
+        qmi.stop()
+        rmtree(VENV_PATH)
+
+    @unittest.mock.patch("sys.platform", "linux")
+    def test_start_local_process_venv(self):
+        """Test start_local_process, with creating and specifying a virtual environment location."""
+        # Arrange
+        os_mock = MagicMock(spec=os)
+        os_mock.name = "posix"
+        os_mock.WIFSTOPPED = Mock(return_value=False)
+        os_mock.WSTOPSIG = Mock(return_value=None)
+        os_mock.WNOHANG = Mock(return_value=True)
+        os_mock.path.abspath = Mock(return_value=VENV_PATH)
+        os_mock.path.islink = Mock(return_value=False)
+        os_mock.path.isfile = Mock(return_value=False)
+        os_mock.path.split = os.path.split
+        os_mock.path.join = Mock(return_value=VENV_PATH + "/pyenv.cfg")
+        # Patch __import__ to raise error
+        def mock_import(name, *args, **kwargs):
+            if name == "msvcrt":
+                raise ModuleNotFoundError("Mocked module not found")
+            if name == "_posixsubprocess":
+                return _posixsubprocess
+            if name == "os":
+                return os_mock
+            return self.original_import(name, *args, **kwargs)
+
+        del sys.modules["subprocess"]
+        with patch("builtins.__import__", side_effect=mock_import):
+            import subprocess
+            from venv import EnvBuilder
+            # subprocess._mswindows = False
+            #
+            # Act
+            EnvBuilder(
+                system_site_packages=self.system_site_packages,
+                clear=True,
+                symlinks=True,  # if os.name == "nt" else True,
+                upgrade=False,
+                with_pip=False,
+            ).create(VENV_PATH)
+            del sys.modules["venv"]
+        # with patch(
+        #     "qmi.tools.proc.open", MagicMock(return_value=(fopen := MagicMock()))
+        # ), patch(
+        #     "qmi.tools.proc.subprocess.Popen",
+        #     MagicMock(return_value=(popen := MagicMock())),
+        # ), patch(
+        #     "qmi.tools.proc.os.path.isdir", MagicMock(return_value=True)
+        # ), patch(
+        #     "sys.executable", (exec := MagicMock())
+        # ), patch(
+        #     "os.environ.copy", MagicMock()
+        # ):
+        # popen.pid = 0
+        # popen.poll = MagicMock(return_value=None)
+        with patch("qmi.core.context.pathlib", autospec=pathlib) as pathlib_patch:
+            pathlib_patch.Path.home.return_value = os.path.join(VENV_PATH)
+            rt_val = proc.start_local_process(self.context_name)
+            pass
+        # self.assertEqual(rt_val, popen.pid)
+        # proc.subprocess.Popen.assert_called_once_with(
+        #     [exec, "-m", ctxcfg.program_module] + ctxcfg.program_args,
+        #     stdin=proc.subprocess.DEVNULL,
+        #     stdout=fopen,
+        #     stderr=proc.subprocess.STDOUT,
+        #     start_new_session=True,
+        #     env=os.environ.copy(),
+        # )
+
+    @unittest.mock.patch("sys.platform", "win32")
+    def test_start_local_process_winvenv(self):
+        """Test start_local_process, with creating and specifying a virtual environment location,
+        Windows environment."""
+        # Arrange
+        os_mock = MagicMock(spec=os)
+        os_mock.name = "nt"
+        os_mock.WIFSTOPPED = Mock(return_value=False)
+        os_mock.WSTOPSIG = Mock(return_value=None)
+        os_mock.WNOHANG = Mock(return_value=True)
+        # Patch __import__ to pass as usual
+        def mock_import(name, *args, **kwargs):
+            # if name == "msvcrt":
+            #     return msvcrt
+            # if name == "_posixsubprocess":
+            #     return _posixsubprocess
+            # if name == "os":
+            #     return os_mock
+            return self.original_import(name, *args, **kwargs)
+
+        del sys.modules["subprocess"]
+        # mock_pid_parent = MagicMock()
+        # mock_pid_parent.children = MagicMock(return_value=[(mock_pid:=MagicMock())])
+        with patch(
+            "builtins.__import__", side_effect=mock_import
+        # ):
+        # ), patch(
+        #     "qmi.tools.proc.open", MagicMock(return_value=(fopen := MagicMock()))
+        ), patch(
+            "qmi.tools.proc.subprocess.Popen",
+            MagicMock(return_value=(popen := MagicMock())),
+        # ), patch(
+        #     "qmi.tools.proc.os.path.isdir", MagicMock(return_value=True)
+        # ), patch(
+        #     "sys.executable", (exec := MagicMock())
+        # ), patch(
+        #     "os.environ.copy", MagicMock()
+        # ), patch("qmi.tools.proc.WINENV", True), patch("qmi.tools.proc.psutil.Process", MagicMock(return_value=mock_pid_parent)):
+        ):
+            #     _, _, ctxcfg = _build_mock_config()
+            popen.poll = MagicMock(return_value=None)
+            import subprocess
+            from venv import EnvBuilder
+            EnvBuilder(
+                system_site_packages=self.system_site_packages,
+                clear=True,
+                symlinks=False,  # if os.name == "nt" else True,
+                upgrade=False,
+                with_pip=False,
+            ).create(VENV_PATH)
+            del sys.modules["venv"]
+
+        rt_val = proc.start_local_process(self.context_name)
+        # self.assertEqual(rt_val, mock_pid.pid)
+
+
 class ArgParserTestCase(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -1478,3 +1638,7 @@ class ArgParserTestCase(unittest.TestCase):
             retval = proc.main()
             self.assertEqual(retval, 1)
             sel_ctx.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()

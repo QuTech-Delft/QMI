@@ -284,7 +284,11 @@ def start_local_process(context_name: str) -> int:
     # Check if a virtual environment needs to be activated.
     venv_path = ctxcfg.virtualenv_path
     if venv_path is not None:
-        executable = os.path.join(venv_path, "bin", "python3")
+        if sys.platform.startswith("win"):
+            executable = os.path.join(venv_path, "Scripts", "python.exe")
+        else:
+            executable = os.path.join(venv_path, "bin", "python")
+        # executable = os.path.join(venv_path, "bin", "python")
     else:
         executable = sys.executable
 
@@ -320,6 +324,7 @@ def start_local_process(context_name: str) -> int:
                                 start_new_session=True,
                                 env=environment)
     except (OSError, subprocess.SubprocessError) as exc:
+        print(exc)
         raise ProcessException("Can not start program ({}: {})"
                                .format(type(exc).__name__, str(exc)))
 
