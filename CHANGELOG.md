@@ -8,16 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - The log file existence is checked and necessary folder structure is created if needed.
+- The log file maximum size and number of backups can now be set. Defaults are 10GB size and 5 backups (total of 60GB).
+- An example of how to define logging options, in the docstring of `logging_init.py` module.
 
 ### Changed
 - All entry point functions in `bin` scripts from `main` to `run` to avoid unintended modifications of `pyproject.toml` when executing release procedure.
+- The `configstruct` wrapper from `qmi.core.config_struct` now accepts only modern typing for field. Most (but not all) of the `typing.<Type>` will not be parsed anymore by the type parser.
 
 ### Fixed
-- In context_singleton.py, the QMI log_dir path is now correctly retrieved from qmi.conf, if it is defined. 
-- The path is made OS-independent and the `~` character, if at start of the path, is replaced with actual path.
+- In `context_singleton.py`, the QMI 'log_dir' path is now correctly retrieved from QMI configuration file, if it is defined.
+- For QMI configuration and log file locations, the path is made OS-independent and the `~` character, if at start of the path, is replaced with full path.
 - Fixed `pyproject.toml` not to point to incorrect qmi location for package installation, but to root by removing [tool.setuptools.packages.find] lines.
 
 ### Removed
+- The support for most old `typing.<Type>` types for `configstruct` wrapper.
 
 
 ## [0.47.0] - 2025-03-14

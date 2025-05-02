@@ -1,5 +1,33 @@
-"""Initialization of the Python logging framework for QMI."""
+"""Initialization of the Python logging framework for QMI.
 
+Logging framework can be configured using the "logging" and "log_dir" sections of the QMI configuration file, e.g.:
+```json
+{
+    # Log level for messages to the console.
+    "logging": {
+        "console_loglevel": "DEBUG",
+        "logfile": "debug.log",
+        "loglevels": {
+            "qmi.core.rpc": "ERROR",
+            "qmi.core.task": "ERROR"
+        },
+        "max_bytes": 1000000,
+        "backup_count": 2
+    },
+    # Directory to write various log files.
+    "log_dir": "${qmi_home}/log_dir",
+
+    "contexts": ...
+}
+```
+to show DEBUG info on the console, and to write into max three log files (the latest log and two backups) of max size
+of 1MB. The location of the log file named 'debug.log' is in 'log_dir' folder of the QMI home directory.  The loglevel
+setting is overridden with module-specific settings, for modules `qmi.core.rpc` and `qmi.core.task`, to be "ERROR".
+
+The default `log levels <https://docs.python.org/3/library/logging.html#logging-levels>` for QMI are "INFO" for the
+log file and "WARNING" for the console. The standard log file name is 'qmi.log'.
+"""
+import os.path
 import sys
 import logging
 import logging.handlers
@@ -85,6 +113,21 @@ class _RateLimitFilter(logging.Filter):
         return ret
 
 
+class WatchedRotatingFileHandler(logging.handlers.RotatingFileHandler, logging.handlers.WatchedFileHandler):
+    def __init__(self, filename, **kwargs):
+        super().__init__(filename, **kwargs)
+        self.dev, self.ino = -1, -1
+        self._statstream()
+        self._basedir = os.path.split(self.baseFilename)[0]
+
+    def emit(self, record):
+        self.reopenIfNeeded()  # WatchedFileHandler, makes sure the log file will be present.
+        if not os.path.isdir(self._basedir):  # Prevents errors if directory is also removed by chance.
+            os.makedirs(self._basedir)
+
+        super().emit(record)  # RotatingFileHandler, handles the log file rotation if log file full.
+
+
 def _makeLogFormatter(log_process: bool) -> logging.Formatter:
     """Create and return a log formatter instance."""
 
@@ -108,11 +151,15 @@ def start_logging(
     logfile: str | None = None,
     loglevels: Mapping[str, int | str] | None = None,
     rate_limit: float | None = None,
-    burst_limit: int = 1
+    burst_limit: int = 1,
+    max_bytes: int = 10 * 2**30,
+    backup_count: int = 5
 ) -> None:
     """Initialize the Python logging framework for use by QMI.
 
-    This function sets up logging to `stderr` and optional logging to a file.
+    This function sets up logging to `stderr` and optional logging to a file. The maximum size
+    of a logfile can be given, and the number of rotating logfile count as well. The maximum total
+    logfile disk space usage will be max_bytes * backup_count.
     Logging of Python *warnings* is enabled.
     Unhandled exceptions are logged to file.
 
@@ -129,6 +176,8 @@ def start_logging(
                           When specified, this is a dictionary mapping logger names to their initial log levels.
         rate_limit:       Maximum number of log messages per second per logger.
         burst_limit:      Maximum number of messages that can be "saved up" for a short burst of messages.
+        max_bytes:        Maximum size of a log file in bytes. Default is 10GB = 10 * 2**30.
+        backup_count:     Number of backup files to be used. Default is 5.
     """
 
     global _file_handler
@@ -157,10 +206,10 @@ def start_logging(
     # early initialization via QMI_DEBUG, then later re-configured to add
     # a log file after the configuration is processed.
     if logfile:
-        # Use the WatchedFileHandler class for logging to file.
-        # This handler will automatically re-open the log file if the underlying
-        # file is removed or renamed, for example as part of log rotation.
-        _file_handler = logging.handlers.WatchedFileHandler(logfile)
+        # Use the custom WatchedRotatingFileHandler class for logging to file[s].
+        # This handler will automatically create or re-open the log file if the underlying
+        # file is removed, renamed or reached its maximum size, for example as part of log rotation.
+        _file_handler = WatchedRotatingFileHandler(logfile, delay=True, maxBytes=max_bytes, backupCount=backup_count)
         fmt = _makeLogFormatter(log_process=True)
         _file_handler.setFormatter(fmt)
         # Configure rate limiting.

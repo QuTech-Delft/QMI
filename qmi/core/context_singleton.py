@@ -184,7 +184,6 @@ def _init_logging() -> None:
     loglevel = cfg.logging.loglevel
     console_loglevel = cfg.logging.console_loglevel
     logfile = cfg.logging.logfile
-    loglevels = cfg.logging.loglevels
 
     # If QMI_DEBUG is set, override configured log level.
     if os.getenv("QMI_DEBUG"):
@@ -215,9 +214,11 @@ def _init_logging() -> None:
         loglevel=loglevel,
         console_loglevel=console_loglevel,
         logfile=logfile,
-        loglevels=loglevels,
+        loglevels=cfg.logging.loglevels,
         rate_limit=cfg.logging.rate_limit,
-        burst_limit=cfg.logging.burst_limit
+        burst_limit=cfg.logging.burst_limit,
+        max_bytes=cfg.logging.max_bytes,
+        backup_count=cfg.logging.backup_count
     )
 
 

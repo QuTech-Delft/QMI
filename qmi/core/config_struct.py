@@ -16,9 +16,9 @@ Only the following data types are allowed for fields of configuration structures
 
  - ``int``, ``float``, ``str``, ``bool``
  - another configuration structure type;
- - ``List[T]`` where `T` is a supported field type
- - ``Dict[str, T]`` where `T` is a supported field type
- - ``Tuple[T1, T2, T3]`` or ``Tuple[T, ...]`` where `T`, `T1`, etc are supported field types
+ - ``list[T]`` where `T` is a supported field type
+ - ``dict[str, T]`` where `T` is a supported field type
+ - ``tuple[T1, T2, T3]`` or ``tuple[T, ...]`` where `T`, `T1`, etc are supported field types
  - ``Optional[T]`` where `T` is a supported field type
  - ``Any``
 
@@ -34,15 +34,15 @@ more fields.
 import collections
 import dataclasses
 
-from typing import Any, Dict, List, Tuple, TypeVar, Type, Union
+from typing import Any, TypeVar
 
 from qmi.core.exceptions import QMI_ConfigurationException
 
 _T = TypeVar("_T")
-_StrDict = Dict[str, Any]
+_StrDict = dict[str, Any]
 
 
-def configstruct(cls: Type[_T]) -> Type[_T]:
+def configstruct(cls: type[_T]) -> type[_T]:
     """Class decorator to mark classes that hold QMI configuration data.
 
     This decorator is based on the standard `@dataclass` decorator.
@@ -90,7 +90,7 @@ def configstruct(cls: Type[_T]) -> Type[_T]:
     return cls
 
 
-def config_struct_to_dict(cfg: Any) -> Dict[str, Any]:
+def config_struct_to_dict(cfg: Any) -> dict[str, Any]:
     """Convert configuration data from a dataclass instance to a dict.
 
     The returned dict will be suitable for serialization to JSON.
@@ -124,7 +124,7 @@ def _inner_config_struct_to_dict(cfg: Any) -> Any:
         raise TypeError(f"Unsupported value type: {cfg!r}")
 
 
-def _dictify_list_value(cfg_list: Union[list, tuple]) -> list:
+def _dictify_list_value(cfg_list: list | tuple) -> list:
     """Copy a list value while converting its elements from structured to dict."""
     return [_inner_config_struct_to_dict(v) for v in cfg_list]
 
@@ -149,12 +149,12 @@ def _dictify_dataclass(cfg_dataclass: Any) -> dict:
     return ret
 
 
-def _parse_config_value(val: Any, field_type: Any, path: List[str]) -> Any:
+def _parse_config_value(val: Any, field_type: Any, path: list[str]) -> Any:
     """Convert JSON value to expected type."""
 
-    # Recognize Optional[T]
+    # Recognize union of types, including None
     optional = False
-    if repr(field_type).startswith("typing.Union[") or repr(field_type).startswith("typing.Optional["):
+    if " | " in repr(field_type):
         for t in field_type.__args__:
             if t == type(None):  # This is intentional! Do not change to 't is None' as it will fail
                 optional = True
@@ -177,25 +177,13 @@ def _parse_config_value(val: Any, field_type: Any, path: List[str]) -> Any:
         # Implicit conversion of integer value to floating point.
         return float(val)
 
-    # Recognize "List" and "Dict" and map them to "list" and "dict".
-    if field_type == List:
-        field_type = list
-    elif field_type == Tuple:
-        field_type = tuple
-    elif field_type == Dict:
-        field_type = dict
-
     # Recognize untyped "list", "tuple" and "dict" values.
     if (field_type in (list, tuple, dict)) and isinstance(val, field_type):
         return val
 
-    # Recognize untyped "tuple" values that are actually list instances.
-    if (field_type is tuple) and isinstance(val, list):
-        return tuple(val)
-
-    # Recognize List[T].
+    # Recognize list[T].
     type_repr = repr(field_type)
-    if type_repr.startswith("typing.List["):
+    if type_repr.startswith("list["):
         (elem_type,) = field_type.__args__
         if isinstance(val, list):
             ret = []
@@ -205,8 +193,8 @@ def _parse_config_value(val: Any, field_type: Any, path: List[str]) -> Any:
                 path.pop()
             return ret
 
-    # Recognize Tuple[...].
-    if type_repr.startswith("typing.Tuple["):
+    # Recognize tuple[...].
+    if type_repr.startswith("tuple["):
         if (len(field_type.__args__) == 2) and (field_type.__args__[1] is Ellipsis):
             elem_type = field_type.__args__[0]
             if isinstance(val, (list, tuple)):
@@ -225,8 +213,8 @@ def _parse_config_value(val: Any, field_type: Any, path: List[str]) -> Any:
                     path.pop()
                 return tuple(ret)
 
-    # Recognize Dict[str, T].
-    if type_repr.startswith("typing.Dict[") and isinstance(val, dict):
+    # Recognize dict[str, T].
+    if type_repr.startswith("dict[") and isinstance(val, dict):
         return _parse_config_dict(val, field_type, path)
 
     # Recognize data class.
@@ -242,11 +230,11 @@ def _parse_config_value(val: Any, field_type: Any, path: List[str]) -> Any:
     )
 
 
-def _parse_config_dict(val: dict, field_type: Any, path: List[str]) -> _StrDict:
+def _parse_config_dict(val: dict, field_type: Any, path: list[str]) -> _StrDict:
     """Parse Config Dict"""
 
     (_, elem_type) = field_type.__args__
-    ret = collections.OrderedDict()  # type: _StrDict
+    ret: _StrDict = collections.OrderedDict()
     for (k, elem) in val.items():
         if not isinstance(k, str):
             pathstr = ".".join(path)
@@ -259,10 +247,10 @@ def _parse_config_dict(val: dict, field_type: Any, path: List[str]) -> _StrDict:
     return ret
 
 
-def _parse_config_struct(data: Any, cls: Any, path: List[str]) -> Any:
+def _parse_config_struct(data: Any, cls: Any, path: list[str]) -> Any:
     """Convert dictionary to dataclass instance."""
 
-    items = collections.OrderedDict()  # type: _StrDict
+    items: _StrDict = collections.OrderedDict()
 
     # Walk the list of field definitions.
     for f in dataclasses.fields(cls):
@@ -289,13 +277,13 @@ def _parse_config_struct(data: Any, cls: Any, path: List[str]) -> Any:
     return cls(**items)
 
 
-def _check_config_struct_type(cls: Any, path: List[str]) -> None:
+def _check_config_struct_type(cls: Any, path: list[str]) -> None:
     """Check that the specified type is acceptable for configuration data."""
 
     pathstr = ".".join(path)
 
-    # Recognize Optional[T]
-    if repr(cls).startswith("typing.Union[") or repr(cls).startswith("typing.Optional["):
+    # Recognize a union of types, including None.
+    if " | " in repr(cls):
         nsub = 0
         for t in cls.__args__:
             if t == type(None):  # This is intentional! Do not change to 't is None' as it will fail
@@ -315,20 +303,20 @@ def _check_config_struct_type(cls: Any, path: List[str]) -> None:
         return  # accept
 
     # Recognize untyped aggregates.
-    if cls in (list, dict, Any, List, Tuple, Dict):
+    if cls in (list, dict, Any, tuple):
         return  # accept
 
-    # Recognize List[T].
+    # Recognize list[T].
     type_repr = repr(cls)
-    if type_repr.startswith("typing.List["):
+    if type_repr.startswith("list["):
         (elem_type,) = cls.__args__
         path.append("[]")
         _check_config_struct_type(elem_type, path)
         path.pop()
         return  # accept
 
-    # Recognize Tuple[...].
-    if type_repr.startswith("typing.Tuple["):
+    # Recognize tuple[...].
+    if type_repr.startswith("tuple["):
         if (len(cls.__args__) == 2) and (cls.__args__[1] is Ellipsis):
             elem_type = cls.__args__[0]
             path.append("[]")
@@ -342,8 +330,8 @@ def _check_config_struct_type(cls: Any, path: List[str]) -> None:
                 path.pop()
             return  # accept
 
-    # Recognize Dict[str, T].
-    if type_repr.startswith("typing.Dict["):
+    # Recognize dict[str, T].
+    if type_repr.startswith("dict["):
         (key_type, elem_type) = cls.__args__
         if key_type is not str:
             raise QMI_ConfigurationException(
@@ -368,7 +356,7 @@ def _check_config_struct_type(cls: Any, path: List[str]) -> None:
     raise QMI_ConfigurationException(f"Unsupported data type in configuration field {pathstr}")
 
 
-def config_struct_from_dict(data: _StrDict, cls: Type[_T]) -> _T:
+def config_struct_from_dict(data: _StrDict, cls: type[_T]) -> _T:
     """Convert configuration data from a dictionary to a dataclass instance.
 
     The input data is typically obtained by parsing a JSON file.
