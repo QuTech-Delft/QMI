@@ -14,11 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - All entry point functions in `bin` scripts from `main` to `run` to avoid unintended modifications of `pyproject.toml` when executing release procedure.
 - The `configstruct` wrapper from `qmi.core.config_struct` now accepts only modern typing for field. Most (but not all) of the `typing.<Type>` will not be parsed anymore by the type parser.
+- The obsoleted "python3" commands were replaced with "python" in `tools.proc`.
 
 ### Fixed
 - In `context_singleton.py`, the QMI 'log_dir' path is now correctly retrieved from QMI configuration file, if it is defined.
 - For QMI configuration and log file locations, the path is made OS-independent and the `~` character, if at start of the path, is replaced with full path.
 - Fixed `pyproject.toml` not to point to incorrect qmi location for package installation, but to root by removing [tool.setuptools.packages.find] lines.
+- The 'venv' executable path was made OS-dependent ("win" or else) for creating 'venv' in `tools.proc`.
 
 ### Removed
 - The support for most old `typing.<Type>` types for `configstruct` wrapper.

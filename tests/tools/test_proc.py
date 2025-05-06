@@ -11,7 +11,10 @@ import subprocess
 import sysconfig
 import unittest
 from unittest.mock import Mock, MagicMock, patch, call
-import _posixsubprocess_mock as _posixsubprocess
+try:
+    from . import _posixsubprocess_mock as _posixsubprocess
+except ImportError:
+    import _posixsubprocess_mock as _posixsubprocess
 
 import qmi
 import qmi.tools.proc as proc
@@ -1304,6 +1307,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
             config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG_VENV[key], CfgContext)})
 
         QMI_Context.get_config = MagicMock(return_value=config)
+        self.ctxcfg = config.contexts[self.context_name]
 
     def tearDown(self):
         __import__ = self.original_import
@@ -1338,8 +1342,6 @@ class QmiProcVenvTestCase(unittest.TestCase):
         with patch("builtins.__import__", side_effect=mock_import):
             import subprocess
             from venv import EnvBuilder
-            # subprocess._mswindows = False
-            #
             # Act
             EnvBuilder(
                 system_site_packages=self.system_site_packages,
@@ -1351,16 +1353,8 @@ class QmiProcVenvTestCase(unittest.TestCase):
             del sys.modules["venv"]
 
         with patch(
-        #     "qmi.tools.proc.open", MagicMock(return_value=(fopen := MagicMock()))
-        # ), patch(
             "qmi.tools.proc.subprocess.Popen",
             MagicMock(return_value=(popen := MagicMock())),
-        # ), patch(
-        #     "qmi.tools.proc.os.path.isdir", MagicMock(return_value=True)
-        # ), patch(
-        #     "sys.executable", (exec := MagicMock())
-        # ), patch(
-        #     "os.environ.copy", MagicMock()
         ):
             popen.pid = 0
             popen.poll = MagicMock(return_value=None)
@@ -1370,14 +1364,9 @@ class QmiProcVenvTestCase(unittest.TestCase):
                     pid = proc.start_local_process(self.context_name)
 
         self.assertEqual(popen.pid, pid)
-        # proc.subprocess.Popen.assert_called_once_with(
-        #     [exec, "-m", ctxcfg.program_module] + ctxcfg.program_args,
-        #     stdin=proc.subprocess.DEVNULL,
-        #     stdout=fopen,
-        #     stderr=proc.subprocess.STDOUT,
-        #     start_new_session=True,
-        #     env=os.environ.copy(),
-        # )
+        popen.poll.assert_called_once_with()
+        os_mock.symlink.assert_called_once_with(sys.executable, VENV_PATH + "/pyenv.cfg")
+        del sys.modules["subprocess"]
 
     @unittest.mock.patch("sys.platform", "win32")
     def test_start_local_process_winvenv(self):
@@ -1386,22 +1375,32 @@ class QmiProcVenvTestCase(unittest.TestCase):
         # Arrange
         os_mock = MagicMock(spec=os)
         os_mock.name = "nt"
-        os_mock.WIFSTOPPED = Mock(return_value=False)
-        os_mock.WSTOPSIG = Mock(return_value=None)
-        os_mock.WNOHANG = Mock(return_value=True)
+        os_mock.path.abspath = Mock(return_value=VENV_PATH)
+        os_mock.path.islink = Mock(return_value=False)
+        os_mock.path.isfile = Mock(return_value=False)
+        os_mock.path.split = os.path.split
+        os_mock.path.join = Mock(side_effect=[
+            VENV_PATH + "\\pyenv.cfg",
+            VENV_PATH + "\\pyenv2.cfg",
+            VENV_PATH + "\\pyenv2.cfg",
+            VENV_PATH + "\\pyenv.cfg",
+            VENV_PATH + "\\pyenv2.cfg",
+            VENV_PATH + "\\pyenv2.cfg",
+            VENV_PATH + "\\pyenv2.cfg",] + [
+            VENV_PATH + "\\pyenv.cfg",
+            VENV_PATH + "\\pyenv.cfg",
+            VENV_PATH + "\\pyenv2.cfg",
+            VENV_PATH + "\\pyenv.cfg",
+        ] * 5)
+        os_mock.path.basename = os.path.basename
+        os_mock.path.dirname = os.path.dirname
+        os_mock.path.splitext = os.path.splitext
         # Patch __import__ to pass as usual
         def mock_import(name, *args, **kwargs):
-            # if name == "msvcrt":
-            #     return msvcrt
-            # if name == "_posixsubprocess":
-            #     return _posixsubprocess
-            # if name == "os":
-            #     return os_mock
+            if name == "os":
+                return os_mock
             return self.original_import(name, *args, **kwargs)
 
-        del sys.modules["subprocess"]
-        # mock_pid_parent = MagicMock()
-        # mock_pid_parent.children = MagicMock(return_value=[(mock_pid:=MagicMock())])
         with patch("builtins.__import__", side_effect=mock_import):
             import subprocess
             from venv import EnvBuilder
@@ -1414,26 +1413,19 @@ class QmiProcVenvTestCase(unittest.TestCase):
             ).create(VENV_PATH)
             del sys.modules["venv"]
 
-        # ), patch(
-        #     "qmi.tools.proc.open", MagicMock(return_value=(fopen := MagicMock()))
         with patch(
             "qmi.tools.proc.subprocess.Popen",
             MagicMock(return_value=(popen := MagicMock())),
-        # ), patch(
-        #     "qmi.tools.proc.os.path.isdir", MagicMock(return_value=True)
-        # ), patch(
-        #     "sys.executable", (exec := MagicMock())
-        # ), patch(
-        #     "os.environ.copy", MagicMock()
-        # ), patch("qmi.tools.proc.WINENV", True), patch("qmi.tools.proc.psutil.Process", MagicMock(return_value=mock_pid_parent)):
         ):
-            #     _, _, ctxcfg = _build_mock_config()
             popen.poll = MagicMock(return_value=None)
             popen.pid = 0
             with patch("qmi.tools.proc.Popen.poll", return_value=None):
                 pid = proc.start_local_process(self.context_name)
 
         self.assertEqual(popen.pid, pid)
+        popen.poll.assert_called_once_with()
+        os_mock.path.join.assert_has_calls([unittest.mock.call(VENV_PATH + "\\Scripts", "python.exe")], any_order=True)
+        del sys.modules["subprocess"]
 
 
 class ArgParserTestCase(unittest.TestCase):

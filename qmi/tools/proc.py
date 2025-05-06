@@ -100,7 +100,12 @@ class ProcessManagementClient:
         ctxcfg = cfg.contexts[context_name]
         venv_path = ctxcfg.virtualenv_path
         if venv_path is not None:
-            server_command = os.path.join(venv_path, "bin", "") + server_command
+            if sys.platform.startswith("win"):
+                executable_path = os.path.join(venv_path, "Scripts", "")
+            else:
+                executable_path = os.path.join(venv_path, "bin", "")
+
+            server_command = executable_path + server_command
 
         # Prepare command to invoke SSH.
         cmdline = [
@@ -288,7 +293,7 @@ def start_local_process(context_name: str) -> int:
             executable = os.path.join(venv_path, "Scripts", "python.exe")
         else:
             executable = os.path.join(venv_path, "bin", "python")
-        # executable = os.path.join(venv_path, "bin", "python")
+
     else:
         executable = sys.executable
 
