@@ -57,7 +57,6 @@ ShutdownResult = NamedTuple("ShutdownResult", [
 
 class ProcessException(Exception):
     """Raised when a process management operation fails."""
-    pass
 
 
 class ProcessManagementClient:

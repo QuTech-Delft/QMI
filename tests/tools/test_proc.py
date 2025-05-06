@@ -3,7 +3,8 @@
 """Test qmi/tools/proc.py"""
 from argparse import Namespace, ArgumentError
 import psutil
-import os, sys
+import os
+import sys
 import pathlib
 from shutil import rmtree
 import socket
@@ -1340,7 +1341,6 @@ class QmiProcVenvTestCase(unittest.TestCase):
 
         del sys.modules["subprocess"]
         with patch("builtins.__import__", side_effect=mock_import):
-            import subprocess
             from venv import EnvBuilder
             # Act
             EnvBuilder(
@@ -1402,7 +1402,6 @@ class QmiProcVenvTestCase(unittest.TestCase):
             return self.original_import(name, *args, **kwargs)
 
         with patch("builtins.__import__", side_effect=mock_import):
-            import subprocess
             from venv import EnvBuilder
             EnvBuilder(
                 system_site_packages=self.system_site_packages,

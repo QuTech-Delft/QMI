@@ -7,7 +7,7 @@ It provides much nicer formatting of compiler errors, a working exit code, and h
 import argparse
 import logging
 import os
-from pathlib import Path, WindowsPath
+from pathlib import Path
 import re
 import sys
 import shutil
