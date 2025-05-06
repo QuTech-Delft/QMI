@@ -37,7 +37,7 @@ WINENV = (sys.prefix != sys.base_prefix and os.name == 'nt')  # type: ignore
 CONTEXT_SHUTDOWN_TIMEOUT = 8
 
 # Default command to run on remote computer to start a process management server.
-DEFAULT_SERVER_COMMAND = "python3 -m qmi.tools.proc server"
+DEFAULT_SERVER_COMMAND = "python -m qmi.tools.proc server"
 
 # Global variable holding the logger for this module.
 if __name__ == "__main__":
@@ -324,7 +324,6 @@ def start_local_process(context_name: str) -> int:
                                 start_new_session=True,
                                 env=environment)
     except (OSError, subprocess.SubprocessError) as exc:
-        print(exc)
         raise ProcessException("Can not start program ({}: {})"
                                .format(type(exc).__name__, str(exc)))
 

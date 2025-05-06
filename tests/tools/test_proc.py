@@ -1349,25 +1349,27 @@ class QmiProcVenvTestCase(unittest.TestCase):
                 with_pip=False,
             ).create(VENV_PATH)
             del sys.modules["venv"]
-        # with patch(
+
+        with patch(
         #     "qmi.tools.proc.open", MagicMock(return_value=(fopen := MagicMock()))
         # ), patch(
-        #     "qmi.tools.proc.subprocess.Popen",
-        #     MagicMock(return_value=(popen := MagicMock())),
+            "qmi.tools.proc.subprocess.Popen",
+            MagicMock(return_value=(popen := MagicMock())),
         # ), patch(
         #     "qmi.tools.proc.os.path.isdir", MagicMock(return_value=True)
         # ), patch(
         #     "sys.executable", (exec := MagicMock())
         # ), patch(
         #     "os.environ.copy", MagicMock()
-        # ):
-        # popen.pid = 0
-        # popen.poll = MagicMock(return_value=None)
-        with patch("qmi.core.context.pathlib", autospec=pathlib) as pathlib_patch:
-            pathlib_patch.Path.home.return_value = os.path.join(VENV_PATH)
-            rt_val = proc.start_local_process(self.context_name)
-            pass
-        # self.assertEqual(rt_val, popen.pid)
+        ):
+            popen.pid = 0
+            popen.poll = MagicMock(return_value=None)
+            with patch("qmi.core.context.pathlib", autospec=pathlib) as pathlib_patch:
+                pathlib_patch.Path.home.return_value = os.path.join(VENV_PATH)
+                with patch("qmi.tools.proc.Popen.poll", return_value=None):
+                    pid = proc.start_local_process(self.context_name)
+
+        self.assertEqual(popen.pid, pid)
         # proc.subprocess.Popen.assert_called_once_with(
         #     [exec, "-m", ctxcfg.program_module] + ctxcfg.program_args,
         #     stdin=proc.subprocess.DEVNULL,
@@ -1400,12 +1402,21 @@ class QmiProcVenvTestCase(unittest.TestCase):
         del sys.modules["subprocess"]
         # mock_pid_parent = MagicMock()
         # mock_pid_parent.children = MagicMock(return_value=[(mock_pid:=MagicMock())])
-        with patch(
-            "builtins.__import__", side_effect=mock_import
-        # ):
+        with patch("builtins.__import__", side_effect=mock_import):
+            import subprocess
+            from venv import EnvBuilder
+            EnvBuilder(
+                system_site_packages=self.system_site_packages,
+                clear=True,
+                symlinks=False,  # if os.name == "nt" else True,
+                upgrade=False,
+                with_pip=False,
+            ).create(VENV_PATH)
+            del sys.modules["venv"]
+
         # ), patch(
         #     "qmi.tools.proc.open", MagicMock(return_value=(fopen := MagicMock()))
-        ), patch(
+        with patch(
             "qmi.tools.proc.subprocess.Popen",
             MagicMock(return_value=(popen := MagicMock())),
         # ), patch(
@@ -1418,19 +1429,11 @@ class QmiProcVenvTestCase(unittest.TestCase):
         ):
             #     _, _, ctxcfg = _build_mock_config()
             popen.poll = MagicMock(return_value=None)
-            import subprocess
-            from venv import EnvBuilder
-            EnvBuilder(
-                system_site_packages=self.system_site_packages,
-                clear=True,
-                symlinks=False,  # if os.name == "nt" else True,
-                upgrade=False,
-                with_pip=False,
-            ).create(VENV_PATH)
-            del sys.modules["venv"]
+            popen.pid = 0
+            with patch("qmi.tools.proc.Popen.poll", return_value=None):
+                pid = proc.start_local_process(self.context_name)
 
-        rt_val = proc.start_local_process(self.context_name)
-        # self.assertEqual(rt_val, mock_pid.pid)
+        self.assertEqual(popen.pid, pid)
 
 
 class ArgParserTestCase(unittest.TestCase):
