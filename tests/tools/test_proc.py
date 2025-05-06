@@ -1315,7 +1315,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
         qmi.stop()
         rmtree(VENV_PATH)
 
-    @unittest.mock.patch("sys.platform", "linux")
+    @unittest.mock.patch("qmi.tools.proc.sys.platform", "linux")
     def test_start_local_process_venv(self):
         """Test start_local_process, with creating and specifying a virtual environment location."""
         # Arrange
@@ -1368,7 +1368,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
         os_mock.symlink.assert_called_once_with(sys.executable, VENV_PATH + "/pyenv.cfg")
         del sys.modules["subprocess"]
 
-    @unittest.mock.patch("sys.platform", "win32")
+    @unittest.mock.patch("qmi.tools.proc.sys.platform", "win32")
     def test_start_local_process_winvenv(self):
         """Test start_local_process, with creating and specifying a virtual environment location,
         Windows environment."""
@@ -1418,8 +1418,10 @@ class QmiProcVenvTestCase(unittest.TestCase):
         ):
             popen.poll = MagicMock(return_value=None)
             popen.pid = 0
-            with patch("qmi.tools.proc.Popen.poll", return_value=None):
-                pid = proc.start_local_process(self.context_name)
+            with patch("qmi.core.context.pathlib", autospec=pathlib) as pathlib_patch:
+                pathlib_patch.Path.home.return_value = os.path.join(VENV_PATH)
+                with patch("qmi.tools.proc.Popen.poll", return_value=None):
+                    pid = proc.start_local_process(self.context_name)
 
         self.assertEqual(popen.pid, pid)
         popen.poll.assert_called_once_with()
