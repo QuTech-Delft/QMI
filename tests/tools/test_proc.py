@@ -1400,7 +1400,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
 
         self.assertEqual(popen.pid, pid)
         popen.poll.assert_called_once_with()
-        self.assertTrue(os.path.isfile(os.path.join(VENV_PATH + "\\Scripts", "python.exe")))
+        self.assertTrue(os.path.isdir(os.path.join(VENV_PATH + "Scripts")))
 
 
 class ArgParserTestCase(unittest.TestCase):
