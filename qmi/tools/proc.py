@@ -160,7 +160,7 @@ class ProcessManagementClient:
         assert self._proc.stdout is not None
 
         # Send command to remote process management server.
-        cmd = "START {}".format(self._context_name)
+        cmd = f"START {self._context_name}"
         self._proc.stdin.write(cmd.encode("ascii") + b"\n")
         self._proc.stdin.flush()
 
@@ -184,7 +184,7 @@ class ProcessManagementClient:
             msg = decoded_resp[4:].strip()
             raise ProcessException(msg)
         else:
-            raise ProcessException("Invalid response from remote process manager ({!r})".format(decoded_resp))
+            raise ProcessException(f"Invalid response from remote process manager ({decoded_resp!r})")
 
     def stop_process(self, pid: int) -> bool:
         """Request that the remote process management server stop a running process."""
@@ -193,7 +193,7 @@ class ProcessManagementClient:
         assert self._proc.stdout is not None
 
         # Send command to remote process management server.
-        cmd = "STOP {} {}".format(self._context_name, pid)
+        cmd = f"STOP {self._context_name} {pid}"
         self._proc.stdin.write(cmd.encode("ascii") + b"\n")
         self._proc.stdin.flush()
 
@@ -217,7 +217,7 @@ class ProcessManagementClient:
             msg = decoded_resp[4:].strip()
             raise ProcessException(msg)
         else:
-            raise ProcessException("Invalid response from remote process manager ({!r})".format(decoded_resp))
+            raise ProcessException(f"Invalid response from remote process manager ({decoded_resp!r})")
 
 
 def is_local_host(host: str) -> bool:
@@ -271,20 +271,20 @@ def start_local_process(context_name: str) -> int:
 
     # Check that the context exists in the configuration.
     if ctxcfg is None:
-        raise ProcessException("Unknown context '{}'".format(context_name))
+        raise ProcessException(f"Unknown context '{context_name}'")
 
     # Get program module and arguments from configuration.
     program_module = ctxcfg.program_module
     program_args = ctxcfg.program_args
     if not program_module:
-        raise ProcessException("No program module configured for context '{}'".format(context_name))
+        raise ProcessException(f"No program module configured for context '{context_name}'")
 
     # Extend PYTHONPATH if needed.
     environment = os.environ.copy()
     python_path = ctxcfg.python_path
     if python_path is not None:
         if not os.path.isdir(python_path):
-            raise ProcessException("PYTHONPATH is not a valid path for context {}".format(context_name))
+            raise ProcessException(f"PYTHONPATH is not a valid path for context '{context_name}'")
         environment["PYTHONPATH"] = python_path
 
     # Check if a virtual environment needs to be activated.
@@ -301,7 +301,7 @@ def start_local_process(context_name: str) -> int:
 
     # Check that a host is configured for this context.
     if not ctxcfg.host:
-        raise ProcessException("No host configured for context '{}'".format(context_name))
+        raise ProcessException(f"No host configured for context '{context_name}'")
 
     # Find the directory where output logs will be written.
     output_dir = cfg.process_management.output_dir
@@ -316,8 +316,7 @@ def start_local_process(context_name: str) -> int:
     try:
         output_file = open(output_file_name, "a")
     except OSError as exc:
-        raise ProcessException("Can not create output log file '{}' ({})".format(
-            output_file_name, str(exc)))
+        raise ProcessException(f"Can not create output log file '{output_file_name}' ({str(exc)})")
 
     # Start a new Python process to run the specified program.
     # Close standard input.
@@ -331,8 +330,7 @@ def start_local_process(context_name: str) -> int:
                                 start_new_session=True,
                                 env=environment)
     except (OSError, subprocess.SubprocessError) as exc:
-        raise ProcessException("Can not start program ({}: {})"
-                               .format(type(exc).__name__, str(exc)))
+        raise ProcessException(f"Can not start program ({type(exc).__name__}: {str(exc)})")
 
     # Close output log file in parent process.
     output_file.close()
@@ -341,7 +339,7 @@ def start_local_process(context_name: str) -> int:
     time.sleep(1)
     ret = proc.poll()
     if ret is not None:
-        raise ProcessException("Program started but already stopped (status={})".format(ret))
+        raise ProcessException(f"Program started but already stopped (status={ret})")
 
     # Workaround for a limitation in the Python subprocess module.
     # The subprocess module does not allow a Popen object to be destroyed
@@ -387,7 +385,7 @@ def stop_local_process(context_name: str, pid: int) -> bool:
             return False
     except psutil.Error as exc:
         # May happen in case of permission errors on Windows.
-        raise ProcessException("Can not check process status ({})".format(type(exc).__name__))
+        raise ProcessException(f"Can not check process status ({type(exc).__name__})")
 
     # Kill process.
     try:
@@ -398,7 +396,7 @@ def stop_local_process(context_name: str, pid: int) -> bool:
         return False
     except psutil.Error as exc:
         # May happen in case of permission error.
-        raise ProcessException("Can not kill process ({})".format(type(exc).__name__))
+        raise ProcessException(f"Can not kill process ({type(exc).__name__})")
 
     # Wait until process ends.
     try:
@@ -426,11 +424,11 @@ def start_process(context_name: str) -> int:
 
     # Check that the context exists in the configuration.
     if ctxcfg is None:
-        raise ProcessException("Unknown context '{}'".format(context_name))
+        raise ProcessException("Unknown context '{context_name}'")
 
     # Check that a host is configured for this context.
     if not ctxcfg.host:
-        raise ProcessException("No host configured for context '{}'".format(context_name))
+        raise ProcessException("No host configured for context '{context_name}'")
 
     if is_local_host(ctxcfg.host):
         # Apply local process management.
@@ -459,11 +457,11 @@ def stop_process(context_name: str, pid: int) -> bool:
 
     # Check that the context exists in the configuration.
     if ctxcfg is None:
-        raise ProcessException("Unknown context '{}'".format(context_name))
+        raise ProcessException("Unknown context '{context_name}'")
 
     # Check that a host is configured for this context.
     if not ctxcfg.host:
-        raise ProcessException("No host configured for context '{}'".format(context_name))
+        raise ProcessException("No host configured for context '{context_name}'")
 
     if is_local_host(ctxcfg.host):
         # Apply local process management.
@@ -667,10 +665,10 @@ def select_context_by_name(cfg: CfgQmi, context_name: str) -> List[str]:
     """
     # Return only the specified context.
     if context_name not in cfg.contexts:
-        raise QMI_ApplicationException("Unknown context name '{}'".format(context_name))
+        raise QMI_ApplicationException("Unknown context name '{context_name}'")
 
     if not is_valid_object_name(context_name):
-        raise QMI_ApplicationException("Invalid context name '{}'".format(context_name))
+        raise QMI_ApplicationException("Invalid context name '{context_name}'")
 
     return [context_name]
 
