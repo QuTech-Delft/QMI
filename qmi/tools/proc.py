@@ -99,6 +99,7 @@ class ProcessManagementClient:
         ctxcfg = cfg.contexts[context_name]
         venv_path = ctxcfg.virtualenv_path
         if venv_path is not None:
+            print(f"1{sys.platform=}")
             if sys.platform.startswith("win"):
                 executable_path = os.path.join(venv_path, "Scripts", "")
             else:
@@ -125,11 +126,12 @@ class ProcessManagementClient:
             self._proc: Popen = subprocess.Popen(
                 cmdline,
                 stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE)
+                stdout=subprocess.PIPE
+            )
         except (OSError, subprocess.SubprocessError) as exc:
             _logger.debug("Can not start SSH (%s: %s)", type(exc).__name__, str(exc))
-            raise ProcessException("Can not start SSH ({}: {})"
-                                   .format(type(exc).__name__, str(exc)))
+            raise ProcessException(f"Can not start SSH ({type(exc).__name__}: {str(exc)})")
+
         assert self._proc.stdin is not None
         assert self._proc.stdout is not None
 
@@ -288,6 +290,7 @@ def start_local_process(context_name: str) -> int:
     # Check if a virtual environment needs to be activated.
     venv_path = ctxcfg.virtualenv_path
     if venv_path is not None:
+        print(f"2{sys.platform=}")
         if sys.platform.startswith("win"):
             executable = os.path.join(venv_path, "Scripts", "python.exe")
         else:
