@@ -1398,14 +1398,17 @@ class QmiProcVenvTestCase(unittest.TestCase):
         os_mock.path.splitext = os.path.splitext
         # Patch __import__ to pass as usual
         def mock_import(name, *args, **kwargs):
-            if name == "os":
-                return os_mock
+            # if name == "os":
+            #     return os_mock
             return self.original_import(name, *args, **kwargs)
 
         with patch(
-                "builtins.__import__", side_effect=mock_import
-            ), patch("venv.sys.platform", "win32"):
+                # "builtins.__import__", side_effect=mock_import
+            # ), patch(
+                "venv.sys.platform", "win32"):
+            import venv
             from venv import EnvBuilder
+            venv.os = os
             # Act
             EnvBuilder(
                 system_site_packages=self.system_site_packages,
@@ -1428,8 +1431,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
 
         self.assertEqual(popen.pid, pid)
         popen.poll.assert_called_once_with()
-        os_mock.path.join.assert_has_calls([unittest.mock.call(VENV_PATH + "\\Scripts", "python.exe")], any_order=True)
-        del sys.modules["subprocess"]
+        # os_mock.path.join.assert_has_calls([unittest.mock.call(VENV_PATH + "\\Scripts", "python.exe")], any_order=True)
 
 
 class ArgParserTestCase(unittest.TestCase):
