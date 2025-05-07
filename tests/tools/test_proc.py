@@ -1374,38 +1374,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
         """Test start_local_process, with creating and specifying a virtual environment location,
         Windows environment."""
         # Arrange
-        os_mock = MagicMock(spec=os)
-        os_mock.name = "nt"
-        os_mock.path.abspath = Mock(return_value=VENV_PATH)
-        os_mock.path.islink = Mock(return_value=False)
-        os_mock.path.isfile = Mock(return_value=False)
-        os_mock.path.split = os.path.split
-        os_mock.path.join = Mock(side_effect=[
-            VENV_PATH + "\\pyenv.cfg",
-            VENV_PATH + "\\pyenv2.cfg",
-            VENV_PATH + "\\pyenv2.cfg",
-            VENV_PATH + "\\pyenv.cfg",
-            VENV_PATH + "\\pyenv2.cfg",
-            VENV_PATH + "\\pyenv2.cfg",
-            VENV_PATH + "\\pyenv2.cfg",] + [
-            VENV_PATH + "\\pyenv.cfg",
-            VENV_PATH + "\\pyenv.cfg",
-            VENV_PATH + "\\pyenv2.cfg",
-            VENV_PATH + "\\pyenv.cfg",
-        ] * 5)
-        os_mock.path.basename = os.path.basename
-        os_mock.path.dirname = os.path.dirname
-        os_mock.path.splitext = os.path.splitext
-        # Patch __import__ to pass as usual
-        def mock_import(name, *args, **kwargs):
-            # if name == "os":
-            #     return os_mock
-            return self.original_import(name, *args, **kwargs)
-
-        with patch(
-                # "builtins.__import__", side_effect=mock_import
-            # ), patch(
-                "venv.sys.platform", "win32"):
+        with patch("venv.sys.platform", "win32"):
             import venv
             from venv import EnvBuilder
             venv.os = os
@@ -1431,7 +1400,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
 
         self.assertEqual(popen.pid, pid)
         popen.poll.assert_called_once_with()
-        # os_mock.path.join.assert_has_calls([unittest.mock.call(VENV_PATH + "\\Scripts", "python.exe")], any_order=True)
+        self.assertTrue(os.path.isfile(os.path.join(VENV_PATH + "\\Scripts", "python.exe")))
 
 
 class ArgParserTestCase(unittest.TestCase):
