@@ -1359,7 +1359,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
             popen.pid = 0
             popen.poll = MagicMock(return_value=None)
             with patch("qmi.core.context.pathlib", autospec=pathlib) as pathlib_patch:
-                pathlib_patch.Path.home.return_value = os.path.join(VENV_PATH)
+                pathlib_patch.Path.home.return_value = VENV_PATH
                 with patch("qmi.tools.proc.Popen.poll", return_value=None):
                     pid = proc.start_local_process(self.context_name)
 
@@ -1368,7 +1368,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
         os_mock.symlink.assert_called_once_with(sys.executable, VENV_PATH + "/pyenv.cfg")
         del sys.modules["subprocess"]
 
-    @unittest.mock.patch("qmi.tools.proc.sys.platform", "win32")
+    # @unittest.mock.patch("qmi.tools.proc.sys.platform", "win32")
     def test_start_local_process_winvenv(self):
         """Test start_local_process, with creating and specifying a virtual environment location,
         Windows environment."""
@@ -1410,7 +1410,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
                 upgrade=False,
                 with_pip=False,
             ).create(VENV_PATH)
-            del sys.modules["venv"]
+            # del sys.modules["venv"]
 
         with patch(
             "qmi.tools.proc.subprocess.Popen",
@@ -1419,8 +1419,10 @@ class QmiProcVenvTestCase(unittest.TestCase):
             popen.poll = MagicMock(return_value=None)
             popen.pid = 0
             with patch("qmi.core.context.pathlib", autospec=pathlib) as pathlib_patch:
-                pathlib_patch.Path.home.return_value = os.path.join(VENV_PATH)
-                with patch("qmi.tools.proc.Popen.poll", return_value=None):
+                pathlib_patch.Path.home.return_value = VENV_PATH
+                with patch(
+                        "qmi.tools.proc.Popen.poll", return_value=None
+                ), patch("qmi.tools.proc.sys.platform", "win32"):
                     pid = proc.start_local_process(self.context_name)
 
         self.assertEqual(popen.pid, pid)

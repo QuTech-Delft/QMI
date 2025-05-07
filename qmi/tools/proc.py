@@ -14,7 +14,7 @@ import subprocess
 from subprocess import Popen
 import time
 
-from typing import Callable, List, NamedTuple, Optional, Tuple
+from typing import Callable, NamedTuple
 
 import colorama
 import psutil
@@ -258,9 +258,14 @@ def is_local_host(host: str) -> bool:
 def start_local_process(context_name: str) -> int:
     """Start the specified process on the local computer.
 
-    :param context_name: Context to be started.
-    :return: Process ID of the newly started process.
-    :raises ProcessException: If the process can not be started.
+    Parameters:
+        context_name: Context to be started.
+
+    Returns:
+        Process ID of the newly started process.
+
+    Raises:
+        ProcessException: If the process can not be started.
     """
 
     _logger.debug("Starting local process for context %s", context_name)
@@ -362,10 +367,16 @@ def start_local_process(context_name: str) -> int:
 def stop_local_process(context_name: str, pid: int) -> bool:
     """Stop the specified process on the local computer.
 
-    :param context_name: Context to be stopped.
-    :param pid: Process ID.
-    :return: True if the process was stopped; False if the process was not running.
-    :raises ProcessException: If the process can not be stopped.
+    Parameters:
+        context_name: Context to be stopped.
+        pid:          Process ID.
+
+    Returns:
+        True:  If the process was stopped;
+        False: If the process was not running.
+
+    Raises:
+         ProcessException: If the process can not be stopped.
     """
 
     _logger.debug("Stopping local process for context %s (PID=%d)", context_name, pid)
@@ -402,9 +413,9 @@ def stop_local_process(context_name: str, pid: int) -> bool:
     try:
         proc.wait(timeout=2)
         if proc.is_running():
-            raise ProcessException("Process killed but still running (pid={})".format(proc.pid))
+            raise ProcessException(f"Process killed but still running (pid={proc.pid})")
     except psutil.Error as exc:
-        raise ProcessException("Can not check process status ({})".format(type(exc).__name__))
+        raise ProcessException(f"Can not check process status ({type(exc).__name__})")
 
     # Process successfully stopped.
     return True
@@ -413,9 +424,14 @@ def stop_local_process(context_name: str, pid: int) -> bool:
 def start_process(context_name: str) -> int:
     """Start the specified process on a local or remote computer.
 
-    :param context_name: Context to be started.
-    :return: Process ID of the newly started process.
-    :raises ProcessException: If the process can not be started.
+    Parameters:
+        context_name: Context to be started.
+
+    Returns:
+        pid: Process ID of the newly started process.
+
+    Raises:
+         ProcessException: If the process can not be started.
     """
 
     # Get context info from QMI configuration.
@@ -424,11 +440,11 @@ def start_process(context_name: str) -> int:
 
     # Check that the context exists in the configuration.
     if ctxcfg is None:
-        raise ProcessException("Unknown context '{context_name}'")
+        raise ProcessException(f"Unknown context '{context_name}'")
 
     # Check that a host is configured for this context.
     if not ctxcfg.host:
-        raise ProcessException("No host configured for context '{context_name}'")
+        raise ProcessException(f"No host configured for context '{context_name}'")
 
     if is_local_host(ctxcfg.host):
         # Apply local process management.
@@ -445,10 +461,16 @@ def start_process(context_name: str) -> int:
 def stop_process(context_name: str, pid: int) -> bool:
     """Stop the specified process on a local or remote computer.
 
-    :param context_name: Context to be stopped.
-    :param pid: Process ID.
-    :return: True if the process was stopped; False if the process was not running.
-    :raises ProcessException: If the process can not be stopped.
+    Parameters:
+        context_name: Context to be stopped.
+        pid:          Process ID.
+
+    Returns:
+        True:  If the process was stopped;
+        False: If the process was not running.
+
+    Raises:
+         ProcessException: If the process can not be stopped.
     """
 
     # Get context info from QMI configuration.
@@ -457,11 +479,11 @@ def stop_process(context_name: str, pid: int) -> bool:
 
     # Check that the context exists in the configuration.
     if ctxcfg is None:
-        raise ProcessException("Unknown context '{context_name}'")
+        raise ProcessException(f"Unknown context '{context_name}'")
 
     # Check that a host is configured for this context.
     if not ctxcfg.host:
-        raise ProcessException("No host configured for context '{context_name}'")
+        raise ProcessException(f"No host configured for context '{context_name}'")
 
     if is_local_host(ctxcfg.host):
         # Apply local process management.
@@ -475,13 +497,18 @@ def stop_process(context_name: str, pid: int) -> bool:
             client.close()
 
 
-def get_context_status(context_name: str) -> Tuple[int, str]:
+def get_context_status(context_name: str) -> tuple[int, str]:
     """Check whether context is responding via TCP.
 
-    :param context_name: Name of the context to be tested.
-    :return: A tuple containing the process ID of the Python program containing the context, or -1 if the context is
-        not responding via TCP. And the QMI version number of the newly created context.
-    :raises ProcessException: If an error occurs.
+    Parameters:
+         context_name: Name of the context to be tested.
+
+    Returns:
+        (pip, ver): A tuple containing the process ID of the Python program containing the context, or -1 if the
+                    context is not responding via TCP. And the QMI version number of the newly created context.
+
+    Raises:
+        ProcessException: If an error occurs.
     """
 
     # Get context info from QMI configuration.
@@ -491,7 +518,7 @@ def get_context_status(context_name: str) -> Tuple[int, str]:
     # Check that the context is configured to support TCP connections.
     if (not ctxcfg.host) or (not ctxcfg.tcp_server_port):
         # Context does not support TCP connections.
-        raise ProcessException("Context {} does not support TCP connections".format(context_name))
+        raise ProcessException(f"Context {context_name} does not support TCP connections")
 
     # Try to connect to the context.
     peer_addr = format_address_and_port((ctxcfg.host, ctxcfg.tcp_server_port))
@@ -508,7 +535,7 @@ def get_context_status(context_name: str) -> Tuple[int, str]:
     except QMI_Exception as exc:
         # Unexpected error while connecting to context (bad handshake, etc.).
         _logger.debug("Protocol error from context %r (%s: %s)", context_name, type(exc).__name__, str(exc))
-        raise ProcessException("Protocol error from context {}".format(context_name))
+        raise ProcessException(f"Protocol error from context '{context_name}'")
 
     # Successfully connected to peer context.
     # Get a proxy for the remote ContextInfo object.
@@ -521,7 +548,7 @@ def get_context_status(context_name: str) -> Tuple[int, str]:
         # Unexpected error
         _logger.debug("Error in get_pid() call to context %r (%s: %s)",
                       context_name, type(exc).__name__, str(exc))
-        raise ProcessException("Can not get PID of context {}".format(context_name))
+        raise ProcessException(f"Can not get PID of context '{context_name}'")
 
     # Get peer QMI version
     ver = proxy.get_version()
@@ -543,15 +570,21 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
     If that does not work, send a hard shutdown request and wait until
     the context goes away. If that does not work, give up and report failure.
 
-    :param context_name: Context to shut down.
-    :param progressfn: Callback function to report progress message.
-    :return: Tuple (responding, pid, success).
-    :raises ProcessException: If an error occurs.
+    Parameters:
+        context_name: Context to shut down.
+        progressfn:   Callback function to report progress message.
+
+    Returns:
+        ShutdownResult: Instance with values responding, pid, success.
+
+    Raises:
+         ProcessException: If an error occurs.
     """
     def wait_disappear() -> bool:
         """Wait for a context to disappear.
 
-        :return: Boolean to tell if context disappeared (True) or not (False).
+        Returns:
+             Boolean to tell if context disappeared (True) or not (False).
         """
         t = 0.0
         while t < CONTEXT_SHUTDOWN_TIMEOUT:
@@ -570,7 +603,7 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
 
     # Check that the context is configured to support TCP connections.
     if (not ctxcfg.host) or (not ctxcfg.tcp_server_port):
-        raise ProcessException("Context {} does not support TCP connections".format(context_name))
+        raise ProcessException(f"Context '{context_name}' does not support TCP connections")
 
     # Supress warning for shutdown
     qmi.context().suppress_version_mismatch_warnings = True
@@ -587,7 +620,7 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
     except QMI_Exception as exc:
         # Unexpected error while connecting to context (bad handshake, etc.).
         _logger.debug("Protocol error from context %r (%s: %s)", context_name, type(exc).__name__, str(exc))
-        raise ProcessException("Protocol error from context {}".format(context_name))
+        raise ProcessException(f"Protocol error from context '{context_name}'")
 
     try:
         # Successfully connected to peer context and received handshake.
@@ -601,7 +634,7 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
             # Unexpected error
             _logger.debug("Error in get_pid() call to context %r (%s: %s)",
                           context_name, type(exc).__name__, str(exc))
-            raise ProcessException("Can not get PID of context {}".format(context_name))
+            raise ProcessException(f"Can not get PID of context '{context_name}'")
 
         # Send soft shutdown request.
         progressfn("soft shutdown")
@@ -617,7 +650,7 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
             # Unexpected error
             _logger.debug("Error in soft shutdown to context %r (%s: %s)",
                           context_name, type(exc).__name__, str(exc))
-            raise ProcessException("Error in soft shutdown to context {}".format(context_name))
+            raise ProcessException(f"Error in soft shutdown to context '{context_name}'")
 
         # Wait until context disappears.
         if wait_disappear():
@@ -650,30 +683,30 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
             pass  # apparently already disconnected
 
 
-def select_context_by_name(cfg: CfgQmi, context_name: str) -> List[str]:
+def select_context_by_name(cfg: CfgQmi, context_name: str) -> list[str]:
     """Return input the context name in a list if it is valid.
 
     Parameters:
-        cfg: The current QMI configuration.
+        cfg:          The current QMI configuration.
         context_name: The name of the context to validate.
 
     Raises:
         QMI_ApplicationException: If context name is not within known contexts or name is invalid.
 
     Returns:
-        The input context name in a list.
+        list: The input context name in a list.
     """
     # Return only the specified context.
     if context_name not in cfg.contexts:
-        raise QMI_ApplicationException("Unknown context name '{context_name}'")
+        raise QMI_ApplicationException(f"Unknown context name '{context_name}'")
 
     if not is_valid_object_name(context_name):
-        raise QMI_ApplicationException("Invalid context name '{context_name}'")
+        raise QMI_ApplicationException(f"Invalid context name '{context_name}'")
 
     return [context_name]
 
 
-def select_contexts(cfg: CfgQmi) -> List[str]:
+def select_contexts(cfg: CfgQmi) -> list[str]:
     """Return a list of all applicable context names.
 
     Parameters:
@@ -683,7 +716,7 @@ def select_contexts(cfg: CfgQmi) -> List[str]:
         QMI_ApplicationException: If no contexts are enabled in the configuration, or name is invalid.
 
     Returns:
-        All context names as a list.
+        context_names: All context names as a list.
     """
     context_names = []
 
@@ -699,12 +732,12 @@ def select_contexts(cfg: CfgQmi) -> List[str]:
     # handle context names containing whitespace or non-ASCII characters.
     for ctxname in context_names:
         if not is_valid_object_name(ctxname):
-            raise QMI_ApplicationException("Invalid context name '{}'".format(ctxname))
+            raise QMI_ApplicationException(f"Invalid context name '{ctxname}'")
 
     return context_names
 
 
-def select_local_contexts(cfg: CfgQmi) -> List[str]:
+def select_local_contexts(cfg: CfgQmi) -> list[str]:
     """Return a list of all applicable local context names.
 
     Parameters:
@@ -731,7 +764,7 @@ def select_local_contexts(cfg: CfgQmi) -> List[str]:
     # handle context names containing whitespace or non-ASCII characters.
     for ctxname in context_names:
         if not is_valid_object_name(ctxname):
-            raise QMI_ApplicationException("Invalid context name '{}'".format(ctxname))
+            raise QMI_ApplicationException(f"Invalid context name '{ctxname}'")
 
     return context_names
 
@@ -753,10 +786,10 @@ def proc_server(cfg: CfgQmi) -> int:
 
     Raises:
         ProcessException: If process is unknown or should not run on this host.
-        ValueError: By invalid command.
+        ValueError:       By invalid command.
 
     Returns:
-        Exit status (0 = success).
+        Exit status: (0 = success).
     """
 
     _logger.debug("Running qmi_proc in server mode")
@@ -794,7 +827,7 @@ def proc_server(cfg: CfgQmi) -> int:
                 pid = start_local_process(context_name)
 
                 # Report result.
-                print("OK {}".format(pid))
+                print(f"OK {pid}")
                 sys.stdout.flush()
 
             elif len(words) == 3 and words[0] == "STOP":
@@ -819,7 +852,7 @@ def proc_server(cfg: CfgQmi) -> int:
                 result = stop_local_process(context_name, pid)
 
                 # Report result.
-                print("OK {}".format(int(result)))
+                print(f"OK {int(result)}")
                 sys.stdout.flush()
 
             else:
@@ -828,7 +861,7 @@ def proc_server(cfg: CfgQmi) -> int:
         except ProcessException as exc:
             # Error occurred while processing command.
             # Report error and continue to next command.
-            print("ERR {}".format(exc))
+            print(f"ERR {exc}")
             sys.stdout.flush()
 
         except ValueError:
@@ -843,7 +876,7 @@ def proc_server(cfg: CfgQmi) -> int:
     return ret
 
 
-def proc_start(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
+def proc_start(cfg: CfgQmi, context_name: str | None, local: bool) -> int:
     """Start one or more processes.
 
     Parameters:
@@ -892,7 +925,7 @@ def proc_start(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
                 # We can not really do anything about that, so just try to start it and hope for the best.
                 show_progress_msg("starting")
                 pid = start_process(context_name)
-                show_progress_msg("started PID={}".format(pid))
+                show_progress_msg(f"started PID={pid}")
 
                 # Check that newly started process responds via TCP.
                 time.sleep(0.5)
@@ -911,12 +944,13 @@ def proc_start(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
                     print("not responding via TCP", failed_str)
                     ret = 1
                 else:
-                    raise ProcessException("New process (PID={}) for context {} reports unexpected PID={}"
-                                           .format(pid, context_name, status_pid))
+                    raise ProcessException(
+                        f"New process (PID={pid}) for context {context_name} reports unexpected PID={status_pid}"
+                    )
 
         except ProcessException as exc:
             print(failed_str)
-            print("ERROR: {}".format(exc), file=sys.stderr)
+            print(f"ERROR: {exc}", file=sys.stderr)
             ret = 1
 
     print()
@@ -925,7 +959,7 @@ def proc_start(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
     return ret
 
 
-def proc_stop(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
+def proc_stop(cfg: CfgQmi, context_name: str | None, local: bool) -> int:
     """Stop one or more running processes.
 
     Parameters:
@@ -958,7 +992,7 @@ def proc_stop(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
     # Process each applicable context. Stop should happen in inverse order to start, in case of dependencies.
     for context_name in reversed(context_names):
         # Show process name.
-        print("    {:30s}:".format(context_name), end=" ")
+        print(f"    {context_name:30s}:", end=" ")
         sys.stdout.flush()
 
         try:
@@ -982,7 +1016,7 @@ def proc_stop(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
 
         except ProcessException as exc:
             print(failed_str)
-            print("ERROR: {}".format(exc), file=sys.stderr)
+            print(f"ERROR: {exc}", file=sys.stderr)
             ret = 1
 
     print()
@@ -991,7 +1025,7 @@ def proc_stop(cfg: CfgQmi, context_name: Optional[str], local: bool) -> int:
     return ret
 
 
-def proc_status(cfg: CfgQmi, context_name: Optional[str]) -> int:
+def proc_status(cfg: CfgQmi, context_name: str | None) -> int:
     """Show the status of one or more processes.
 
     Parameters:
@@ -1031,12 +1065,12 @@ def proc_status(cfg: CfgQmi, context_name: Optional[str]) -> int:
             pid, ver = get_context_status(context_name)
             # Print process status
             if pid >= 0:
-                print(running_str, "responding via TCP (PID={}, QMI={})".format(pid, ver))
+                print(running_str, f"responding via TCP (PID={pid}, QMI={ver})")
             else:
                 print(offline_str, "not responding via TCP")
         except ProcessException as exc:
             print()
-            print("ERROR: {}".format(exc), file=sys.stderr)
+            print(f"ERROR: {exc}", file=sys.stderr)
             ret = 1
 
     print()
@@ -1048,7 +1082,8 @@ def proc_status(cfg: CfgQmi, context_name: Optional[str]) -> int:
 def main() -> int:
     """Main routine of QMI process manager.
 
-    :return: 0 in case of success; exit status in case of error.
+    Returns:
+         0 in case of success; exit status in case of error.
     """
     parser = argparse.ArgumentParser()
     parser.description = """This tool starts or stops background QMI processes.
@@ -1106,7 +1141,7 @@ def main() -> int:
             return proc_status(cfg=cfg, context_name=args.context_name)
 
         else:
-            print("ERROR: Unknown command {!r}".format(args.command), file=sys.stderr)
+            print(f"ERROR: Unknown command {args.command!r}", file=sys.stderr)
             return 1
 
     except QMI_ApplicationException as exc:
