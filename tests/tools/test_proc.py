@@ -1375,10 +1375,18 @@ class QmiProcVenvTestCase(unittest.TestCase):
         """Test start_local_process, with creating and specifying a virtual environment location,
         Windows environment."""
         # Arrange
+        os_mock = MagicMock(spec=os)
+        os_mock.name = "nt"
+        os_mock.path = os.path
+        # Patch __import__ to raise error
+        def mock_import(name, *args, **kwargs):
+            if name == "os":
+                return os_mock
+            return self.original_import(name, *args, **kwargs)
+
         with patch(
-            "venv.sys.platform", "win32"), patch(
-            "os.name", "nt"
-        ):
+                "builtins.__import__", side_effect=mock_import
+            ), patch("venv.sys.platform", "win32"):
             import venv
             from venv import EnvBuilder
             venv.os = os
