@@ -1378,6 +1378,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
             import venv
             from venv import EnvBuilder
             venv.os = os
+            venv.os.name = "nt"
             # Act
             EnvBuilder(
                 system_site_packages=self.system_site_packages,
@@ -1400,7 +1401,8 @@ class QmiProcVenvTestCase(unittest.TestCase):
 
         self.assertEqual(popen.pid, pid)
         popen.poll.assert_called_once_with()
-        self.assertTrue(os.path.isdir(os.path.join(VENV_PATH + "Scripts")))
+        print(os.listdir(VENV_PATH))
+        self.assertTrue(os.path.isdir(os.path.join(VENV_PATH, "Scripts")))
 
 
 class ArgParserTestCase(unittest.TestCase):
