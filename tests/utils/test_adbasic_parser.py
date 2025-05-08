@@ -80,12 +80,18 @@ def write_source_file(tempdir, fn, content):
 
 class TestAdbasicParser(unittest.TestCase):
 
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory(prefix="qmitest")
+        self.tempdir_name = self.tempdir.name
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+
     def test_parse_symbols(self):
 
-        with tempfile.TemporaryDirectory(prefix="qmitest") as tempdir:
-            write_source_files(tempdir)
-            filename = os.path.join(tempdir, TEST_PROGRAM_FILE)
-            symbols = parse_adbasic_program(filename, tempdir)
+        write_source_files(self.tempdir_name)
+        filename = os.path.join(self.tempdir_name, TEST_PROGRAM_FILE)
+        symbols = parse_adbasic_program(filename, self.tempdir_name)
 
         expect_symbols = [
             (TEST_PROGRAM_FILE, 7, "Pi", "3.14159"),
@@ -104,7 +110,7 @@ class TestAdbasicParser(unittest.TestCase):
 
         for (symbol, expect) in zip(symbols, expect_symbols):
             file_path = symbol.filename.replace("\\", "/").replace("/./", "/")
-            expect_dir = tempdir.replace("\\", "/") + "/"
+            expect_dir = self.tempdir_name.replace("\\", "/") + "/"
             self.assertEqual(file_path, expect_dir + expect[0])
             if expect[1] is not None:
                 self.assertEqual(symbol.line_nr, expect[1])
@@ -115,14 +121,13 @@ class TestAdbasicParser(unittest.TestCase):
     def test_parse_symbols_no_dots(self):
         """Test the path is returned into a subfolder if no dots present."""
         global TEST_PROGRAM
-        with tempfile.TemporaryDirectory(prefix="qmitest") as tempdir:
-            TEST_PROGRAM = TEST_PROGRAM.replace(".\\", "subfolder\\")
-            write_source_files(tempdir)
-            subdir = os.path.join(tempdir, "subfolder")
-            os.mkdir(subdir)
-            write_source_file(subdir, TEST_INCLUDE_FILE, TEST_INCLUDE)
-            filename = os.path.join(tempdir, TEST_PROGRAM_FILE)
-            symbols = parse_adbasic_program(filename, tempdir)
+        TEST_PROGRAM = TEST_PROGRAM.replace(".\\", "subfolder\\")
+        write_source_files(self.tempdir_name)
+        subdir = os.path.join(self.tempdir_name, "subfolder")
+        os.mkdir(subdir)
+        write_source_file(subdir, TEST_INCLUDE_FILE, TEST_INCLUDE)
+        filename = os.path.join(self.tempdir_name, TEST_PROGRAM_FILE)
+        symbols = parse_adbasic_program(filename, self.tempdir_name)
 
         expect_symbols = [
             (TEST_PROGRAM_FILE, 7, "Pi", "3.14159"),
@@ -140,7 +145,7 @@ class TestAdbasicParser(unittest.TestCase):
 
         for (symbol, expect) in zip(symbols, expect_symbols):
             file_path = symbol.filename.replace("\\", "/").replace("/./", "/")
-            expect_dir = tempdir.replace("\\", "/") + "/"
+            expect_dir = self.tempdir_name.replace("\\", "/") + "/"
             self.assertEqual(file_path, expect_dir + expect[0])
             if expect[1] is not None:
                 self.assertEqual(symbol.line_nr, expect[1])
@@ -162,10 +167,9 @@ class TestAdbasicParser(unittest.TestCase):
             ("params", 10),
             ("result", 11)
         ]
-        with tempfile.TemporaryDirectory(prefix="qmitest") as tempdir:
-            write_source_files(tempdir)
-            filename = os.path.join(tempdir, TEST_PROGRAM_FILE)
-            symbols = parse_adbasic_program(filename, tempdir)
+        write_source_files(self.tempdir_name)
+        filename = os.path.join(self.tempdir_name, TEST_PROGRAM_FILE)
+        symbols = parse_adbasic_program(filename, self.tempdir_name)
 
         # Act
         param_info = analyze_parameter_info(symbols)
