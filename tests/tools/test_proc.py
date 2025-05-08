@@ -1378,6 +1378,12 @@ class QmiProcVenvTestCase(unittest.TestCase):
         os_mock = MagicMock(spec=os)
         os_mock.name = "nt"
         os_mock.path = os.path
+        os_mock.listdir = os.listdir
+        os_mock.getcwd = os.getcwd
+        os_mock.remove = os.remove
+        os_mock.makedirs = os.makedirs
+        os_mock.pathsep = os.pathsep
+        os_mock.fspath = os.fspath
         # Patch __import__ to raise error
         def mock_import(name, *args, **kwargs):
             if name == "os":
