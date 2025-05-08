@@ -1378,7 +1378,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
             import venv
             from venv import EnvBuilder
             venv.os = os
-            venv.os.name = "nt"
+            # venv.os.name = "nt"
             # Act
             EnvBuilder(
                 system_site_packages=self.system_site_packages,
