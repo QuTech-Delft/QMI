@@ -1368,6 +1368,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
         popen.poll.assert_called_once_with()
         os_mock.symlink.assert_called_once_with(sys.executable, VENV_PATH + "/pyenv.cfg")
         del sys.modules["subprocess"]
+        del sys.modules["venv"]
 
     @unittest.mock.patch("sys.platform", "win32")
     def test_start_local_process_winvenv(self):
@@ -1376,7 +1377,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
         # Arrange
         with patch(
             "venv.sys.platform", "win32"), patch(
-            "venv.os.name", "nt"
+            "os.name", "nt"
         ):
             import venv
             from venv import EnvBuilder
@@ -1405,6 +1406,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
         popen.poll.assert_called_once_with()
         print(os.listdir(VENV_PATH))
         self.assertTrue(os.path.isdir(os.path.join(VENV_PATH, "Scripts")))
+        del sys.modules["venv"]
 
 
 class ArgParserTestCase(unittest.TestCase):
