@@ -1389,7 +1389,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
             ), patch("venv.sys.platform", "win32"):
             import venv
             from venv import EnvBuilder
-            venv.os = os
+            venv.os = os_mock
             # Act
             EnvBuilder(
                 system_site_packages=self.system_site_packages,
