@@ -1374,11 +1374,13 @@ class QmiProcVenvTestCase(unittest.TestCase):
         """Test start_local_process, with creating and specifying a virtual environment location,
         Windows environment."""
         # Arrange
-        with patch("venv.sys.platform", "win32"):
+        with patch(
+            "venv.sys.platform", "win32"), patch(
+            "venv.os.name", "nt"
+        ):
             import venv
             from venv import EnvBuilder
             venv.os = os
-            # venv.os.name = "nt"
             # Act
             EnvBuilder(
                 system_site_packages=self.system_site_packages,
