@@ -69,12 +69,6 @@ CONTEXT_CFG_VENV = {
 }
 
 
-def _start_qmi_context(context_name, context_cfg):
-    """Start qmi and initialize the context with a configuration. Returns the configuration."""
-    qmi.start(context_name, context_cfg=context_cfg)
-    return {"config": CONFIG, "config0": CONFIG0}
-
-
 def _build_mock_config(extra=False):
     context = QMI_Context
     qmi.context = context
@@ -93,57 +87,21 @@ def _build_mock_config(extra=False):
     return context, config, ctxcfg1
 
 
-# class CustomLinuxEnvBuilder(venv.EnvBuilder):
-#     def ensure_directories(self, env_dir):
-#         context = super().ensure_directories(env_dir)
-#         # Override bin path to 'bin' even on Windows
-#         context.bin_name = "bin"
-#         context.bin_path = pathlib.Path(env_dir) / "bin"
-#         os.makedirs(context.bin_path, exist_ok=True)
-#         if os.path.isdir(pathlib.Path(env_dir) / "Scripts"):
-#             rmtree(pathlib.Path(env_dir) / "Scripts")
-#         return context
-#
-#
-# class CustomWinEnvBuilder(venv.EnvBuilder):
-#     def ensure_directories(self, env_dir):
-#         context = super().ensure_directories(env_dir)
-#         # Override bin path to 'Scripts' even on POSIX
-#         context.bin_name = "Scripts"
-#         context.bin_path = pathlib.Path(env_dir) / "Scripts"
-#         os.makedirs(context.bin_path, exist_ok=True)
-#         if os.path.isdir(pathlib.Path(env_dir) / "bin"):
-#             rmtree(pathlib.Path(env_dir) / "bin")
-#         return context
-#
-#
-
-# context = super().ensure_directories(env_dir)
-#         # Override bin path to 'bin' even on Windows
-#         context.bin_name = "bin"
-#         context.bin_path = pathlib.Path(env_dir) / "bin"
-#         os.makedirs(context.bin_path, exist_ok=True)
-#         if os.path.isdir(pathlib.Path(env_dir) / "Scripts"):
-#             rmtree(pathlib.Path(env_dir) / "Scripts")
-#         return context
-
-
 class ProcessManagementClientTestCase(unittest.TestCase):
 
     def setUp(self):
         proc.subprocess = MagicMock(spec=subprocess)
         proc.subprocess.SubprocessError = subprocess.SubprocessError
         proc.open = MagicMock()
-        self._config = _start_qmi_context("ContextName2", CONTEXT_CFG)
+        self._config = {"config": CONFIG, "config0": CONFIG0}
         proc.print = MagicMock()
         proc._logger = MagicMock()
 
-    def tearDown(self):
-        qmi.stop()
-
     def test_pmc_init(self):
         """Test ProcessManagementClient.__init__, happy flow, configuration parameters."""
-        with patch("qmi.tools.proc.qmi.context", MagicMock()) as patcher:
+        with patch(
+            "qmi.tools.proc.qmi") as qmi_mock, patch(
+            "qmi.tools.proc.qmi.context", MagicMock()) as patcher:
             context, _, _ = _build_mock_config()
             context._config = CfgQmi(
                 contexts={
@@ -161,7 +119,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
                     }
                 ),
             )
-            context.get_config = MagicMock(return_value=context._config)
+            QMI_Context.get_config = MagicMock(return_value=context._config)
+            qmi_mock.context = QMI_Context
             proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
             proc.subprocess.Popen.assert_called_once_with(
                 [
@@ -223,19 +182,32 @@ class ProcessManagementClientTestCase(unittest.TestCase):
 
     def test_pmc_close(self):
         """Test ProcessManagementClient.close, happy flow."""
-        manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
-        manager.close()
-        manager._proc.stdin.close.assert_called_once_with()
-        manager._proc.stdout.close.assert_called_once_with()
-        manager._proc.wait.assert_called_once_with(timeout=2)
+        with patch("qmi.tools.proc.qmi") as qmi_mock:
+            _config = CfgQmi()
+            for key in CONTEXT_CFG.keys():
+                _config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG[key], CfgContext)})
+
+            QMI_Context.get_config = MagicMock(return_value=_config)
+            qmi_mock.context = QMI_Context
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
+            manager.close()
+            manager._proc.stdin.close.assert_called_once_with()
+            manager._proc.stdout.close.assert_called_once_with()
+            manager._proc.wait.assert_called_once_with(timeout=2)
 
     def test_pmc_close_timeout(self):
         """Test whether ProcessManagementClient.close kills the process when a timeout happened."""
-        manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
-        with patch("qmi.tools.proc.qmi.context", MagicMock()), patch.object(
-            manager._proc, "wait", side_effect=TimeoutError
-        ):
-            manager.close()
+        with patch("qmi.tools.proc.qmi") as qmi_mock:
+            _config = CfgQmi()
+            for key in CONTEXT_CFG.keys():
+                _config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG[key], CfgContext)})
+
+            QMI_Context.get_config = MagicMock(return_value=_config)
+            qmi_mock.context = QMI_Context
+
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
+            with patch.object(manager._proc, "wait", side_effect=TimeoutError):
+                manager.close()
 
         manager._proc.kill.assert_called_once_with()
 
