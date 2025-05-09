@@ -6,17 +6,10 @@ import logging
 import psutil
 import os
 import sys
-import pathlib
-from shutil import rmtree
 import socket
 import subprocess
-import sysconfig
 import unittest
 from unittest.mock import Mock, MagicMock, patch, call
-try:
-    from . import _posixsubprocess_mock as _posixsubprocess
-except ImportError:
-    import _posixsubprocess_mock as _posixsubprocess
 
 import qmi
 from qmi.core.config_defs import CfgQmi
@@ -26,7 +19,6 @@ from qmi.core.config_defs import CfgProcessHost
 from qmi.core.config_struct import config_struct_from_dict
 from qmi.core.exceptions import QMI_ApplicationException
 import qmi.tools.proc as proc
-import venv
 
 from tests.patcher import PatcherQmiContext as QMI_Context
 from tests.patcher import PatcherQmiRpcProxy as QMI_RpcProxy
@@ -101,28 +93,39 @@ def _build_mock_config(extra=False):
     return context, config, ctxcfg1
 
 
-class CustomLinuxEnvBuilder(venv.EnvBuilder):
-    def ensure_directories(self, env_dir):
-        context = super().ensure_directories(env_dir)
-        # Override bin path to 'bin' even on Windows
-        context.bin_name = "bin"
-        context.bin_path = pathlib.Path(env_dir) / "bin"
-        os.makedirs(context.bin_path, exist_ok=True)
-        if os.path.isdir(pathlib.Path(env_dir) / "Scripts"):
-            rmtree(pathlib.Path(env_dir) / "Scripts")
-        return context
+# class CustomLinuxEnvBuilder(venv.EnvBuilder):
+#     def ensure_directories(self, env_dir):
+#         context = super().ensure_directories(env_dir)
+#         # Override bin path to 'bin' even on Windows
+#         context.bin_name = "bin"
+#         context.bin_path = pathlib.Path(env_dir) / "bin"
+#         os.makedirs(context.bin_path, exist_ok=True)
+#         if os.path.isdir(pathlib.Path(env_dir) / "Scripts"):
+#             rmtree(pathlib.Path(env_dir) / "Scripts")
+#         return context
+#
+#
+# class CustomWinEnvBuilder(venv.EnvBuilder):
+#     def ensure_directories(self, env_dir):
+#         context = super().ensure_directories(env_dir)
+#         # Override bin path to 'Scripts' even on POSIX
+#         context.bin_name = "Scripts"
+#         context.bin_path = pathlib.Path(env_dir) / "Scripts"
+#         os.makedirs(context.bin_path, exist_ok=True)
+#         if os.path.isdir(pathlib.Path(env_dir) / "bin"):
+#             rmtree(pathlib.Path(env_dir) / "bin")
+#         return context
+#
+#
 
-
-class CustomWinEnvBuilder(venv.EnvBuilder):
-    def ensure_directories(self, env_dir):
-        context = super().ensure_directories(env_dir)
-        # Override bin path to 'Scripts' even on POSIX
-        context.bin_name = "Scripts"
-        context.bin_path = pathlib.Path(env_dir) / "Scripts"
-        os.makedirs(context.bin_path, exist_ok=True)
-        if os.path.isdir(pathlib.Path(env_dir) / "bin"):
-            rmtree(pathlib.Path(env_dir) / "bin")
-        return context
+# context = super().ensure_directories(env_dir)
+#         # Override bin path to 'bin' even on Windows
+#         context.bin_name = "bin"
+#         context.bin_path = pathlib.Path(env_dir) / "bin"
+#         os.makedirs(context.bin_path, exist_ok=True)
+#         if os.path.isdir(pathlib.Path(env_dir) / "Scripts"):
+#             rmtree(pathlib.Path(env_dir) / "Scripts")
+#         return context
 
 
 class ProcessManagementClientTestCase(unittest.TestCase):
@@ -1323,100 +1326,82 @@ class QmiProcMethodsTestCase(unittest.TestCase):
 class QmiProcVenvTestCase(unittest.TestCase):
 
     def setUp(self):
-        if not os.path.isdir(VENV_PATH):
-            os.makedirs(VENV_PATH)
-
-        self.system_site_packages = sysconfig.get_paths()["purelib"]
         self.context_name = "ContextName"
-        config = CfgQmi()
+        self._config = CfgQmi()
         for key in CONTEXT_CFG_VENV.keys():
-            config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG_VENV[key], CfgContext)})
+            self._config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG_VENV[key], CfgContext)})
 
-        QMI_Context.get_config = MagicMock(return_value=config)
-
-    def tearDown(self):
-        rmtree(VENV_PATH)
+        QMI_Context.get_config = MagicMock(return_value=self._config)
 
     @unittest.mock.patch("sys.platform", "linux")
     def test_start_local_process_venv(self):
-        """Test start_local_process, with creating and specifying a virtual environment location."""
+        """Test start_local_process, with creating and specifying a virtual environment location,
+        Unix environment."""
         # Arrange
-        os_mock = MagicMock(spec=os)
-        os_mock.name = "posix"
-        os_mock.WIFSTOPPED = Mock(return_value=False)
-        os_mock.WSTOPSIG = Mock(return_value=None)
-        os_mock.WNOHANG = Mock(return_value=True)
-        os_mock.path = os.path
-        os_mock.path.dirname = Mock(return_value=os.path.join(VENV_PATH))
-        os_mock.listdir = os.listdir
-        os_mock.getcwd = os.getcwd
-        os_mock.remove = os.remove
-        os_mock.makedirs = os.makedirs
-        os_mock.pathsep = os.pathsep
-        os_mock.fspath = os.fspath
-
-        with patch("venv.os", os_mock):
-            # Act
-            CustomLinuxEnvBuilder(
-                    system_site_packages=self.system_site_packages,
-                    clear=True,
-                    symlinks=True,  # Linux uses symlinks
-                    upgrade=False,
-                    with_pip=False,
-                ).create(VENV_PATH)
-
+        exename = "python"
         with patch(
-            "qmi.tools.proc.subprocess.Popen",
-            MagicMock(return_value=(popen := MagicMock())),
-        ):
+            "qmi.tools.proc.subprocess", autospec=subprocess
+        ) as subprocess_patch, patch(
+            "qmi.tools.proc.qmi") as qmi_mock, patch(
+            "qmi.tools.proc.open"
+        ) as open_mock:
+            qmi_mock.context = QMI_Context
+            popen = MagicMock()
             popen.pid = 0
             popen.poll = MagicMock(return_value=None)
+            subprocess_patch.Popen.return_value = popen
             with patch("qmi.tools.proc.Popen.poll", return_value=None):
                 pid = proc.start_local_process(self.context_name)
 
         self.assertEqual(popen.pid, pid)
         popen.poll.assert_called_once_with()
-        self.assertTrue(os.path.isdir(os.path.join(VENV_PATH, "bin")))
-        os_mock.symlink.has_calls(os.path.split(sys.executable)[1], os.path.join(VENV_PATH, "bin", "python"))
+        subprocess_patch.Popen.assert_called_once_with(
+            [
+                os.path.join(VENV_PATH, "bin", exename),
+                "-m",
+                "test_venv_module",
+            ],
+            stdin=subprocess_patch.DEVNULL,
+            stdout=open_mock(),
+            stderr=subprocess_patch.STDOUT,
+            start_new_session=True,
+            env=os.environ.copy()
+        )
 
     @unittest.mock.patch("sys.platform", "win32")
     def test_start_local_process_winvenv(self):
         """Test start_local_process, with creating and specifying a virtual environment location,
         Windows environment."""
         # Arrange
-        os_mock = MagicMock(spec=os)
-        os_mock.name = "nt"
-        os_mock.path = os.path
-        os_mock.listdir = os.listdir
-        os_mock.getcwd = os.getcwd
-        os_mock.remove = os.remove
-        os_mock.makedirs = os.makedirs
-        os_mock.pathsep = os.pathsep
-        os_mock.fspath = os.fspath
-
-        with patch("venv.os", os_mock):
-            # Act
-            CustomWinEnvBuilder(
-                system_site_packages=self.system_site_packages,
-                clear=True,
-                symlinks=False,  # Windows doesn't use symlinks
-                upgrade=False,
-                with_pip=False,
-            ).create(VENV_PATH)
-
+        exename = "python.exe"
         with patch(
-            "qmi.tools.proc.subprocess.Popen",
-            MagicMock(return_value=(popen := MagicMock())),
-        ):
-            popen.poll = MagicMock(return_value=None)
+            "qmi.tools.proc.subprocess", autospec=subprocess
+        ) as subprocess_patch, patch(
+            "qmi.tools.proc.qmi") as qmi_mock, patch(
+            "qmi.tools.proc.open"
+        ) as open_mock:
+            qmi_mock.context = QMI_Context
+            popen = MagicMock()
             popen.pid = 0
+            popen.poll = MagicMock(return_value=None)
+            subprocess_patch.Popen.return_value = popen
             with patch("qmi.tools.proc.Popen.poll", return_value=None):
                 pid = proc.start_local_process(self.context_name)
 
         self.assertEqual(popen.pid, pid)
         popen.poll.assert_called_once_with()
-        self.assertTrue(os.path.isdir(os.path.join(VENV_PATH, "Scripts")))
-
+        subprocess_patch.Popen.assert_called_once_with(
+            [
+                os.path.join(VENV_PATH, "Scripts", exename),
+                "-m",
+                "test_venv_module",
+            ],
+            stdin=subprocess_patch.DEVNULL,
+            stdout=open_mock(),
+            stderr=subprocess_patch.STDOUT,
+            start_new_session=True,
+            env=os.environ.copy()
+        )
 
 class ArgParserTestCase(unittest.TestCase):
 

@@ -99,7 +99,6 @@ class ProcessManagementClient:
         ctxcfg = cfg.contexts[context_name]
         venv_path = ctxcfg.virtualenv_path
         if venv_path is not None:
-            print(f"1{sys.platform=}")
             if sys.platform.startswith("win"):
                 executable_path = os.path.join(venv_path, "Scripts", "")
             else:
@@ -295,7 +294,6 @@ def start_local_process(context_name: str) -> int:
     # Check if a virtual environment needs to be activated.
     venv_path = ctxcfg.virtualenv_path
     if venv_path is not None:
-        print(f"2{sys.platform=}")
         if sys.platform.startswith("win"):
             executable = os.path.join(venv_path, "Scripts", "python.exe")
         else:

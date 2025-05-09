@@ -54,7 +54,7 @@ class TestRunAdBasicCompiler(unittest.TestCase):
                          stdout=b"some stdout line\n", stderr=b"")
 
         # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
             qmi.utils.adbasic_compiler.ADBASIC_COMPILER_EXECUTABLE = LINUX_EXECUTABLE
             full_dir = self.adwin_dir[sys.platform] + exec_dir[sys.platform]
             expected_command_line_linux = full_dir + " " + " ".join(map(str, adbasic_arguments))
@@ -63,7 +63,7 @@ class TestRunAdBasicCompiler(unittest.TestCase):
                 pretty_print
                 )
 
-        with mock.patch("sys.platform", "win32"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
             qmi.utils.adbasic_compiler.ADBASIC_COMPILER_EXECUTABLE = WINDOWS_EXECUTABLE
             full_dir = self.adwin_dir[sys.platform] + exec_dir[sys.platform]
             expected_command_line_win = full_dir + " " + " ".join(map(str, adbasic_arguments))
@@ -111,13 +111,13 @@ class TestRunAdBasicCompiler(unittest.TestCase):
                          stdout=b"some stdout line\n", stderr=bytes(stderr_string, encoding="ASCII"))
 
         # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
             adbasic_result_linux = run_adbasic_compiler(
                 self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
                 pretty_print
                 )
 
-        with mock.patch("sys.platform", "win32"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
             adbasic_result_win = run_adbasic_compiler(
                 self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
                 pretty_print
@@ -159,13 +159,13 @@ class TestRunAdBasicCompiler(unittest.TestCase):
                          stdout=b"some stdout line\n", stderr=bytes(stderr_string, encoding="ASCII"))
 
         # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
             adbasic_result_linux = run_adbasic_compiler(
                 self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
                 pretty_print
                 )
 
-        with mock.patch("sys.platform", "win32"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
             adbasic_result_win = run_adbasic_compiler(
                 self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
                 pretty_print
@@ -202,13 +202,13 @@ class TestRunAdBasicCompiler(unittest.TestCase):
                          stdout=b"some stdout line\n", stderr=bytes(stderr_string, encoding="ASCII"))
 
         # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
             adbasic_result_linux = run_adbasic_compiler(
                 self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
                 pretty_print
                 )
 
-        with mock.patch("sys.platform", "win32"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
             adbasic_result_win = run_adbasic_compiler(
                 self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
                 pretty_print
@@ -233,7 +233,7 @@ class TestRunAdBasicCompiler(unittest.TestCase):
                          stdout=b"some stdout line\n", stderr=b"")
 
         # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
             run_adbasic_compiler(
                 self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr, remove_c_directory,
                 pretty_print
@@ -260,7 +260,7 @@ class TestRunAdBasicCompiler(unittest.TestCase):
                              stdout=b"some stdout line\n", stderr=bytes(stderr_string))
 
             # Act
-            with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+            with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
                 # Assert
                 with self.assertRaises(AdbasicCompilerException):
                     run_adbasic_compiler(
@@ -268,7 +268,7 @@ class TestRunAdBasicCompiler(unittest.TestCase):
                         remove_c_directory, pretty_print
                         )
 
-            with mock.patch("sys.platform", "win32"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+            with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
                 # Assert
                 with self.assertRaises(AdbasicCompilerException):
                     run_adbasic_compiler(
@@ -285,7 +285,7 @@ class TestRunAdBasicCompiler(unittest.TestCase):
         run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=0,
                          stdout=bytes(help_test.encode()), stderr=b"")
         # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
             with mock.patch("builtins.print") as print_patch:
                 print_adbasic_compiler_help(self.adwin_dir[sys.platform], "T11")
 
@@ -300,7 +300,7 @@ class TestRunAdBasicCompiler(unittest.TestCase):
         run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=0,
                          stdout=bytes(help_test.encode()), stderr=b"")
         # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
             with mock.patch("builtins.print") as print_patch:
                 print_adbasic_compiler_help(self.adwin_dir[sys.platform], "T12")
 
@@ -315,7 +315,7 @@ class TestRunAdBasicCompiler(unittest.TestCase):
         run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=0,
                          stdout=bytes(help_test.encode()), stderr=b"")
         # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
             with mock.patch("builtins.print") as print_patch:
                 print_adbasic_compiler_help(self.adwin_dir[sys.platform], "T12.1")
 
@@ -343,7 +343,7 @@ class TestCompileProgram(unittest.TestCase):
         run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=0,
                          stdout=bytes(help_test.encode()), stderr=b"")
         # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
             qmi.utils.adbasic_compiler.ADBASIC_COMPILER_EXECUTABLE = LINUX_EXECUTABLE
             full_dir = default_adwindir[sys.platform] + exec_dir[sys.platform]
             inc_dir = default_adwindir[sys.platform] + "/" + LINUX_INCLUDE_DIR
@@ -364,7 +364,7 @@ class TestCompileProgram(unittest.TestCase):
                 pretty_print
             )
 
-        with mock.patch("sys.platform", "win32"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
             qmi.utils.adbasic_compiler.ADBASIC_COMPILER_EXECUTABLE = WINDOWS_EXECUTABLE
             full_dir = default_adwindir[sys.platform] + exec_dir[sys.platform]
             expected_command_line_win = "{} /M /P12 /SPII /EE /PN2 /PL0 /O2 {}".format(full_dir, basic_filename)
@@ -404,7 +404,7 @@ class TestCompileProgram(unittest.TestCase):
         run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=0,
                          stdout=bytes(help_test.encode()), stderr=b"")
         # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
             qmi.utils.adbasic_compiler.ADBASIC_COMPILER_EXECUTABLE = LINUX_EXECUTABLE
             full_dir = default_adwindir[sys.platform] + exec_dir[sys.platform]
             inc_dir = default_adwindir[sys.platform] + "/" + LINUX_INCLUDE_DIR
@@ -425,7 +425,7 @@ class TestCompileProgram(unittest.TestCase):
                 pretty_print
             )
 
-        with mock.patch("sys.platform", "win32"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
             qmi.utils.adbasic_compiler.ADBASIC_COMPILER_EXECUTABLE = WINDOWS_EXECUTABLE
             full_dir = default_adwindir[sys.platform] + exec_dir[sys.platform]
             expected_command_line_win = "{} /M /P11 /SGII /EE /PN2 /PL0 /O2 {}".format(full_dir, basic_filename)
@@ -479,7 +479,7 @@ class TestMain(unittest.TestCase):
         run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=0,
                          stdout=b"some stdout text", stderr=b"")
         # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
             qmi.utils.adbasic_compiler.ADBASIC_COMPILER_EXECUTABLE = LINUX_EXECUTABLE
             full_dir = default_adwindir[sys.platform] + exec_dir[sys.platform]
             expected_stdout_linux = [
@@ -506,7 +506,7 @@ class TestMain(unittest.TestCase):
 
                     linux_prints = buf.getvalue()
 
-        with mock.patch("sys.platform", "win32"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
             qmi.utils.adbasic_compiler.ADBASIC_COMPILER_EXECUTABLE = WINDOWS_EXECUTABLE
             full_dir = default_adwindir[sys.platform] + exec_dir[sys.platform]
             expected_stdout_win = [
@@ -548,7 +548,7 @@ class TestMain(unittest.TestCase):
         run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=0,
                          stdout=b"some stdout text", stderr=b"")
         # Act
-        with mock.patch("sys.platform", "linux1"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
             qmi.utils.adbasic_compiler.ADBASIC_COMPILER_EXECUTABLE = LINUX_EXECUTABLE
             full_dir = default_adwindir[sys.platform] + exec_dir[sys.platform]
             expected_stdout_linux = [
@@ -575,7 +575,7 @@ class TestMain(unittest.TestCase):
 
                     linux_prints = buf.getvalue()
 
-        with mock.patch("sys.platform", "win32"), mock.patch("qmi.utils.adbasic_compiler.subprocess.run", return_value=run_return):
+        with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
             qmi.utils.adbasic_compiler.ADBASIC_COMPILER_EXECUTABLE = WINDOWS_EXECUTABLE
             full_dir = default_adwindir[sys.platform] + exec_dir[sys.platform]
             expected_stdout_win = [
