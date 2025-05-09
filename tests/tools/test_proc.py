@@ -1,26 +1,30 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Test qmi/tools/proc.py"""
-import unittest
-from unittest.mock import MagicMock, patch, call
-import socket
-import os, sys
-import psutil
-import subprocess
 from argparse import Namespace, ArgumentError
+import logging
+import psutil
+import os
+import sys
+import socket
+import subprocess
+import unittest
+from unittest.mock import Mock, MagicMock, patch, call
 
 import qmi
-import qmi.tools.proc as proc
-
 from qmi.core.config_defs import CfgQmi
 from qmi.core.config_defs import CfgContext
 from qmi.core.config_defs import CfgProcessManagement
 from qmi.core.config_defs import CfgProcessHost
 from qmi.core.config_struct import config_struct_from_dict
 from qmi.core.exceptions import QMI_ApplicationException
+import qmi.tools.proc as proc
 
 from tests.patcher import PatcherQmiContext as QMI_Context
 from tests.patcher import PatcherQmiRpcProxy as QMI_RpcProxy
+
+# Disable all logging
+logging.disable(logging.CRITICAL)
 
 CONFIG = {
     "ip": "10.10.10.10",  # Local IP address
@@ -54,13 +58,15 @@ CONTEXT_CFG = {
             "connect_to_peers": ["ContextName1"],
             "enabled": True,
         }
-    }
-
-
-def _start_qmi_context():
-    """Start qmi and initialize the context with a configuration. Returns the configuration."""
-    qmi.start("ContextName2", context_cfg=CONTEXT_CFG)
-    return {"config": CONFIG, "config0": CONFIG0}
+}
+VENV_PATH = os.path.join(os.path.dirname(__file__), ".venv")
+CONTEXT_CFG_VENV = {
+        "ContextName": {
+            "host": CONFIG["ip"],
+            "program_module": "test_venv_module",
+            "virtualenv_path": VENV_PATH,
+        }
+}
 
 
 def _build_mock_config(extra=False):
@@ -87,16 +93,15 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         proc.subprocess = MagicMock(spec=subprocess)
         proc.subprocess.SubprocessError = subprocess.SubprocessError
         proc.open = MagicMock()
-        self._config = _start_qmi_context()
+        self._config = {"config": CONFIG, "config0": CONFIG0}
         proc.print = MagicMock()
         proc._logger = MagicMock()
 
-    def tearDown(self):
-        qmi.stop()
-
     def test_pmc_init(self):
         """Test ProcessManagementClient.__init__, happy flow, configuration parameters."""
-        with patch("qmi.tools.proc.qmi.context", MagicMock()) as patcher:
+        with patch(
+            "qmi.tools.proc.qmi") as qmi_mock, patch(
+            "qmi.tools.proc.qmi.context", MagicMock()) as patcher:
             context, _, _ = _build_mock_config()
             context._config = CfgQmi(
                 contexts={
@@ -114,7 +119,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
                     }
                 ),
             )
-            context.get_config = MagicMock(return_value=context._config)
+            QMI_Context.get_config = MagicMock(return_value=context._config)
+            qmi_mock.context = QMI_Context
             proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
             proc.subprocess.Popen.assert_called_once_with(
                 [
@@ -176,19 +182,32 @@ class ProcessManagementClientTestCase(unittest.TestCase):
 
     def test_pmc_close(self):
         """Test ProcessManagementClient.close, happy flow."""
-        manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
-        manager.close()
-        manager._proc.stdin.close.assert_called_once_with()
-        manager._proc.stdout.close.assert_called_once_with()
-        manager._proc.wait.assert_called_once_with(timeout=2)
+        with patch("qmi.tools.proc.qmi") as qmi_mock:
+            _config = CfgQmi()
+            for key in CONTEXT_CFG.keys():
+                _config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG[key], CfgContext)})
+
+            QMI_Context.get_config = MagicMock(return_value=_config)
+            qmi_mock.context = QMI_Context
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
+            manager.close()
+            manager._proc.stdin.close.assert_called_once_with()
+            manager._proc.stdout.close.assert_called_once_with()
+            manager._proc.wait.assert_called_once_with(timeout=2)
 
     def test_pmc_close_timeout(self):
         """Test whether ProcessManagementClient.close kills the process when a timeout happened."""
-        manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
-        with patch("qmi.tools.proc.qmi.context", MagicMock()), patch.object(
-            manager._proc, "wait", side_effect=TimeoutError
-        ):
-            manager.close()
+        with patch("qmi.tools.proc.qmi") as qmi_mock:
+            _config = CfgQmi()
+            for key in CONTEXT_CFG.keys():
+                _config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG[key], CfgContext)})
+
+            QMI_Context.get_config = MagicMock(return_value=_config)
+            qmi_mock.context = QMI_Context
+
+            manager = proc.ProcessManagementClient(self._config["config"]["ip"], "ContextName1")
+            with patch.object(manager._proc, "wait", side_effect=TimeoutError):
+                manager.close()
 
         manager._proc.kill.assert_called_once_with()
 
@@ -387,6 +406,7 @@ class QmiProcMethodsTestCase(unittest.TestCase):
         self.assertEqual("", str(ass_err_2.exception))
         self.assertEqual("AssertionError(\"'ip_address' unexpectedly not a string!\")", repr(ass_err_1.exception))
 
+    @unittest.mock.patch("sys.platform", "linux")
     def test_start_local_process(self):
         """Test start_local_process, happy flow."""
         with patch(
@@ -421,8 +441,9 @@ class QmiProcMethodsTestCase(unittest.TestCase):
                 env=os.environ.copy(),
             )
 
+    @unittest.mock.patch("sys.platform", "win32")
     def test_start_local_process_winenv(self):
-        """Test start_local_process, happy flow, windows environment."""
+        """Test start_local_process, happy flow, Windows environment."""
         mock_pid_parent = MagicMock()
         mock_pid_parent.children = MagicMock(return_value=[(mock_pid:=MagicMock())])
         with patch(
@@ -436,7 +457,7 @@ class QmiProcMethodsTestCase(unittest.TestCase):
             "sys.executable", (exec := MagicMock())
         ), patch(
             "os.environ.copy", MagicMock()
-        ), patch("qmi.tools.proc.WINENV", True), patch('qmi.tools.proc.psutil.Process', MagicMock(return_value=mock_pid_parent)):
+        ), patch("qmi.tools.proc.WINENV", True), patch("qmi.tools.proc.psutil.Process", MagicMock(return_value=mock_pid_parent)):
             _, _, ctxcfg = _build_mock_config()
             popen.poll = MagicMock(return_value=None)
             rt_val = proc.start_local_process("ContextName1")
@@ -622,7 +643,6 @@ class QmiProcMethodsTestCase(unittest.TestCase):
     def _make_context_mock_peer(self):
         """Adapt the qmi context to use mocking for peer connections."""
         proxy = QMI_RpcProxy(QMI_Context(), None)
-        qmi.context().make_peer_context_proxy = MagicMock(return_value=proxy)
         return proxy
 
     def test_start_process_localhost(self):
@@ -763,7 +783,6 @@ class QmiProcMethodsTestCase(unittest.TestCase):
             context.connect_to_peer.side_effect = None
             context.has_peer_context = MagicMock(side_effect=[True, False])
             context.make_peer_context_proxy = MagicMock(return_value=proxy)
-            qmi.context = context
             proxy(context, None).rpc_nonblocking.shutdown_context = MagicMock(return_value=future)
 
             rt_val = proc.shutdown_context("ContextName1", cb := MagicMock())
@@ -1273,6 +1292,86 @@ class QmiProcMethodsTestCase(unittest.TestCase):
             self.assertEqual(rt_val, 1)
 
 
+class QmiProcVenvTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.context_name = "ContextName"
+        self._config = CfgQmi()
+        for key in CONTEXT_CFG_VENV.keys():
+            self._config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG_VENV[key], CfgContext)})
+
+        QMI_Context.get_config = MagicMock(return_value=self._config)
+
+    @unittest.mock.patch("sys.platform", "linux")
+    def test_start_local_process_venv(self):
+        """Test start_local_process, with creating and specifying a virtual environment location,
+        Unix environment."""
+        # Arrange
+        exename = "python"
+        with patch(
+            "qmi.tools.proc.subprocess", autospec=subprocess
+        ) as subprocess_patch, patch(
+            "qmi.tools.proc.qmi") as qmi_mock, patch(
+            "qmi.tools.proc.open"
+        ) as open_mock:
+            qmi_mock.context = QMI_Context
+            popen = MagicMock()
+            popen.pid = 0
+            popen.poll = MagicMock(return_value=None)
+            subprocess_patch.Popen.return_value = popen
+            with patch("qmi.tools.proc.Popen.poll", return_value=None):
+                pid = proc.start_local_process(self.context_name)
+
+        self.assertEqual(popen.pid, pid)
+        popen.poll.assert_called_once_with()
+        subprocess_patch.Popen.assert_called_once_with(
+            [
+                os.path.join(VENV_PATH, "bin", exename),
+                "-m",
+                "test_venv_module",
+            ],
+            stdin=subprocess_patch.DEVNULL,
+            stdout=open_mock(),
+            stderr=subprocess_patch.STDOUT,
+            start_new_session=True,
+            env=os.environ.copy()
+        )
+
+    @unittest.mock.patch("sys.platform", "win32")
+    def test_start_local_process_winvenv(self):
+        """Test start_local_process, with creating and specifying a virtual environment location,
+        Windows environment."""
+        # Arrange
+        exename = "python.exe"
+        with patch(
+            "qmi.tools.proc.subprocess", autospec=subprocess
+        ) as subprocess_patch, patch(
+            "qmi.tools.proc.qmi") as qmi_mock, patch(
+            "qmi.tools.proc.open"
+        ) as open_mock:
+            qmi_mock.context = QMI_Context
+            popen = MagicMock()
+            popen.pid = 0
+            popen.poll = MagicMock(return_value=None)
+            subprocess_patch.Popen.return_value = popen
+            with patch("qmi.tools.proc.Popen.poll", return_value=None):
+                pid = proc.start_local_process(self.context_name)
+
+        self.assertEqual(popen.pid, pid)
+        popen.poll.assert_called_once_with()
+        subprocess_patch.Popen.assert_called_once_with(
+            [
+                os.path.join(VENV_PATH, "Scripts", exename),
+                "-m",
+                "test_venv_module",
+            ],
+            stdin=subprocess_patch.DEVNULL,
+            stdout=open_mock(),
+            stderr=subprocess_patch.STDOUT,
+            start_new_session=True,
+            env=os.environ.copy()
+        )
+
 class ArgParserTestCase(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -1478,3 +1577,7 @@ class ArgParserTestCase(unittest.TestCase):
             retval = proc.main()
             self.assertEqual(retval, 1)
             sel_ctx.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()
