@@ -643,8 +643,6 @@ class QmiProcMethodsTestCase(unittest.TestCase):
     def _make_context_mock_peer(self):
         """Adapt the qmi context to use mocking for peer connections."""
         proxy = QMI_RpcProxy(QMI_Context(), None)
-        # qmi.context().make_peer_context_proxy = MagicMock(return_value=proxy)
-        # qmi.context().make_peer_context_proxy = MagicMock(return_value=proxy)
         return proxy
 
     def test_start_process_localhost(self):
@@ -785,7 +783,6 @@ class QmiProcMethodsTestCase(unittest.TestCase):
             context.connect_to_peer.side_effect = None
             context.has_peer_context = MagicMock(side_effect=[True, False])
             context.make_peer_context_proxy = MagicMock(return_value=proxy)
-            # qmi.context = context
             proxy(context, None).rpc_nonblocking.shutdown_context = MagicMock(return_value=future)
 
             rt_val = proc.shutdown_context("ContextName1", cb := MagicMock())
