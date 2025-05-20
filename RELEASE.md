@@ -30,7 +30,7 @@ If you are using e.g. Git Bash on Windows, the `bump2version` command probably n
     ```
 6. If the tag passes the workflow, do the following:
   - Find the tag in GitHub and make a release with the latest `CHANGELOG.md` entry.
-  - See that the release has created a package and upload it to Pypi.
+  - See that the release has set as the latest package and that a new release has been uploaded to Pypi.
 7. Checkout `main` branch:
     ```shell script
     git checkout main

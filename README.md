@@ -38,6 +38,7 @@ when necessary for the use of a specific QMI driver:
 - [usbdll.dll](https://www.newport.com/software-and-drivers)
 - [VCP driver](https://ftdichip.com/Drivers/vcp-drivers/)
 - [stmcdc.inf](https://www.wieserlabs.com/products/radio-frequency/flexdds-ng-dual/FlexDDS-NG-ad9910_standalone.zip)
+- [wlmData.dll, libwlmData.so](https://www.highfinesse.com/en/support/software-update.html)
 - [zhinst](https://pypi.org/project/zhinst/)
 
 Usage of the third-party software, drivers or libraries can be subject to copyright and license terms of the provider. Please review their terms before using the software, driver or library.
