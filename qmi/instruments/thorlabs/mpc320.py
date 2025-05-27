@@ -176,10 +176,10 @@ class Thorlabs_Mpc320(QMI_Instrument):
         _logger.info("[%s] Getting identification of instrument", self._name)
         self._check_is_open()
         # Send request message.
-        self._apt_protocol.write_param_command(AptMessageId.HW_REQ_INFO.value)
+        self._apt_protocol.write_two_param_command(AptMessageId.HW_REQ_INFO.value)
         # Get response
         resp = self._apt_protocol.ask(HW_GET_INFO)
-        return QMI_InstrumentIdentification("Thorlabs", resp.model_number, resp.serial_number, resp.firmware_version)
+        return QMI_InstrumentIdentification("Thorlabs", resp.model_number, resp.serial_number, resp.fw_version)
 
     @rpc_method
     def identify(self) -> None:
@@ -191,7 +191,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         # Send message.
         # For the MPC320 the channel number does not matter here. The device has one LED that flashes irrespective
         # of the provided channel number.
-        self._apt_protocol.write_param_command(AptMessageId.MOD_IDENTIFY.value, 0x01)
+        self._apt_protocol.write_two_param_command(AptMessageId.MOD_IDENTIFY.value, 0x01)
 
     @rpc_method
     def enable_channels(self, channel_numbers: List[int]) -> None:
@@ -218,7 +218,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         for channel_number in channel_numbers:
             channels_to_enable ^= Thorlabs_Mpc320_ChannelMap[channel_number]
         # Send message.
-        self._apt_protocol.write_param_command(
+        self._apt_protocol.write_two_param_command(
             AptMessageId.MOD_SET_CHANENABLESTATE.value,
             channels_to_enable,
             AptChannelState.ENABLE.value,
@@ -231,7 +231,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         """
         _logger.info("[%s] Disabling channels", self._name)
         self._check_is_open()
-        self._apt_protocol.write_param_command(
+        self._apt_protocol.write_two_param_command(
             AptMessageId.MOD_SET_CHANENABLESTATE.value,
             0x00,
             AptChannelState.ENABLE.value,
@@ -252,7 +252,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self._validate_channel(channel_number)
         self._check_is_open()
         # Send request message.
-        self._apt_protocol.write_param_command(
+        self._apt_protocol.write_two_param_command(
             AptMessageId.MOD_REQ_CHANENABLESTATE.value,
             Thorlabs_Mpc320_ChannelMap[channel_number],
         )
@@ -271,7 +271,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         _logger.info("[%s] Starting automatic status updates from instrument", self._name)
         self._check_is_open()
         # Send message.
-        self._apt_protocol.write_param_command(AptMessageId.HW_START_UPDATEMSGS.value)
+        self._apt_protocol.write_two_param_command(AptMessageId.HW_START_UPDATEMSGS.value)
 
     @rpc_method
     def stop_auto_status_update(self) -> None:
@@ -281,7 +281,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         _logger.info("[%s] Stopping automatic status updates from instrument", self._name)
         self._check_is_open()
         # Send message.
-        self._apt_protocol.write_param_command(AptMessageId.HW_STOP_UPDATEMSGS.value)
+        self._apt_protocol.write_two_param_command(AptMessageId.HW_STOP_UPDATEMSGS.value)
 
     @rpc_method
     def home_channel(self, channel_number: int) -> None:
@@ -297,7 +297,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self._validate_channel(channel_number)
         self._check_is_open()
         # Send message.
-        self._apt_protocol.write_param_command(
+        self._apt_protocol.write_two_param_command(
             AptMessageId.MOT_MOVE_HOME.value, Thorlabs_Mpc320_ChannelMap[channel_number]
         )
 
@@ -425,7 +425,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self._check_is_open()
         self._validate_channel(channel_number)
         # Send request message.
-        self._apt_protocol.write_param_command(
+        self._apt_protocol.write_two_param_command(
             AptMessageId.MOT_REQ_USTATUSUPDATE.value,
             Thorlabs_Mpc320_ChannelMap[channel_number],
         )
@@ -455,7 +455,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self._check_is_open()
         self._validate_channel(channel_number)
         # Send request message.
-        self._apt_protocol.write_param_command(
+        self._apt_protocol.write_two_param_command(
             AptMessageId.MOT_MOVE_JOG.value,
             Thorlabs_Mpc320_ChannelMap[channel_number],
             direction.value,
@@ -510,7 +510,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         _logger.info("[%s] Getting polarisation parameters", self._name)
         self._check_is_open()
         # Send request message.
-        self._apt_protocol.write_param_command(AptMessageId.POL_REQ_PARAMS.value)
+        self._apt_protocol.write_two_param_command(AptMessageId.POL_REQ_PARAMS.value)
         # Get response.
         params = self._apt_protocol.ask(POL_GET_SET_PARAMS)
         return Thorlabs_Mpc320_PolarisationParameters(

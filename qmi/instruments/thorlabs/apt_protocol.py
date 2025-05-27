@@ -78,10 +78,26 @@ class AptMessageId(Enum):
     MOD_GET_CHANENABLESTATE = 0x0212
     HW_START_UPDATEMSGS = 0x0011
     HW_STOP_UPDATEMSGS = 0x0012
+    MOT_REQ_POS_COUNTER = 0x0411
+    MOT_GET_POS_COUNTER = 0x0412
+    MOT_SET_VEL_PARAMS = 0x0413
+    MOT_REQ_VEL_PARAMS = 0x0414
+    MOT_GET_VEL_PARAMS = 0x0415
+    MOT_REQ_STATUS_BITS = 0x0429
+    MOT_GET_STATUS_BITS = 0x042A
+    MOT_SET_GEN_MOVE_PARAMS = 0x043A
+    MOT_REQ_GEN_MOVE_PARAMS = 0x043B
+    MOT_GET_GEN_MOVE_PARAMS = 0x043C
+    MOT_SET_HOME_PARAMS = 0x0440
+    MOT_REQ_HOME_PARAMS = 0x0441
+    MOT_GET_HOME_PARAMS = 0x0442
     MOT_MOVE_HOME = 0x0443
     MOT_MOVE_HOMED = 0x0444
+    MOT_MOVE_RELATIVE = 0x0448
     MOT_MOVE_ABSOLUTE = 0x0453
     MOT_MOVE_COMPLETED = 0x0464
+    MOT_MOVE_STOP = 0x0465
+    MOT_MOVE_STOPPED = 0x0466
     MOT_SET_EEPROMPARAMS = 0x04B9
     MOT_REQ_USTATUSUPDATE = 0x0490
     MOT_GET_USTATUSUPDATE = 0x0491
@@ -105,7 +121,19 @@ class AptChannelJogDirection(Enum):
     BACKWARD = 0x02
 
 
-class AptMessageHeaderWithParams(LittleEndianStructure):
+class AptChannelHomeDirection(Enum):
+    """Possible values for the ``home_direction`` field in the homing parameters."""
+    FORWARD = 0x01
+    REVERSE = 0x02
+
+
+class AptChannelHomeLimitSwitch(Enum):
+    """Possible values for the ``limit_switch`` field in the homing parameters."""
+    REVERSE = 0x01
+    FORWARD = 0x04
+
+
+class AptMessageHeaderWithTwoParams(LittleEndianStructure):
     """
     This is the version of the APT message header when no data packet follows a header.
     """
@@ -117,6 +145,20 @@ class AptMessageHeaderWithParams(LittleEndianStructure):
         ("param2", c_uint8),
         ("dest", c_uint8),
         ("source", c_uint8),
+    ]
+
+
+class AptMessageHeaderWithThreeParams(LittleEndianStructure):
+    """
+    This is the version of the APT message header when no data packet follows a header.
+    """
+
+    _pack_ = True
+    _fields_: ClassVar[list[tuple[str, type]]] = [
+        ("message_id", c_uint16),
+        ("param1", apt_long),
+        ("param2", apt_long),
+        ("param3", apt_long),
     ]
 
 
@@ -177,7 +219,7 @@ class AptProtocol:
         self._apt_device_address = apt_device_address
         self._host_address = host_address
 
-    def write_param_command(
+    def write_two_param_command(
         self,
         message_id: int,
         param1: int = 0x00,
@@ -192,12 +234,63 @@ class AptProtocol:
             param2:     Parameter 2 to be sent with default value of 0x00.
         """
         # Make the command.
-        msg = AptMessageHeaderWithParams(
+        msg = AptMessageHeaderWithTwoParams(
             message_id,
             param1,
             param2,
             self._apt_device_address,
             self._host_address,
+        )
+        # Send command.
+        self._transport.write(bytearray(msg))
+
+    def write_three_param_command(
+        self,
+        message_id: int,
+        param1: int = 0x00,
+        param2: int = 0x00,
+        param3: int = 0x00,
+    ) -> None:
+        """
+        Send an APT protocol command that is a header (i.e. 6 bytes) with params.
+
+        Parameters:
+            message_id: ID of message to send.
+            param1:     Parameter 1 to be sent with default value of 0x00.
+            param2:     Parameter 2 to be sent with default value of 0x00.
+            param3:     Parameter 3 to be sent with default value of 0x00.
+        """
+        # Make the command.
+        msg = AptMessageHeaderWithThreeParams(
+            message_id,
+            param1,
+            param2,
+            param3
+        )
+        # Send command.
+        self._transport.write(bytearray(msg))
+
+    def write_home_param_command(
+        self,
+        message_id: int,
+        home_dir: int,
+        limit_switch: int,
+        home_velocity: int,
+        offset_dist: int
+    ) -> None:
+        """
+        Send an APT protocol command that is a header (i.e. 6 bytes) with params.
+
+        Parameters:
+            message_id: ID of message to send.
+        """
+        # Make the command.
+        msg = AptMessageHeaderWithThreeParams(
+            message_id,
+            home_dir,
+            limit_switch,
+            home_velocity,
+            offset_dist
         )
         # Send command.
         self._transport.write(bytearray(msg))

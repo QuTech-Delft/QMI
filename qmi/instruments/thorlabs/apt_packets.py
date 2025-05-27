@@ -32,9 +32,9 @@ class HW_GET_INFO(AptMessage):
         ("serial_number", apt_long),
         ("model_number", apt_char * 8),
         ("type", apt_word),
-        ("firmware_version", apt_dword),
+        ("fw_version", apt_dword),
         (
-            "internal",
+            "internal_use",
             apt_dword * 15,
         ),  # this is for internal use, so we don't know what type it returns
         ("hw_version", apt_word),
@@ -67,6 +67,160 @@ class MOD_GET_CHANENABLESTATE(AptMessage):
     ]
 
 
+class MOT_GET_POS_COUNTER(AptMessage):
+    """
+    Header structure for the MOT_GET_POS_COUNTER response. This header is sent as a response to MOT_REQ_POS_COUNTER.
+
+    Fields:
+        message_id:     ID of message.
+        chan_ident:     Channel number.
+        position:       The counter position.
+    """
+
+    MESSAGE_ID = AptMessageId.MOT_GET_POS_COUNTER.value
+    HEADER_ONLY = True
+    _fields_: ClassVar[list[tuple[str, type]]] = [
+        ("message_id", apt_word),
+        ("chan_ident", apt_byte),
+        ("position", apt_long),
+    ]
+
+
+class MOT_SET_VEL_PARAMS(AptMessage):
+    """
+    Data packet structure for a MOT_SET_VEL_PARAMS command.
+
+    Fields:
+        chan_ident: The channel being addressed.
+        min_vel:    Minimum velocity of the channel.
+        accel:      Acceleration of the channel.
+        max_vel:    Maximum velocity of the channel.
+    """
+
+    MESSAGE_ID = AptMessageId.MOT_SET_VEL_PARAMS.value
+    _fields_: ClassVar[list[tuple[str, type]]] = [
+        ("chan_ident", apt_word),
+        ("min_vel", apt_long),
+        ("accel", apt_long),
+        ("max_vel", apt_long)
+    ]
+
+
+class MOT_GET_VEL_PARAMS(AptMessage):
+    """
+    Header structure for the MOT_GET_VEL_PARAMS response. This header is sent as a response to MOT_REQ_VEL_PARAMS.
+
+    Fields:
+        chan_ident: The channel being addressed.
+        min_vel:    Minimum velocity of the channel.
+        accel:      Acceleration of the channel.
+        max_vel:    Maximum velocity of the channel.
+    """
+    MESSAGE_ID = AptMessageId.MOT_GET_VEL_PARAMS.value
+    HEADER_ONLY = True
+    _fields_: ClassVar[list[tuple[str, type]]] = [
+        ("chan_ident", apt_word),
+        ("min_vel", apt_long),
+        ("accel", apt_long),
+        ("max_vel", apt_long)
+    ]
+
+
+class MOT_GET_STATUS_BITS(AptMessage):
+    """
+    Header structure for the MOT_GET_STATUS_BITS response. This header is sent as a response to MOT_REQ_STATUS_BITS.
+
+    Fields:
+        chan_ident:    The channel being addressed.
+        status_bits:   Channel status_bits.
+    """
+
+    MESSAGE_ID = AptMessageId.MOT_GET_STATUS_BITS.value
+    HEADER_ONLY = True
+    _fields_: ClassVar[list[tuple[str, type]]] = [
+        ("chan_ident", apt_word),
+        ("status_bits", apt_dword),
+    ]
+
+
+class MOT_SET_GEN_MOVE_PARAMS(AptMessage):
+    """
+    Data packet structure for a MOT_SET_GEN_MOVE_PARAMS command.
+
+    Fields:
+        chan_ident:    The channel being addressed.
+        backlash_dist: Channel backlash distance.
+    """
+
+    MESSAGE_ID = AptMessageId.MOT_SET_GEN_MOVE_PARAMS.value
+    _fields_: ClassVar[list[tuple[str, type]]] = [
+        ("chan_ident", apt_word),
+        ("backlash_dist", apt_long),
+    ]
+
+
+class MOT_GET_GEN_MOVE_PARAMS(AptMessage):
+    """
+    Header structure for the MOT_GET_GEN_MOVE_PARAMS response. This header is sent as a response to MOT_REQ_GEN_MOVE_PARAMS.
+
+    Fields:
+        chan_ident:    The channel being addressed.
+        backlash_dist: Channel backlash distance.
+    """
+
+    MESSAGE_ID = AptMessageId.MOT_GET_GEN_MOVE_PARAMS.value
+    HEADER_ONLY = True
+    _fields_: ClassVar[list[tuple[str, type]]] = [
+        ("chan_ident", apt_word),
+        ("backlash_dist", apt_long),
+    ]
+
+
+class MOT_SET_HOME_PARAMS(AptMessage):
+    """
+    Data packet structure for a MOT_SET_HOME_PARAMS command.
+
+    Fields:
+        chan_ident:    The channel being addressed.
+        home_dir:      Channel home direction.
+        limit_switch:  Channel limit switch.
+        home_velocity: Channel homing velocity.
+        offset_dist:   Channel offset distance.
+    """
+
+    MESSAGE_ID = AptMessageId.MOT_SET_HOME_PARAMS.value
+    _fields_: ClassVar[list[tuple[str, type]]] = [
+        ("chan_ident", apt_word),
+        ("home_dir", apt_word),
+        ("limit_switch", apt_word),
+        ("home_velocity", apt_long),
+        ("offset_dist", apt_long)
+    ]
+
+
+class MOT_GET_HOME_PARAMS(AptMessage):
+    """
+    Header structure for the MOT_GET_HOME_PARAMS response. This header is sent as a response to MOT_REQ_HOME_PARAMS.
+
+    Fields:
+        chan_ident:    The channel being addressed.
+        home_dir:      Channel home direction.
+        limit_switch:  Channel limit switch.
+        home_velocity: Channel homing velocity.
+        offset_dist:   Channel offset distance.
+    """
+
+    MESSAGE_ID = AptMessageId.MOT_GET_GEN_MOVE_PARAMS.value
+    HEADER_ONLY = True
+    _fields_: ClassVar[list[tuple[str, type]]] = [
+        ("chan_ident", apt_word),
+        ("home_dir", apt_word),
+        ("limit_switch", apt_word),
+        ("home_velocity", apt_long),
+        ("offset_dist", apt_long)
+    ]
+
+
 class MOT_MOVE_HOMED(AptMessage):
     """
     Header structure for the MOT_MOVE_HOMED response. This header is sent as a response to MOT_MOVE_HOME
@@ -91,19 +245,35 @@ class MOT_MOVE_HOMED(AptMessage):
     ]
 
 
-class MOT_MOVE_ABSOLUTE(AptMessage):
+class MOT_MOVE_RELATIVE(AptMessage):
     """
-    Data packet structure for a MOT_SMOVE_ABSOLUTE command.
+    Data packet structure for a MOT_MOVE_RELATIVE command.
 
     Fields:
-        chan_ident:         The channel being addressed.
-        absolute_distance:  The distance to move in encoder units.
+        chan_ident:    The channel being addressed.
+        rel_dist:      The relative distance to move in encoder units.
+    """
+
+    MESSAGE_ID = AptMessageId.MOT_MOVE_RELATIVE.value
+    _fields_: ClassVar[list[tuple[str, type]]] = [
+        ("chan_ident", apt_word),
+        ("rel_dist", apt_long),
+    ]
+
+
+class MOT_MOVE_ABSOLUTE(AptMessage):
+    """
+    Data packet structure for a MOT_MOVE_ABSOLUTE command.
+
+    Fields:
+        chan_ident:    The channel being addressed.
+        abs_position:  The position to move to in encoder units.
     """
 
     MESSAGE_ID = AptMessageId.MOT_MOVE_ABSOLUTE.value
     _fields_: ClassVar[list[tuple[str, type]]] = [
         ("chan_ident", apt_word),
-        ("absolute_distance", apt_long),
+        ("abs_position", apt_long),
     ]
 
 
@@ -115,9 +285,9 @@ class MOT_MOVE_COMPLETED(AptMessage):
     Fields:
         message_id:     ID of message.
         chan_ident:     Channel number.
-        param2:         To be left as 0x00.
-        dest:           Destination of message.
-        source:         Source of message.
+        position:       To be left as 0x00.
+        reserved:       Destination of message.
+        status_bits:    Move status bits.
     """
 
     MESSAGE_ID = AptMessageId.MOT_MOVE_COMPLETED.value
@@ -125,9 +295,33 @@ class MOT_MOVE_COMPLETED(AptMessage):
     _fields_: ClassVar[list[tuple[str, type]]] = [
         ("message_id", apt_word),
         ("chan_ident", apt_byte),
-        ("param2", apt_byte),
-        ("dest", apt_byte),
-        ("source", apt_byte),
+        ("position", apt_long),
+        ("reserved", apt_long),
+        ("status_bits", apt_dword),
+    ]
+
+
+class MOT_MOVE_STOPPED(AptMessage):
+    """
+    Header structure for the MOT_MOVE_STOPPED response. This header is sent as a response to a relative or absolute
+    move command once the move has been stopped.
+
+    Fields:
+        message_id:     ID of message.
+        chan_ident:     Channel number.
+        position:       To be left as 0x00.
+        reserved:       Destination of message.
+        status_bits:    Move status bits.
+    """
+
+    MESSAGE_ID = AptMessageId.MOT_MOVE_STOPPED.value
+    HEADER_ONLY = True
+    _fields_: ClassVar[list[tuple[str, type]]] = [
+        ("message_id", apt_word),
+        ("chan_ident", apt_byte),
+        ("position", apt_long),
+        ("reserved", apt_long),
+        ("status_bits", apt_dword),
     ]
 
 
@@ -160,7 +354,7 @@ class MOT_SET_EEPROMPARAMS(AptMessage):
 
     Fields:
         chan_ident: The channel being addressed.
-        msg_id:     ID of message whose settings should be save.
+        msg_id:     ID of message whose settings should be saved.
     """
 
     MESSAGE_ID = AptMessageId.MOT_SET_EEPROMPARAMS.value
