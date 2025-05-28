@@ -3,108 +3,19 @@ Module for the APT protocol used by Thorlabs. The documentation for the protocol
 here https://www.thorlabs.com/Software/Motion%20Control/APT_Communications_Protocol.pdf
 """
 
-from ctypes import (
-    LittleEndianStructure,
-    c_uint8,
-    c_uint16,
-    c_int16,
-    c_uint32,
-    c_int32,
-    c_char,
-    sizeof,
-)
+from ctypes import sizeof
+
 from enum import Enum
-from typing import ClassVar, Type, TypeVar
+import logging
+import time
+from typing import Any
 
 from qmi.core.transport import QMI_Transport
-from qmi.core.exceptions import QMI_InstrumentException
+from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
+from qmi.instruments.thorlabs.apt_packets import _AptMessage, _AptMessageHeader, APT_MESSAGE_TYPE_TABLE
 
-# APT format specifiers
-apt_word = c_uint16
-apt_short = c_int16
-apt_dword = c_uint32
-apt_long = c_int32
-apt_char = c_char
-# this format specifier is not defined in the APT protocol manual but is helpful for packets that are divided into
-# single bytes
-apt_byte = c_uint8
-
-
-class AptStatusBits(Enum):
-    """Status bits for a status update message."""
-
-    P_MOT_SB_CWHARDLIMIT = 0x00000001  # clockwise hardware limit switch
-    P_MOT_SB_CCWHARDLIMIT = 0x00000002  # counter clockwise hardware limit switch
-    P_MOT_SB_CWSOFTLIMIT = 0x00000004  # clockwise software limit switch
-    P_MOT_SB_CCWSOFTLIMIT = 0x00000008  # counter clockwise software limit switch
-    P_MOT_SB_INMOTIONCW = 0x00000010  # in motion, clockwise direction
-    P_MOT_SB_INMOTIONCCW = 0x00000020  # in motion, counter clockwise direction
-    P_MOT_SB_JOGGINGCW = 0x00000040  # jogging in clockwise direction
-    P_MOT_SB_JOGGINGCCW = 0x00000080  # jogging in counter clockwise direction
-    P_MOT_SB_CONNECTED = 0x00000100  # motor recognised by controller
-    P_MOT_SB_HOMING = 0x00000200  # motor is homing
-    P_MOT_SB_HOMED = 0x00000400  # motor is homed
-    P_MOT_SB_INITIALISING = 0x00000800  # motor performing phase initialisation
-    P_MOT_SB_TRACKING = 0x00001000  # actual position is within the tracking window
-    P_MOT_SB_SETTLED = 0x00002000  # motor not moving and at target position
-    P_MOT_SB_POSITIONERERROR = 0x00004000  # actual position outside margin specified around trajectory position
-    P_MOT_SB_INSTRERROR = 0x00008000  # unable to execute command
-    P_MOT_SB_INTERLOCK = 0x00010000  # used in controllers where a seperate signal is used to enable the motor
-    P_MOT_SB_OVERTEMP = 0x00020000  # motor or motor power driver electronics reached maximum temperature
-    P_MOT_SB_BUSVOLTFAULT = 0x00040000  # low supply voltage
-    P_MOT_SB_COMMUTATIONERROR = 0x00080000  # problem with motor commutation. Can only be recovered with power cycle
-    P_MOT_SB_DIGIP1 = 0x00100000  # state of digital input 1
-    P_MOT_SB_DIGIP2 = 0x00200000  # state of digital input 2
-    P_MOT_SB_DIGIP4 = 0x00400000  # state of digital input 3
-    P_MOT_SB_DIGIP8 = 0x00800000  # state of digital input 4
-    P_MOT_SB_OVERLOAD = 0x01000000  # some form of motor overload
-    P_MOT_SB_ENCODERFAULT = 0x02000000  # encoder fault
-    P_MOT_SB_OVERCURRENT = 0x04000000  # motor exceeded continuous current limit
-    P_MOT_SB_BUSCURRENTFAULT = 0x08000000  # excessive current being drawn from motor power supply
-    P_MOT_SB_POWEROK = 0x10000000  # controller power supplies operating normally
-    P_MOT_SB_ACTIVE = 0x20000000  # controller executing motion commend
-    P_MOT_SB_ERROR = 0x40000000  # indicates an error condition
-    P_MOT_SB_ENABLED = 0x80000000  # motor output enabled, with controller maintaining position
-
-
-class AptMessageId(Enum):
-    """Message IDs for devices using the APT protocol."""
-
-    HW_REQ_INFO = 0x0005
-    HW_GET_INFO = 0x0006
-    MOD_IDENTIFY = 0x0223
-    MOD_SET_CHANENABLESTATE = 0x0210
-    MOD_REQ_CHANENABLESTATE = 0x0211
-    MOD_GET_CHANENABLESTATE = 0x0212
-    HW_START_UPDATEMSGS = 0x0011
-    HW_STOP_UPDATEMSGS = 0x0012
-    MOT_REQ_POS_COUNTER = 0x0411
-    MOT_GET_POS_COUNTER = 0x0412
-    MOT_SET_VEL_PARAMS = 0x0413
-    MOT_REQ_VEL_PARAMS = 0x0414
-    MOT_GET_VEL_PARAMS = 0x0415
-    MOT_REQ_STATUS_BITS = 0x0429
-    MOT_GET_STATUS_BITS = 0x042A
-    MOT_SET_GEN_MOVE_PARAMS = 0x043A
-    MOT_REQ_GEN_MOVE_PARAMS = 0x043B
-    MOT_GET_GEN_MOVE_PARAMS = 0x043C
-    MOT_SET_HOME_PARAMS = 0x0440
-    MOT_REQ_HOME_PARAMS = 0x0441
-    MOT_GET_HOME_PARAMS = 0x0442
-    MOT_MOVE_HOME = 0x0443
-    MOT_MOVE_HOMED = 0x0444
-    MOT_MOVE_RELATIVE = 0x0448
-    MOT_MOVE_ABSOLUTE = 0x0453
-    MOT_MOVE_COMPLETED = 0x0464
-    MOT_MOVE_STOP = 0x0465
-    MOT_MOVE_STOPPED = 0x0466
-    MOT_SET_EEPROMPARAMS = 0x04B9
-    MOT_REQ_USTATUSUPDATE = 0x0490
-    MOT_GET_USTATUSUPDATE = 0x0491
-    MOT_MOVE_JOG = 0x046A
-    POL_SET_PARAMS = 0x0530
-    POL_REQ_PARAMS = 0x0531
-    POL_GET_PARAMS = 0x0532
+# Global variable holding the logger for this module.
+_logger = logging.getLogger(__name__)
 
 
 class AptChannelState(Enum):
@@ -131,62 +42,6 @@ class AptChannelHomeLimitSwitch(Enum):
     """Possible values for the ``limit_switch`` field in the homing parameters."""
     REVERSE = 0x01
     FORWARD = 0x04
-
-
-class AptMessageHeaderWithTwoParams(LittleEndianStructure):
-    """
-    This is the version of the APT message header when no data packet follows a header.
-    """
-
-    _pack_ = True
-    _fields_: ClassVar[list[tuple[str, type]]] = [
-        ("message_id", c_uint16),
-        ("param1", c_uint8),
-        ("param2", c_uint8),
-        ("dest", c_uint8),
-        ("source", c_uint8),
-    ]
-
-
-class AptMessageHeaderWithThreeParams(LittleEndianStructure):
-    """
-    This is the version of the APT message header when no data packet follows a header.
-    """
-
-    _pack_ = True
-    _fields_: ClassVar[list[tuple[str, type]]] = [
-        ("message_id", c_uint16),
-        ("param1", apt_long),
-        ("param2", apt_long),
-        ("param3", apt_long),
-    ]
-
-
-class AptMessageHeaderForData(LittleEndianStructure):
-    """
-    This is the version of the APT message header when a data packet follows a header.
-    """
-
-    _pack_ = True
-    _fields_: ClassVar[list[tuple[str, type]]] = [
-        ("message_id", c_uint16),
-        ("data_length", c_uint16),
-        ("dest", c_uint8),
-        ("source", c_uint8),
-    ]
-
-
-class AptMessage(LittleEndianStructure):
-    """
-    Base class for an APT message.
-    """
-
-    MESSAGE_ID: int
-    HEADER_ONLY: bool = False
-    _pack_ = True
-
-
-T = TypeVar("T", bound=AptMessage)
 
 
 class AptProtocol:
@@ -219,124 +74,98 @@ class AptProtocol:
         self._apt_device_address = apt_device_address
         self._host_address = host_address
 
-    def write_two_param_command(
-        self,
-        message_id: int,
-        param1: int = 0x00,
-        param2: int = 0x00,
-    ) -> None:
-        """
-        Send an APT protocol command that is a header (i.e. 6 bytes) with params.
-
-        Parameters:
-            message_id: ID of message to send.
-            param1:     Parameter 1 to be sent with default value of 0x00.
-            param2:     Parameter 2 to be sent with default value of 0x00.
-        """
-        # Make the command.
-        msg = AptMessageHeaderWithTwoParams(
-            message_id,
-            param1,
-            param2,
-            self._apt_device_address,
-            self._host_address,
+    def create(self, msg_type: _AptMessage, **kwargs: Any) -> str:
+        return msg_type.create(
+            dest=self._apt_device_address,
+            source=self._host_address,
+            **kwargs
         )
-        # Send command.
-        self._transport.write(bytearray(msg))
 
-    def write_three_param_command(
-        self,
-        message_id: int,
-        param1: int = 0x00,
-        param2: int = 0x00,
-        param3: int = 0x00,
-    ) -> None:
-        """
-        Send an APT protocol command that is a header (i.e. 6 bytes) with params.
+    def _send_message(self, msg: _AptMessage) -> None:
+        """Encode and send a binary message to the instrument."""
+        self._transport.write(bytes(msg))
 
-        Parameters:
-            message_id: ID of message to send.
-            param1:     Parameter 1 to be sent with default value of 0x00.
-            param2:     Parameter 2 to be sent with default value of 0x00.
-            param3:     Parameter 3 to be sent with default value of 0x00.
-        """
-        # Make the command.
-        msg = AptMessageHeaderWithThreeParams(
-            message_id,
-            param1,
-            param2,
-            param3
-        )
-        # Send command.
-        self._transport.write(bytearray(msg))
+    def _read_message(self, timeout: float) -> _AptMessage:
+        """Read and decode a binary message from the instrument."""
 
-    def write_home_param_command(
-        self,
-        message_id: int,
-        home_dir: int,
-        limit_switch: int,
-        home_velocity: int,
-        offset_dist: int
-    ) -> None:
-        """
-        Send an APT protocol command that is a header (i.e. 6 bytes) with params.
+        # Read message header.
+        data = self._transport.read(nbytes=6, timeout=timeout)
 
-        Parameters:
-            message_id: ID of message to send.
-        """
-        # Make the command.
-        msg = AptMessageHeaderWithThreeParams(
-            message_id,
-            home_dir,
-            limit_switch,
-            home_velocity,
-            offset_dist
-        )
-        # Send command.
-        self._transport.write(bytearray(msg))
+        # Decode message header.
+        hdr = _AptMessageHeader.from_buffer_copy(data)
 
-    def write_data_command(self, message_id: int, data: T) -> None:
-        """
-        Send and APT protocol command with data.
-        """
-        # Get size of data packet.
-        data_length = sizeof(data)
+        # Long APT messages are identified by bit 7 in the destination field.
+        if (hdr.dest & 0x80) != 0:
+            # This is a long APT message (header + data). Read the additional data.
+            try:
+                # Since we already received a partial message, the timeout
+                # only needs to account for the time it takes to receive
+                # the payload data. (The instrument will probably transmit
+                # the entire message as fast as possible).
+                # 50 ms should be more than enough.
+                data += self._transport.read(nbytes=hdr.data_length, timeout=0.050)
+            except QMI_TimeoutException:
+                # Discard pending data after receiving a partial message.
+                self._transport.discard_read()
+                raise QMI_InstrumentException(
+                    "Received partial message (message_id=0x{:04x}, data_length={})".format(
+                        hdr.message_id, hdr.data_length
+                    )
+                )
 
-        # Make the header.
-        msg = AptMessageHeaderForData(message_id, data_length, self._apt_device_address | 0x80, self._host_address)
-
-        # Send the header and data packet.
-        self._transport.write(bytearray(msg) + bytearray(data))
-
-    def ask(self, data_type: Type[T], timeout: float | None = None) -> T:
-        """
-        Ask for a response.
-
-        Parameters:
-            data_type:  Data type of the data packet that follows the header.
-            timeout:    Optional response timeout in seconds.
-
-        Returns:
-            The requested data typed as the provided data type.
-        """
-
-        if timeout is None:
-            timeout = self._timeout
-
-        # Read the header first.
-        header_bytes = self._transport.read(nbytes=self.HEADER_SIZE_BYTES, timeout=timeout)
-        if data_type.HEADER_ONLY:
-            return data_type.from_buffer_copy(header_bytes)
-        header = AptMessageHeaderForData.from_buffer_copy(header_bytes)
-        data_length = header.data_length
-
-        # Read the data packet that follows the header.
-        data_bytes = self._transport.read(nbytes=data_length, timeout=timeout)
-
-        # Check that the received message ID is the ID that is expected.
-        if data_type.MESSAGE_ID != header.message_id:
+        # Decode the complete message.
+        message_type = APT_MESSAGE_TYPE_TABLE.get(hdr.message_id)
+        if message_type is None:
+            # Discard pending data after receiving a bad message.
+            self._transport.discard_read()
             raise QMI_InstrumentException(
-                f"Expected message with ID {data_type.MESSAGE_ID}, but received {header.message_id}"
+                "Received unknown message id 0x{:04x} from instrument".format(hdr.message_id)
             )
 
-        return data_type.from_buffer_copy(data_bytes)
+        if len(data) != sizeof(message_type):
+            # Discard pending data after receiving a bad message.
+            self._transport.discard_read()
+            raise QMI_InstrumentException(
+                ("Received incorrect message length for message id 0x{:04x} "
+                + "(got {} bytes while expecting {} bytes)").format(
+                    hdr.message_id, len(data), sizeof(message_type)
+                )
+            )
+
+        # Decode received message.
+        return message_type.from_buffer_copy(data)
+
+    def _wait_message(self, message_type: type[_AptMessage], timeout: float) -> _AptMessage:
+        """Wait for a specific message type from the instrument.
+
+        Any other (valid) messages received from the instrument will be discarded.
+
+        Parameters:
+            message_type:   Type of message to wait for.
+            timeout:        Maximum time to wait for the message in seconds.
+
+        Returns:
+            The received message.
+
+        Raises:
+            QMI_TimeoutException: If the expected message is not received within the timeout.
+            QMI_InstrumentException: If an invalid message is received.
+        """
+
+        end_time = time.monotonic() + timeout
+        while True:
+
+            # Read next message from instrument.
+            tmo = max(end_time - time.monotonic(), 0)
+            msg = self._read_message(timeout=tmo)
+
+            if isinstance(msg, message_type):
+                # Got the expected message.
+                return msg
+
+            # Discard message and continue waiting.
+            _logger.debug("Ignoring APT message %s (message_id=0x%04x)",
+                          type(msg).__name__, msg.message_id)
+
+            if time.monotonic() > end_time:
+                raise QMI_TimeoutException(f"Expected message type {message_type} not received.")

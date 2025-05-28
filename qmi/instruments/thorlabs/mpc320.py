@@ -19,6 +19,7 @@ from qmi.instruments.thorlabs.apt_packets import (
     POL_GET_SET_PARAMS,
 )
 from qmi.instruments.thorlabs.apt_protocol import (
+    APT_MESSAGE_TYPE_TABLE,
     AptChannelJogDirection,
     AptChannelState,
     AptMessageId,
@@ -176,9 +177,14 @@ class Thorlabs_Mpc320(QMI_Instrument):
         _logger.info("[%s] Getting identification of instrument", self._name)
         self._check_is_open()
         # Send request message.
-        self._apt_protocol.write_two_param_command(AptMessageId.HW_REQ_INFO.value)
-        # Get response
-        resp = self._apt_protocol.ask(HW_GET_INFO)
+        req_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_REQ_INFO.value].create(
+
+        )
+        reply_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_GET_INFO.value]
+        self._apt_protocol._send_message(req_msg)
+
+        # Receive reply message.
+        resp = self._apt_protocol._wait_message(reply_msg, timeout=self._reply_timeout)
         return QMI_InstrumentIdentification("Thorlabs", resp.model_number, resp.serial_number, resp.fw_version)
 
     @rpc_method
@@ -257,7 +263,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
             Thorlabs_Mpc320_ChannelMap[channel_number],
         )
         # Get response
-        resp = self._apt_protocol.ask(MOD_GET_CHANENABLESTATE)
+        resp = self._apt_protocol.request(MOD_GET_CHANENABLESTATE)
         # For the MPC320 the state 0x01 is the ENABLE state and anything else is DISABLE
         if resp.enable_state == 0x01:
             return AptChannelState.ENABLE
@@ -290,7 +296,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         After running this command, you must clear the buffer by checking if the channel
         was homed, using is_channel_homed()
 
-        Paramters:
+        Parameters:
             channel_number: The channel to home.
         """
         _logger.info("[%s] Homing channel %d", self._name, channel_number)
@@ -320,10 +326,10 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self._check_is_open()
         # This command needs a workaround. Instead of returning the MOT_MOVE_HOMED message, the instrument returns
         # its current state first, so read that to discard the buffer
-        _ = self._apt_protocol.ask(MOT_GET_USTATUSUPDATE, timeout)
+        _ = self._apt_protocol.request(MOT_GET_USTATUSUPDATE, timeout)
         # then read the actual response we need
         try:
-            resp = self._apt_protocol.ask(MOT_MOVE_HOMED, timeout)
+            resp = self._apt_protocol.request(MOT_MOVE_HOMED, timeout)
             return resp.chan_ident == Thorlabs_Mpc320_ChannelMap[channel_number]
         except QMI_TimeoutException:
             _logger.debug("[%s] Channel %d not homed yet", self._name, channel_number)
@@ -380,11 +386,11 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self._check_is_open()
         # This command needs a workaround. Instead of returning the MOT_MOVE_COMPLETED message, the instrument returns
         # its current state first, so read that to discard the buffer
-        _ = self._apt_protocol.ask(MOT_GET_USTATUSUPDATE, timeout)
+        _ = self._apt_protocol.request(MOT_GET_USTATUSUPDATE, timeout)
         # then read the actual response we need
         # then read the actual response we need. If the call times out then the channel has not finished its move.
         try:
-            resp = self._apt_protocol.ask(MOT_MOVE_COMPLETED, timeout)
+            resp = self._apt_protocol.request(MOT_MOVE_COMPLETED, timeout)
             return resp.chan_ident == Thorlabs_Mpc320_ChannelMap[channel_number]
         except QMI_TimeoutException:
             _logger.debug("[%s] Channel %d move not completed yet", self._name, channel_number)
@@ -430,7 +436,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
             Thorlabs_Mpc320_ChannelMap[channel_number],
         )
         # Get response
-        resp = self._apt_protocol.ask(MOT_GET_USTATUSUPDATE)
+        resp = self._apt_protocol.request(MOT_GET_USTATUSUPDATE)
         return Thorlabs_Mpc320_Status(
             channel=channel_number,
             position=resp.position * self.ENCODER_CONVERSION_UNIT,
@@ -512,7 +518,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         # Send request message.
         self._apt_protocol.write_two_param_command(AptMessageId.POL_REQ_PARAMS.value)
         # Get response.
-        params = self._apt_protocol.ask(POL_GET_SET_PARAMS)
+        params = self._apt_protocol.request(POL_GET_SET_PARAMS)
         return Thorlabs_Mpc320_PolarisationParameters(
             velocity=params.velocity,
             home_position=params.home_position * self.ENCODER_CONVERSION_UNIT,
