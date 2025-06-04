@@ -2,27 +2,19 @@
 
 from dataclasses import dataclass
 import logging
+import time
 from typing import Dict, List
+
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.transport import create_transport
-from qmi.instruments.thorlabs.apt_packets import (
-    HW_GET_INFO,
-    MOD_GET_CHANENABLESTATE,
-    MOT_GET_USTATUSUPDATE,
-    MOT_MOVE_ABSOLUTE,
-    MOT_MOVE_COMPLETED,
-    MOT_MOVE_HOMED,
-    MOT_SET_EEPROMPARAMS,
-    POL_GET_SET_PARAMS,
-)
+from qmi.instruments.thorlabs.apt_packets import AptMessageId, _AptMessage, _AptMessageHeader
 from qmi.instruments.thorlabs.apt_protocol import (
     APT_MESSAGE_TYPE_TABLE,
     AptChannelJogDirection,
     AptChannelState,
-    AptMessageId,
     AptProtocol,
 )
 
@@ -153,6 +145,49 @@ class Thorlabs_Mpc320(QMI_Instrument):
                     [{self.MIN_CHANNEL_NUMBER}, {self.MAX_CHANNEL_NUMBER}]"
             )
 
+    def _wait_move_complete(self, channel: int, timeout: float) -> bool:
+        """Wait until the motor has stopped moving.
+
+        If the motor is not currently moving, this function returns immediately.
+        Otherwise, this function wait (blocks) until the motor has stopped moving
+        or until the specified timeout expires.
+
+        Parameters:
+            channel: The channel number to check.
+            timeout: Maximum time to wait in seconds.
+
+        Returns:
+            Boolean: To indicate if the move was finished or not.
+        """
+        end_time = time.monotonic() + timeout
+
+        # Read the motor status to see if we are moving.
+        status = self.get_status_update(channel)
+        if not (status.velocity > 0 or status.motor_current > 0):
+            # Not moving anymore. We are done here.
+            _logger.debug("[%s] Not moving", self._name)
+            return True
+
+        # Check if we reached the timeout.
+        time_left = end_time - time.monotonic()
+        if time_left <= 0:
+            return False
+
+        # Wait for a short while, or until the motor sends a new message.
+        try:
+            msg = self._apt_protocol.read_message(timeout=min(0.5, time_left))
+        except QMI_TimeoutException:
+            # No message from the motor.
+            # This is normal and expected if the motor is still moving.
+            return False
+
+        # Any message from the motor is most likely an announcement that
+        # the move has ended. Whatever the actual message, return True
+        _logger.debug("[%s] Ignoring message %s (message_id=0x%04x)",
+                      self._name, type(msg).__name__, msg.message_id)
+
+        return True
+
     @rpc_method
     def open(self) -> None:
         _logger.info("[%s] Opening connection to instrument", self._name)
@@ -177,14 +212,10 @@ class Thorlabs_Mpc320(QMI_Instrument):
         _logger.info("[%s] Getting identification of instrument", self._name)
         self._check_is_open()
         # Send request message.
-        req_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_REQ_INFO.value].create(
-
-        )
+        req_msg = self._apt_protocol.create(APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_REQ_INFO.value])
         reply_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_GET_INFO.value]
-        self._apt_protocol._send_message(req_msg)
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
 
-        # Receive reply message.
-        resp = self._apt_protocol._wait_message(reply_msg, timeout=self._reply_timeout)
         return QMI_InstrumentIdentification("Thorlabs", resp.model_number, resp.serial_number, resp.fw_version)
 
     @rpc_method
@@ -197,7 +228,11 @@ class Thorlabs_Mpc320(QMI_Instrument):
         # Send message.
         # For the MPC320 the channel number does not matter here. The device has one LED that flashes irrespective
         # of the provided channel number.
-        self._apt_protocol.write_two_param_command(AptMessageId.MOD_IDENTIFY.value, 0x01)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_IDENTIFY.value],
+            chan_ident=1,
+        )
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def enable_channels(self, channel_numbers: List[int]) -> None:
@@ -213,7 +248,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self.enable_channel([1,2])
 
         Parameters:
-            channel_number: The channel(s) to enable.
+            channel_numbers: The channel(s) to enable.
         """
         _logger.info("[%s] Enabling channel(s) %s", self._name, str(channel_numbers))
         self._check_is_open()
@@ -224,24 +259,27 @@ class Thorlabs_Mpc320(QMI_Instrument):
         for channel_number in channel_numbers:
             channels_to_enable ^= Thorlabs_Mpc320_ChannelMap[channel_number]
         # Send message.
-        self._apt_protocol.write_two_param_command(
-            AptMessageId.MOD_SET_CHANENABLESTATE.value,
-            channels_to_enable,
-            AptChannelState.ENABLE.value,
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_SET_CHANENABLESTATE.value],
+            chan_ident=channels_to_enable,
+            enable_state=AptChannelState.ENABLE.value
         )
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def disable_all_channels(self) -> None:
         """
-        Disable all the channels.
+        Disable all the channels. Note that this is done indirectly by "enabling"
+        channel 0, which disables channels 1, 2 and 3.
         """
         _logger.info("[%s] Disabling channels", self._name)
         self._check_is_open()
-        self._apt_protocol.write_two_param_command(
-            AptMessageId.MOD_SET_CHANENABLESTATE.value,
-            0x00,
-            AptChannelState.ENABLE.value,
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_SET_CHANENABLESTATE.value],
+            chan_ident=0x00,
+            enable_state=AptChannelState.ENABLE.value,
         )
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def get_channel_state(self, channel_number: int) -> AptChannelState:
@@ -258,16 +296,16 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self._validate_channel(channel_number)
         self._check_is_open()
         # Send request message.
-        self._apt_protocol.write_two_param_command(
-            AptMessageId.MOD_REQ_CHANENABLESTATE.value,
-            Thorlabs_Mpc320_ChannelMap[channel_number],
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_REQ_CHANENABLESTATE.value],
+            chan_ident=Thorlabs_Mpc320_ChannelMap[channel_number]
         )
-        # Get response
-        resp = self._apt_protocol.request(MOD_GET_CHANENABLESTATE)
-        # For the MPC320 the state 0x01 is the ENABLE state and anything else is DISABLE
-        if resp.enable_state == 0x01:
-            return AptChannelState.ENABLE
-        return AptChannelState.DISABLE
+        reply_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_GET_CHANENABLESTATE.value]
+
+        # Receive response
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
+
+        return AptChannelState(resp.enable_state)
 
     @rpc_method
     def start_auto_status_update(self) -> None:
@@ -277,7 +315,8 @@ class Thorlabs_Mpc320(QMI_Instrument):
         _logger.info("[%s] Starting automatic status updates from instrument", self._name)
         self._check_is_open()
         # Send message.
-        self._apt_protocol.write_two_param_command(AptMessageId.HW_START_UPDATEMSGS.value)
+        req_msg = self._apt_protocol.create(APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_START_UPDATEMSGS.value])
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def stop_auto_status_update(self) -> None:
@@ -287,7 +326,8 @@ class Thorlabs_Mpc320(QMI_Instrument):
         _logger.info("[%s] Stopping automatic status updates from instrument", self._name)
         self._check_is_open()
         # Send message.
-        self._apt_protocol.write_two_param_command(AptMessageId.HW_STOP_UPDATEMSGS.value)
+        req_msg = self._apt_protocol.create(APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_STOP_UPDATEMSGS.value])
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def home_channel(self, channel_number: int) -> None:
@@ -302,9 +342,10 @@ class Thorlabs_Mpc320(QMI_Instrument):
         _logger.info("[%s] Homing channel %d", self._name, channel_number)
         self._validate_channel(channel_number)
         self._check_is_open()
-        # Send message.
-        self._apt_protocol.write_two_param_command(
-            AptMessageId.MOT_MOVE_HOME.value, Thorlabs_Mpc320_ChannelMap[channel_number]
+        # Send command message.
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_HOME.value],
+            chan_ident=Thorlabs_Mpc320_ChannelMap[channel_number],
         )
 
     @rpc_method
@@ -313,7 +354,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         Check if a given channel is homed. This command should only be run after the method `home_channel`.
         Otherwise you will read bytes from other commands using this method.
 
-        Paramters:
+        Parameters:
             channel_number: The channel to check.
             timeout:        The time to wait for a response to the homing command
                             with default value DEFAULT_RESPONSE_TIMEOUT.
@@ -324,17 +365,8 @@ class Thorlabs_Mpc320(QMI_Instrument):
         _logger.info("[%s] Checking if channel %d is homed", self._name, channel_number)
         self._validate_channel(channel_number)
         self._check_is_open()
-        # This command needs a workaround. Instead of returning the MOT_MOVE_HOMED message, the instrument returns
-        # its current state first, so read that to discard the buffer
-        _ = self._apt_protocol.request(MOT_GET_USTATUSUPDATE, timeout)
-        # then read the actual response we need
-        try:
-            resp = self._apt_protocol.request(MOT_MOVE_HOMED, timeout)
-            return resp.chan_ident == Thorlabs_Mpc320_ChannelMap[channel_number]
-        except QMI_TimeoutException:
-            _logger.debug("[%s] Channel %d not homed yet", self._name, channel_number)
 
-        return False
+        return self._wait_move_complete(channel_number, timeout)
 
     @rpc_method
     def move_absolute(self, channel_number: int, position: float) -> None:
@@ -355,13 +387,13 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self._check_is_open()
         # Convert position in degrees to encoder counts.
         encoder_position = round(position / self.ENCODER_CONVERSION_UNIT)
-        # Make data packet.
-        data_packet = MOT_MOVE_ABSOLUTE(
+        # Send command message.
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_ABSOLUTE.value],
             chan_ident=Thorlabs_Mpc320_ChannelMap[channel_number],
-            absolute_distance=encoder_position,
+            abs_position=encoder_position,
         )
-        # Send message.
-        self._apt_protocol.write_data_command(AptMessageId.MOT_MOVE_ABSOLUTE.value, data_packet)
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def is_move_completed(self, channel_number: int, timeout: float = DEFAULT_RESPONSE_TIMEOUT) -> bool:
@@ -369,7 +401,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         Check if a given channel has completed its move. This command should only be run after a relative or absolute
         move command. Otherwise you will read bytes from other commands.
 
-        Paramters:
+        Parameters:
             channel_number: The channel to check.
             timeout:        The time to wait for a response to the homing command. This is optional
                             and is set to a default value of DEFAULT_RESPONSE_TIMEOUT.
@@ -384,17 +416,8 @@ class Thorlabs_Mpc320(QMI_Instrument):
         )
         self._validate_channel(channel_number)
         self._check_is_open()
-        # This command needs a workaround. Instead of returning the MOT_MOVE_COMPLETED message, the instrument returns
-        # its current state first, so read that to discard the buffer
-        _ = self._apt_protocol.request(MOT_GET_USTATUSUPDATE, timeout)
-        # then read the actual response we need
-        # then read the actual response we need. If the call times out then the channel has not finished its move.
-        try:
-            resp = self._apt_protocol.request(MOT_MOVE_COMPLETED, timeout)
-            return resp.chan_ident == Thorlabs_Mpc320_ChannelMap[channel_number]
-        except QMI_TimeoutException:
-            _logger.debug("[%s] Channel %d move not completed yet", self._name, channel_number)
-        return False
+
+        return self._wait_move_complete(channel_number, timeout)
 
     @rpc_method
     def save_parameter_settings(self, channel_number: int, message_id: int) -> None:

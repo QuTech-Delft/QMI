@@ -545,8 +545,8 @@ class _AptMsgGetSetParams(_AptMessage):
 
 
 # Build a table, mapping message ID to the corresponding Python class.
-APT_MESSAGE_TYPE_TABLE: dict[int, type["_AptMessage"]] = {}
+APT_MESSAGE_TYPE_TABLE: dict[int, _AptMessage] = {}
 for name, obj in globals().items():
-    if isinstance(obj, type) and name.startswith('_AptMsg'):
+    if name.startswith('_AptMsg'):
         assert hasattr(obj, "MESSAGE_ID"), f"{obj} class definition is missing MESSAGE_ID."
         APT_MESSAGE_TYPE_TABLE[obj.MESSAGE_ID] = obj

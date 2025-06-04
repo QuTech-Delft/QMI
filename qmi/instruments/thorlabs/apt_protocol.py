@@ -4,11 +4,10 @@ here https://www.thorlabs.com/Software/Motion%20Control/APT_Communications_Proto
 """
 
 from ctypes import sizeof
-
 from enum import Enum
 import logging
 import time
-from typing import Any
+from typing import Any, Union
 
 from qmi.core.transport import QMI_Transport
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
@@ -23,6 +22,13 @@ class AptChannelState(Enum):
 
     ENABLE = 0x01
     DISABLE = 0x02
+
+
+class AptChannelStopMode(Enum):
+    """Channel stop mode"""
+
+    IMMEDIATE = 0x01
+    PROFILED = 0x02
 
 
 class AptChannelJogDirection(Enum):
@@ -74,18 +80,18 @@ class AptProtocol:
         self._apt_device_address = apt_device_address
         self._host_address = host_address
 
-    def create(self, msg_type: _AptMessage, **kwargs: Any) -> str:
+    def create(self, msg_type: _AptMessage, **kwargs: Any) -> _AptMessage:
         return msg_type.create(
             dest=self._apt_device_address,
             source=self._host_address,
             **kwargs
         )
 
-    def _send_message(self, msg: _AptMessage) -> None:
+    def send_message(self, msg: _AptMessage) -> None:
         """Encode and send a binary message to the instrument."""
         self._transport.write(bytes(msg))
 
-    def _read_message(self, timeout: float) -> _AptMessage:
+    def read_message(self, timeout: float) -> _AptMessage:
         """Read and decode a binary message from the instrument."""
 
         # Read message header.
@@ -135,7 +141,7 @@ class AptProtocol:
         # Decode received message.
         return message_type.from_buffer_copy(data)
 
-    def _wait_message(self, message_type: type[_AptMessage], timeout: float) -> _AptMessage:
+    def wait_message(self, message_type: type[_AptMessage], timeout: float) -> _AptMessage:
         """Wait for a specific message type from the instrument.
 
         Any other (valid) messages received from the instrument will be discarded.
@@ -157,7 +163,7 @@ class AptProtocol:
 
             # Read next message from instrument.
             tmo = max(end_time - time.monotonic(), 0)
-            msg = self._read_message(timeout=tmo)
+            msg = self.read_message(timeout=tmo)
 
             if isinstance(msg, message_type):
                 # Got the expected message.
@@ -169,3 +175,13 @@ class AptProtocol:
 
             if time.monotonic() > end_time:
                 raise QMI_TimeoutException(f"Expected message type {message_type} not received.")
+
+    def ask(self, request_msg: _AptMessage, reply_msg: Union[_AptMessage, _AptMessageHeader]) -> _AptMessage:
+        """A helper function for requests that expect a response.
+
+        Parameters:
+            request_msg: The request message to be sent.
+            reply_msg:   The reply message expected to be received.
+        """
+        self.send_message(request_msg)
+        return self.wait_message(type(reply_msg), timeout=self._timeout)
