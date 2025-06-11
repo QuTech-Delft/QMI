@@ -185,7 +185,7 @@ def _apt_short_message_fields(fields: list[tuple[str, type]]) -> list[tuple[str,
 
 # APT messages. See the "Thorlabs APT Controllers Host-Controller Communications Protocol".
 class _AptMsgHwReqInfo(_AptMessage):
-    MESSAGE_ID = AptMessageId.HW_GET_INFO.value
+    MESSAGE_ID = AptMessageId.HW_REQ_INFO.value
     _fields_ = _apt_short_message_fields([])
 
 
@@ -213,17 +213,26 @@ class _AptMsgHwGetInfo(_AptMessageHeader):
                 ("n_channels", apt_word)]
 
 
+class _AptMsgHwStartUpdateMsgs(_AptMessage):
+    MESSAGE_ID = AptMessageId.HW_START_UPDATEMSGS.value
+    _fields_ = _apt_short_message_fields([])
+
+
+class _AptMsgHwStopUpdateMsgs(_AptMessage):
+    MESSAGE_ID = AptMessageId.HW_STOP_UPDATEMSGS.value
+    _fields_ = _apt_short_message_fields([])
+
+
 class _AptMsgSetChanEnableState(_AptMessage):
     """
-    Header structure for the MOD_GET_CHANENABLESTATE response. This header is sent as a response to
-    MOD_REQ_CHANENABLESTATE.
+    Header structure for the MOD_SET_CHANENABLESTATE response.
 
     Fields:
         message_id:     ID of message.
         chan_ident:     Channel number.
         enable_state:   Indicate whether chanel is enabled or disabled.
     """
-    MESSAGE_ID = AptMessageId.MOD_GET_CHANENABLESTATE.value
+    MESSAGE_ID = AptMessageId.MOD_SET_CHANENABLESTATE.value
     _fields_ = _apt_short_message_fields([("chan_ident", apt_byte),
                                           ("enable_state", apt_byte)])
 
@@ -234,6 +243,15 @@ class _AptMsgReqChanEnableState(_AptMessage):
 
 
 class _AptMsgGetChanEnableState(_AptMessage):
+    """
+    Header structure for the MOD_GET_CHANENABLESTATE response. This header is sent as a response to
+    MOD_REQ_CHANENABLESTATE.
+
+    Fields:
+        message_id:     ID of message.
+        chan_ident:     Channel number.
+        enable_state:   Indicate whether chanel is enabled or disabled.
+    """
     MESSAGE_ID = AptMessageId.MOD_GET_CHANENABLESTATE.value
     _fields_ = _apt_short_message_fields([("chan_ident", apt_byte),
                                           ("enable_state", apt_byte)])
@@ -389,7 +407,7 @@ class _AptMsgGetHomeParams(_AptMessageHeader):
         home_velocity: Channel homing velocity.
         offset_dist:   Channel offset distance.
     """
-    MESSAGE_ID = AptMessageId.MOT_GET_GEN_MOVE_PARAMS.value
+    MESSAGE_ID = AptMessageId.MOT_GET_HOME_PARAMS.value
     _fields_ = [("chan_ident", apt_word),
                 ("home_dir", apt_word),
                 ("limit_switch", apt_word),
@@ -487,6 +505,11 @@ class _AptMsgMoveStopped(_AptMessageHeader):
                 ("status_bits", apt_dword)]
 
 
+class _AptMsgReqUStatusUpdate(_AptMessage):
+    MESSAGE_ID = AptMessageId.MOT_REQ_USTATUSUPDATE.value
+    _fields_ = _apt_short_message_fields([("chan_ident", apt_byte)])
+
+
 class _AptMsgGetUStatusUpdate(_AptMessage):
     """
     Data packet structure for a MOT_GET_USTATUSUPDATE command.
@@ -521,9 +544,43 @@ class _AptMsgSetEepromParams(_AptMessage):
     _fields_: ClassVar[list[tuple[str, type]]] = [("chan_ident", apt_word), ("msg_id", apt_word)]
 
 
-class _AptMsgGetSetParams(_AptMessage):
+class _AptMsgMoveJog(_AptMessage):
+    MESSAGE_ID = AptMessageId.MOT_MOVE_JOG.value
+    _fields_ = _apt_short_message_fields([("chan_ident", apt_byte),
+                                          ("direction", apt_byte)])
+
+
+class _AptMsgSetParams(_AptMessage):
     """
-    Data packet structure for POL_SET_PARAMS command. It is also the data packet structure for the POL_GET_PARAMS.
+    Data packet structure for POL_SET_PARAMS command.
+
+    Fields:
+        not_used:       This field is not used, but needs to be in the field structure to not break it.
+        velocity:       Velocity in range 10% to 100% of 400 degrees/s.
+        home_position:  Home position in encoder counts.
+        jog_step1:      Size fo jog step to be performed on paddle 1.
+        jog_step2:      Size fo jog step to be performed on paddle 2.
+        jog_step3:      Size fo jog step to be performed on paddle 3.
+    """
+    MESSAGE_ID = AptMessageId.POL_SET_PARAMS.value
+    _fields_: ClassVar[list[tuple[str, type]]] = [
+        ("not_used", apt_word),
+        ("velocity", apt_word),
+        ("home_position", apt_word),
+        ("jog_step1", apt_word),
+        ("jog_step2", apt_word),
+        ("jog_step3", apt_word),
+    ]
+
+
+class _AptMsgReqParams(_AptMessage):
+    MESSAGE_ID = AptMessageId.POL_REQ_PARAMS.value
+    _fields_ = _apt_short_message_fields([("chan_ident", apt_byte)])
+
+
+class _AptMsgGetParams(_AptMessage):
+    """
+    Data packet structure for POL_GET_PARAMS command. It is also the data packet structure for the POL_REQ_PARAMS.
 
     Fields:
         not_used:       This field is not used, but needs to be in the field structure to not break it.
@@ -546,7 +603,8 @@ class _AptMsgGetSetParams(_AptMessage):
 
 # Build a table, mapping message ID to the corresponding Python class.
 APT_MESSAGE_TYPE_TABLE: dict[int, _AptMessage] = {}
-for name, obj in globals().items():
+global_items = dict(globals().items())
+for name, obj in global_items.items():
     if name.startswith('_AptMsg'):
         assert hasattr(obj, "MESSAGE_ID"), f"{obj} class definition is missing MESSAGE_ID."
         APT_MESSAGE_TYPE_TABLE[obj.MESSAGE_ID] = obj
