@@ -141,7 +141,7 @@ class AptProtocol:
         # Decode received message.
         return message_type.from_buffer_copy(data)
 
-    def wait_message(self, message_type: type[_AptMessage], timeout: float) -> _AptMessage:
+    def wait_message(self, message_type: _AptMessage, timeout: float) -> _AptMessage:
         """Wait for a specific message type from the instrument.
 
         Any other (valid) messages received from the instrument will be discarded.

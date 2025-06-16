@@ -160,7 +160,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
             reply_msg:   The reply message expected to be received.
         """
         self._send_message(request_msg)
-        return self._apt_protocol.wait_message(type(reply_msg), timeout=self.DEFAULT_RESPONSE_TIMEOUT)
+        return self._apt_protocol.wait_message(reply_msg, timeout=self.DEFAULT_RESPONSE_TIMEOUT)
 
     def _check_k10cr1(self) -> None:
         """Check that the connected device is a Thorlabs K10CR1.
@@ -296,7 +296,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Receive response
         resp = self._ask(req_msg, reply_msg)
-        return resp.enable_state == 0x01
+        if resp.enable_state == AptChannelState.ENABLE.value:
+            return True
+        elif resp.enable_state == AptChannelState.DISABLE.value:
+           return False
+        else:
+            raise ValueError(f"{resp.enable_state} is not a valid channel enable state.")
 
     @rpc_method
     def set_chan_enable_state(self, enable: bool) -> None:
@@ -434,7 +439,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Send command message.
         req_msg = self._apt_protocol.create(
-            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_GEN_MOVE_PARAMS.value],
             chan_ident=self._channel,
             backlash_dist=raw_dist
         )

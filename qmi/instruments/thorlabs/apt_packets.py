@@ -264,7 +264,7 @@ class _AptMsgIdentify(_AptMessage):
 
 class _AptMsgReqPosCounter(_AptMessage):
     MESSAGE_ID = AptMessageId.MOT_REQ_POS_COUNTER.value
-    _fields_ = _apt_short_message_fields([("chan_id ent", apt_byte)])
+    _fields_ = _apt_short_message_fields([("chan_ident", apt_byte)])
 
 
 class _AptMsgGetPosCounter(_AptMessageHeader):

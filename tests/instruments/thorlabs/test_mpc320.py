@@ -1,4 +1,5 @@
 import random
+import struct
 import unittest
 import unittest.mock
 import qmi
@@ -9,11 +10,14 @@ from qmi.instruments.thorlabs.apt_protocol import (
     AptChannelJogDirection,
     AptChannelState,
 )
+from qmi.instruments.thorlabs.apt_packets import AptMessageId
 from tests.patcher import PatcherQmiContext
 
 
 class TestThorlabsMPC320(unittest.TestCase):
     def setUp(self):
+        self._pack = "<l"
+        self._empty = b"\x00" * 2
         # Patch QMI context and make instrument
         self._ctx_qmi_id = f"test-tasks-{random.randint(0, 100)}"
         self.qmi_patcher = PatcherQmiContext()
@@ -35,26 +39,32 @@ class TestThorlabsMPC320(unittest.TestCase):
     def test_get_idn_sends_command_and_returns_identification_info(self):
         """Test get_idn method and returns identification info."""
         # Arrange
-        expected_idn = ["Thorlabs", b"MPC320 ", 94000009, 3735810]
+        expected_idn = ["Thorlabs", b"MPC320", 3158579, 3158579]
         # \x89\x53\x9a\x05 is 94000009
         # \x4d\x50\x43\x33\x32\x30\x0a is MPC320
         # x2c\x00 is Brushless DC controller card
         # \x02\x01\x39\x00 is 3735810
-        self._transport_mock.read.side_effect = [
-            b"\x06\x00\x54\x00\x00\x81",
-            b"\x89\x53\x9a\x05\x4d\x50\x43\x33\x32\x30\x20\x00\x2c\x00\x02\x01\x39\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
-        ]
+        # self._transport_mock.read.side_effect = [
+        #     b"\x06\x00\x54\x00\x00\x81" +
+        #     b"\x89\x53\x9a\x05\x4d\x50\x43\x33\x32\x30\x20\x00\x2c\x00\x02\x01\x39\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+        # ]
+        # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
+        expected_write = struct.pack(self._pack, AptMessageId.HW_REQ_INFO.value) + b"P\x01"
+        # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
+        expected_read = struct.pack(self._pack, AptMessageId.HW_GET_INFO.value)
+        # The request+data has to be 90 bytes long and should include string "MPC320" at right spot.
+        self._transport_mock.read.side_effect = [expected_read + self._empty, b"320\0MPC" * 12]
 
         # Act
         idn = self._instr.get_idn()
 
         # Assert
-        self.assertEqual(idn.vendor, expected_idn[0])
-        self.assertEqual(idn.model, expected_idn[1])
-        self.assertEqual(idn.serial, expected_idn[2])
-        self.assertEqual(idn.version, expected_idn[3])
+        self.assertEqual(expected_idn[0], idn.vendor)
+        self.assertEqual(expected_idn[1], idn.model)
+        self.assertEqual(expected_idn[2], idn.serial)
+        self.assertEqual(expected_idn[3], idn.version)
 
-        self._transport_mock.write.assert_called_once_with(bytearray(b"\x05\x00\x00\x00P\x01"))
+        self._transport_mock.write.assert_called_once_with(expected_write)
         self._transport_mock.read.assert_has_calls(
             [
                 unittest.mock.call(nbytes=6, timeout=1.0),
@@ -65,16 +75,23 @@ class TestThorlabsMPC320(unittest.TestCase):
     def test_get_idn_with_wrong_returned_msg_id_sends_command_and_throws_error(self):
         """Test get_idn method and returns identification info."""
         # Arrange
-        self._transport_mock.read.side_effect = [
-            b"\x11\x00\x54\x00\x00\x81",
-            b"\x89\x53\x9a\x05\x4d\x50\x43\x33\x32\x30\x20\x00\x2c\x00\x02\x01\x39\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
-        ]
+        # self._transport_mock.read.side_effect = [
+        #     b"\x11\x00\x54\x00\x00\x81",
+        #     b"\x89\x53\x9a\x05\x4d\x50\x43\x33\x32\x30\x20\x00\x2c\x00\x02\x01\x39\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+        # ]
+        # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
+        expected_write = struct.pack(self._pack, AptMessageId.HW_REQ_INFO.value) + b"P\x01"
+        # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
+        expected_read = struct.pack(self._pack, AptMessageId.HW_GET_INFO.value)
+        # The request+data has to be 90 bytes long and should include string "MPC320" at right spot.
+        self._transport_mock.read.side_effect = [expected_read + self._empty, b"320\0MPC" * 12]
 
         # Act
-        # Assert
         with self.assertRaises(QMI_InstrumentException):
             _ = self._instr.get_idn()
-        self._transport_mock.write.assert_called_once_with(bytearray(b"\x05\x00\x00\x00P\x01"))
+
+        # Assert
+        self._transport_mock.write.assert_called_once_with(expected_write)
         self._transport_mock.read.assert_has_calls(
             [
                 unittest.mock.call(nbytes=6, timeout=1.0),
@@ -85,12 +102,13 @@ class TestThorlabsMPC320(unittest.TestCase):
     def test_identify_sends_command(self):
         """Test identify method and send relevant command."""
         # Arrange
+        expected_write = struct.pack(self._pack, AptMessageId.MOD_IDENTIFY.value) + b"P\x01"
 
         # Act
         self._instr.identify()
 
         # Assert
-        self._transport_mock.write.assert_called_once_with(bytearray(b"\x23\x02\x01\x00\x50\x01"))
+        self._transport_mock.write.assert_called_once_with(expected_write)
 
     def test_enable_channels_enable_four_throws_exception(self):
         """Test enable channel 4, throws exception."""
@@ -104,32 +122,35 @@ class TestThorlabsMPC320(unittest.TestCase):
     def test_enable_channels_enable_one_sends_command(self):
         """Test enable channel 1, send command to enable channel 1."""
         # Arrange
+        expected_write = struct.pack(self._pack, AptMessageId.MOD_SET_CHANENABLESTATE.value) + b"P\x01"
 
         # Act
         self._instr.enable_channels([1])
 
         # Assert
-        self._transport_mock.write.assert_called_once_with(bytearray(b"\x10\x02\x01\x01\x50\x01"))
+        self._transport_mock.write.assert_called_once_with(expected_write)
 
     def test_enable_channels_enable_one_and_three_sends_command(self):
         """Test enable channels 1 and 3, sends command to enable channels 1 and 3."""
         # Arrange
+        expected_write = struct.pack(self._pack, AptMessageId.MOD_SET_CHANENABLESTATE.value) + b"P\x01"
 
         # Act
         self._instr.enable_channels([1, 3])
 
         # Assert
-        self._transport_mock.write.assert_called_once_with(bytearray(b"\x10\x02\x05\x01\x50\x01"))
+        self._transport_mock.write.assert_called_once_with(expected_write)
 
     def test_disable_all_channels_sends_command(self):
         """Test disable all channels, sends command to disable all channels."""
         # Arrange
+        expected_write = struct.pack(self._pack, 0x1000000 + AptMessageId.MOD_SET_CHANENABLESTATE.value) + b"P\x01"
 
         # Act
         self._instr.disable_all_channels()
 
         # Assert
-        self._transport_mock.write.assert_called_once_with(bytearray(b"\x10\x02\x00\x01\x50\x01"))
+        self._transport_mock.write.assert_called_once_with(expected_write)
 
     def test_get_channel_state_for_channel_four_throws_exception(self):
         """Test get state of channel 4, throws exception."""

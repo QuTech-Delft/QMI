@@ -309,8 +309,12 @@ class Thorlabs_Mpc320(QMI_Instrument):
 
         # Receive response
         resp = self._apt_protocol.ask(req_msg, reply_msg)
-
-        return AptChannelState(resp.enable_state)
+        if resp.enable_state == AptChannelState.ENABLE.value:
+            return AptChannelState.ENABLE
+        elif resp.enable_state == AptChannelState.DISABLE.value:
+           return AptChannelState.DISABLE
+        else:
+            raise ValueError(f"{resp.enable_state} is not a valid channel enable state.")
 
     @rpc_method
     def start_auto_status_update(self) -> None:
