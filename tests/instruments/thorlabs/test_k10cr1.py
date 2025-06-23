@@ -5,7 +5,7 @@ from typing import cast
 
 from qmi.core.transport import QMI_SerialTransport
 from qmi.instruments.thorlabs import Thorlabs_K10Cr1
-from qmi.instruments.thorlabs.apt_packets import _AptMsgHwGetInfo
+from qmi.instruments.thorlabs.apt_packets import _AptMsgHwGetInfo, AptMessageId
 import qmi.core.exceptions
 from qmi.instruments.thorlabs.apt_protocol import AptChannelHomeDirection, AptChannelHomeLimitSwitch, AptChannelState
 
@@ -193,7 +193,6 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         expected_write = struct.pack(self._pack, 0x10211) + b"P\x01"  # This is 5001 == 0x1389
         # _AptMsgGetChanEnableState 0x0212
         expected_read = struct.pack(self._pack, 0x1000000 + 0x0212)
-        # We cannot change the enabled state so we content to having it as 0
         self._transport_mock.read.return_value = expected_read + b"00"
 
         state = self.instr.get_chan_enable_state()
@@ -207,7 +206,6 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         expected_write = struct.pack(self._pack, 0x10211) + b"P\x01"  # This is 5001 == 0x1389
         # _AptMsgGetChanEnableState 0x0212
         expected_read = struct.pack(self._pack, 0x2000000 + 0x0212)
-        # We cannot change the enabled state so we content to having it as 0
         self._transport_mock.read.return_value = expected_read + b"00"
 
         state = self.instr.get_chan_enable_state()
@@ -223,17 +221,16 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         for invalid_state in invalid_states:
             expected_error = f"{invalid_state} is not a valid channel enable state."
             # _AptMsgGetChanEnableState 0x0212
-            invalid_read = struct.pack(self._pack, (invalid_state >> 24) + 0x0212)
-            # invalid_read = struct.pack(self._pack, 0x4000000 + 0x0212)
-            # We cannot change the enabled state so we content to having it as 0
+            invalid_read = struct.pack(self._pack, (invalid_state << 24) + 0x0212)
             self._transport_mock.read.return_value = invalid_read + b"00"
 
-            # As enabled state 0 is invalid, we need to assert it:
+            # As invalid enabled state raises an error, we need to assert it:
             with self.assertRaises(ValueError) as v_err:
                 self.instr.get_chan_enable_state()
 
             self.assertEqual(expected_error, str(v_err.exception))
             self._transport_mock.write.assert_called_with(expected_write)
+            self._transport_mock.reset_mock()
 
     def test_get_absolute_position(self):
         """Test get_absolute_position method returns expected position."""
@@ -260,8 +257,8 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         # _AptMsgGetVelParams 0x0415
         expected_read = struct.pack(self._pack, 0x0415)
         # Manually define the bit strings
-        max_vel = b"\x0a\xd3\xed\x35"
-        accel = b"\x1d\x73\x0c\x00"
+        max_vel = struct.pack("<f", expected_max_vel)  # b"\x0a\xd3\xed\x35"
+        accel = struct.pack("<f", expected_accel)  # b"\x1d\x73\x0c\x00"
         self._transport_mock.read.return_value = expected_read + b"\x00\x00\x00\x00\x00\x00\x00\x00" + accel + max_vel
 
         velocity_params = self.instr.get_velocity_params()
@@ -313,7 +310,9 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
     def test_set_chan_enable_state(self):
         """Test set_chan_enable_state can be used to set state to True and False."""
         # We expect to write MESSAGE_ID 0x0210 (_AptMsgSetChanEnableState). Don't know why need to add 101 after x.
-        expected_write = struct.pack(self._pack, 0x1010210) + b"P\x01"  # This is 5001 == 0x1389
+        msg_id = AptMessageId.MOD_SET_CHANENABLESTATE.value
+        expected_write = struct.pack(self._pack, 0x1010000 + msg_id) + b"P\x01"  # This is 5001 == 0x1389
+        # expected_write = struct.pack(self._pack, 0x1010210) + b"P\x01"  # This is 5001 == 0x1389
         expected_read = struct.pack(self._pack, 0x0210)
         # We have no other requirements from the read than the start being the same as the write
         self._transport_mock.read.return_value = expected_read + self._empty

@@ -185,7 +185,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         # Any message from the motor is most likely an announcement that
         # the move has ended. Whatever the actual message, return True
         _logger.debug("[%s] Ignoring message %s (message_id=0x%04x)",
-                      self._name, type(msg).__name__, msg.message_id)
+                      self._name, type(msg).__name__, msg.MESSAGE_ID)
 
         return True
 
@@ -356,6 +356,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_HOME.value],
             chan_ident=Thorlabs_Mpc320_ChannelMap[channel_number],
         )
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def is_channel_homed(self, channel_number: int, timeout: float = DEFAULT_RESPONSE_TIMEOUT) -> bool:
