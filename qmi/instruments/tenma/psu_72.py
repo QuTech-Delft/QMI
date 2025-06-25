@@ -262,7 +262,7 @@ class Tenma72_2550(Tenma72_Base):
     def get_status(self) -> dict[str, Any]:
         """Get the power supply status as a dictionary of status values.
 
-        dictionary composition is:
+        Dictionary composition is:
             Ch1Mode:       "C.V" | "C.C"
             Ch2Mode:       "C.V" | "C.C"
             Tracking:      xx, where xx is byte
@@ -272,7 +272,7 @@ class Tenma72_2550(Tenma72_Base):
             OutputEnabled: True | False
         
         Returns: 
-            dictionary of status values.
+            Dictionary of status values.
         """
         self._send("STATUS?")
         statusByte = ord(self._transport.read(1, 1))  # Read response byte
@@ -407,7 +407,7 @@ class Tenma72_13350(Tenma72_Base):
     def get_status(self) -> dict[str, Any]:
         """Get the power supply status as a dictionary of status values.
 
-        dictionary composition is:
+        Dictionary composition is:
             "ChannelMode ":  "C.V" | "C.C"
             "OutputEnabled": True | False
             "V/C priority ": "Current priority" | "Voltage priority"
@@ -415,7 +415,7 @@ class Tenma72_13350(Tenma72_Base):
             "Lock":          True | False
 
         Returns:
-            dictionary of status values.
+            Dictionary of status values.
         """
         self._send("STATUS?")
         status_bytes = self._transport.read(2, 2)  # Read response byte
