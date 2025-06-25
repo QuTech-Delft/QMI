@@ -49,7 +49,7 @@ def run() -> int:
         channel = args.channel
         if args.current is not None:
             if args.current == "get":
-                print("Current is", instr.read_current(channel), "A")
+                print("Current is", instr.get_current(channel), "A")
 
             else:
                 current = float(args.current)
@@ -58,7 +58,7 @@ def run() -> int:
 
         if args.voltage is not None:
             if args.voltage == "get":
-                print("Voltage is", instr.read_voltage(channel), "V")
+                print("Voltage is", instr.get_voltage(channel), "V")
 
             else:
                 voltage = float(args.voltage)
