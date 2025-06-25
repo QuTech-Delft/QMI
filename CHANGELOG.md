@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.50.0-beta.0] - Unreleased
 
+### Added
+
+### Changed
+
+### Fixed
+- Tenma power supply unit CLI read current and voltage calls fixed to be the correct `get_...` calls.
+
+### Removed
+
 ## [0.49.0] - 2025-05-19
 
 ### Added
