@@ -1,8 +1,7 @@
 """Instrument driver for the Thorlabs K10CR1/M motorized rotational mount.
 
-This driver communicates with the device via a USB serial port,
-using the Thorlabs APT protocol. For details, see the document
-"Thorlabs APT Controllers Host-Controller Communications Protocol",
+This driver communicates with the device via a USB serial port, using the Thorlabs APT protocol. For details,
+see the document "Thorlabs APT Controllers Host-Controller Communications Protocol",
 issue 25 from Thorlabs.
 
 This driver has only been tested under Linux. In principle it should also
@@ -14,7 +13,6 @@ import contextlib
 from dataclasses import dataclass
 import logging
 import time
-from typing import Union
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
@@ -152,12 +150,15 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # Now send the new command.
         self._apt_protocol.send_message(msg)
 
-    def _ask(self, request_msg: _AptMessage, reply_msg: Union[_AptMessage, _AptMessageHeader]) -> _AptMessage:
+    def _ask(self, request_msg: _AptMessage, reply_msg: _AptMessage | _AptMessageHeader) -> _AptMessage:
         """A helper function for requests that expect a response.
 
         Parameters:
             request_msg: The request message to be sent.
             reply_msg:   The reply message expected to be received.
+
+        Returns:
+            apt_message: The message returned by the device.
         """
         self._send_message(request_msg)
         return self._apt_protocol.wait_message(reply_msg, timeout=self.DEFAULT_RESPONSE_TIMEOUT)
@@ -167,7 +168,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         Raises:
             QMI_InstrumentException: If not connected to a K10CR1 device.
-            QMI_TimeoutException: If the instrument does not answer our request.
+            QMI_TimeoutException:    If the instrument does not answer our request.
         """
 
         # Send request message.
@@ -230,12 +231,13 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Receive response
         resp = self._ask(req_msg, reply_msg)
+        fw_version = str(resp.fw_version)
 
         return QMI_InstrumentIdentification(
             vendor="Thorlabs",
             model=resp.model_number.decode("iso8859-1"),
             serial=resp.serial_number,
-            version="{}.{}.{}".format(resp.fw_version[2], resp.fw_version[1], resp.fw_version[0])
+            version="{}.{}.{}".format(fw_version[2], fw_version[1], fw_version[0])
         )
 
     @rpc_method

@@ -1,17 +1,20 @@
-"""Module for a Thorlabs MPC320 motorised fibre polarisation controller."""
+"""Module for a Thorlabs MPC320 motorised fibre polarisation controller.
 
-from ctypes import cast
+This driver communicates with the device via a USB serial port, using the Thorlabs APT protocol. For details,
+see the document "Thorlabs APT Controllers Host-Controller Communications Protocol",
+issue 25 from Thorlabs.
+"""
+
 from dataclasses import dataclass
 import logging
 import time
-from typing import Dict, List
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.transport import create_transport
-from qmi.instruments.thorlabs.apt_packets import AptMessageId, _AptMessage, _AptMessageHeader
+from qmi.instruments.thorlabs.apt_packets import AptMessageId
 from qmi.instruments.thorlabs.apt_protocol import (
     APT_MESSAGE_TYPE_TABLE,
     AptChannelJogDirection,
@@ -61,7 +64,7 @@ class Thorlabs_Mpc320_PolarisationParameters:
     jog_step3: float
 
 
-Thorlabs_Mpc320_ChannelMap: Dict[int, int] = {1: 0x01, 2: 0x02, 3: 0x04}
+Thorlabs_Mpc320_ChannelMap: dict[int, int] = {1: 0x01, 2: 0x02, 3: 0x04}
 
 
 class Thorlabs_Mpc320(QMI_Instrument):
@@ -164,7 +167,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
 
         # Read the motor status to see if we are moving.
         status = self.get_status_update(channel)
-        if not (status.velocity > 0 or status.motor_current > 0):
+        if status.velocity == 0 or status.motor_current == 0:
             # Not moving anymore. We are done here.
             _logger.debug("[%s] Not moving", self._name)
             return True
@@ -238,7 +241,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self._apt_protocol.send_message(req_msg)
 
     @rpc_method
-    def enable_channels(self, channel_numbers: List[int]) -> None:
+    def enable_channels(self, channel_numbers: list[int]) -> None:
         """
         Enable the channel(s). Note that this method will disable any channel that is not provided as an argument. For
         example, if you enable channel 1, then 2 and 3 will be disabled. If you have previously enabled a channel(s)
@@ -370,7 +373,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
                             with default value DEFAULT_RESPONSE_TIMEOUT.
 
         Returns:
-            True if the channel was homed.
+            boolean: True if the channel was homed.
         """
         _logger.info("[%s] Checking if channel %d is homed", self._name, channel_number)
         self._validate_channel(channel_number)
@@ -417,7 +420,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
                             and is set to a default value of DEFAULT_RESPONSE_TIMEOUT.
 
         Returns:
-            True if the move for the channel was completed.
+            boolean: True if the move for the channel was completed.
         """
         _logger.info(
             "[%s] Checking if channel %d has completed its move",
@@ -461,7 +464,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
             channel_number: The channel to query.
 
         Returns:
-            An instance of Thorlabs_MPC320_Status.
+            status: An instance of Thorlabs_MPC320_Status.
         """
         _logger.info("[%s] Getting position counter of channel %d", self._name, channel_number)
         self._check_is_open()
@@ -552,7 +555,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         Get the polarisation parameters.
 
         Returns:
-            An instance of Thorlabs_Mpc320_PolarisationParameters
+            parameters: An instance of Thorlabs_Mpc320_PolarisationParameters.
         """
         _logger.info("[%s] Getting polarisation parameters", self._name)
         self._check_is_open()

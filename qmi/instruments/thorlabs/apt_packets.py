@@ -510,7 +510,7 @@ class _AptMsgReqUStatusUpdate(_AptMessage):
     _fields_ = _apt_short_message_fields([("chan_ident", apt_byte)])
 
 
-class _AptMsgGetUStatusUpdate(_AptMessage):
+class _AptMsgGetUStatusUpdate(_AptMessageHeader):
     """
     Data packet structure for a MOT_GET_USTATUSUPDATE command.
 
@@ -523,16 +523,16 @@ class _AptMsgGetUStatusUpdate(_AptMessage):
         status_bits:    Status bits that provide various errors and indications.
     """
     MESSAGE_ID = AptMessageId.MOT_GET_USTATUSUPDATE.value
-    _fields_: ClassVar[list[tuple[str, type]]] = [
+    _fields_ = [
         ("chan_ident", apt_word),
         ("position", apt_long),
         ("velocity", apt_word),
-        ("motor_current", apt_short),
+        ("motor_current", apt_short),  # Documentation says this is 'word' but description details it unsigned
         ("status_bits", apt_dword),
     ]
 
 
-class _AptMsgSetEepromParams(_AptMessage):
+class _AptMsgSetEepromParams(_AptMessageHeader):
     """
     Data packet structure for a MOT_SET_EEPROMPARAMS command.
 
@@ -541,16 +541,15 @@ class _AptMsgSetEepromParams(_AptMessage):
         msg_id:     ID of message whose settings should be saved.
     """
     MESSAGE_ID = AptMessageId.MOT_SET_EEPROMPARAMS.value
-    _fields_: ClassVar[list[tuple[str, type]]] = [("chan_ident", apt_word), ("msg_id", apt_word)]
+    _fields_ = [("chan_ident", apt_word), ("msg_id", apt_word)]
 
 
 class _AptMsgMoveJog(_AptMessage):
     MESSAGE_ID = AptMessageId.MOT_MOVE_JOG.value
-    _fields_ = _apt_short_message_fields([("chan_ident", apt_byte),
-                                          ("direction", apt_byte)])
+    _fields_ = _apt_short_message_fields([("chan_ident", apt_byte), ("direction", apt_byte)])
 
 
-class _AptMsgSetParams(_AptMessage):
+class _AptMsgSetPolParams(_AptMessageHeader):
     """
     Data packet structure for POL_SET_PARAMS command.
 
@@ -563,7 +562,7 @@ class _AptMsgSetParams(_AptMessage):
         jog_step3:      Size fo jog step to be performed on paddle 3.
     """
     MESSAGE_ID = AptMessageId.POL_SET_PARAMS.value
-    _fields_: ClassVar[list[tuple[str, type]]] = [
+    _fields_ = [
         ("not_used", apt_word),
         ("velocity", apt_word),
         ("home_position", apt_word),
@@ -573,12 +572,12 @@ class _AptMsgSetParams(_AptMessage):
     ]
 
 
-class _AptMsgReqParams(_AptMessage):
+class _AptMsgReqPolParams(_AptMessage):
     MESSAGE_ID = AptMessageId.POL_REQ_PARAMS.value
     _fields_ = _apt_short_message_fields([("chan_ident", apt_byte)])
 
 
-class _AptMsgGetParams(_AptMessage):
+class _AptMsgGetPolParams(_AptMessageHeader):
     """
     Data packet structure for POL_GET_PARAMS command. It is also the data packet structure for the POL_REQ_PARAMS.
 
@@ -591,7 +590,7 @@ class _AptMsgGetParams(_AptMessage):
         jog_step3:      Size fo jog step to be performed on paddle 3.
     """
     MESSAGE_ID = AptMessageId.POL_GET_PARAMS.value
-    _fields_: ClassVar[list[tuple[str, type]]] = [
+    _fields_ = [
         ("not_used", apt_word),
         ("velocity", apt_word),
         ("home_position", apt_word),

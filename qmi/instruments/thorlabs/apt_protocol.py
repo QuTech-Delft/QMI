@@ -7,7 +7,7 @@ from ctypes import sizeof
 from enum import Enum
 import logging
 import time
-from typing import Any, Union
+from typing import Any
 
 from qmi.core.transport import QMI_Transport
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
@@ -176,7 +176,7 @@ class AptProtocol:
             if time.monotonic() > end_time:
                 raise QMI_TimeoutException(f"Expected message type {message_type} not received.")
 
-    def ask(self, request_msg: _AptMessage, reply_msg: Union[_AptMessage, _AptMessageHeader]) -> _AptMessage:
+    def ask(self, request_msg: _AptMessage, reply_msg: _AptMessage | _AptMessageHeader) -> _AptMessage:
         """A helper function for requests that expect a response.
 
         Parameters:

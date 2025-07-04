@@ -140,15 +140,15 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
     def test_get_idn(self):
         """Test the get_idn method."""
         # First two values are hardcoded, and the two latter are based on the standard return value for read in `setUp`
-        expected_idn = ["Thorlabs", "K10CR1", 3232323, "49.82.67"]
+        expected_idn = ["Thorlabs", "K10CR1", 3232323, "3.2.3"]
         # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
         expected_write = struct.pack(self._pack, 0x0005) + b"P\x01"  # This is 5001 == 0x1389
 
         idn = self.instr.get_idn()
-        self.assertEqual(idn.vendor, expected_idn[0])
-        self.assertEqual(idn.model, expected_idn[1])
-        self.assertEqual(idn.serial, expected_idn[2])
-        self.assertEqual(idn.version, expected_idn[3])
+        self.assertEqual(expected_idn[0], idn.vendor)
+        self.assertEqual(expected_idn[1], idn.model)
+        self.assertEqual(expected_idn[2], idn.serial)
+        self.assertEqual(expected_idn[3], idn.version)
 
         self._transport_mock.write.assert_called_with(expected_write)
 
@@ -255,11 +255,17 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         # _AptMsgReqVelParams 0x0414
         expected_write = struct.pack(self._pack, 0x10414) + b"P\x01"  # This is 5001 == 0x1389
         # _AptMsgGetVelParams 0x0415
-        expected_read = struct.pack(self._pack, 0x0415)
         # Manually define the bit strings
-        max_vel = struct.pack("<f", expected_max_vel)  # b"\x0a\xd3\xed\x35"
-        accel = struct.pack("<f", expected_accel)  # b"\x1d\x73\x0c\x00"
-        self._transport_mock.read.return_value = expected_read + b"\x00\x00\x00\x00\x00\x00\x00\x00" + accel + max_vel
+        max_vel = struct.pack(self._pack, int(round(expected_max_vel * Thorlabs_K10Cr1.VELOCITY_FACTOR)))
+        accel = struct.pack(self._pack, int(round(expected_accel * Thorlabs_K10Cr1.ACCELERATION_FACTOR)))
+        self._transport_mock.read.return_value = (
+            struct.pack(self._pack, 0x0415) +
+            struct.pack("<h", 0) +
+            struct.pack("<h", 1) +  # chan ident
+            struct.pack(self._pack, 0) +  # min velocity, always 0
+            accel +
+            max_vel
+        )
 
         velocity_params = self.instr.get_velocity_params()
 
@@ -273,13 +279,16 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         # _AptMsgReqGenMoveParams 0x043B
         expected_write = struct.pack(self._pack, 0x1043B) + b"P\x01"  # This is 5001 == 0x1389
         # _AptMsgGetPosCounter 0x043C
-        expected_read = struct.pack(self._pack, 0x043C)
         # We cannot change the enabled state so we content to having it as false
-        self._transport_mock.read.return_value = expected_read + b"\x00\x00\x00\x00\x00\x30\x01\x01"
-
+        self._transport_mock.read.return_value = (
+            struct.pack(self._pack, 0x043C) +
+            struct.pack("<h", 0) +
+            struct.pack("<h", 1) +  # chan ident
+            struct.pack(self._pack, int(round(expected * Thorlabs_K10Cr1.MICROSTEPS_PER_DEGREE)))
+        )
         distance = self.instr.get_backlash_distance()
 
-        self.assertEqual(round(distance, 2), expected)
+        self.assertEqual(expected, round(distance, 2))
         self._transport_mock.write.assert_called_with(expected_write)
 
     def test_get_home_params(self):
