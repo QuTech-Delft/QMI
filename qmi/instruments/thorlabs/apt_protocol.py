@@ -153,8 +153,8 @@ class AptProtocol:
         # Long APT messages are identified by bit 7 in the destination field.
         if (hdr.dest & 0x80) != 0 or hdr.data_length:
             # This is a long APT message (header + data). Read the additional data.
-            print(f"{len(data)}, {sizeof(message_type)}")
             while len(data) < sizeof(message_type):
+                print(f"{len(data)}, {sizeof(message_type)}")
                 try:
                     # Since we already received a partial message, the timeout
                     # only needs to account for the time it takes to receive
