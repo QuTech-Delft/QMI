@@ -67,14 +67,14 @@ class TestThorlabsK10cr1(unittest.TestCase):
     def test_open_excepts_with_timeout(self):
         """Test opening the instrument time-outs and raises QMI_InstrumentException"""
         # Long APT messages start with 0x80. Give unknown message ID 0x8080
-        long_apt_msg = b"\x80" * 6
-        # expected_exception = "Received partial message (message_id=0x{:04x}, data_length={})".format(0x8080, 32896)
+        long_apt_msg = struct.pack("<l", 0x0006) + b"\x81\x5A"
+        expected_exception = "Received partial message (message_id=0x{:04x}, data_length=0, data=b'')".format(0x0006)
         # Make a long APT message to go into the loop where more data should be read, and cause timeout
         self._transport_mock.read.side_effect = [long_apt_msg, QMI_TimeoutException]
         with self.assertRaises(QMI_InstrumentException) as exc:
             self.instr.open()
 
-        # self.assertEqual(str(exc.exception), expected_exception)
+        self.assertEqual(expected_exception, str(exc.exception))
 
     def test_open_with_no_pending_message(self):
         """Test opening the instrument and no pending message in buffer."""
@@ -111,6 +111,7 @@ class TestThorlabsK10cr1(unittest.TestCase):
         # The data should include string "K10CR1" at right spot.
         self._transport_mock.read.side_effect = [expected_read, QMI_TimeoutException]
         with self.assertRaises(QMI_InstrumentException) as exc:
+            print("expecting timeout exception...")
             self.instr.open()
 
         self.assertEqual(expected_exception, str(exc.exception))

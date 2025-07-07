@@ -163,6 +163,7 @@ class AptProtocol:
                     data += self._transport.read(nbytes=hdr.data_length, timeout=0.050)
                 except QMI_TimeoutException:
                     # Discard data after receiving a partial message.
+                    print(f"Received timeout. {len(data)}, {sizeof(message_type)}")
                     partial_msg = self._clear_buffer()
                     raise QMI_InstrumentException(
                         "Received partial message (message_id=0x{:04x}, data_length={}, data={!r})".format(
