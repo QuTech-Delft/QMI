@@ -170,6 +170,9 @@ class AptProtocol:
                             hdr.message_id, hdr.data_length, partial_msg
                         )
                     )
+                else:
+                    print(f"Did not receive timeout. {len(data)}, {sizeof(message_type)}")
+
 
         if len(data) != sizeof(message_type):
             raise QMI_InstrumentException(
