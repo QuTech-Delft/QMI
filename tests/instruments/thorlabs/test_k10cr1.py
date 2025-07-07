@@ -109,7 +109,7 @@ class TestThorlabsK10cr1(unittest.TestCase):
         # expected_exception = ("Received incorrect message length for message id 0x{:04x} ".format(0x0006) +
         #                      "(got 10 bytes while expecting 90 bytes).")
         # The data should include string "K10CR1" at right spot.
-        self._transport_mock.read.side_effect = [expected_read + b"\x01\x02", QMI_TimeoutException]
+        self._transport_mock.read.side_effect = [expected_read, b"\x01\x02", QMI_TimeoutException()]
         with self.assertRaises(QMI_InstrumentException) as exc:
             print("expecting timeout exception...")
             self.instr.open()
