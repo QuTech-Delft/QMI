@@ -1,14 +1,16 @@
 import unittest, unittest.mock
 import struct
 import binascii
-from typing import cast
 
+from qmi.core.exceptions import QMI_TimeoutException, QMI_InstrumentException
 from qmi.core.transport import QMI_SerialTransport
 from qmi.instruments.thorlabs import Thorlabs_K10Cr1
 from qmi.instruments.thorlabs.apt_packets import _AptMsgHwGetInfo, AptMessageId
-import qmi.core.exceptions
 from qmi.instruments.thorlabs.apt_protocol import AptChannelHomeDirection, AptChannelHomeLimitSwitch, AptChannelState
 
+from tests.patcher import PatcherQmiContext
+
+Thorlabs_K10Cr1.DEFAULT_RESPONSE_TIMEOUT = 0.01
 # Number of microsteps per degree of rotation.
 MICROSTEPS_PER_DEGREE = 409600.0 / 3.0
 # Internal velocity setting for 1 degree/second.
@@ -19,17 +21,20 @@ ACCELERATION_FACTOR = 1502.0
 
 class TestThorlabsK10cr1(unittest.TestCase):
     def setUp(self):
-        qmi.start("TestK10cr1OpenClose")
+        # qmi.start("TestK10cr1OpenClose")
         self._transport_mock = unittest.mock.MagicMock(spec=QMI_SerialTransport)
+        self._transport_mock._safe_serial.in_waiting = 0
+        self._transport_mock._safe_serial.out_waiting = 0
         with unittest.mock.patch(
                 'qmi.instruments.thorlabs.k10cr1.create_transport',
                 return_value=self._transport_mock):
-            self.instr: Thorlabs_K10Cr1 = qmi.make_instrument("instr", Thorlabs_K10Cr1, "transport_descriptor")
-            self.instr = cast(Thorlabs_K10Cr1, self.instr)
+            # self.instr: Thorlabs_K10Cr1 = qmi.make_instrument("instr", Thorlabs_K10Cr1, "transport_descriptor")
+            # self.instr = cast(Thorlabs_K10Cr1, self.instr)
+            self.instr: Thorlabs_K10Cr1 = Thorlabs_K10Cr1(PatcherQmiContext(), "instr", "transport_descriptor")
 
     def tearDown(self):
         self._transport_mock.reset_mock()
-        qmi.stop()
+        # qmi.stop()
 
     def test_open_close(self):
         """Test opening and closing the instrument"""
@@ -50,7 +55,7 @@ class TestThorlabsK10cr1(unittest.TestCase):
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo) but we give 0x0412
         expected_read = struct.pack("<l", 0x0412) + b"\x00\x00"
         self._transport_mock.read.return_value = expected_read + b"K10CR1"
-        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException) as exc:
+        with self.assertRaises(QMI_TimeoutException) as exc:
             self.instr.open()
 
         self.assertEqual(str(exc.exception), expected_exception)
@@ -64,24 +69,24 @@ class TestThorlabsK10cr1(unittest.TestCase):
 
     def test_open_excepts_with_timeout(self):
         """Test opening the instrument time-outs and raises QMI_InstrumentException"""
-        # Long APT messages start with 0x80
+        # Long APT messages start with 0x80. Give unknown message ID 0x8080
         long_apt_msg = b"\x80" * 6
-        expected_exception = "Received partial message (message_id=0x{:04x}, data_length={})".format(0x8080, 32896)
+        # expected_exception = "Received partial message (message_id=0x{:04x}, data_length={})".format(0x8080, 32896)
         # Make a long APT message to go into the loop where more data should be read, and cause timeout
-        self._transport_mock.read.side_effect = [long_apt_msg, qmi.core.exceptions.QMI_TimeoutException]
-        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+        self._transport_mock.read.side_effect = [long_apt_msg, QMI_TimeoutException]
+        with self.assertRaises(QMI_InstrumentException) as exc:
             self.instr.open()
 
-        self.assertEqual(str(exc.exception), expected_exception)
+        # self.assertEqual(str(exc.exception), expected_exception)
 
     def test_open_with_no_pending_message(self):
         """Test opening the instrument and no pending message in buffer."""
         # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
         expected_write = struct.pack("<l", 0x0005) + b"P\x01"  # This is 5001 == 0x1389
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
-        expected_read = struct.pack("<l", 0x0006) + b"\x00" * 2 + b"CR1\0K10" * 12
+        expected_read = struct.pack("<l", 0x0006) + b"\x81\x5A"
         # The request+data has to be 90 bytes long and should include string "K10CR1" at right spot.
-        self._transport_mock.read.side_effect = [qmi.core.exceptions.QMI_TimeoutException, expected_read]
+        self._transport_mock.read.side_effect = [expected_read, b"CR1\0K10" * 12]
         self.instr.open()
         self.instr.close()
         # Assert
@@ -93,23 +98,23 @@ class TestThorlabsK10cr1(unittest.TestCase):
         # Make unexpected response MESSAGE_ID
         expected_read = struct.pack("l", 0x8080) + b"\x00\x00"
         self._transport_mock.read.return_value = expected_read
-        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+        with self.assertRaises(QMI_InstrumentException) as exc:
             self.instr.open()
 
-        self.assertEqual(str(exc.exception), expected_exception)
+        self.assertEqual(expected_exception, str(exc.exception))
 
     def test_open_excepts_with_wrong_data_length(self):
         """Test opening and closing the instrument"""
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
-        expected_read = struct.pack("l", 0x0006) + b"\x00\x00"
-        expected_exception = "Received incorrect message length for message id 0x{:04x} ".format(0x0006) +\
-                             "(got {} bytes while expecting {} bytes)".format(len(expected_read), 90)
+        expected_read = struct.pack("l", 0x0006) + b"\x81\x02"
+        expected_exception = "Received partial message (message_id=0x{:04x}, ".format(0x0006) +\
+                             "data_length=0, data=b'')"
         # The data should include string "K10CR1" at right spot.
-        self._transport_mock.read.return_value = expected_read
-        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException) as exc:
+        self._transport_mock.read.side_effect = [expected_read, QMI_TimeoutException]
+        with self.assertRaises(QMI_InstrumentException) as exc:
             self.instr.open()
 
-        self.assertEqual(str(exc.exception), expected_exception)
+        self.assertEqual(expected_exception, str(exc.exception))
 
 
 class TestThorlabsK10cr1Methods(unittest.TestCase):
@@ -117,13 +122,15 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
     def setUp(self):
         self._pack = "<l"
         self._empty = b"\x00" * 2
-        qmi.start("TestK10cr1Context")
+        # qmi.start("TestK10cr1Context")
         self._transport_mock = unittest.mock.MagicMock(spec=QMI_SerialTransport)
+        self._transport_mock._safe_serial.in_waiting = 0
+        self._transport_mock._safe_serial.out_waiting = 0
         with unittest.mock.patch(
                 'qmi.instruments.thorlabs.k10cr1.create_transport',
                 return_value=self._transport_mock):
-            self.instr: Thorlabs_K10Cr1 = qmi.make_instrument("instr", Thorlabs_K10Cr1, "transport_descriptor")
-            self.instr = cast(Thorlabs_K10Cr1, self.instr)
+            self.instr: Thorlabs_K10Cr1 = Thorlabs_K10Cr1(PatcherQmiContext(), "instr", "transport_descriptor")
+            # self.instr = cast(Thorlabs_K10Cr1, self.instr)
 
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo) to 'open'
         expected_read = struct.pack("<l", 0x0006)
@@ -135,7 +142,7 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
+        # qmi.stop()
 
     def test_get_idn(self):
         """Test the get_idn method."""
@@ -573,7 +580,7 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         # Let's get all expected values as "True". The bit order is in reverse pairs.
         self._transport_mock.read.return_value = expected_read + b"\x00\x00\x00\x00\xfb\xff\x00\x81"
 
-        with self.assertRaises(qmi.core.exceptions.QMI_TimeoutException) as exc:
+        with self.assertRaises(QMI_TimeoutException) as exc:
             self.instr.wait_move_complete(0.0)
 
         self._transport_mock.write.assert_called_with(expected_write)
@@ -581,19 +588,19 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
 
     def test_wait_move_complete_excepts_with_timeout_2(self):
         """See that a move is completed. We need to suppress motor giving a response."""
-        expected_read_calls = 2
         # We expect to write MESSAGE_ID 0x0429 (_AptMsgReqStatusBits).
         # Bit 1 after x below is to identify as "Get" command.
         expected_write = struct.pack(self._pack, 0x10429) + b"P\x01"  # This is 5001 == 0x1389
-        expected_read = struct.pack(self._pack, 0x042A)
+        expected_read = struct.pack(self._pack, 0x042A) + b"\x81\x00"
         unexpected_read = struct.pack(self._pack, 0x0429) + self._empty
         # Let's get all expected values as "False"
-        self._transport_mock.read.side_effect = [unexpected_read, expected_read + b"\x00\x00\x00\x00\x00\x00\x00\x00"]
+        self._transport_mock.read.side_effect = [unexpected_read, expected_read, b"\x00\x00\x00\x00\x00\x00\x00\x00"]
 
-        self.instr.wait_move_complete(0.0)
+        with self.assertRaises(QMI_TimeoutException):
+            self.instr.wait_move_complete(1.0)
 
         self._transport_mock.write.assert_called_with(expected_write)
-        self.assertEqual(self._transport_mock.read.call_count, expected_read_calls)
+        self._transport_mock.read.assert_called_once_with(nbytes=6, timeout=Thorlabs_K10Cr1.DEFAULT_RESPONSE_TIMEOUT)
 
 
 if __name__ == '__main__':

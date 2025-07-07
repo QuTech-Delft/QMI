@@ -52,9 +52,9 @@ class Thorlabs_Mpc320_PolarisationParameters:
     Attributes:
         velocity:       The velocity in percentage of the max velocity 400 degrees/s.
         home_position:  The home position of all the paddles/channels in degrees.
-        jog_step1:      The position to move paddel/channel 1 by for a jog step in degrees.
-        jog_step2:      The position to move paddel/channel 2 by for a jog step in degrees.
-        jog_step3:      The position to move paddel/channel 3 by for a jog step in degrees.
+        jog_step1:      The position to move paddle/channel 1 by for a jog step in degrees.
+        jog_step2:      The position to move paddle/channel 2 by for a jog step in degrees.
+        jog_step3:      The position to move paddle/channel 3 by for a jog step in degrees.
     """
 
     velocity: float
@@ -72,7 +72,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
     Driver for a Thorlabs MPC320 motorised fibre polarisation controller.
     """
 
-    DEFAULT_RESPONSE_TIMEOUT = 1.0
+    DEFAULT_RESPONSE_TIMEOUT = 0.5
 
     # the maximum range for a paddle is 170 degrees
     # the value returned by the encoder is 1370 for 170 degrees
@@ -149,7 +149,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
                     [{self.MIN_CHANNEL_NUMBER}, {self.MAX_CHANNEL_NUMBER}]"
             )
 
-    def _wait_move_complete(self, channel: int, timeout: float) -> bool:
+    def _is_move_complete(self, channel: int, timeout: float) -> bool:
         """Wait until the motor has stopped moving.
 
         If the motor is not currently moving, this function returns immediately.
@@ -179,7 +179,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
 
         # Wait for a short while, or until the motor sends a new message.
         try:
-            msg = self._apt_protocol.read_message(timeout=min(0.5, time_left))
+            msg = self._apt_protocol.read_message(timeout=min(self.DEFAULT_RESPONSE_TIMEOUT, time_left))
         except QMI_TimeoutException:
             # No message from the motor.
             # This is normal and expected if the motor is still moving.
@@ -379,16 +379,15 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self._validate_channel(channel_number)
         self._check_is_open()
 
-        return self._wait_move_complete(channel_number, timeout)
+        return self._is_move_complete(channel_number, timeout)
 
     @rpc_method
     def move_absolute(self, channel_number: int, position: float) -> None:
         """
         Move a channel to the specified position. The specified position is in degrees. A conversion is done to convert
         this into encoder counts. This means that there may be a slight mismatch in the specified position and the
-        actual position. You may use the get_status_update method to get the actual position.
-        After running this command, you must clear the buffer by checking if the channel
-        move was completed, using is_move_completed()
+        actual position. You may use the `get_status_update` method to get the actual position or use
+        `is_move_completed` to wait until the move is finished.
 
         Parameters:
             channel_number: The channel to address.
@@ -414,6 +413,10 @@ class Thorlabs_Mpc320(QMI_Instrument):
         Check if a given channel has completed its move. This command should only be run after a relative or absolute
         move command. Otherwise you will read bytes from other commands.
 
+        NOTE: If the `is_move_completed` call is used in a loop to check the move status until a move is
+              finished (i.e. returns `True`), it is better to have a short time.sleep (0.01 seconds should
+              suffice) in between the `is_move_completed` calls. Polling too fast seems to cause issues.
+
         Parameters:
             channel_number: The channel to check.
             timeout:        The time to wait for a response to the homing command. This is optional
@@ -430,7 +433,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         self._validate_channel(channel_number)
         self._check_is_open()
 
-        return self._wait_move_complete(channel_number, timeout)
+        return self._is_move_complete(channel_number, timeout)
 
     @rpc_method
     def save_parameter_settings(self, channel_number: int, message_id: int) -> None:

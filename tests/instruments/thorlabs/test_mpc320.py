@@ -2,7 +2,7 @@ import random
 import struct
 import unittest
 import unittest.mock
-import qmi
+
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.transport import QMI_SerialTransport
 from qmi.instruments.thorlabs import Thorlabs_Mpc320
@@ -10,8 +10,11 @@ from qmi.instruments.thorlabs.apt_protocol import (
     AptChannelJogDirection,
     AptChannelState,
 )
-from qmi.instruments.thorlabs.apt_packets import AptMessageId
+from qmi.instruments.thorlabs.apt_packets import AptMessageId, _AptMsgHwGetInfo
+
 from tests.patcher import PatcherQmiContext
+
+Thorlabs_Mpc320.DEFAULT_RESPONSE_TIMEOUT = 0.01
 
 
 class TestThorlabsMPC320(unittest.TestCase):
@@ -24,21 +27,18 @@ class TestThorlabsMPC320(unittest.TestCase):
         self.source = 0x01
         # Patch QMI context and make instrument
         self._ctx_qmi_id = f"test-tasks-{random.randint(0, 100)}"
-        self.qmi_patcher = PatcherQmiContext()
-        self.qmi_patcher.start(self._ctx_qmi_id)
         self._transport_mock = unittest.mock.MagicMock(spec=QMI_SerialTransport)
+        self._transport_mock._safe_serial.in_waiting = 0
+        self._transport_mock._safe_serial.out_waiting = 0
         with unittest.mock.patch(
             "qmi.instruments.thorlabs.mpc320.create_transport",
             return_value=self._transport_mock,
         ):
-            self._instr: Thorlabs_Mpc320 = self.qmi_patcher.make_instrument(
-                "test_mpc320", Thorlabs_Mpc320, "serial:transport_str"
-            )
+            self._instr = Thorlabs_Mpc320(PatcherQmiContext(), "test_mpc320", "serial:transport_str")
         self._instr.open()
 
     def tearDown(self):
         self._instr.close()
-        qmi.stop()
 
     def test_get_idn_sends_command_and_returns_identification_info(self):
         """Test get_idn method and returns identification info."""
@@ -69,20 +69,25 @@ class TestThorlabsMPC320(unittest.TestCase):
     def test_get_idn_with_wrong_returned_msg_id_sends_command_and_throws_error(self):
         """Test get_idn method and returns identification info."""
         # Arrange
+        expected_error = f"Expected message type {str(_AptMsgHwGetInfo)} not received."
         # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
         expected_write = struct.pack(self._pack, AptMessageId.HW_REQ_INFO.value) + b"P\x01"
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
-        expected_read = struct.pack(self._pack, AptMessageId.HW_GET_INFO.value)
+        expected_read = struct.pack(self._pack, AptMessageId.MOT_GET_POS_COUNTER.value)
         # The request+data has to be 90 bytes long and should include string "MPC320" at right spot.
-        self._transport_mock.read.side_effect = [expected_read + self._empty, b"320\0MPC" * 12]
+        self._transport_mock.read.side_effect = [expected_read + b"\x81\x00", b"320\0MPC" * 12]
 
         # Act
-        with self.assertRaises(QMI_InstrumentException):
+        with self.assertRaises(QMI_TimeoutException) as exc:
             _ = self._instr.get_idn()
 
         # Assert
+        self.assertEqual(expected_error, str(exc.exception))
         self._transport_mock.write.assert_called_once_with(expected_write)
-        self._transport_mock.read.assert_called_once()
+        self._transport_mock.read.assert_has_calls([
+            unittest.mock.call(nbytes=6, timeout=Thorlabs_Mpc320.DEFAULT_RESPONSE_TIMEOUT),
+            unittest.mock.call(nbytes=0, timeout=0.050)
+        ])
 
     def test_identify_sends_command(self):
         """Test identify method and send relevant command."""

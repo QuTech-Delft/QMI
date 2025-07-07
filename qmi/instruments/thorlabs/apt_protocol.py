@@ -80,7 +80,28 @@ class AptProtocol:
         self._apt_device_address = apt_device_address
         self._host_address = host_address
 
+    def _clear_buffer(self) -> bytes:
+        """Reads and clears the buffer. Suppress the timeout exception if no old message is in the buffer.
+
+        Returns:
+            pending_msg: Collected message bytes from the buffer or empty bytes string.
+        """
+        pending_msg = b""
+        while self._transport._safe_serial.in_waiting > 0:
+            _logger.debug("waiting to receive %i bytes.", self._transport._safe_serial.in_waiting)
+            try:
+                pending_msg += self._transport.read(self._transport._safe_serial.in_waiting, timeout=0.0)
+            except QMI_TimeoutException:
+                break
+
+        return pending_msg
+
     def create(self, msg_type: _AptMessage, **kwargs: Any) -> _AptMessage:
+        """Call for creating and returning a message instance. Valid for request and get messages.
+
+        Returns:
+            apt_message: The created message instance.
+        """
         return msg_type.create(
             dest=self._apt_device_address,
             source=self._host_address,
@@ -88,55 +109,64 @@ class AptProtocol:
         )
 
     def send_message(self, msg: _AptMessage) -> None:
-        """Encode and send a binary message to the instrument."""
+        """Encode and send a binary message to the instrument. Before sending a new command, do a non-blocking read
+        to consume a potential old message from the instrument. This prevents a buildup of unhandled notification
+        messages from the instrument after several move_XXX() commands.
+
+        Parameters:
+            msg: An `_AptMessage` instance.
+        """
+        pending_msg = self._clear_buffer()
+        _logger.debug("Pending message %s (message_id=0x%04x): %s", type(msg).__name__, msg.message_id, pending_msg)
+
         self._transport.write(bytes(msg))
 
     def read_message(self, timeout: float) -> _AptMessage:
-        """Read and decode a binary message from the instrument."""
+        """Read and decode a binary message from the instrument.
 
-        # Read message header.
-        data = self._transport.read(nbytes=6, timeout=timeout)
+        Parameters:
+            timeout: A timeout value for reading the messages.
+
+        Returns:
+            message: The obtained message instance with data from the buffer.
+        """
+
+        # Read message header. If the header is not ready, double the timeout.
+        if self._transport._safe_serial.in_waiting < self.HEADER_SIZE_BYTES:
+            time.sleep(timeout)
+
+        data = self._transport.read(nbytes=self.HEADER_SIZE_BYTES, timeout=timeout)
 
         # Decode message header.
         hdr = _AptMessageHeader.from_buffer_copy(data)
-
-        # Long APT messages are identified by bit 7 in the destination field.
-        if (hdr.dest & 0x80) != 0:
-            # This is a long APT message (header + data). Read the additional data.
-            try:
-                # Since we already received a partial message, the timeout
-                # only needs to account for the time it takes to receive
-                # the payload data. (The instrument will probably transmit
-                # the entire message as fast as possible).
-                # 50 ms should be more than enough.
-                data += self._transport.read(nbytes=hdr.data_length, timeout=0.050)
-            except QMI_TimeoutException:
-                # Discard pending data after receiving a partial message.
-                self._transport.discard_read()
-                raise QMI_InstrumentException(
-                    "Received partial message (message_id=0x{:04x}, data_length={})".format(
-                        hdr.message_id, hdr.data_length
-                    )
-                )
-
         # Decode the complete message.
         message_type = APT_MESSAGE_TYPE_TABLE.get(hdr.message_id)
         if message_type is None:
-            # Discard pending data after receiving a bad message.
+            # Discard pending data after receiving a bad message. Usually happens only when (too) many commands
+            # are sent to the device in quick succession.
             self._transport.discard_read()
             raise QMI_InstrumentException(
                 "Received unknown message id 0x{:04x} from instrument".format(hdr.message_id)
             )
 
-        if len(data) != sizeof(message_type):
-            # Discard pending data after receiving a bad message.
-            self._transport.discard_read()
-            raise QMI_InstrumentException(
-                ("Received incorrect message length for message id 0x{:04x} "
-                + "(got {} bytes while expecting {} bytes)").format(
-                    hdr.message_id, len(data), sizeof(message_type)
-                )
-            )
+        # Long APT messages are identified by bit 7 in the destination field.
+        if (hdr.dest & 0x80) != 0 or hdr.data_length:
+            # This is a long APT message (header + data). Read the additional data.
+            while len(data) < sizeof(message_type):
+                try:
+                    # Since we already received a partial message, the timeout
+                    # only needs to account for the time it takes to receive
+                    # the payload data. (The instrument will probably transmit
+                    # the entire message as fast as possible).
+                    data += self._transport.read(nbytes=hdr.data_length, timeout=0.050)
+                except QMI_TimeoutException:
+                    # Discard data after receiving a partial message.
+                    partial_msg = self._clear_buffer()
+                    raise QMI_InstrumentException(
+                        "Received partial message (message_id=0x{:04x}, data_length={}, data={})".format(
+                            hdr.message_id, hdr.data_length, partial_msg
+                        )
+                    )
 
         # Decode received message.
         return message_type.from_buffer_copy(data)
@@ -162,9 +192,7 @@ class AptProtocol:
         while True:
 
             # Read next message from instrument.
-            tmo = max(end_time - time.monotonic(), 0)
-            msg = self.read_message(timeout=tmo)
-
+            msg = self.read_message(timeout=timeout)
             if isinstance(msg, message_type):
                 # Got the expected message.
                 return msg
@@ -184,4 +212,7 @@ class AptProtocol:
             reply_msg:   The reply message expected to be received.
         """
         self.send_message(request_msg)
+        while self._transport._safe_serial.out_waiting > 0:
+            _logger.debug("waiting for device to receive %i bytes.", self._transport._safe_serial.out_waiting)
+
         return self.wait_message(type(reply_msg), timeout=self._timeout)

@@ -9,7 +9,6 @@ work under Windows, but that would require somehow creating a virtual COM port
 for the internal USB serial port in the instrument.
 """
 
-import contextlib
 from dataclasses import dataclass
 import logging
 import time
@@ -19,7 +18,7 @@ from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.transport import create_transport
-from qmi.instruments.thorlabs.apt_packets import AptMessageId, _AptMessage, _AptMessageHeader
+from qmi.instruments.thorlabs.apt_packets import AptMessageId
 from qmi.instruments.thorlabs.apt_protocol import (
     APT_MESSAGE_TYPE_TABLE,
     AptChannelHomeDirection,
@@ -135,34 +134,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # The K10CR1 only uses channel 1.
         self._channel = 1
 
-    def _send_message(self, msg: _AptMessage) -> None:
-        """Encode and send a binary message to the instrument."""
-        # Before sending a new command, do a non-blocking read to consume
-        # a potential old message from the instrument.
-        # This prevents a buildup of unhandled notification messages from
-        # the instrument after several move_XXX() commands.
-        # Suppress the timeout exception if no old message is in the buffer.
-        with contextlib.suppress(QMI_TimeoutException):
-            pending_msg = self._apt_protocol.read_message(timeout=0.0)
-            _logger.debug("[%s] Pending message %s (message_id=0x%04x)",
-                          self._name, type(pending_msg).__name__, pending_msg.message_id)
-
-        # Now send the new command.
-        self._apt_protocol.send_message(msg)
-
-    def _ask(self, request_msg: _AptMessage, reply_msg: _AptMessage | _AptMessageHeader) -> _AptMessage:
-        """A helper function for requests that expect a response.
-
-        Parameters:
-            request_msg: The request message to be sent.
-            reply_msg:   The reply message expected to be received.
-
-        Returns:
-            apt_message: The message returned by the device.
-        """
-        self._send_message(request_msg)
-        return self._apt_protocol.wait_message(reply_msg, timeout=self.DEFAULT_RESPONSE_TIMEOUT)
-
     def _check_k10cr1(self) -> None:
         """Check that the connected device is a Thorlabs K10CR1.
 
@@ -173,10 +144,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Send request message.
         req_msg = self._apt_protocol.create(APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_REQ_INFO.value])
-        reply_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_GET_INFO.value]
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_GET_INFO.value]
+        )
 
         # Receive response
-        resp = self._ask(req_msg, reply_msg)
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
 
         # Check that this is a K10CR1 device.
         model_str = resp.model_number.decode("iso8859-1")
@@ -227,10 +200,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Send request message.
         req_msg = self._apt_protocol.create(APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_REQ_INFO.value])
-        reply_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_GET_INFO.value]
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_GET_INFO.value]
+        )
 
         # Receive response
-        resp = self._ask(req_msg, reply_msg)
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
         fw_version = str(resp.fw_version)
 
         return QMI_InstrumentIdentification(
@@ -250,9 +225,11 @@ class Thorlabs_K10CR1(QMI_Instrument):
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_STATUS_BITS.value],
             chan_ident=self._channel
         )
-        reply_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_STATUS_BITS.value]
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_STATUS_BITS.value]
+        )
         # Receive response
-        resp = self._ask(req_msg, reply_msg)
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
 
         # Decode motor status bits.
         status_bits = resp.status_bits
@@ -282,7 +259,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_IDENTIFY.value],
             chan_ident=self._channel
         )
-        self._send_message(req_msg)
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def get_chan_enable_state(self) -> bool:
@@ -294,10 +271,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_REQ_CHANENABLESTATE.value],
             chan_ident=self._channel
         )
-        reply_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_GET_CHANENABLESTATE.value]
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_GET_CHANENABLESTATE.value]
+        )
 
         # Receive response
-        resp = self._ask(req_msg, reply_msg)
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
         if resp.enable_state == AptChannelState.ENABLE.value:
             return True
         elif resp.enable_state == AptChannelState.DISABLE.value:
@@ -323,7 +302,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
             chan_ident=self._channel,
             enable_state=enable_state.value,
         )
-        self._send_message(set_msg)
+        self._apt_protocol.send_message(set_msg)
 
     @rpc_method
     def get_absolute_position(self) -> float:
@@ -346,10 +325,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_POS_COUNTER.value],
             chan_ident=self._channel
         )
-        reply_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_POS_COUNTER.value]
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_POS_COUNTER.value]
+        )
 
         # Receive response
-        resp = self._ask(req_msg, reply_msg)
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
         return resp.position / self.MICROSTEPS_PER_DEGREE
 
     @rpc_method
@@ -363,10 +344,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_VEL_PARAMS.value],
             chan_ident=self._channel
         )
-        reply_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_VEL_PARAMS.value]
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_VEL_PARAMS.value]
+        )
 
         # Receive response
-        resp = self._ask(req_msg, reply_msg)
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
         return VelocityParams(
             max_velocity=(resp.max_vel / self.VELOCITY_FACTOR),
             acceleration=(resp.accel / self.ACCELERATION_FACTOR)
@@ -390,7 +373,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         self._check_is_open()
 
-        # Send command message.
+        # Send command message. Note that documentation describes 'min_vel' to be always zero.
         max_vel = int(round(max_velocity * self.VELOCITY_FACTOR))
         accel = int(round(acceleration * self.ACCELERATION_FACTOR))
         req_msg = self._apt_protocol.create(
@@ -400,7 +383,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
             accel=accel,
             max_vel=max_vel
         )
-        self._send_message(req_msg)
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def get_backlash_distance(self) -> float:
@@ -413,10 +396,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_GEN_MOVE_PARAMS.value],
             chan_ident=self._channel
         )
-        reply_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_GEN_MOVE_PARAMS.value]
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_GEN_MOVE_PARAMS.value]
+        )
 
         # Receive response
-        resp = self._ask(req_msg, reply_msg)
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
 
         return resp.backlash_dist / self.MICROSTEPS_PER_DEGREE
 
@@ -446,7 +431,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
             backlash_dist=raw_dist
         )
 
-        self._send_message(req_msg)
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def get_home_params(self) -> HomeParams:
@@ -459,10 +444,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_HOME_PARAMS.value],
             chan_ident=self._channel
         )
-        reply_msg = APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_HOME_PARAMS.value]
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_HOME_PARAMS.value]
+        )
 
         # Receive response
-        resp = self._ask(req_msg, reply_msg)
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
 
         return HomeParams(
             home_direction=AptChannelHomeDirection(resp.home_dir),
@@ -515,7 +502,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
             home_velocity=raw_velocity,
             offset_dist=raw_dist
         )
-        self._send_message(req_msg)
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def move_stop(self, immediate_stop: bool = False) -> None:
@@ -536,7 +523,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
             chan_ident=self._channel,
             stop_mode=stop_mode.value,
         )
-        self._send_message(req_msg)
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def move_home(self) -> None:
@@ -552,7 +539,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_HOME.value],
             chan_ident=self._channel,
         )
-        self._send_message(req_msg)
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def move_relative(self, distance: float) -> None:
@@ -578,7 +565,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
             chan_ident=self._channel,
             rel_dist=raw_dist
         )
-        self._send_message(req_msg)
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def move_absolute(self, position: float) -> None:
@@ -614,7 +601,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
             chan_ident=self._channel,
             abs_position=raw_pos,
         )
-        self._send_message(req_msg)
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def wait_move_complete(self, timeout: float) -> None:
@@ -654,7 +641,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
             # Wait for a short while, or until the motor sends a new message.
             try:
-                msg = self._apt_protocol.read_message(timeout=min(0.5, time_left))
+                msg = self._apt_protocol.read_message(timeout=min(self.DEFAULT_RESPONSE_TIMEOUT, time_left))
             except QMI_TimeoutException:
                 # No message from the motor.
                 # This is normal and expected if the motor is still moving.
