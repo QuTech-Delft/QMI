@@ -10,7 +10,7 @@ from qmi.instruments.thorlabs.apt_protocol import (
     AptChannelJogDirection,
     AptChannelState,
 )
-from qmi.instruments.thorlabs.apt_packets import AptMessageId, _AptMsgHwGetInfo
+from qmi.instruments.thorlabs.apt_packets import AptMessageId
 
 from tests.patcher import PatcherQmiContext
 
@@ -69,7 +69,8 @@ class TestThorlabsMPC320(unittest.TestCase):
     def test_get_idn_with_wrong_returned_msg_id_sends_command_and_throws_error(self):
         """Test get_idn method and returns identification info."""
         # Arrange
-        expected_error = f"Expected message type {str(_AptMsgHwGetInfo)} not received."
+        expected_error = (f"Received incorrect message length for message id 0x0412" +
+                          " (got 90 bytes while expecting 12 bytes).")
         # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
         expected_write = struct.pack(self._pack, AptMessageId.HW_REQ_INFO.value) + b"P\x01"
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
@@ -78,7 +79,7 @@ class TestThorlabsMPC320(unittest.TestCase):
         self._transport_mock.read.side_effect = [expected_read + b"\x81\x00", b"320\0MPC" * 12]
 
         # Act
-        with self.assertRaises(QMI_TimeoutException) as exc:
+        with self.assertRaises(QMI_InstrumentException) as exc:
             _ = self._instr.get_idn()
 
         # Assert
