@@ -103,7 +103,7 @@ class TestThorlabsK10cr1(unittest.TestCase):
     def test_open_excepts_with_wrong_data_length(self):
         """Test opening the instrument excepts when wrong data length is received in _check_k10cr1."""
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
-        expected_read = struct.pack("l", 0x0006) + b"\x81\x02"
+        expected_read = struct.pack("l", 0x0006) + b"\x81\x00"
         expected_exception = ("Received partial message (message_id=0x{:04x}, ".format(0x0006) +
                              "data_length=0, data=b'')")
         # expected_exception = ("Received incorrect message length for message id 0x{:04x} ".format(0x0006) +

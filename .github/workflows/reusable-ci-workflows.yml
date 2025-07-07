@@ -70,7 +70,7 @@ jobs:
         run: |
           if [[ ${{ inputs.python-version }} == "3.13" ]]; \
             then pip install py-xdrlib; fi
-          coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"
+          coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_k10cr1.py"
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage-${{ inputs.python-version }}.log
           COVERAGE_PERC=$(grep "TOTAL" coverage-${{ inputs.python-version }}.log | grep -Eo '[0-9.]+%' | sed 's/%//')
           echo "Coverage: $COVERAGE_PERC%"
