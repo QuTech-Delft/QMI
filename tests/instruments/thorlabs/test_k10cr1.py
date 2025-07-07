@@ -20,21 +20,18 @@ ACCELERATION_FACTOR = 1502.0
 
 
 class TestThorlabsK10cr1(unittest.TestCase):
+
     def setUp(self):
-        # qmi.start("TestK10cr1OpenClose")
         self._transport_mock = unittest.mock.MagicMock(spec=QMI_SerialTransport)
         self._transport_mock._safe_serial.in_waiting = 0
         self._transport_mock._safe_serial.out_waiting = 0
         with unittest.mock.patch(
                 'qmi.instruments.thorlabs.k10cr1.create_transport',
                 return_value=self._transport_mock):
-            # self.instr: Thorlabs_K10Cr1 = qmi.make_instrument("instr", Thorlabs_K10Cr1, "transport_descriptor")
-            # self.instr = cast(Thorlabs_K10Cr1, self.instr)
             self.instr: Thorlabs_K10Cr1 = Thorlabs_K10Cr1(PatcherQmiContext(), "instr", "transport_descriptor")
 
     def tearDown(self):
         self._transport_mock.reset_mock()
-        # qmi.stop()
 
     def test_open_close(self):
         """Test opening and closing the instrument"""
@@ -122,7 +119,6 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
     def setUp(self):
         self._pack = "<l"
         self._empty = b"\x00" * 2
-        # qmi.start("TestK10cr1Context")
         self._transport_mock = unittest.mock.MagicMock(spec=QMI_SerialTransport)
         self._transport_mock._safe_serial.in_waiting = 0
         self._transport_mock._safe_serial.out_waiting = 0
@@ -130,7 +126,6 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
                 'qmi.instruments.thorlabs.k10cr1.create_transport',
                 return_value=self._transport_mock):
             self.instr: Thorlabs_K10Cr1 = Thorlabs_K10Cr1(PatcherQmiContext(), "instr", "transport_descriptor")
-            # self.instr = cast(Thorlabs_K10Cr1, self.instr)
 
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo) to 'open'
         expected_read = struct.pack("<l", 0x0006)
@@ -142,7 +137,6 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
 
     def tearDown(self):
         self.instr.close()
-        # qmi.stop()
 
     def test_get_idn(self):
         """Test the get_idn method."""

@@ -9,7 +9,7 @@ import logging
 import time
 from typing import Any
 
-from qmi.core.transport import QMI_Transport
+from qmi.core.transport import QMI_SerialTransport
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.instruments.thorlabs.apt_packets import _AptMessage, _AptMessageHeader, APT_MESSAGE_TYPE_TABLE
 
@@ -59,7 +59,7 @@ class AptProtocol:
 
     def __init__(
         self,
-        transport: QMI_Transport,
+        transport: QMI_SerialTransport,
         apt_device_address: int = 0x50,
         host_address: int = 0x01,
         default_timeout: float | None = None,
@@ -121,7 +121,7 @@ class AptProtocol:
 
         self._transport.write(bytes(msg))
 
-    def read_message(self, timeout: float) -> _AptMessage:
+    def read_message(self, timeout: float | None) -> _AptMessage:
         """Read and decode a binary message from the instrument.
 
         Parameters:
@@ -133,7 +133,8 @@ class AptProtocol:
 
         # Read message header. If the header is not ready, double the timeout.
         if self._transport._safe_serial.in_waiting < self.HEADER_SIZE_BYTES:
-            time.sleep(timeout)
+            if timeout is not None:
+                time.sleep(timeout)
 
         data = self._transport.read(nbytes=self.HEADER_SIZE_BYTES, timeout=timeout)
 
@@ -163,7 +164,7 @@ class AptProtocol:
                     # Discard data after receiving a partial message.
                     partial_msg = self._clear_buffer()
                     raise QMI_InstrumentException(
-                        "Received partial message (message_id=0x{:04x}, data_length={}, data={})".format(
+                        "Received partial message (message_id=0x{:04x}, data_length={}, data={!r})".format(
                             hdr.message_id, hdr.data_length, partial_msg
                         )
                     )
@@ -171,7 +172,7 @@ class AptProtocol:
         # Decode received message.
         return message_type.from_buffer_copy(data)
 
-    def wait_message(self, message_type: _AptMessage, timeout: float) -> _AptMessage:
+    def wait_message(self, message_type: type, timeout: float | None) -> _AptMessage:
         """Wait for a specific message type from the instrument.
 
         Any other (valid) messages received from the instrument will be discarded.
@@ -188,7 +189,7 @@ class AptProtocol:
             QMI_InstrumentException: If an invalid message is received.
         """
 
-        end_time = time.monotonic() + timeout
+        end_time = time.monotonic() + timeout if timeout is not None else time.monotonic()
         while True:
 
             # Read next message from instrument.

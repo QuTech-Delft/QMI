@@ -13,7 +13,7 @@ from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
-from qmi.core.transport import create_transport
+from qmi.core.transport import create_transport, QMI_SerialTransport
 from qmi.instruments.thorlabs.apt_packets import AptMessageId
 from qmi.instruments.thorlabs.apt_protocol import (
     APT_MESSAGE_TYPE_TABLE,
@@ -96,6 +96,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
         """
         super().__init__(context, name)
         self._transport = create_transport(transport, default_attributes={"baudrate": 115200, "rtscts": True})
+        assert isinstance(self._transport, QMI_SerialTransport)
         self._apt_protocol = AptProtocol(self._transport, default_timeout=self.DEFAULT_RESPONSE_TIMEOUT)
 
     def _validate_position(self, pos: float) -> None:

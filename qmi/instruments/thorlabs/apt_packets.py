@@ -107,7 +107,7 @@ class _AptMessage(LittleEndianStructure):
     _pack_ = 1
 
     @classmethod
-    def create(cls, dest: hex, source: hex, **kwargs: Any) -> "_AptMessage":
+    def create(cls, dest: int, source: int, **kwargs: Any) -> "_AptMessage":
         """Return a new message instance.
 
         Message ID, destination address, source address and data length
