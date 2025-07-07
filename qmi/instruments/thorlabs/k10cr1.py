@@ -477,9 +477,9 @@ class Thorlabs_K10CR1(QMI_Instrument):
             offset_distance:    Distance of home position from home limit switch (in degrees).
         """
 
-        if home_direction not in AptChannelHomeDirection:
+        if home_direction != AptChannelHomeDirection.REVERSE:
             raise ValueError("Invalid value for home_direction")
-        if limit_switch not in AptChannelHomeLimitSwitch:
+        if limit_switch != AptChannelHomeLimitSwitch.REVERSE:
             raise ValueError("Invalid value for limit_switch")
         if home_velocity <= 0 or home_velocity > 5:
             raise ValueError("Invalid range for home_velocity")
@@ -645,6 +645,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
                 # No message from the motor.
                 # This is normal and expected if the motor is still moving.
                 # Go around the loop again and poll the motor status.
+                time.sleep(0.01)
                 continue
 
             # Any message from the motor is most likely an announcement that

@@ -435,12 +435,12 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
     def test_set_home_params_excepts_with_values_out_of_range(self):
         """Test set_home_params excepts with invalid direction, limit switch, velocity and offset distance."""
         # Values to set
-        home_dir_ok = 2
-        limit_switch_ok = 1
+        home_dir_ok = AptChannelHomeDirection.REVERSE
+        limit_switch_ok = AptChannelHomeLimitSwitch.REVERSE
         velocity_ok = 1.2345
         offset_dist_ok = 5.4321
-        home_dir_nok = 0
-        limit_switch_nok = 10
+        home_dir_nok = AptChannelHomeDirection.FORWARD
+        limit_switch_nok = AptChannelHomeLimitSwitch.FORWARD
         home_velocity_noks = [0, 6]
         offset_noks = [-2**31 / MICROSTEPS_PER_DEGREE, 2**31 / MICROSTEPS_PER_DEGREE]
         # Test home_direction
