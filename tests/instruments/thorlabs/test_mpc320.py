@@ -6,11 +6,8 @@ import unittest.mock
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.transport import QMI_SerialTransport
 from qmi.instruments.thorlabs import Thorlabs_Mpc320
-from qmi.instruments.thorlabs.apt_protocol import (
-    AptChannelJogDirection,
-    AptChannelState,
-)
-from qmi.instruments.thorlabs.apt_packets import AptMessageId
+from qmi.instruments.thorlabs.apt_protocol import AptChannelJogDirection, AptChannelState
+from qmi.instruments.thorlabs.apt_packets import AptMessageId, _AptMsgHwGetInfo
 
 from tests.patcher import PatcherQmiContext
 
@@ -66,20 +63,19 @@ class TestThorlabsMPC320(unittest.TestCase):
         self._transport_mock.write.assert_called_once_with(expected_write)
         self._transport_mock.read.assert_called_once()
 
-    def test_get_idn_with_wrong_returned_msg_id_sends_command_and_throws_error(self):
-        """Test get_idn method and returns identification info."""
+    def test_get_idn_with_wrong_returned_msg_id_throws_error(self):
+        """Test get_idn method with wrong message ID and see that it excepts."""
         # Arrange
-        expected_error = (f"Received incorrect message length for message id 0x0412" +
-                          " (got 90 bytes while expecting 12 bytes).")
+        expected_error = (f"Expected message type {_AptMsgHwGetInfo} not received.")
         # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
         expected_write = struct.pack(self._pack, AptMessageId.HW_REQ_INFO.value) + b"P\x01"
-        # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
-        expected_read = struct.pack(self._pack, AptMessageId.MOT_GET_POS_COUNTER.value)
+        # As response we get unexpectedly MESSAGE_ID 0x0412 (_AptMsgGetPosCounter)
+        unexpected_read = struct.pack(self._pack, AptMessageId.MOT_GET_POS_COUNTER.value)
         # The request+data has to be 90 bytes long and should include string "MPC320" at right spot.
-        self._transport_mock.read.side_effect = [expected_read + b"\x81\x00", b"320\0MPC" * 12]
+        self._transport_mock.read.side_effect = [unexpected_read + b"\x81\x00", b"320\0MPC" * 12]
 
         # Act
-        with self.assertRaises(QMI_InstrumentException) as exc:
+        with self.assertRaises(QMI_TimeoutException) as exc:
             _ = self._instr.get_idn()
 
         # Assert

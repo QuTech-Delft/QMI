@@ -169,14 +169,6 @@ class AptProtocol:
                         )
                     )
 
-        # if len(data) != sizeof(message_type):
-        #     raise QMI_InstrumentException(
-        #         ("Received incorrect message length for message id 0x{:04x} "
-        #          + "(got {} bytes while expecting {} bytes).").format(
-        #             hdr.message_id, len(data), sizeof(message_type)
-        #         )
-        #     )
-        #
         # Decode received message.
         return message_type.from_buffer_copy(data)
 
