@@ -30,10 +30,6 @@ from qmi.instruments.thorlabs.apt_protocol import (
 _logger = logging.getLogger(__name__)
 
 
-_APT_HOST_ADDRESS = 0x01    # Address of the computer in the APT protocol.
-_APT_DEVICE_ADDRESS = 0x50  # Address of the device in the APT protocol.
-
-
 @dataclass
 class VelocityParams:
     """Velocity parameters for the K10CR1.

@@ -19,21 +19,18 @@ _logger = logging.getLogger(__name__)
 
 class AptChannelState(Enum):
     """Channel state"""
-
     ENABLE = 0x01
     DISABLE = 0x02
 
 
 class AptChannelStopMode(Enum):
     """Channel stop mode"""
-
     IMMEDIATE = 0x01
     PROFILED = 0x02
 
 
 class AptChannelJogDirection(Enum):
     """Jog direction"""
-
     FORWARD = 0x01
     BACKWARD = 0x02
 
