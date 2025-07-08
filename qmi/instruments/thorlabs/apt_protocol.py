@@ -154,7 +154,7 @@ class AptProtocol:
         if (hdr.dest & 0x80) != 0 or hdr.data_length:
             # This is a long APT message (header + data). Read the additional data.
             while len(data) < sizeof(message_type):
-                print(f"{len(data)}, {sizeof(message_type)}")
+                print(f"{len(data)}, {sizeof(message_type)}", data)
                 try:
                     # Since we already received a partial message, the timeout
                     # only needs to account for the time it takes to receive
@@ -171,7 +171,7 @@ class AptProtocol:
                         )
                     )
                 else:
-                    print(f"Did not receive timeout. {len(data)}, {sizeof(message_type)}")
+                    print(f"Did not receive timeout. {len(data)}, {sizeof(message_type)}", data)
 
 
         if len(data) != sizeof(message_type):
