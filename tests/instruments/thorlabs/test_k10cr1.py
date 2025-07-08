@@ -111,7 +111,6 @@ class TestThorlabsK10cr1(unittest.TestCase):
         self._transport_mock.reset_mock()
         self._transport_mock.read.side_effect = [expected_read, b"\x01\x02", QMI_TimeoutException]
         with self.assertRaises(QMI_InstrumentException) as exc:
-            print("expecting timeout exception...")
             self.instr.open()
 
         self.assertEqual(expected_exception, str(exc.exception))

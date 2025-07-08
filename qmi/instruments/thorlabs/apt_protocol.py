@@ -154,7 +154,6 @@ class AptProtocol:
         if (hdr.dest & 0x80) != 0 or hdr.data_length:
             # This is a long APT message (header + data). Read the additional data.
             while len(data) < sizeof(message_type):
-                print(f"{len(data)}, {sizeof(message_type)}", data)
                 try:
                     # Since we already received a partial message, the timeout
                     # only needs to account for the time it takes to receive
@@ -163,25 +162,21 @@ class AptProtocol:
                     data += self._transport.read(nbytes=hdr.data_length, timeout=0.050)
                 except QMI_TimeoutException:
                     # Discard data after receiving a partial message.
-                    print(f"Received timeout. {len(data)}, {sizeof(message_type)}")
                     partial_msg = self._clear_buffer()
                     raise QMI_InstrumentException(
                         "Received partial message (message_id=0x{:04x}, data_length={}, data={!r})".format(
                             hdr.message_id, hdr.data_length, partial_msg
                         )
                     )
-                else:
-                    print(f"Did not receive timeout. {len(data)}, {sizeof(message_type)}", data)
 
-
-        if len(data) != sizeof(message_type):
-            raise QMI_InstrumentException(
-                ("Received incorrect message length for message id 0x{:04x} "
-                 + "(got {} bytes while expecting {} bytes).").format(
-                    hdr.message_id, len(data), sizeof(message_type)
-                )
-            )
-
+        # if len(data) != sizeof(message_type):
+        #     raise QMI_InstrumentException(
+        #         ("Received incorrect message length for message id 0x{:04x} "
+        #          + "(got {} bytes while expecting {} bytes).").format(
+        #             hdr.message_id, len(data), sizeof(message_type)
+        #         )
+        #     )
+        #
         # Decode received message.
         return message_type.from_buffer_copy(data)
 
