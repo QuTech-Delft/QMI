@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.50.0-beta.0] - Unreleased
 
+### Added
+
 ### Changed
 - The Thorlabs APT protocol is now the same for both K10CR1 and MPC320 instruments.
 - The handling of discarding data and waiting for data during requests in APT protocol was improved. The waiting times are now directly from the class attribute DEFAULT_RESPONSE_TIMEOUT unless otherwise defined in calls.
@@ -13,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - The `is_move_completed` in Thorlabs_Mpc320 is fixed to work now, providing a short wait is used if it is called continuously in a loop until the response is True
 - The unittests were fixed accordingly to changes for K10CR1 and MPC320 device driver tests.
+- Tenma power supply unit CLI read current and voltage calls fixed to be the correct `get_...` calls.
+
+### Removed
 
 ## [0.49.0] - 2025-05-19
 
