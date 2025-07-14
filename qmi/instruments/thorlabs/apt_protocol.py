@@ -7,6 +7,7 @@ from ctypes import sizeof
 from enum import Enum
 import logging
 import time
+from serial import SerialException
 from typing import Any
 
 from qmi.core.transport import QMI_SerialTransport
@@ -88,7 +89,7 @@ class AptProtocol:
             _logger.debug("waiting to receive %i bytes.", self._transport._safe_serial.in_waiting)
             try:
                 pending_msg += self._transport.read(self._transport._safe_serial.in_waiting, timeout=0.0)
-            except QMI_TimeoutException:
+            except SerialException:
                 break
 
         return pending_msg
@@ -126,6 +127,9 @@ class AptProtocol:
 
         Returns:
             message: The obtained message instance with data from the buffer.
+
+        Raises:
+            QMI_InstrumentException: If an unknown or partial message is received.
         """
 
         # Read message header. If the header is not ready, double the timeout.
@@ -148,7 +152,7 @@ class AptProtocol:
             )
 
         # Long APT messages are identified by bit 7 in the destination field.
-        if (hdr.dest & 0x80) != 0 or hdr.data_length:
+        if (hdr.dest & 0x80) != 0:
             # This is a long APT message (header + data). Read the additional data.
             while len(data) < sizeof(message_type):
                 try:
@@ -183,7 +187,6 @@ class AptProtocol:
 
         Raises:
             QMI_TimeoutException: If the expected message is not received within the timeout.
-            QMI_InstrumentException: If an invalid message is received.
         """
 
         end_time = time.monotonic() + timeout if timeout is not None else time.monotonic()

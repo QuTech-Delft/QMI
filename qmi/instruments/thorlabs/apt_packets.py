@@ -191,7 +191,7 @@ class _AptMsgHwReqInfo(_AptMessage):
 
 class _AptMsgHwGetInfo(_AptMessageHeader):
     """
-    Data packet structure for the HW_GET_INFO response. This packet is sent as a response to HW_GET_INFO.
+    Data packet structure for the HW_GET_INFO response. This packet is sent as a response to HW_REQ_INFO.
 
     Fields:
         serial_number:      Serial number of device.
