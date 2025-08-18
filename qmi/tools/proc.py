@@ -1077,7 +1077,7 @@ def proc_status(cfg: CfgQmi, context_name: str | None) -> int:
     return ret
 
 
-def main() -> int:
+def run() -> int:
     """Main routine of QMI process manager.
 
     Returns:
@@ -1151,4 +1151,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

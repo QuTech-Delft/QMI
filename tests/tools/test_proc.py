@@ -1405,21 +1405,21 @@ class ArgParserTestCase(unittest.TestCase):
         fail_local = Namespace(command="server", all=False, locals=True, context_name=None, config=None)
         fail_context_name = Namespace(command="server", all=False, locals=False, context_name="somectx", config=None)
         with patch("argparse.ArgumentParser.parse_args", return_value=fail_all):
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
 
         print_patch.assert_called_with("ERROR: Can not specify server mode together with other options")
         print_patch.reset()
 
         with patch("argparse.ArgumentParser.parse_args", return_value=fail_local):
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
 
         print_patch.assert_called_with("ERROR: Can not specify server mode together with other options")
         print_patch.reset()
 
         with patch("argparse.ArgumentParser.parse_args", return_value=fail_context_name):
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
 
         print_patch.assert_called_with("ERROR: Can not specify server mode together with other options")
@@ -1430,7 +1430,7 @@ class ArgParserTestCase(unittest.TestCase):
         """Test that starting all contexts fails with incompatible commands."""
         fail_context_name = Namespace(command="start", all=True, locals=False, context_name="fail_ctx", config=None)
         with patch("argparse.ArgumentParser.parse_args", return_value=fail_context_name):
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
 
         print_patch.assert_called_with("ERROR: Can not specify a context_name together with --all", file=sys_patch)
@@ -1440,18 +1440,18 @@ class ArgParserTestCase(unittest.TestCase):
         sys.argv = ["command", "start", "--all", "--locals"]
         with patch("qmi.tools.proc.argparse.ArgumentParser.error", side_effect=[ArgumentError(MagicMock(), "Fail!")]):
             with self.assertRaises(ArgumentError) as arg_err:
-                retval = proc.main()
+                retval = proc.run()
 
         self.assertEqual(retval, 1)
         self.assertEqual("argument : Fail!", str(arg_err.exception))
 
         # But one true and one false should not raise ArgumentError, even if it fails otherwise!
         sys.argv = ["command", "start", "--all"]
-        retval = proc.main()
+        retval = proc.run()
         self.assertEqual(retval, 1)
 
         sys.argv = ["command", "start", "--locals"]
-        retval = proc.main()
+        retval = proc.run()
         self.assertEqual(retval, 1)
 
     @patch("builtins.print")
@@ -1460,7 +1460,7 @@ class ArgParserTestCase(unittest.TestCase):
         """Test that starting local contexts fails with incompatible context name."""
         fail_context_name = Namespace(command="start", all=False, locals=True, context_name="fail_ctx", config=None)
         with patch("argparse.ArgumentParser.parse_args", return_value=fail_context_name):
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
 
         print_patch.assert_called_with("ERROR: Can not specify a context_name together with --locals", file=sys_patch)
@@ -1473,7 +1473,7 @@ class ArgParserTestCase(unittest.TestCase):
         for command in commands:
             fail_command = Namespace(command=command, all=False, locals=False, context_name=None, config=None)
             with patch("argparse.ArgumentParser.parse_args", return_value=fail_command):
-                retval = proc.main()
+                retval = proc.run()
                 self.assertEqual(retval, 1)
 
             print_patch.assert_called_with("ERROR: Specify either: a context_name, or --all, or --local", file=sys_patch)
@@ -1484,7 +1484,7 @@ class ArgParserTestCase(unittest.TestCase):
         return_value = Namespace(command="server", all=False, locals=False, context_name=None, config=None)
         with patch("argparse.ArgumentParser.parse_args", return_value=return_value):
             with patch("sys.stdin.readline", return_value=None) as sys_readline:
-                retval = proc.main()
+                retval = proc.run()
                 sys_readline.assert_called_once()
                 self.assertEqual(retval, 0)
 
@@ -1497,13 +1497,13 @@ class ArgParserTestCase(unittest.TestCase):
         start_local_ctx = Namespace(command="start", all=False, locals=True, context_name=local_ctx, config=None)
         with patch("argparse.ArgumentParser.parse_args", return_value=start_ctx),\
              patch("qmi.tools.proc.select_context_by_name", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
             sel_ctx.assert_called_once_with(ctx, ctx_name)
 
         with patch("argparse.ArgumentParser.parse_args", return_value=start_local_ctx),\
              patch("qmi.tools.proc.select_local_contexts", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
             sel_ctx.assert_called_once_with(ctx)
 
@@ -1516,13 +1516,13 @@ class ArgParserTestCase(unittest.TestCase):
         stop_local_ctx = Namespace(command="stop", all=False, locals=True, context_name=local_ctx, config=None)
         with patch("argparse.ArgumentParser.parse_args", return_value=stop_ctx),\
              patch("qmi.tools.proc.select_context_by_name", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
             sel_ctx.assert_called_once_with(ctx, ctx_name)
 
         with patch("argparse.ArgumentParser.parse_args", return_value=stop_local_ctx),\
              patch("qmi.tools.proc.select_local_contexts", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
             sel_ctx.assert_called_once_with(ctx)
 
@@ -1537,13 +1537,13 @@ class ArgParserTestCase(unittest.TestCase):
         restart_local_ctx = Namespace(command="restart", all=False, locals=True, context_name=local_ctx, config=None)
         with patch("argparse.ArgumentParser.parse_args", return_value=restart_ctx),\
              patch("qmi.tools.proc.select_context_by_name", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
             sel_ctx.assert_called_once_with(ctx, ctx_name)
 
         with patch("argparse.ArgumentParser.parse_args", return_value=restart_local_ctx),\
              patch("qmi.tools.proc.select_local_contexts", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
             sel_ctx.assert_called_once_with(ctx)
 
@@ -1556,7 +1556,7 @@ class ArgParserTestCase(unittest.TestCase):
         status_ctx = Namespace(command="status", all=False, locals=False, context_name=ctx_name, config=None)
         with patch("argparse.ArgumentParser.parse_args", return_value=status_ctx),\
              patch("qmi.tools.proc.select_context_by_name", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
             sel_ctx.assert_called_once_with(ctx, ctx_name)
 
@@ -1568,13 +1568,13 @@ class ArgParserTestCase(unittest.TestCase):
         unknown_local_ctx = Namespace(command="unknown", all=True, locals=True, context_name=None, config=None)
         with patch("argparse.ArgumentParser.parse_args", return_value=unknown_ctx),\
              patch("qmi.tools.proc.select_contexts", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
             sel_ctx.assert_not_called()
 
         with patch("argparse.ArgumentParser.parse_args", return_value=unknown_local_ctx),\
              patch("qmi.tools.proc.select_local_contexts", side_effect=[QMI_ApplicationException("wrong")]) as sel_ctx:
-            retval = proc.main()
+            retval = proc.run()
             self.assertEqual(retval, 1)
             sel_ctx.assert_not_called()
 
