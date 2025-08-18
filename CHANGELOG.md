@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The handling of discarding data and waiting for data during requests in APT protocol was improved. The waiting times are now directly from the class attribute DEFAULT_RESPONSE_TIMEOUT unless otherwise defined in calls.
 
 ### Fixed
+- Critical fix on `qmi.tools.proc` where the main program should also have `run` as the main method, not `main`.
 - The `is_move_completed` in Thorlabs_Mpc320 is fixed to work now, providing a short wait is used if it is called continuously in a loop until the response is True
 - The unittests were fixed accordingly to changes for K10CR1 and MPC320 device driver tests.
 - Tenma power supply unit CLI read current and voltage calls fixed to be the correct `get_...` calls.
