@@ -335,8 +335,9 @@ def start_local_process(context_name: str) -> int:
     except (OSError, subprocess.SubprocessError) as exc:
         raise ProcessException(f"Can not start program ({type(exc).__name__}: {str(exc)})")
 
-    # Close output log file in parent process.
-    output_file.close()
+    finally:
+        # Close output log file in parent process.
+        output_file.close()
 
     # Wait and check if managed process is running.
     time.sleep(1)
