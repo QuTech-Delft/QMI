@@ -66,18 +66,23 @@ It is a useful convention to assign the result of the ``make_instrument()`` func
 The instrument instance itself is owned and managed by the default context; we receive a *proxy* to the NoisySineGenerator instrument, rather than a reference to the instrument itself:
 
 >>> nsg
-NoisySineGenerator.Proxy(QMI_MessageHandlerAddress(context_id='nsg_demo', object_id='nsg'))
+<rpc proxy for nsg_demo.nsg (qmi.instruments.dummy.noisy_sine_generator.NoisySineGenerator)>
 
 In QMI, it is rare to deal with instruments directly. We mostly deal with them through proxy objects that act as a references to an actual instrument
 owned by some QMI context. The advantage of this is that it is possible to have a proxy to an instrument that lives in a different QMI process,
 perhaps even running on a different computer in the network - and we can use such a remote instrument as if it were local, which is pretty useful.
 Thus, by using proxies to talk to instruments, QMI achieves *network transparency*.
 
-We can look at the documentation of the Proxy instance to see which methods are supported:
+We can look at the documentation of the Proxy instance:
 
 >>> help(nsg)
 
-This prints the help of the NoisySineGenerator proxy.
+This prints the docstring of the NoisySineGenerator class. We can look at all variables of the proxy with
+
+>>> vars(nsg)
+
+which prints a long dictionary of info, which might be hard to read. But it does also give the docstring of the class and lists all RPC methods, for example.
+
 As we can read in the help, our noisy sine generator ``nsg`` supports a bunch of methods, including the ``get_sample()`` method.
 Let's give it a shot:
 
@@ -270,11 +275,8 @@ Start the instrument server in a new Python session:
 >>> qmi.start("instr_server")
 >>> nsg = qmi.make_instrument("nsg", NoisySineGenerator)
 
-Because the name of the context ``instr_server`` matches the name
-specified in the configuration file, QMI opens a TCP server port
-for this context.
-Other Python programs can connect to this port to access
-the sine generator.
+Because the name of the context ``instr_server`` matches the name specified in the configuration file, QMI opens a TCP server port for this context.
+Other Python programs can connect to this port to access the sine generator.
 
 To try this, leave the instrument server session running and start
 another Python session in a separate terminal window:
@@ -284,6 +286,10 @@ another Python session in a separate terminal window:
 >>> qmi.context().connect_to_peer("instr_server")
 >>> nsg = qmi.get_instrument("instr_server.nsg")
 >>> nsg.get_sample()
+
+On Windows, the peer connection probably fails and you'll have to use
+
+>>> qmi.context().connect_to_peer("instr_server", peer_address="127.0.0.1:40001")
 
 This example demonstrates how the second Python program is able to access
 the NoisySineGenerator instance that exists within the first Python program.
@@ -306,21 +312,32 @@ and the answer to be sent to the second program.
     >>> instr_server 145.90.38.138:0 no
     >>> ---------    --------------- ---------
 
-    If this doesn't match the IP:port configuration of your ``qmi.conf`` file, the connection probably fails.
-    Also if the shown IP:port is not the one you defined in ``qmi.conf`` of ``instr_server``, the IP:Port you gave
-    is not in the valid range of your system. In this case, ``qmi`` just sets other values in correct range.
+    If this doesn't match the IP:port configuration of your ``qmi.conf`` file, and you used "localhost" or "127.0.0.1" in your configuration,
+    the reason is that the localhost address gets interpreted in the background as the IP address of the PC itself. But if you set something else and the
+    IP addresses do no match, the connection probably fails.
+    Also if the shown IP:port is not the one you defined in ``qmi.conf`` of ``instr_server``, the IP:Port you gave is not in the valid range of your system. In this case, ``qmi`` just sets other values in correct range.
+    If only the port number does not match, it might be possible the the ``qmi.conf`` was actually not read and QMI has set default (localhost) values. In that case,
+    define the config file location manually in ``qmi.start`` call.
+
+    >>> qmi.start("instr_server", config_file="<path_to_qmi.conf>")
+
+    **Linux**
 
     In case you did not specify the IP:port in the ``qmi.conf`` file, you then need to specify it like this:
 
     >>> qmi.context().connect_to_peer("instr_server", "145.90.38.138:0")
 
-    **WINDOWS related**
+    The IP address can be also "localhost" or "127.0.0.1" if that is used in the ``qmi.conf``.
+
+    **Windows**
 
     If the port number is `0`, and you are on a Windows machine, trying to connect this peer will give you an error:
 
     >>> OSError: [WinError 10049] The requested address is not valid in its context
 
-    While on Linux this usually works, Windows does not allow this and you have to specify a non-zero port number.
+    While on Linux this usually works, Windows does not allow this and you have to specify a non-zero port number for the context.
+    On most systems, port numbers up to 1023 are mostly reserved so it is best to use a port number > 1023.
+
 
 Using the 'autoconnect' option
 ------------------------------
@@ -353,7 +370,7 @@ For more complicated work, it is often convenient to create a dedicated Python s
 
 To set up a simple measurement script, create a file ``measure_demo.py`` with the following content::
 
-    #!/usr/bin/env python3
+    #!/usr/bin/env python
 
     import qmi
     from qmi.utils.context_managers import start_stop
@@ -377,7 +394,7 @@ To set up a simple measurement script, create a file ``measure_demo.py`` with th
 
 Run the new script by typing the following command in a shell terminal::
 
-    python3 measure_demo.py
+    python measure_demo.py
 
 Note that the script uses :py:class:`qmi.utils.context_managers.start_stop` to
 start and stop the QMI framework.
@@ -447,7 +464,7 @@ immediately when it is necessary to stop the task.
 Finally, create a top-level script ``task_demo.py`` which starts
 the task and continues to perform other activities::
 
-    #!/usr/bin/env python3
+    #!/usr/bin/env python
 
     import time
     import qmi
@@ -489,7 +506,7 @@ to wait until the task is fully stopped.
 
 Run the script from the shell command line::
 
-    python3 task_demo.py
+    python task_demo.py
 
 The script prints a warning when the task stops.
 This happens because stopping the task raises
@@ -612,7 +629,7 @@ Or setting it to 1.1 we bounce back to large values:
 Let's build up the task and control in another way, making use of another custom task runner. In this example, we build the control
 of the task in the script instead of inside the task. We now rewrite the script ``task_demo.py`` to be::
 
-    #!/usr/bin/env python3
+    #!/usr/bin/env python
 
     import time
     import qmi
@@ -739,7 +756,7 @@ in the current directory::
 Let's test that this program works when started manually
 from the shell command-line::
 
-    python3 -m proc_demo
+    python -m proc_demo
 
 Note the ``-m`` flag which tells the Python interpreter to load
 this program as a module.
@@ -783,7 +800,7 @@ run the tool simply by typing ``qmi_proc`` at the shell command-line::
 
 Alternatively, you can run ``qmi_proc`` as a Python module::
 
-  python3 -m qmi.tools.proc status
+  python -m qmi.tools.proc status
 
 You should see a list of configured processes.
 In this case the list contains just one process called ``proc_demo``

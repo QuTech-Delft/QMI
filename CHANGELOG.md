@@ -9,11 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- The dummy instrument now requires to be opened before using the RPC methods, by additions of open-checks.
 
 ### Fixed
 - Tenma power supply unit CLI read current and voltage calls fixed to be the correct `get_...` calls.
+- Corrections in documentation.
 
 ### Removed
+- The obsolete Raspberry Pi relay example.
 
 ## [0.49.0] - 2025-05-19
 
