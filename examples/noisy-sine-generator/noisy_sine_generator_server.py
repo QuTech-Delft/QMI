@@ -1,15 +1,13 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 import time
 
 import qmi
 from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
+from qmi.utils.context_managers import start_stop
 
-qmi.start("nsg_server", "qmi.conf")
+with start_stop(qmi, "nsg_server", "qmi.conf"):
 
-nsg = qmi.make_instrument("nsg", NoisySineGenerator)
-
-time.sleep(0.100)
-input("\nSimulated noisy sine generator instrument active, press Enter to quit ...\n")
-
-qmi.stop()
+    with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
+        time.sleep(0.100)
+        input("\nSimulated noisy sine generator instrument active, press Enter to quit ...\n")

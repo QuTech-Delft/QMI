@@ -1,5 +1,4 @@
-""" Instrument driver for the virtual noisy sine generator.
-"""
+""" Instrument driver for a virtual noisy sine generator."""
 
 import time
 import math
@@ -21,6 +20,7 @@ class NoisySineGenerator(QMI_Instrument):
 
     @rpc_method
     def set_frequency(self, value: float) -> None:
+        self._check_is_open()
         valid = isinstance(value, float) and math.isfinite(value) and value >= 0.0
         if not valid:
             raise ValueError("Bad value for frequency: {!r}".format(value))
@@ -28,21 +28,26 @@ class NoisySineGenerator(QMI_Instrument):
 
     @rpc_method
     def get_frequency(self) -> float:
+        self._check_is_open()
         return self.frequency
 
     @rpc_method
     def set_amplitude(self, value: float) -> None:
+        self._check_is_open()
         valid = isinstance(value, float) and math.isfinite(value) and value >= 0.0
         if not valid:
             raise ValueError("Bad value for amplitude: {!r}".format(value))
+
         self.amplitude = value
 
     @rpc_method
     def get_amplitude(self) -> float:
+        self._check_is_open()
         return self.amplitude
 
     @rpc_method
     def set_noise(self, value: float) -> None:
+        self._check_is_open()
         valid = isinstance(value, float) and math.isfinite(value) and value >= 0.0
         if not valid:
             raise ValueError("Bad value for noise: {!r}".format(value))
@@ -50,15 +55,19 @@ class NoisySineGenerator(QMI_Instrument):
 
     @rpc_method
     def get_noise(self) -> float:
+        self._check_is_open()
         return self.noise
 
     @rpc_method
     def wait(self, duration: float) -> None:
+        self._check_is_open()
         if duration < 0.0:
             raise ValueError("Bad value for duration: {!r}".format(duration))
+
         time.sleep(duration)
 
     @rpc_method
     def get_sample(self) -> float:
+        self._check_is_open()
         t = time.time()
         return self.amplitude * math.sin(t * self.frequency * 2 * math.pi) + random.gauss(0.0, self.noise)
