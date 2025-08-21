@@ -907,7 +907,7 @@ def proc_start(cfg: CfgQmi, context_name: str | None, local: bool) -> int:
     # Process each applicable context.
     for context_name in context_names:
         # Show process name.
-        print("    {:30s}:".format(context_name), end=" ")
+        print(f"    {context_name:30s}:", end=" ")
         sys.stdout.flush()
 
         try:
@@ -915,7 +915,7 @@ def proc_start(cfg: CfgQmi, context_name: str | None, local: bool) -> int:
             # Check if the peer context responds via TCP.
             pid, ver = get_context_status(context_name)
             if pid >= 0:
-                print("already running (PID={}, QMI={})".format(pid, ver))
+                print(f"already running (PID={pid}, QMI={ver})")
 
             else:
                 # Context not responding via TCP.
@@ -1004,7 +1004,7 @@ def proc_stop(cfg: CfgQmi, context_name: str | None, local: bool) -> int:
                 print(failed_str)
                 # Failed to stop via TCP.
                 # Try to stop process via local process management.
-                print("    {:30s} ".format(""), end=" ")
+                print(f"    {'':30s} ", end=" ")
                 show_progress_msg("kill")
                 sys.stdout.flush()
                 if stop_process(context_name, result.pid):
