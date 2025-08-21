@@ -182,7 +182,7 @@ class AdwinProgramLibrary:
                         prog_cfg = config_struct_from_dict(cfg_dict, CfgAdwinProgram)
                     except (json.JSONDecodeError, QMI_ConfigurationException) as exc:
                         raise QMI_ConfigurationException(
-                            "Error reading Adwin program config {}".format(file_name)) from exc
+                            f"Error reading Adwin program config {file_name}") from exc
                     self._check_program_config(prog_name, prog_cfg)
                     self._program_config[prog_name] = prog_cfg
 
@@ -202,7 +202,7 @@ class AdwinProgramLibrary:
                                              format(prog_cfg.priority, prog_name))
 
         if prog_cfg.parse_parameters and (prog_cfg.par or prog_cfg.fpar or prog_cfg.data or prog_cfg.par_array):
-            raise QMI_ConfigurationException("Invalid configuration for ADwin program {!r}".format(prog_name)
+            raise QMI_ConfigurationException(f"Invalid configuration for ADwin program {prog_name!r}"
                                              + ": Can not parse source code and specify explicit parameters")
 
     def list_programs(self) -> list[str]:
@@ -321,13 +321,13 @@ class AdwinProcess:
         try:
             return self._get_dict_item_case_insensitive(par_name, self._param_info.param)
         except KeyError:
-            raise ValueError("Unknown parameter {} for process {}".format(par_name, self._name))
+            raise ValueError(f"Unknown parameter {par_name} for process {self._name}")
 
     def _get_data_idx(self, data_name):
         try:
             return self._get_dict_item_case_insensitive(data_name, self._param_info.data)
         except KeyError:
-            raise ValueError("Unknown data array {} for process {}".format(data_name, self._name))
+            raise ValueError(f"Unknown data array {data_name} for process {self._name}")
 
     def load(self) -> None:
         """Load the Adwin process but do not start it yet.
@@ -335,10 +335,10 @@ class AdwinProcess:
         If a process is already running in the same process slot number, that process will be stopped.
         """
         if "T12" in self._processor_type.upper():
-            bin_file = self._file_name + ".TC{}".format(self._process_number % 10)  # T12 and T12.1
+            bin_file = self._file_name + f".TC{self._process_number % 10}"  # T12 and T12.1
 
         else:
-            bin_file = self._file_name + ".TB{}".format(self._process_number % 10)  # T11 gets extension "TB{}".
+            bin_file = self._file_name + f".TB{self._process_number % 10}"  # T11 gets extension "TB{}".
 
         self._adwin.stop_process(self._process_number)
         self._adwin.wait_for_process(self._process_number, Adwin_Base.PROCESS_STOP_TIMEOUT)
@@ -439,7 +439,7 @@ class AdwinProcess:
             elems = self._adwin.get_data(param_desc.data_index, param_desc.elem_index, 1)
             return elems[0]
         else:
-            raise ValueError("Unknown parameter {} for process {}".format(par_name, self._name))
+            raise ValueError(f"Unknown parameter {par_name} for process {self._name}")
 
     def set_par(self, par_name: str, value: int | float) -> None:
         """Change the value of the specified parameter.
@@ -454,7 +454,7 @@ class AdwinProcess:
         param_desc = self._get_par_desc(par_name)
         if isinstance(param_desc, ParDesc):
             if not isinstance(value, int):
-                raise TypeError("Expecting integer value for parameter {} but got {}".format(par_name, value))
+                raise TypeError(f"Expecting integer value for parameter {par_name} but got {value}")
             self._adwin.set_par(param_desc.par_index, value)
         elif isinstance(param_desc, FParDesc):
             self._adwin.set_fpar(param_desc.fpar_index, value)
@@ -462,7 +462,7 @@ class AdwinProcess:
             elems = np.array([value])
             self._adwin.set_data(param_desc.data_index, param_desc.elem_index, elems)
         else:
-            raise ValueError("Unknown parameter {} for process {}".format(par_name, self._name))
+            raise ValueError(f"Unknown parameter {par_name} for process {self._name}")
 
     @staticmethod
     def _find_sequential_ranges(seq: Iterable[int]) -> list[tuple[int, int]]:
@@ -508,7 +508,7 @@ class AdwinProcess:
                     params_data[param_desc.data_index] = {}
                 params_data[param_desc.data_index][param_desc.elem_index] = par_name
             else:
-                raise ValueError("Unknown parameter {} for process {}".format(par_name, self._name))
+                raise ValueError(f"Unknown parameter {par_name} for process {self._name}")
 
         # Fetch array parameters.
         for data_index in sorted(params_data.keys()):
@@ -539,7 +539,7 @@ class AdwinProcess:
             param_desc = self._get_par_desc(par_name)
             if isinstance(param_desc, ParDesc):
                 if not isinstance(par_value, int):
-                    raise TypeError("Expecting integer value for parameter {} but got {}".format(par_name, par_value))
+                    raise TypeError(f"Expecting integer value for parameter {par_name} but got {par_value}")
                 self._adwin.set_par(param_desc.par_index, par_value)
             elif isinstance(param_desc, FParDesc):
                 self._adwin.set_fpar(param_desc.fpar_index, par_value)
@@ -548,7 +548,7 @@ class AdwinProcess:
                     params_data[param_desc.data_index] = {}
                 params_data[param_desc.data_index][param_desc.elem_index] = par_value
             else:
-                raise ValueError("Unknown parameter {} for process {}".format(par_name, self._name))
+                raise ValueError(f"Unknown parameter {par_name} for process {self._name}")
 
         # Upload array parameters.
         for data_index in sorted(params_data.keys()):
@@ -701,7 +701,7 @@ class AdwinManager:
         program_names = set(self._program_library.list_programs())
         for program_name in self._auto_load_programs:
             if program_name not in program_names:
-                raise ValueError("Unknown program {!r} in auto_load_programs".format(program_name))
+                raise ValueError(f"Unknown program {program_name!r} in auto_load_programs")
             program_info = self._program_library.get_program_info(program_name)
             if program_info.slot in numbers_used:
                 raise ValueError("Duplicate auto_load program in process slot number {} ({})"

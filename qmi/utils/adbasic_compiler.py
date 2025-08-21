@@ -55,13 +55,13 @@ class AdbasicError(NamedTuple):
         if self.filename:
             msg += "[" + self.filename
             if self.line_number:
-                msg += ":{}".format(self.line_number)
+                msg += f":{self.line_number}"
             msg += "] "
         if self.error_number:
-            msg += "Error {}: ".format(self.error_number)
+            msg += f"Error {self.error_number}: "
         msg += self.error_description
         if self.error_line:
-            msg += " ({!r})".format(self.error_line.strip())
+            msg += f" ({self.error_line.strip()!r})"
         return msg
 
 
@@ -151,7 +151,7 @@ def _parse_stderr_lines(stderr_lines: list[str]) -> tuple[list[AdbasicError], li
             match = error_invalid_option_pattern.match(line)
             if match:
                 (invalid_option, ) = match.groups()
-                error = AdbasicError(0, "Invalid command line option: {}".format(invalid_option), "", "", 0)
+                error = AdbasicError(0, f"Invalid command line option: {invalid_option}", "", "", 0)
                 errors.append(error)
                 line = line[match.end():]
                 continue
@@ -183,7 +183,7 @@ def _parse_stderr_lines(stderr_lines: list[str]) -> tuple[list[AdbasicError], li
                 line = line[match.end():]
                 continue
 
-            raise AdbasicCompilerException("Unrecognized ADbasic error string: {!r}".format(line), [])
+            raise AdbasicCompilerException(f"Unrecognized ADbasic error string: {line!r}", [])
 
     return errors, warnings
 
@@ -242,7 +242,7 @@ def run_adbasic_compiler(
         adbasic_executable = str(adbasic_executable_p).replace("/", "\\")
 
     run_args = [adbasic_executable] + adbasic_arguments
-    _logger.debug("Running %s", " ".join("{!r}".format(arg) for arg in run_args))
+    _logger.debug("Running %s", " ".join(f"{arg!r}" for arg in run_args))
 
     command_line = " ".join(run_args)
 
@@ -281,12 +281,12 @@ def run_adbasic_compiler(
         # Log parsed errors.
         for error in errors:
             if pretty_print:
-                print("{}(error){}".format(colorama.Fore.RED, colorama.Style.RESET_ALL), str(error))
+                print(f"{colorama.Fore.RED}(error){colorama.Style.RESET_ALL}", str(error))
             else:
                 _logger.error("ADbasic error: %s", str(error))
         for error in warnings:
             if pretty_print:
-                print("{}(warning){}".format(colorama.Fore.RED, colorama.Style.RESET_ALL), str(error))
+                print(f"{colorama.Fore.RED}(warning){colorama.Style.RESET_ALL}", str(error))
             else:
                 _logger.warning("ADbasic warning: %s", str(error))
 
@@ -382,11 +382,11 @@ def compile_program(
     if priority == PRIO_HIGH:
         priority_argument = "/PH"
     elif -10 <= priority <= 10:
-        priority_argument = "/PL{}".format(int(priority))
+        priority_argument = f"/PL{int(priority)}"
     else:
-        raise ValueError("Invalid process priority {!r}".format(priority))
+        raise ValueError(f"Invalid process priority {priority!r}")
 
-    process_number_argument = "/PN{}".format(process_number)
+    process_number_argument = f"/PN{process_number}"
     optimization_level_argument = "/O2"
 
     adbasic_arguments = [
@@ -478,7 +478,7 @@ def run():
         description="Python wrapper for the ADbasic script, with improved error reporting.")
 
     parser.add_argument("--adwin-dir", default=DEFAULT_ADWINDIR,
-                        help="base directory of ADwin software installation (default: {!r})".format(DEFAULT_ADWINDIR))
+                        help=f"base directory of ADwin software installation (default: {DEFAULT_ADWINDIR!r})")
     parser.add_argument("--compiler-help", action="store_true",
                         help="show help of the underlying ADbasic compiler")
     parser.add_argument("-k", "--keep-c-files", action="store_true",
@@ -487,14 +487,14 @@ def run():
                         help="compile a library instead of a binary executable")
     parser.add_argument("-P", "--processor-type", choices=["T11", "T12", "T12.1"],
                         default=DEFAULT_PROCESSOR_TYPE,
-                        help="select ADwin processor type (default: {!r})".format(DEFAULT_PROCESSOR_TYPE))
+                        help=f"select ADwin processor type (default: {DEFAULT_PROCESSOR_TYPE!r})")
     parser.add_argument("-H", "--hardware-type", choices=["P", "PII", "G", "GII"],
                         default=DEFAULT_HARDWARE_TYPE,
-                        help="select ADwin hardware type (default: {!r})".format(DEFAULT_HARDWARE_TYPE))
+                        help=f"select ADwin hardware type (default: {DEFAULT_HARDWARE_TYPE!r})")
     parser.add_argument("-t", "--trigger", choices=["external", "timer"], default=DEFAULT_TRIGGER_MECHANISM,
-                        help="select event trigger mechanism (default: {!r})".format(DEFAULT_TRIGGER_MECHANISM))
+                        help=f"select event trigger mechanism (default: {DEFAULT_TRIGGER_MECHANISM!r})")
     parser.add_argument("-p", "--process-number", type=int, default=DEFAULT_PROCESS_NUMBER,
-                        help="select process number, range 1..10 (default: {})".format(DEFAULT_PROCESS_NUMBER))
+                        help=f"select process number, range 1..10 (default: {DEFAULT_PROCESS_NUMBER})")
     parser.add_argument("filename", nargs='?', help="file name of the adbasic .bas file")
 
     args = parser.parse_args()
@@ -538,11 +538,11 @@ def run():
             print()
             print("Executed command line:")
             print()
-            print("    {}".format(result.command_line))
+            print(f"    {result.command_line}")
             print()
-            print("Execution time: {:.3f} seconds.".format(result.duration))
+            print(f"Execution time: {result.duration:.3f} seconds.")
             print()
-            print("Performing exit({}), bye!".format(exitcode))
+            print(f"Performing exit({exitcode}), bye!")
             print()
     finally:
         colorama.deinit()
