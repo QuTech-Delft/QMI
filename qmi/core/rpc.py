@@ -825,9 +825,9 @@ def class_docstring_wrapper(cls: _T) -> _T:
         if name.startswith("_"):
             continue
 
-        signature = str(inspect.signature(member)).replace("(self, ", "(")
+        signature = str(inspect.signature(member)).replace("(self, ", "(").replace("(self", "(")
         # docstring = member.__doc__
-        method_str = f"{name}{signature.replace("(self", "(")}"
+        method_str = f"{name}{signature}"
         # if docstring is not None:
         #     method_str += f"\n\t{docstring}"
         #
