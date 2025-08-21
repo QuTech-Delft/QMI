@@ -611,7 +611,7 @@ class QMI_RpcNonBlockingProxy:
             setattr(self, method_descriptor.name, method.__get__(self))
 
     def __repr__(self) -> str:
-        return "<non-blocking rpc proxy for {} ({})>".format(self._rpc_object_address, self._rpc_class_fqn)
+        return f"<non-blocking rpc proxy for {self._rpc_object_address} ({self._rpc_class_fqn})>"
 
 
 class QMI_RpcProxy:
@@ -698,7 +698,7 @@ class QMI_RpcProxy:
         return
 
     def __repr__(self) -> str:
-        return "<rpc proxy for {} ({})>".format(self._rpc_object_address, self._rpc_class_fqn)
+        return f"<rpc proxy for {self._rpc_object_address} ({self._rpc_class_fqn})>"
 
     @property
     def address(self) -> str:
@@ -858,7 +858,7 @@ class _RpcObjectMetaClass(ABCMeta):
         signals = []
         for attr_name, attr_value in inspect.getmembers(cls, lambda member: isinstance(member, QMI_Signal)):
             if not is_valid_object_name(attr_name):
-                raise QMI_UsageException("Invalid signal name {!r} in class {}".format(attr_name, cls.__name__))
+                raise QMI_UsageException(f"Invalid signal name {attr_name!r} in class {cls.__name__}")
 
             signals.append(SignalDescription(name=attr_name, arg_types=attr_value.arg_types))
 
@@ -947,7 +947,7 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
             setattr(self, sig_desc.name, sig)
 
     def __repr__(self) -> str:
-        return "{}({!r})".format(type(self).__name__, self._name)
+        return f"{type(self).__name__}({self._name!r})"
 
     @rpc_method
     def __enter__(self):
@@ -1210,7 +1210,7 @@ class _RpcThread(QMI_Thread):
         method = getattr(self._rpc_object, request.method_name)
         is_rpc_callable = getattr(method, "_rpc_method", False)
         if not is_rpc_callable:
-            raise QMI_UnknownRpcException("Method {!r} is not RPC-callable!".format(request.method_name))
+            raise QMI_UnknownRpcException(f"Method {request.method_name!r} is not RPC-callable!")
 
         return method
 
@@ -1274,7 +1274,7 @@ class _RpcThread(QMI_Thread):
             # Construct and initialize RpcObject instance.
             rpc_object = self._rpc_object_maker()
             if not isinstance(rpc_object, QMI_RpcObject):
-                raise TypeError("Expecting QMI_RpcObject but got {}".format(type(rpc_object)))
+                raise TypeError(f"Expecting QMI_RpcObject but got {type(rpc_object)}")
         except BaseException as exception:
             # Initialization failed. Store the exception.
             _logger.warning("Initialization of RpcObject failed", exc_info=True)
@@ -1311,7 +1311,7 @@ class _RpcThread(QMI_Thread):
             elif isinstance(request, QMI_LockRpcRequestMessage):
                 reply = self._handle_lock_rpc_request(request)
             else:
-                raise ValueError("Unknown request type: {}".format(type(request)))
+                raise ValueError(f"Unknown request type: {type(request)}")
 
             # Send reply.
             try:

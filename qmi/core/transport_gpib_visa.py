@@ -130,7 +130,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
         if len(ret) == nbytes:
             return ret
 
-        _logger.debug("GPIB read message contained data %s" % self._read_buffer.decode())
+        _logger.debug("GPIB read message contained data %s", self._read_buffer.decode())
         raise QMI_EndOfInputException(
             f"The read message did not contain expected bytes of data ({len(ret)} != {nbytes}."
         )

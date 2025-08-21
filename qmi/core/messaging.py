@@ -99,7 +99,7 @@ class QMI_RequestMessage(QMI_Message):
                  destination_address: QMI_MessageHandlerAddress
                  ) -> None:
         super().__init__(source_address, destination_address)
-        self.request_id = "{:016x}".format(random.getrandbits(64))
+        self.request_id = f"{random.getrandbits(64):016x}"
 
 
 class QMI_ReplyMessage(QMI_Message):
@@ -651,7 +651,7 @@ class _PeerTcpConnection(_SocketWrapper):
                 source_address=destination_address,
                 destination_address=source_address,
                 request_id=request_id,
-                error_msg="Connection to {} closed while waiting for reply".format(self.peer_context_name))
+                error_msg=f"Connection to {self.peer_context_name} closed while waiting for reply")
             try:
                 self._message_router.deliver_message(reply)
             except QMI_MessageDeliveryException:
@@ -712,7 +712,7 @@ class _PeerTcpConnection(_SocketWrapper):
 
             if pickled_message_size > self.MAX_MESSAGE_SIZE:
                 # Protocol violation.
-                raise QMI_RuntimeException('Protocol packet too big ({})'.format(pickled_message_size))
+                raise QMI_RuntimeException(f'Protocol packet too big ({pickled_message_size})')
 
             if len(self._recv_buf) < 9 + pickled_message_size:
                 break
@@ -877,7 +877,7 @@ class _PeerTcpConnection(_SocketWrapper):
             else:
                 pickled_message_size = int.from_bytes(self._recv_buf[1:9], byteorder='little')
                 if pickled_message_size > self.MAX_MESSAGE_SIZE:
-                    raise QMI_RuntimeException('Protocol packet too big ({})'.format(pickled_message_size))
+                    raise QMI_RuntimeException(f'Protocol packet too big ({pickled_message_size})')
                 need_len = 9 + pickled_message_size
 
             # Stop when message complete.
@@ -1022,7 +1022,7 @@ class _SocketManager:
 
         # Assign unique "anonymous" name for the remote side of this connection.
         self._peer_name_counter += 1
-        peer_context_alias = "$client_{}".format(self._peer_name_counter)
+        peer_context_alias = f"$client_{self._peer_name_counter}"
 
         # Wrap socket in PeerTcpConnection object.
         conn = _PeerTcpConnection(self._message_router,
@@ -1087,7 +1087,7 @@ class _SocketManager:
         """Disconnect from the specified peer context."""
         conn = self._peer_context_map.get(peer_context_name)
         if conn is None:
-            raise QMI_UnknownNameException("Unknown peer context {}".format(peer_context_name))
+            raise QMI_UnknownNameException(f"Unknown peer context {peer_context_name}")
         self.remove_peer_connection(conn)
         conn.close()
 
@@ -1125,10 +1125,10 @@ class _SocketManager:
                     message.destination_address.context_id,
                     message.destination_address.object_id,
                     type(message))
-                error_msg = "{}: {}".format(type(exc).__name__, str(exc))
+                error_msg = f"{type(exc).__name__}: {exc!s}"
         else:
             _logger.warning("Unknown message destination context %r", destination_context_name)
-            error_msg = "Unknown message destination context {}".format(destination_context_name)
+            error_msg = f"Unknown message destination context {destination_context_name}"
 
         # Generate an error reply if we fail to route a request message.
         if (error_msg is not None) and isinstance(message, QMI_RequestMessage):
@@ -1283,7 +1283,7 @@ class MessageRouter:
         object_id = message_handler.address.object_id
         with self._address_to_messagehandler_map_lock:
             if self._address_to_messagehandler_map.get(object_id) is not message_handler:
-                raise QMI_UnknownNameException("Unknown message handler {}".format(message_handler.address))
+                raise QMI_UnknownNameException(f"Unknown message handler {message_handler.address}")
             del self._address_to_messagehandler_map[object_id]
 
     def start_tcp_server(self, tcp_server_port: int) -> None:
@@ -1349,7 +1349,7 @@ class MessageRouter:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         else:
             sock.close()
-            raise QMI_RuntimeException("Unexpected value for sys.platform ({!r})".format(sys.platform))
+            raise QMI_RuntimeException(f"Unexpected value for sys.platform ({sys.platform!r})")
 
         # Bind the port so we can be reached from the outside.
         address = ('', udp_server_port)  # The empty string represents 'INADDR_ANY'.
@@ -1366,9 +1366,9 @@ class MessageRouter:
 
         # Check that the peer context name is valid (not anonymous) and not yet connected.
         if peer_context_name.startswith("$"):
-            raise QMI_UsageException("Invalid peer context name {}".format(peer_context_name))
+            raise QMI_UsageException(f"Invalid peer context name {peer_context_name}")
         if self._socket_manager.has_peer_context(peer_context_name):
-            raise QMI_UsageException("Duplicate connection to context {} not allowed".format(peer_context_name))
+            raise QMI_UsageException(f"Duplicate connection to context {peer_context_name} not allowed")
 
         peer_addr_parsed = parse_address_and_port(peer_address)
         _logger.info("Connecting to peer context %s at %s",

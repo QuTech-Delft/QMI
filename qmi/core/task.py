@@ -152,7 +152,7 @@ class _TaskMetaClass(type):
         signals = []
         for attr_name, attr_value in inspect.getmembers(cls, lambda member: isinstance(member, QMI_Signal)):
             if not is_valid_object_name(attr_name):
-                raise QMI_UsageException("Invalid signal name {!r} in class {}".format(attr_name, cls.__name__))
+                raise QMI_UsageException(f"Invalid signal name {attr_name!r} in class {cls.__name__}")
             signals.append(SignalDescription(name=attr_name, arg_types=attr_value.arg_types))
 
         # Add the list of signals as an attribute of the newly created QMI_Task subclass.
@@ -597,7 +597,7 @@ class QMI_TaskRunner(QMI_RpcObject):
             # Clean up task and re-raise the exception here.
             self._thread.join()
             assert isinstance(exception, BaseException)
-            raise QMI_TaskInitException("Failed to initialize task {}".format(self._name)) from exception
+            raise QMI_TaskInitException(f"Failed to initialize task {self._name}") from exception
 
         assert state == _TaskThread.State.READY_TO_RUN
         assert self._thread.task is not None
@@ -637,7 +637,7 @@ class QMI_TaskRunner(QMI_RpcObject):
         # Check that task was not yet started.
         (state, dummy_exception) = self._thread.get_state()
         if state != _TaskThread.State.READY_TO_RUN:
-            raise QMI_UsageException("Task {} can not be started more than once".format(self._name))
+            raise QMI_UsageException(f"Task {self._name} can not be started more than once")
 
         _logger.debug("Starting task %s", self._name)
         self._thread.start_task()
@@ -696,7 +696,7 @@ class QMI_TaskRunner(QMI_RpcObject):
             # An exception occurred while running the task.
             # Re-raise the exception to report it to the application.
             assert isinstance(exception, BaseException)
-            raise QMI_TaskRunException("Task {} failed".format(self._name)) from exception
+            raise QMI_TaskRunException(f"Task {self._name} failed") from exception
 
     @rpc_method
     def is_running(self) -> bool:

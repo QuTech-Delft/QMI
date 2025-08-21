@@ -50,7 +50,7 @@ class QMI_Transport:
         """Verify that the transport is open, otherwise raise exception."""
         if not self._is_open:
             raise QMI_InvalidOperationException(
-                "Operation not allowed on closed transport {}".format(type(self).__name__))
+                f"Operation not allowed on closed transport {type(self).__name__}")
 
     def _open_transport(self) -> None:
         """Subclasses must override this method to open specific resources."""
@@ -60,7 +60,7 @@ class QMI_Transport:
         """Open the transport and claim associated resources."""
         if self._is_open:
             raise QMI_InvalidOperationException(
-                "Operation not allowed on opened transport {}".format(type(self).__name__))
+                f"Operation not allowed on opened transport {type(self).__name__}")
 
         self._open_transport()
         self._is_open = True
@@ -222,7 +222,7 @@ class TransportDescriptorParser:
 
         if self.interface != interface.lower():
             raise QMI_TransportDescriptorException(
-                'Unexpected interface: {} expected {}'.format(interface, self.interface))
+                f'Unexpected interface: {interface} expected {self.interface}')
 
         parts = self._parse_parts(transport_descriptor)
 
@@ -248,9 +248,9 @@ class TransportDescriptorParser:
                 parts.append(match[4])
             else:
                 raise QMI_TransportDescriptorException(
-                    "Invalid transport descriptor {!r}".format(transport_descriptor))
+                    f"Invalid transport descriptor {transport_descriptor!r}")
         if len(parts) < 2:
-            raise QMI_TransportDescriptorException("Invalid transport descriptor {!r}".format(transport_descriptor))
+            raise QMI_TransportDescriptorException(f"Invalid transport descriptor {transport_descriptor!r}")
         return parts
 
     @staticmethod
@@ -267,7 +267,7 @@ class TransportDescriptorParser:
         req_params = self._get_required_parameters()
         missing_parameters = req_params.difference(parameters.keys())
         if len(missing_parameters) > 0:
-            raise QMI_TransportDescriptorException('Missing required parameter(s): {}'.format(missing_parameters))
+            raise QMI_TransportDescriptorException(f'Missing required parameter(s): {missing_parameters}')
 
     def _parse_positional_parameters(self, params: List[str]) -> Dict[str, Any]:
         positional_params = [param for param in params if not self._is_keyword_param(param)]
@@ -418,32 +418,32 @@ class QMI_SerialTransport(QMI_Transport):
     @staticmethod
     def _validate_stopbits(stopbits: float) -> None:
         if stopbits not in (1.0, 1.5, 2.0):
-            raise QMI_TransportDescriptorException("Invalid value for stopbits ({})".format(stopbits))
+            raise QMI_TransportDescriptorException(f"Invalid value for stopbits ({stopbits})")
 
     @staticmethod
     def _validate_parity(parity: str) -> None:
         if parity not in ('N', 'E', 'O'):
-            raise QMI_TransportDescriptorException("Invalid parity specification ({})".format(parity))
+            raise QMI_TransportDescriptorException(f"Invalid parity specification ({parity})")
 
     @staticmethod
     def _validate_bytesize(bytesize: int) -> None:
         if bytesize < 5 or bytesize > 8:
-            raise QMI_TransportDescriptorException("Invalid value for bytesize ({})".format(bytesize))
+            raise QMI_TransportDescriptorException(f"Invalid value for bytesize ({bytesize})")
 
     @staticmethod
     def _validate_baudrate(baudrate: int) -> None:
         if baudrate < 1:
-            raise QMI_TransportDescriptorException("Invalid baud rate ({})".format(baudrate))
+            raise QMI_TransportDescriptorException(f"Invalid baud rate ({baudrate})")
 
     @staticmethod
     def _validate_device_name(device: str) -> None:
         if not (device.upper().startswith("COM") or device.startswith("/")):
-            raise QMI_TransportDescriptorException("Unknown serial port device path ({})".format(device))
+            raise QMI_TransportDescriptorException(f"Unknown serial port device path ({device})")
 
     @staticmethod
     def _validate_rstcts(rtscts: bool) -> None:
         if rtscts not in (True, False):
-            raise QMI_TransportDescriptorException("Invalid rtscts ({})".format(rtscts))
+            raise QMI_TransportDescriptorException(f"Invalid rtscts ({rtscts})")
 
     @property
     def _safe_serial(self) -> serial.Serial:
@@ -462,7 +462,7 @@ class QMI_SerialTransport(QMI_Transport):
         return self._serial
 
     def __str__(self) -> str:
-        return "QMI_SerialTransport {!r}".format(self.device)
+        return f"QMI_SerialTransport {self.device!r}"
 
     def _open_transport(self) -> None:
         _logger.debug("Opening serial port %r", self.device)
@@ -521,7 +521,7 @@ class QMI_SerialTransport(QMI_Transport):
         # Raise exception and leave all data in the buffer.
         nbuf = len(self._read_buffer)
         if nbuf < nbytes:
-            raise QMI_TimeoutException("Timeout after {} bytes while expecting {}".format(nbuf, nbytes))
+            raise QMI_TimeoutException(f"Timeout after {nbuf} bytes while expecting {nbytes}")
 
         # Return the received data.
         assert nbuf == nbytes
@@ -572,7 +572,7 @@ class QMI_SerialTransport(QMI_Transport):
                 tremain = tstart + timeout - time.monotonic()
 
         nbuf = len(self._read_buffer)
-        raise QMI_TimeoutException("Timeout after {} bytes without message terminator".format(nbuf))
+        raise QMI_TimeoutException(f"Timeout after {nbuf} bytes without message terminator")
 
     def read_until_timeout(self, nbytes: int, timeout: float) -> bytes:
         try:
@@ -902,7 +902,7 @@ class QMI_TcpTransport(QMI_SocketTransport):
             self._socket.connect(self._address)
         except socket.timeout as e:
             self._socket.close()
-            raise QMI_TimeoutException("Timeout while connecting to {}".format(self._address)) from e
+            raise QMI_TimeoutException(f"Timeout while connecting to {self._address}") from e
 
     def close(self) -> None:
         _logger.debug("Closing TCP transport %s", self)
@@ -964,12 +964,12 @@ class QMI_UsbTmcTransport(QMI_Transport):
     @staticmethod
     def _validate_product_id(productid):
         if (productid < 0) or (productid > 65535):
-            raise QMI_TransportDescriptorException("Missing/bad USB product ID {}".format(productid))
+            raise QMI_TransportDescriptorException(f"Missing/bad USB product ID {productid}")
 
     @staticmethod
     def _validate_vendor_id(vendorid):
         if (vendorid < 0) or (vendorid > 65535):
-            raise QMI_TransportDescriptorException("Missing/bad USB vendor ID {}".format(vendorid))
+            raise QMI_TransportDescriptorException(f"Missing/bad USB vendor ID {vendorid}")
 
     def __str__(self) -> str:
         return f"QMI_UsbTmcTransport 0x{self.vendorid:04x}:0x{self.productid:04x} ({self.serialnr})"
@@ -1019,7 +1019,7 @@ class QMI_UsbTmcTransport(QMI_Transport):
         if len(ret) == nbytes:
             return ret
 
-        _logger.debug("USBTMC read message contained data %s" % ret.decode())
+        _logger.debug(f"USBTMC read message contained data {ret.decode()}")
         raise QMI_EndOfInputException(
             f"The read message did not contain expected bytes of data ({len(ret)} != {nbytes}."
         )
@@ -1157,7 +1157,7 @@ class QMI_Vxi11Transport(QMI_Transport):
             self._instr = vxi11.Instrument(self._host)
             self._safe_instr.open()
         except vxi11.vxi11.Vxi11Exception as err:
-            raise QMI_InstrumentException("Error attempting to open VXI11 transport to {}".format(self._host)) from err
+            raise QMI_InstrumentException(f"Error attempting to open VXI11 transport to {self._host}") from err
 
     def close(self) -> None:
         _logger.debug("Closing %s", self)
@@ -1209,7 +1209,7 @@ class QMI_Vxi11Transport(QMI_Transport):
         self._check_is_open()
         if len(message_terminator) != 1:
             raise QMI_InstrumentException(
-                "VXI11 instrument only support 1 byte terminating character, received {!r}.".format(message_terminator)
+                f"VXI11 instrument only support 1 byte terminating character, received {message_terminator!r}."
             )
 
         nbuf = len(self._read_buffer)
@@ -1382,4 +1382,4 @@ def create_transport(
         attributes = Vxi11TransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
         return QMI_Vxi11Transport(**attributes)
     else:
-        raise QMI_TransportDescriptorException("Unknown type in transport descriptor %r" % transport_descriptor)
+        raise QMI_TransportDescriptorException(f"Unknown type in transport descriptor {transport_descriptor!r}")

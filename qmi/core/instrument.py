@@ -82,21 +82,21 @@ class QMI_Instrument(QMI_RpcObject):
     def release_rpc_object(self) -> None:
         """Give a warning if the instrument is removed while still open."""
         if self._is_open:
-            warnings.warn("QMI_Instrument {} removed while still open".format(self._name), ResourceWarning)
+            warnings.warn(f"QMI_Instrument {self._name} removed while still open", ResourceWarning)
 
     def _check_is_open(self) -> None:
         """Verify that the instrument is open, otherwise raise an exception."""
         if not self._is_open:
             _logger.error("Interaction with closed instrument %s not allowed", self._name)
             raise QMI_InvalidOperationException(
-                "Operation not allowed on closed instrument {}".format(self._name))
+                f"Operation not allowed on closed instrument {self._name}")
 
     def _check_is_closed(self) -> None:
         """Verify that the instrument is closed, otherwise raise an exception."""
         if self._is_open:
             _logger.error("Interaction with open instrument %s not allowed", self._name)
             raise QMI_InvalidOperationException(
-                "Operation not allowed on open instrument {}".format(self._name))
+                f"Operation not allowed on open instrument {self._name}")
 
     @rpc_method
     def is_open(self) -> bool:

@@ -56,7 +56,7 @@ def _check_active_contexts() -> None:
     count = _active_context_counter.value()
     if count:
         # Note: ResourceWarning is by default not displayed in Python.
-        warnings.warn("Still {} active QMI contexts at program exit".format(count), ResourceWarning)
+        warnings.warn(f"Still {count} active QMI contexts at program exit", ResourceWarning)
 
 
 class _UdpPingResponse(NamedTuple):
@@ -254,7 +254,7 @@ class QMI_Context:
         self._start_time = time.time()
 
         if not is_valid_object_name(name):
-            raise QMI_UsageException("Invalid context name {!r}".format(name))
+            raise QMI_UsageException(f"Invalid context name {name!r}")
 
         self.name = name
         self._unique_counters: dict[str, int] = {}
@@ -309,7 +309,7 @@ class QMI_Context:
         return self._workgroup_name
 
     def __repr__(self) -> str:
-        return "QMI_Context(name={!r})".format(self.name)
+        return f"QMI_Context(name={self.name!r})"
 
     def _check_in_context_thread(self) -> None:
         """Check that this function is called in the same thread that created the context.
@@ -617,9 +617,9 @@ class QMI_Context:
             cfg = self.get_config()
             peer_cfg = cfg.contexts.get(peer_context_name)
             if peer_cfg is None:
-                raise QMI_UnknownNameException("Unknown remote context {}".format(peer_context_name))
+                raise QMI_UnknownNameException(f"Unknown remote context {peer_context_name}")
             if (not peer_cfg.host) or (not peer_cfg.tcp_server_port):
-                raise QMI_ConfigurationException("Missing host/port for peer context {}".format(peer_context_name))
+                raise QMI_ConfigurationException(f"Missing host/port for peer context {peer_context_name}")
             peer_address = format_address_and_port((peer_cfg.host, int(peer_cfg.tcp_server_port)))
 
         # Make new peer connection.
@@ -790,7 +790,7 @@ class QMI_Context:
             An RPC proxy that provides access to the new object instance.
         """
         if not is_valid_object_name(rpc_object_name):
-            raise QMI_UsageException("Invalid object name {!r}".format(rpc_object_name))
+            raise QMI_UsageException(f"Invalid object name {rpc_object_name!r}")
 
         return self._internal_make_rpc_object(rpc_object_name, rpc_object_class, *args, **kwargs)
 
@@ -816,7 +816,7 @@ class QMI_Context:
 
             # Check unique name.
             if rpc_object_name in self._rpc_object_map:
-                raise QMI_DuplicateNameException("Duplicate object name {}".format(rpc_object_name))
+                raise QMI_DuplicateNameException(f"Duplicate object name {rpc_object_name}")
 
             # Reserve name.
             self._rpc_object_map[rpc_object_name] = None
@@ -871,7 +871,7 @@ class QMI_Context:
 
         # Check that the proxy refers to a local object.
         if proxy._rpc_object_address.context_id != self.name:
-            raise QMI_UsageException("Can not remove remote RPC object {}".format(proxy._rpc_object_address))
+            raise QMI_UsageException(f"Can not remove remote RPC object {proxy._rpc_object_address}")
 
         rpc_object_name = proxy._rpc_object_address.object_id
 
@@ -880,7 +880,7 @@ class QMI_Context:
             # Find the RPC object manager.
             manager = self._rpc_object_map.get(rpc_object_name)
             if manager is None:
-                raise QMI_UnknownNameException("Can not remove unknown RPC object {}".format(rpc_object_name))
+                raise QMI_UnknownNameException(f"Can not remove unknown RPC object {rpc_object_name}")
 
             # Mark the object as being removed.
             self._rpc_object_map[rpc_object_name] = None
@@ -1019,17 +1019,17 @@ class QMI_Context:
             addr_wdt = max(len(addr_hdr), max_addr_length)
             conn_wdt = len(conn_hdr)
 
-            print("{} {} {}".format(name_hdr.ljust(name_wdt), addr_hdr.ljust(addr_wdt), conn_hdr))
-            print("{} {} {}".format("-" * name_wdt, "-" * addr_wdt, "-" * conn_wdt))
+            print(f"{name_hdr.ljust(name_wdt)} {addr_hdr.ljust(addr_wdt)} {conn_hdr}")
+            print(f"{'-' * name_wdt} {'-' * addr_wdt} {'-' * conn_wdt}")
             for context_name, context_address in contexts:
                 if self.has_peer_context(context_name):
                     connected = "yes"
                 else:
                     connected = "no"
 
-                print("{} {} {}".format(context_name.ljust(name_wdt), context_address.ljust(addr_wdt), connected))
+                print(f"{context_name.ljust(name_wdt)} {context_address.ljust(addr_wdt)} {connected}")
 
-            print("{} {} {}".format("-" * name_wdt, "-" * addr_wdt, "-" * conn_wdt))
+            print(f"{'-' * name_wdt} {'-' * addr_wdt} {'-' * conn_wdt}")
 
     def list_rpc_objects(self, category: str | None = None) -> list[tuple[str, str]]:
         """Returns a list of tuple strings of RPC objects addresses in the local context and in peer context."""
@@ -1060,11 +1060,11 @@ class QMI_Context:
             max_address_length = max(max(len(address) for address, _ in rpc_objects), 7)
             max_class_name_length = max(max(len(class_name) for _, class_name in rpc_objects), 4)
 
-            print("{}  {}".format("address".ljust(max_address_length), "type"))
-            print("{}  {}".format("-" * max_address_length, "-" * max_class_name_length))
+            print(f"{'address'.ljust(max_address_length)}  type")
+            print(f"{'-' * max_address_length}  {'-' * max_class_name_length}")
             for address, class_name in rpc_objects:
-                print("{}  {}".format(address.ljust(max_address_length), class_name))
-            print("{}  {}".format("-" * max_address_length, "-" * max_class_name_length))
+                print(f"{address.ljust(max_address_length)}  {class_name}")
+            print(f"{'-' * max_address_length}  {'-' * max_class_name_length}")
 
     def show_tasks(self) -> None:
         """Show a list of tasks in the local context and peer contexts."""
@@ -1112,7 +1112,7 @@ class QMI_Context:
                    (rpc_object_descriptor.address.object_id == object_id)
             return self.make_proxy(rpc_object_descriptor)
 
-        raise ValueError("Unknown RPC object '{}'.".format(rpc_object_name))
+        raise ValueError(f"Unknown RPC object '{rpc_object_name}'.")
 
     def get_instrument(self, instrument_name: str, auto_connect: bool = False, host_port: str | None = None) -> Any:
         """Return a proxy for the specified instrument.

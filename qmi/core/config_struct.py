@@ -188,7 +188,7 @@ def _parse_config_value(val: Any, field_type: Any, path: list[str]) -> Any:
         if isinstance(val, list):
             ret = []
             for (i, elem) in enumerate(val):
-                path.append("[{}]".format(i))
+                path.append(f"[{i}]")
                 ret.append(_parse_config_value(elem, elem_type, path))
                 path.pop()
             return ret
@@ -200,7 +200,7 @@ def _parse_config_value(val: Any, field_type: Any, path: list[str]) -> Any:
             if isinstance(val, (list, tuple)):
                 ret = []
                 for (i, elem) in enumerate(val):
-                    path.append("[{}]".format(i))
+                    path.append(f"[{i}]")
                     ret.append(_parse_config_value(elem, elem_type, path))
                     path.pop()
                 return tuple(ret)
@@ -208,7 +208,7 @@ def _parse_config_value(val: Any, field_type: Any, path: list[str]) -> Any:
             if isinstance(val, (list, tuple)) and (len(val) == len(field_type.__args__)):
                 ret = []
                 for (i, elem) in enumerate(val):
-                    path.append("[{}]".format(i))
+                    path.append(f"[{i}]")
                     ret.append(_parse_config_value(elem, field_type.__args__[i], path))
                     path.pop()
                 return tuple(ret)
@@ -241,7 +241,7 @@ def _parse_config_dict(val: dict, field_type: Any, path: list[str]) -> _StrDict:
             raise QMI_ConfigurationException(
                 f"Unsupported non-string dictionary key {k!r} in configuration item {pathstr}"
             )
-        path.append("[{!r}]".format(k))
+        path.append(f"[{k!r}]")
         ret[k] = _parse_config_value(elem, elem_type, path)
         path.pop()
     return ret
@@ -325,7 +325,7 @@ def _check_config_struct_type(cls: Any, path: list[str]) -> None:
             return  # accept
         else:
             for (i, elem_type) in enumerate(cls.__args__):
-                path.append("[{}]".format(i))
+                path.append(f"[{i}]")
                 _check_config_struct_type(elem_type, path)
                 path.pop()
             return  # accept

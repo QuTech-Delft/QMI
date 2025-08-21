@@ -117,21 +117,21 @@ class ScpiProtocol:
         header = self._transport.read(2, timeout=timeout)
 
         if header[0] != ord("#"):
-            raise QMI_InstrumentException("Invalid binary data format, expecting '#' but got {!r}".format(header[0:1]))
+            raise QMI_InstrumentException(f"Invalid binary data format, expecting '#' but got {header[0:1]!r}")
 
         if not header[1:].isdigit():
-            msg = "Invalid binary data format, expecting digit but got {!r}".format(header[1:])
+            msg = f"Invalid binary data format, expecting digit but got {header[1:]!r}"
             raise QMI_InstrumentException(msg)
 
         # Read data size.
         num_digits = int(header[1:])
 
         if num_digits == 0:
-            raise QMI_InstrumentException("Invalid binary data format {!r}".format(header))
+            raise QMI_InstrumentException(f"Invalid binary data format {header!r}")
 
         header2 = self._transport.read(num_digits, timeout=timeout)
         if not header2.isdigit():
-            msg = "Invalid binary data format, expecting data size but got {!r}" .format(header2)
+            msg = f"Invalid binary data format, expecting data size but got {header2!r}"
             raise QMI_InstrumentException(msg)
         num_bytes = int(header2)
 
@@ -142,7 +142,7 @@ class ScpiProtocol:
             # Read response terminator.
             tail = self._transport.read(len(self._response_terminator), timeout=timeout)
             if tail != self._response_terminator:
-                msg = "Invalid binary data format, expecting newline but got {!r}".format(tail)
+                msg = f"Invalid binary data format, expecting newline but got {tail!r}"
                 raise QMI_InstrumentException(msg)
 
         return data

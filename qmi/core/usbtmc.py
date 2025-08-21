@@ -136,7 +136,7 @@ class UsbtmcException(Exception):
             else:
                 self.msg = err
             if note is not None:
-                self.msg = "%s [%s]" % (self.msg, note)
+                self.msg = f"{self.msg} [{note}]"
 
     def __str__(self):
         return self.msg

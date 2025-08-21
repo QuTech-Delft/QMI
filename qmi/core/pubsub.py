@@ -230,7 +230,7 @@ class QMI_RegisteredSignal:
 
     def __repr__(self) -> str:
         arg_types = ", ".join(arg_type.__name__ for arg_type in self.arg_types)
-        return "<registered signal {}.{} ({})>".format(self.publisher_name, self.signal_name, arg_types)
+        return f"<registered signal {self.publisher_name}.{self.signal_name} ({arg_types})>"
 
     def publish(self, *args: Any) -> None:
         """Publish this signal.
@@ -676,11 +676,11 @@ class SignalManager(QMI_MessageHandler):
         if publisher_context == "":
             publisher_context = self._context.name
         if not is_valid_object_name(publisher_context):
-            raise QMI_UsageException("Invalid context name {!r}".format(publisher_context))
+            raise QMI_UsageException(f"Invalid context name {publisher_context!r}")
         if not is_valid_object_name(publisher_name):
-            raise QMI_UsageException("Invalid publisher name {!r}".format(publisher_name))
+            raise QMI_UsageException(f"Invalid publisher name {publisher_name!r}")
         if not is_valid_object_name(signal_name):
-            raise QMI_UsageException("Invalid signal name {!r}".format(signal_name))
+            raise QMI_UsageException(f"Invalid signal name {signal_name!r}")
 
         _logger.debug("Subscribing to signal %s.%s.%s", publisher_context, publisher_name, signal_name)
 
@@ -705,11 +705,11 @@ class SignalManager(QMI_MessageHandler):
         if publisher_context == "":
             publisher_context = self._context.name
         if not is_valid_object_name(publisher_context):
-            raise QMI_UsageException("Invalid context name {!r}".format(publisher_context))
+            raise QMI_UsageException(f"Invalid context name {publisher_context!r}")
         if not is_valid_object_name(publisher_name):
-            raise QMI_UsageException("Invalid publisher name {!r}".format(publisher_name))
+            raise QMI_UsageException(f"Invalid publisher name {publisher_name!r}")
         if not is_valid_object_name(signal_name):
-            raise QMI_UsageException("Invalid signal name {!r}".format(signal_name))
+            raise QMI_UsageException(f"Invalid signal name {signal_name!r}")
 
         _logger.debug("Unsubscribing from signal %s.%s.%s", publisher_context, publisher_name, signal_name)
 
@@ -776,7 +776,7 @@ class SignalManager(QMI_MessageHandler):
 
         # Check that the publisher exists as an RPC object.
         if self._context.get_rpc_object_descriptor(publisher_name) is None:
-            raise QMI_SignalSubscriptionException("Unknown RPC object {}.{}".format(publisher_context, publisher_name))
+            raise QMI_SignalSubscriptionException(f"Unknown RPC object {publisher_context}.{publisher_name}")
 
         # Add the receiver to the list of local subscribers.
         self._add_local_subscriber(publisher_context, publisher_name, signal_name, receiver)
@@ -919,9 +919,9 @@ class SignalManager(QMI_MessageHandler):
         """Publish the specified signal to the QMI network."""
 
         if not is_valid_object_name(publisher_name):
-            raise QMI_UsageException("Invalid publisher name {!r}".format(publisher_name))
+            raise QMI_UsageException(f"Invalid publisher name {publisher_name!r}")
         if not is_valid_object_name(signal_name):
-            raise QMI_UsageException("Invalid signal name {!r}".format(signal_name))
+            raise QMI_UsageException(f"Invalid signal name {signal_name!r}")
 
         source_address = QMI_MessageHandlerAddress(self._context.name, publisher_name)
 
@@ -981,7 +981,7 @@ class SignalManager(QMI_MessageHandler):
             # Check that the publisher exists as a local RPC object.
             if self._context.get_rpc_object_descriptor(publisher_name) is None:
                 success = False
-                error_msg = "Unknown RPC object {}.{}".format(self._context.name, publisher_name)
+                error_msg = f"Unknown RPC object {self._context.name}.{publisher_name}"
             else:
                 # Add the remote context to the table of remote subscribers.
                 self._add_remote_subscriber(publisher_name, signal_name, subscriber_context)
@@ -990,7 +990,7 @@ class SignalManager(QMI_MessageHandler):
                 if self._context.get_rpc_object_descriptor(publisher_name) is None:
                     self._remove_remote_subscriber(publisher_name, signal_name, subscriber_context)
                     success = False
-                    error_msg = "Unknown RPC object {}.{}".format(self._context.name, publisher_name)
+                    error_msg = f"Unknown RPC object {self._context.name}.{publisher_name}"
                 else:
                     success = True
                     error_msg = ""
@@ -1106,7 +1106,7 @@ class SignalManager(QMI_MessageHandler):
         elif isinstance(message, QMI_SignalRemovedMessage):
             self._handle_remote_signal_removed(message)
         else:
-            raise QMI_RuntimeException("Unexpected message type {}".format(type(message).__name__))
+            raise QMI_RuntimeException(f"Unexpected message type {type(message).__name__}")
 
     def handle_object_removed(self, rpc_object_name: str) -> None:
         """Called when a local RPC object is removed.

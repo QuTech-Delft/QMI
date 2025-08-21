@@ -44,7 +44,7 @@ def config_pairs_hook(config_pairs) -> collections.OrderedDict:
     cfg_dict = collections.OrderedDict()
     for k, v in config_pairs:
         if k in cfg_dict:
-            raise ValueError("duplicate key: {}".format(k))
+            raise ValueError(f"duplicate key: {k}")
 
         else:
             cfg_dict[k] = v
