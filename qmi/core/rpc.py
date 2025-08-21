@@ -818,6 +818,26 @@ def is_rpc_method(object: Any) -> bool:
     return inspect.isfunction(object) and getattr(object, "_rpc_method", False)
 
 
+def class_docstring_wrapper(cls: _T) -> _T:
+    methods = []
+    for name, member in inspect.getmembers(cls, is_rpc_method):
+        if name.startswith("_"):
+            continue
+
+        signature = str(inspect.signature(member))
+        # docstring = member.__doc__
+        method_str = f"{name}{signature.replace("(self, ", "(").replace("(self", "(")}"
+        # if docstring is not None:
+        #     method_str += f"\n\t{docstring}"
+        #
+        methods.append(method_str)
+
+    doc = cls.__doc__ or ''
+    doc += '\n\nRPC methods:\n' + '\n'.join(f'- {m}' for m in methods)
+    cls.__doc__ = doc
+    return cls
+
+
 class _RpcObjectMetaClass(ABCMeta):
     """Meta-class used to create `QMI_RpcObject` and its subclasses.
 
