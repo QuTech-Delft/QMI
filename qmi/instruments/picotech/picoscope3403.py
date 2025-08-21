@@ -16,8 +16,7 @@ from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_UsageException
 from qmi.core.rpc import rpc_method
 
-from qmi.instruments.picotech import ChannelCoupling, TriggerEdge
-from qmi.instruments.picotech._picoscope import PicoTech_PicoScope, _check_error
+from qmi.instruments.picotech._picoscope import ChannelCoupling, PicoTech_PicoScope, TriggerEdge, _check_error
 
 # Lazy import of the "picosdk" module. See the function _import_modules() _picoscope.py.
 if TYPE_CHECKING:

@@ -108,8 +108,9 @@ class ProgramInfo(NamedTuple):
             param: dict[str, ParameterDesc] = {}
             for (name, desc) in param_items:
                 if name in param:
-                    raise QMI_ConfigurationException("Duplicate use of parameter name {!r} in ADwin program \"{!r}\"!"
-                                                     .format(name, config.file))
+                    raise QMI_ConfigurationException(
+                        f"Duplicate use of parameter name {name!r} in ADwin program \"{config.file!r}\"!"
+                    )
                 param[name] = desc
 
             param_info = ParameterInfo(param=param, data=config.data)
@@ -190,16 +191,19 @@ class AdwinProgramLibrary:
     def _check_program_config(prog_name: str, prog_cfg: CfgAdwinProgram) -> None:
 
         if prog_cfg.slot < 1 or prog_cfg.slot > 10:
-            raise QMI_ConfigurationException("Invalid ADwin process slot number {} for program {!r}"
-                                             .format(prog_cfg.slot, prog_name))
+            raise QMI_ConfigurationException(
+                f"Invalid ADwin process slot number {prog_cfg.slot} for program {prog_name!r}"
+            )
 
         if prog_cfg.trigger.lower() not in ("timer", "external"):
-            raise QMI_ConfigurationException("Invalid ADwin process trigger {!r} for program {!r}"
-                                             .format(prog_cfg.trigger, prog_name))
+            raise QMI_ConfigurationException(
+                f"Invalid ADwin process trigger {prog_cfg.trigger!r} for program {prog_name!r}"
+            )
 
         if ((prog_cfg.priority < -10) or (prog_cfg.priority > 10)) and (prog_cfg.priority != 1000):
-            raise QMI_ConfigurationException("Invalid ADwin process priority {} for program {!r}".
-                                             format(prog_cfg.priority, prog_name))
+            raise QMI_ConfigurationException(
+                f"Invalid ADwin process priority {prog_cfg.priority} for program {prog_name!r}"
+            )
 
         if prog_cfg.parse_parameters and (prog_cfg.par or prog_cfg.fpar or prog_cfg.data or prog_cfg.par_array):
             raise QMI_ConfigurationException(f"Invalid configuration for ADwin program {prog_name!r}"
@@ -356,8 +360,9 @@ class AdwinProcess:
             QMI_InstrumentException: If the process is already running.
         """
         if self._adwin.is_process_running(self._process_number):
-            raise QMI_InstrumentException("Can not start Adwin process {}, process {} already running"
-                                          .format(self._name, self._process_number))
+            raise QMI_InstrumentException(
+                f"Can not start Adwin process {self._name}, process {self._process_number} already running"
+            )
         self._adwin.start_process(self._process_number)
 
     def start_with_params(self, **kwargs: Any) -> None:
@@ -378,8 +383,9 @@ class AdwinProcess:
 
         # Check that process is not running.
         if self._adwin.is_process_running(self._process_number):
-            raise QMI_InstrumentException("Can not start Adwin process {}, process {} already running"
-                                          .format(self._name, self._process_number))
+            raise QMI_InstrumentException(
+                f"Can not start Adwin process {self._name}, process {self._process_number} already running"
+            )
 
         # Set parameters. Fill-in zero for unspecified parameters.
         params = {}
@@ -704,8 +710,9 @@ class AdwinManager:
                 raise ValueError(f"Unknown program {program_name!r} in auto_load_programs")
             program_info = self._program_library.get_program_info(program_name)
             if program_info.slot in numbers_used:
-                raise ValueError("Duplicate auto_load program in process slot number {} ({})"
-                                 .format(program_info.slot, program_name))
+                raise ValueError(
+                    f"Duplicate auto_load program in process slot number {program_info.slot} ({program_name})"
+                )
             numbers_used.add(program_info.slot)
 
     def get_adwin(self) -> Adwin_Base:

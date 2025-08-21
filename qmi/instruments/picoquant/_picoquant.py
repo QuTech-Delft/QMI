@@ -16,7 +16,7 @@ from qmi.core.instrument import QMI_Instrument
 from qmi.core.messaging import _PeerTcpConnection
 from qmi.core.pubsub import QMI_Signal
 from qmi.core.rpc import rpc_method
-from qmi.instruments.picoquant import EventFilterMode, SYNC_TYPE
+from qmi.instruments.picoquant.support._decoders import EventFilterMode, SYNC_TYPE
 from qmi.instruments.picoquant.support._realtime import RealTimeHistogram, RealTimeCountRate, NUM_CHANNELS
 from qmi.instruments.picoquant.support._events import _FetchEventsThread, _MODE
 from qmi.instruments.picoquant.support._library_wrapper import _LibWrapper

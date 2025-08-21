@@ -3,7 +3,7 @@ from typing import NamedTuple, List, Callable, Tuple
 import numpy as np
 from numpy.typing import ArrayLike
 
-from qmi.instruments.picoquant import SYNC_TYPE
+from qmi.instruments.picoquant.support._decoders import SYNC_TYPE
 
 NUM_CHANNELS = 8
 

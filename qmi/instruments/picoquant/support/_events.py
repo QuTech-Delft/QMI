@@ -7,8 +7,9 @@ import numpy as np
 
 from qmi.core.exceptions import QMI_InvalidOperationException, QMI_RuntimeException, QMI_UsageException
 from qmi.core.thread import QMI_Thread
-from qmi.instruments.picoquant import EventDataType, EventFilterMode, SYNC_TYPE
-from qmi.instruments.picoquant.support._decoders import EventDecoder, _T2EventDecoder, _T3EventDecoder
+from qmi.instruments.picoquant.support._decoders import (
+    EventDataType, EventDecoder, EventFilterMode, SYNC_TYPE, _T2EventDecoder, _T3EventDecoder
+)
 from qmi.instruments.picoquant.support._realtime import _RealTimeHistogramProcessor, _get_sync_deltas
 
 
