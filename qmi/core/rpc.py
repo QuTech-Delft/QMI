@@ -819,14 +819,15 @@ def is_rpc_method(object: Any) -> bool:
 
 
 def class_docstring_wrapper(cls: _T) -> _T:
+    """Decorator for instrument class objects to include a list of RPC methods in their docstrings."""
     methods = []
     for name, member in inspect.getmembers(cls, is_rpc_method):
         if name.startswith("_"):
             continue
 
-        signature = str(inspect.signature(member))
+        signature = str(inspect.signature(member)).replace("(self, ", "(")
         # docstring = member.__doc__
-        method_str = f"{name}{signature.replace("(self, ", "(").replace("(self", "(")}"
+        method_str = f"{name}{signature.replace("(self", "(")}"
         # if docstring is not None:
         #     method_str += f"\n\t{docstring}"
         #
