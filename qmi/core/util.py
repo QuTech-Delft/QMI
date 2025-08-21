@@ -3,8 +3,6 @@
 import re
 import threading
 
-from typing import Tuple
-
 
 def is_valid_object_name(name: str) -> bool:
     """Check that the specified name is an acceptable name for QMI.
@@ -31,7 +29,7 @@ def is_valid_object_name(name: str) -> bool:
     return True
 
 
-def format_address_and_port(address: Tuple[str, int]) -> str:
+def format_address_and_port(address: tuple[str, int]) -> str:
     """Format a host address and port number as a string ``"<host>:<port>"``.
 
     The host address may either be an IP address or a host name.
@@ -53,7 +51,7 @@ def format_address_and_port(address: Tuple[str, int]) -> str:
     return host + ':' + str(port)
 
 
-def parse_address_and_port(address: str) -> Tuple[str, int]:
+def parse_address_and_port(address: str) -> tuple[str, int]:
     """Parse host address and port number.
 
     The host address may either be an IP address or a host name.

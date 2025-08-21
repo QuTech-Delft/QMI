@@ -6,7 +6,7 @@ import socket
 import sys
 import time
 from collections.abc import Mapping
-from typing import Any, Dict, Optional, List, Tuple, Type
+from typing import Any, Type
 
 import serial
 import vxi11  # type: ignore
@@ -86,7 +86,7 @@ class QMI_Transport:
         """
         raise NotImplementedError("QMI_Transport.write not implemented")
 
-    def read(self, nbytes: int, timeout: Optional[float]) -> bytes:
+    def read(self, nbytes: int, timeout: float | None) -> bytes:
         """Read a specified number of bytes from the transport.
 
         This method blocks until the specified number of bytes are available,
@@ -114,7 +114,7 @@ class QMI_Transport:
         """
         raise NotImplementedError("QMI_Transport.read not implemented")
 
-    def read_until(self, message_terminator: bytes, timeout: Optional[float]) -> bytes:
+    def read_until(self, message_terminator: bytes, timeout: float | None) -> bytes:
         """Read a sequence of bytes ending in "message_terminator".
 
         This method blocks until the specified message terminator sequence
@@ -184,16 +184,16 @@ class TransportDescriptorParser:
     """
     def __init__(self,
                  interface: str,
-                 positionals: List[Tuple[str, Tuple[Type, bool]]],
-                 keywords: Mapping[str, Tuple[Type, bool]]
+                 positionals: list[tuple[str, tuple[Type, bool]]],
+                 keywords: Mapping[str, tuple[Type, bool]]
     ) -> None:
         self.interface = interface
         self._positionals = positionals
         self._keywords = keywords
 
     def parse_parameter_strings(
-            self, transport_descriptor: str, default_parameters: Optional[Mapping[str, Any]] = None
-    ) -> Dict[str, Any]:
+            self, transport_descriptor: str, default_parameters: Mapping[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Method for parsing transport descriptor strings.
 
         Parameters:
@@ -230,7 +230,7 @@ class TransportDescriptorParser:
         return parameters
 
     @staticmethod
-    def _parse_parts(transport_descriptor: str) -> List[str]:
+    def _parse_parts(transport_descriptor: str) -> list[str]:
         regex = re.compile(
             r"((?:^([^:]+))|"  # transport interface: i.e. serial:...
             r"(?::\[(.+)[\]$])|"  # enclosed parameter (for example used in ipv6): i.e. ...:[param]:... or ...:[param]
@@ -260,13 +260,13 @@ class TransportDescriptorParser:
         interface = self._parse_interface(transport_descriptor).lower()
         return self.interface == interface
 
-    def _check_missing_parameters(self, parameters: Dict[str, Any]):
+    def _check_missing_parameters(self, parameters: dict[str, Any]):
         req_params = self._get_required_parameters()
         missing_parameters = req_params.difference(parameters.keys())
         if len(missing_parameters) > 0:
             raise QMI_TransportDescriptorException(f'Missing required parameter(s): {missing_parameters}')
 
-    def _parse_positional_parameters(self, params: List[str]) -> Dict[str, Any]:
+    def _parse_positional_parameters(self, params: list[str]) -> dict[str, Any]:
         positional_params = [param for param in params if not self._is_keyword_param(param)]
         d = dict()
         for (name, (ty, _)), param in zip(self._positionals, positional_params):
@@ -277,7 +277,7 @@ class TransportDescriptorParser:
                                                        ty, param)
         return d
 
-    def _parse_keyword_parameters(self, strings: List[str]) -> Dict[str, Any]:
+    def _parse_keyword_parameters(self, strings: list[str]) -> dict[str, Any]:
         keyword_strings = [param for param in strings if self._is_keyword_param(param)]
         parameters = dict()
         for keyword_string in keyword_strings:
@@ -410,7 +410,7 @@ class QMI_SerialTransport(QMI_Transport):
         self._stopbits = stopbits
         self._rtscts = rtscts
         self._read_buffer = bytearray()
-        self._serial: Optional[serial.Serial] = None
+        self._serial: serial.Serial | None = None
 
     @staticmethod
     def _validate_stopbits(stopbits: float) -> None:
@@ -481,7 +481,7 @@ class QMI_SerialTransport(QMI_Transport):
         self._check_is_open()
         self._safe_serial.write(data)
 
-    def read(self, nbytes: int, timeout: Optional[float]) -> bytes:
+    def read(self, nbytes: int, timeout: float | None) -> bytes:
         self._check_is_open()
 
         nbuf = len(self._read_buffer)
@@ -526,7 +526,7 @@ class QMI_SerialTransport(QMI_Transport):
         self._read_buffer = bytearray()
         return ret
 
-    def read_until(self, message_terminator: bytes, timeout: Optional[float]) -> bytes:
+    def read_until(self, message_terminator: bytes, timeout: float | None) -> bytes:
         self._check_is_open()
 
         # Check if a message terminator is already present in the buffer.
@@ -637,7 +637,7 @@ class QMI_SocketTransport(QMI_Transport):
         self._validate_host(host)
         self._validate_port(port)
         self._address = (host, port)
-        self._socket: Optional[socket.socket] = None
+        self._socket: socket.socket | None = None
         self._read_buffer = bytearray()
 
     @staticmethod
@@ -670,7 +670,7 @@ class QMI_SocketTransport(QMI_Transport):
         _logger.debug("Opening %s with address %s", self, self._address)
         self._read_buffer = bytearray()
 
-    def _read_from_socket(self, packet_size: int) -> Tuple[bytes, Any]:
+    def _read_from_socket(self, packet_size: int) -> tuple[bytes, Any]:
         """Helper function to read from a socket with specific packet size.
         Exact amount does not matter but a small power of 2 is recommended, e.g. 4096
         by socket.recv() documentation.
@@ -700,7 +700,7 @@ class QMI_SocketTransport(QMI_Transport):
     def write(self, data: bytes) -> None:
         raise NotImplementedError("QMI_SocketTransportBase.write not implemented")
 
-    def read(self, nbytes: int, timeout: Optional[float] = None) -> bytes:
+    def read(self, nbytes: int, timeout: float | None = None) -> bytes:
         self._check_is_open()
         tstart = time.monotonic()
         tremain = timeout
@@ -725,7 +725,7 @@ class QMI_SocketTransport(QMI_Transport):
         self._read_buffer = self._read_buffer[nbytes:]
         return ret
 
-    def read_until(self, message_terminator: bytes, timeout: Optional[float] = None) -> bytes:
+    def read_until(self, message_terminator: bytes, timeout: float | None = None) -> bytes:
         # Check if message terminator already received. To be further handled in subclass implementation.
         p = self._read_buffer.find(message_terminator)
         if p >= 0:
@@ -871,7 +871,7 @@ class QMI_TcpTransport(QMI_SocketTransport):
     MIN_PACKET_SIZE = 0
     MAX_PACKET_SIZE = 512
 
-    def __init__(self, host: str, port: int, connect_timeout: Optional[float] = DEFAULT_CONNECT_TIMEOUT) -> None:
+    def __init__(self, host: str, port: int, connect_timeout: float | None = DEFAULT_CONNECT_TIMEOUT) -> None:
         """Initialize the TCP transport by connecting to the specified address.
 
         Parameters:
@@ -984,7 +984,7 @@ class QMI_UsbTmcTransport(QMI_Transport):
         """
         raise NotImplementedError("QMI_UsbTmcTransport.write not implemented")
 
-    def read(self, nbytes: int, timeout: Optional[float]) -> bytes:
+    def read(self, nbytes: int, timeout: float | None) -> bytes:
         """Read a specified number of bytes from the transport.
 
         All bytes must belong to the same USBTMC message.
@@ -1021,7 +1021,7 @@ class QMI_UsbTmcTransport(QMI_Transport):
             f"The read message did not contain expected bytes of data ({len(ret)} != {nbytes}."
         )
 
-    def read_until(self, message_terminator: bytes, timeout: Optional[float]) -> bytes:
+    def read_until(self, message_terminator: bytes, timeout: float | None) -> bytes:
         """The specified message_terminator is ignored. Instead, the instrument must autonomously indicate the end
         of the message according to the USBTMC protocol.
 
@@ -1036,7 +1036,7 @@ class QMI_UsbTmcTransport(QMI_Transport):
         """
         return self.read_until_timeout(0, timeout)
 
-    def read_until_timeout(self, nbytes: int, timeout: Optional[float]) -> bytes:
+    def read_until_timeout(self, nbytes: int, timeout: float | None) -> bytes:
         """Read a single USBTMC message from the instrument.
 
         If the timeout expires before the message is received, the read is
@@ -1083,7 +1083,7 @@ class QMI_UsbTmcTransport(QMI_Transport):
         raise NotImplementedError("QMI_UsbTmcTransport.read not implemented")
 
     @staticmethod
-    def _format_resources(resources: List[str]) -> List[str]:
+    def _format_resources(resources: list[str]) -> list[str]:
         transports = set()
         for res in resources:
             parts = res.split("::")
@@ -1100,7 +1100,7 @@ class QMI_UsbTmcTransport(QMI_Transport):
         return sorted(list(transports))
 
     @staticmethod
-    def list_resources() -> List[str]:
+    def list_resources() -> list[str]:
         """List available resources from USB connections.
         This should be implemented in deriving classes.
 
@@ -1127,7 +1127,7 @@ class QMI_Vxi11Transport(QMI_Transport):
         QMI_TcpTransport._validate_host(host)
 
         self._host = host
-        self._instr: Optional[vxi11.Instrument] = None
+        self._instr: vxi11.Instrument | None = None
         self._read_buffer = bytes()
 
     @property
@@ -1171,7 +1171,7 @@ class QMI_Vxi11Transport(QMI_Transport):
         except vxi11.vxi11.Vxi11Exception as err:
             raise QMI_InstrumentException() from err
 
-    def read(self, nbytes: int, timeout: Optional[float] = None) -> bytes:
+    def read(self, nbytes: int, timeout: float | None = None) -> bytes:
         self._check_is_open()
         nbuf = len(self._read_buffer)
         if nbuf >= nbytes:
@@ -1202,7 +1202,7 @@ class QMI_Vxi11Transport(QMI_Transport):
         self._read_buffer = bytes()
         return ret
 
-    def read_until(self, message_terminator: bytes, timeout: Optional[float] = None) -> bytes:
+    def read_until(self, message_terminator: bytes, timeout: float | None = None) -> bytes:
         self._check_is_open()
         if len(message_terminator) != 1:
             raise QMI_InstrumentException(
@@ -1285,7 +1285,7 @@ class QMI_Vxi11Transport(QMI_Transport):
         self._safe_instr.timeout = old_timeout
 
 
-def list_usbtmc_transports() -> List[str]:
+def list_usbtmc_transports() -> list[str]:
     """Return a list of currently detected USBTMC transports."""
     if sys.platform.lower().startswith("win"):
         from qmi.core.transport_usbtmc_visa import QMI_VisaUsbTmcTransport
@@ -1297,7 +1297,7 @@ def list_usbtmc_transports() -> List[str]:
 
 
 def create_transport(
-        transport_descriptor: str, default_attributes: Optional[Dict[str, Any]] = None
+        transport_descriptor: str, default_attributes: dict[str, Any] | None = None
 ) -> QMI_Transport:
     """Create a bidirectional communication channel.
 

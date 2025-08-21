@@ -110,9 +110,9 @@ Reference
 import logging
 import threading
 from collections import deque
+from collections.abc import Callable
 
-import typing
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Set, Tuple, Type
+from typing import Any, NamedTuple, Type, TYPE_CHECKING
 
 from qmi.core.exceptions import (
     QMI_TimeoutException, QMI_MessageDeliveryException,
@@ -137,7 +137,7 @@ class SignalDescription(NamedTuple):
             this signal type.
     """
     name: str
-    arg_types: Tuple[Type, ...]
+    arg_types: tuple[Type, ...]
 
 
 class ReceivedSignal(NamedTuple):
@@ -177,7 +177,7 @@ class QMI_Signal:
     """
     __slots__ = ("arg_types",)
 
-    def __init__(self, arg_types: List[Type]) -> None:
+    def __init__(self, arg_types: list[Type]) -> None:
         """Declare a new signal type.
 
         Parameters:
@@ -214,7 +214,7 @@ class QMI_RegisteredSignal:
                  context: "qmi.core.context.QMI_Context",
                  publisher_name: str,
                  signal_name: str,
-                 arg_types: Tuple[Type, ...]
+                 arg_types: tuple[Type, ...]
                  ) -> None:
         """Initialize the `QMI_RegisteredSignal` instance.
 
@@ -313,7 +313,7 @@ class QMI_SignalSubscriber:
         self.context.unsubscribe_signal(self.publisher_context, self.publisher_name, self.signal_name, receiver)
 
 
-def _wait_for_condition(cond: threading.Condition, predicate: Callable[[], bool], timeout: Optional[float]) -> bool:
+def _wait_for_condition(cond: threading.Condition, predicate: Callable[[], bool], timeout: float | None) -> bool:
     """Helper function to wait for a condition.
 
     When called from the main thread, this function is equivalent to::
@@ -397,7 +397,7 @@ class QMI_SignalReceiver:
         with self._queue_cond:
             return len(self._queue)
 
-    def get_next_signal(self, timeout: Optional[float] = 0) -> ReceivedSignal:
+    def get_next_signal(self, timeout: float | None = 0) -> ReceivedSignal:
         """Return the oldest published signal waiting in the receive queue.
 
         If there is no signal waiting in the queue, optionally wait until
@@ -581,7 +581,7 @@ class _PendingSubscriptionRequest:
         self.publisher_name = publisher_name
         self.signal_name = signal_name
         self.subscribe = subscribe
-        self.receivers: Set[QMI_SignalReceiver] = set()
+        self.receivers: set[QMI_SignalReceiver] = set()
         self._completed = threading.Event()
         self._success = False
         self._error_msg = ""
@@ -602,7 +602,7 @@ class _PendingSubscriptionRequest:
         self._error_msg = error_msg
         self._completed.set()
 
-    def wait(self) -> Tuple[bool, str]:
+    def wait(self) -> tuple[bool, str]:
         """Wait until a reply is received, then return (success, error_msg)."""
         self._completed.wait()
         return (self._success, self._error_msg)
@@ -637,24 +637,24 @@ class SignalManager(QMI_MessageHandler):
 
         # Register of subscribers in the local context.
         # Map "<context>.<publisher>.<signal>" to a set of SignalReceiver objects.
-        self._local_subscriptions: Dict[str, Set[QMI_SignalReceiver]] = {}
+        self._local_subscriptions: dict[str, set[QMI_SignalReceiver]] = {}
 
         # Register of remote subscribers to locally published signals.
         # Type: { "publisher_name": { "signal_name": set_of_context_names } }
         # Map "<publisher>.<signal>" to a set of remote context names.
-        self._remote_subscriptions: Dict[str, Set[str]] = {}
+        self._remote_subscriptions: dict[str, set[str]] = {}
 
         # Register of pending subscription requests by request ID.
         # Each pending subscription request is stored in this dictionary,
         # as well as in "_pending_subscription_request_by_signal_name".
-        self._pending_subscription_request_by_request_id: Dict[str, _PendingSubscriptionRequest] = {}
+        self._pending_subscription_request_by_request_id: dict[str, _PendingSubscriptionRequest] = {}
 
         # Register of pending subscription requests by signal name.
         # This is a mapping from "<context>.<publisher>.<signal>" to
         # a corresponding PendingSubscriptionRequest, if one exists.
         # Each pending subscription request is stored in this dictionary,
         # as well as in "_pending_subscription_request_by_request_id".
-        self._pending_subscription_request_by_signal_name: Dict[str, _PendingSubscriptionRequest] = {}
+        self._pending_subscription_request_by_signal_name: dict[str, _PendingSubscriptionRequest] = {}
 
         context.register_message_handler(self)
 
@@ -908,7 +908,7 @@ class SignalManager(QMI_MessageHandler):
         with self._lock:
             receiver_set = self._local_subscriptions.get(full_name)
             if receiver_set is None:
-                receiver_list: List[QMI_SignalReceiver] = []
+                receiver_list: list[QMI_SignalReceiver] = []
             else:
                 receiver_list = list(receiver_set)
 
@@ -940,7 +940,7 @@ class SignalManager(QMI_MessageHandler):
         with self._lock:
             rsubs = self._remote_subscriptions.get(full_name)
             if rsubs is None:
-                rsubs_list: List[str] = []
+                rsubs_list: list[str] = []
             else:
                 # Copy list of subscribers to avoid race conditions.
                 rsubs_list = list(rsubs)
@@ -1188,5 +1188,5 @@ class SignalManager(QMI_MessageHandler):
 
 
 # Imports needed only for static typing.
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     import qmi.core.context

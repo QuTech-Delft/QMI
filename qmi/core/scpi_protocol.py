@@ -1,7 +1,5 @@
 """Implementation of SCPI protocol primitives."""
 
-from typing import Optional
-
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_Transport
 
@@ -28,7 +26,7 @@ class ScpiProtocol:
                  transport: QMI_Transport,
                  command_terminator: str = "\n",
                  response_terminator: str = "\n",
-                 default_timeout: Optional[float] = None
+                 default_timeout: float | None = None
                  ):
         """Initialize the SCPI protocol handler.
 
@@ -64,7 +62,7 @@ class ScpiProtocol:
         binary_cmd = cmd + self._command_terminator
         self._transport.write(binary_cmd)
 
-    def ask(self, cmd: str, timeout: Optional[float] = None, discard: bool = False) -> str:
+    def ask(self, cmd: str, timeout: float | None = None, discard: bool = False) -> str:
         """Send an SCPI command, then read and return the response.
 
         Parameters:
@@ -98,7 +96,7 @@ class ScpiProtocol:
 
     def read_binary_data(self,
                          read_terminator_flag: bool = True,
-                         timeout: Optional[float] = None
+                         timeout: float | None = None
                          ) -> bytes:
         """Read a binary data block formatted as in SCPI *definite length arbitrary block response data*.
 

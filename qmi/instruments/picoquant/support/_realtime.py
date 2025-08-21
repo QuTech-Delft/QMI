@@ -1,4 +1,5 @@
-from typing import NamedTuple, List, Callable, Tuple
+from collections.abc import Callable
+from typing import NamedTuple
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -21,7 +22,7 @@ class RealTimeHistogram(NamedTuple):
     start_timestamp: int
     bin_resolution: int
     num_sync: int
-    channels: List[int]
+    channels: list[int]
     histogram_data: np.ndarray
 
 
@@ -52,7 +53,7 @@ class _RealTimeHistogramProcessor:
         self._publish_countrate_func = publish_countrate_func
         self._previous_sync_timestamp = -1
 
-        self._histogram_channels: List[int] = []
+        self._histogram_channels: list[int] = []
         self._histogram_resolution = 1
         self._histogram_num_bins = 0
         self._histogram_num_sync = 0
@@ -66,7 +67,7 @@ class _RealTimeHistogramProcessor:
         self._countrate_sync_counter = -1
         self._countrate_start_timestamp = 0
 
-    def set_histogram_config(self, channels: List[int], bin_resolution_ps: int, num_bins: int, num_sync: int) -> None:
+    def set_histogram_config(self, channels: list[int], bin_resolution_ps: int, num_bins: int, num_sync: int) -> None:
         """Configure real-time histograms.
 
         Parameters:
@@ -86,7 +87,7 @@ class _RealTimeHistogramProcessor:
         self._histogram_data = np.zeros((len(channels), num_bins), dtype=np.uint32)
         self._histogram_sync_counter = -1
 
-    def set_countrate_config(self, sync_aperture: Tuple[int, int], num_sync: int) -> None:
+    def set_countrate_config(self, sync_aperture: tuple[int, int], num_sync: int) -> None:
         """Configure real-time count rate reporting.
 
         Parameters:
@@ -391,7 +392,7 @@ class TttrHistogram:
 
         self.previous = most_recent_synctime[-1]
 
-    def get_plot_data(self, bin_resolution_s: float) -> Tuple[ArrayLike, ArrayLike, int]:
+    def get_plot_data(self, bin_resolution_s: float) -> tuple[ArrayLike, ArrayLike, int]:
         """Convenience function for plotting to return bin values and counts to the caller.
 
         Parameters:

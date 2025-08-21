@@ -105,9 +105,9 @@ import enum
 import inspect
 import logging
 import threading
-import typing
-from typing import Callable, Optional, Tuple, Type, Any, TypeVar, Generic
 import time
+from typing import Any, Generic, Type, TypeVar, TYPE_CHECKING
+from collections.abc import Callable
 
 from qmi.core.rpc import QMI_RpcObject, rpc_method
 from qmi.core.pubsub import SignalDescription, QMI_Signal, QMI_RegisteredSignal
@@ -207,8 +207,8 @@ class QMI_Task(Generic[_SET, _STS], metaclass=_TaskMetaClass):
         self._name = name
         self._stop_requested = threading.Event()
         self._settings_fifo: collections.deque = collections.deque(maxlen=1)
-        self.settings: Optional[_SET] = None
-        self.status: Optional[_STS] = None
+        self.settings: _SET | None = None
+        self.status: _STS | None = None
 
         # Create instances of QMI_RegisteredSignal for each signal type that this class may publish.
         # Insert these QMI_RegisteredSignal instances as attributes of the RpcObject instance.
@@ -319,12 +319,12 @@ class _TaskThread(QMI_Thread):
         self._task_class = task_class
         self._task_args = task_args
         self._task_kwargs = task_kwargs
-        self.task: Optional[QMI_Task] = None
-        self._exception: Optional[BaseException] = None
+        self.task: QMI_Task | None = None
+        self._exception: BaseException | None = None
         self._state = _TaskThread.State.INITIAL
         self._state_cond = threading.Condition()
         self._wait_cond_lock = threading.Lock()
-        self._wait_cond: Optional[threading.Condition] = None
+        self._wait_cond: threading.Condition | None = None
 
     def run(self) -> None:
         """Main function inside the thread."""
@@ -389,7 +389,7 @@ class _TaskThread(QMI_Thread):
 
         _logger.debug("Task thread %s completed normally", self._task_name)
 
-    def get_state(self) -> Tuple[State, Optional[BaseException]]:
+    def get_state(self) -> tuple[State, BaseException | None]:
         """Return task state and any exception that occurred in the task."""
         with self._state_cond:
             return (self._state, self._exception)
@@ -470,7 +470,7 @@ class _TaskThread(QMI_Thread):
     def wait_for_condition(self,
                            cond: threading.Condition,
                            predicate: Callable[[], bool],
-                           timeout: Optional[float]
+                           timeout: float | None
                            ) -> bool:
         """Wait until a condition becomes true, or until the task is stopped.
 
@@ -547,7 +547,7 @@ class QMI_TaskRunner(QMI_RpcObject):
     """
 
     @classmethod
-    def get_category(cls) -> Optional[str]:
+    def get_category(cls) -> str | None:
         return "task"
 
     def __init__(self,
@@ -929,5 +929,5 @@ class QMI_LoopTask(QMI_Task):
 
 
 # Imports needed only for static typing.
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     import qmi.core.context

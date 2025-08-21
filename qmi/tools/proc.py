@@ -14,7 +14,8 @@ import subprocess
 from subprocess import Popen
 import time
 
-from typing import Callable, NamedTuple
+from collections.abc import Callable
+from typing import NamedTuple
 
 import colorama
 import psutil

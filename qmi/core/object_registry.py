@@ -4,7 +4,7 @@ import logging
 import threading
 import time
 from collections import namedtuple
-from typing import Any, Dict, Optional
+from typing import Any
 
 _logger = logging.getLogger(__name__)
 
@@ -16,9 +16,9 @@ class ObjectRegistry:
     def __init__(self) -> None:
         self._mutex = threading.Lock()
         self._counter = 0
-        self._registry: Dict[int, ObjectRegistration] = {}
+        self._registry: dict[int, ObjectRegistration] = {}
 
-    def register(self, obj: Any, comment: Optional[str] = None) -> int:
+    def register(self, obj: Any, comment: str | None = None) -> int:
         timestamp = time.time()
         with self._mutex:
             oid = self._counter

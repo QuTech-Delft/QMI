@@ -1,6 +1,5 @@
 import os, sys
 import logging
-from typing import Optional
 
 from qmi.core.exceptions import QMI_TimeoutException, QMI_TransportDescriptorException, QMI_InstrumentException,\
     QMI_RuntimeException, QMI_EndOfInputException, QMI_Exception
@@ -44,8 +43,8 @@ class QMI_VisaGpibTransport(QMI_Transport):
     def __init__(
         self,
         primary_addr: int,
-        board: Optional[int] = None,
-        secondary_addr: Optional[int] = None,
+        board: int | None = None,
+        secondary_addr: int | None = None,
         connect_timeout: float = 30.0
     ) -> None:
         """Initialization of the Gpib transport.
@@ -62,7 +61,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
         self._board = board
         self._secondary_addr = secondary_addr
         self._connect_timeout = connect_timeout
-        self._device: Optional[pyvisa.ResourceManager] = None
+        self._device: pyvisa.ResourceManager | None = None
         self._read_buffer = bytes()
 
     def _open_transport(self) -> None:
@@ -122,7 +121,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
         self._safe_device.timeout = 0.0
         self._safe_device.write_raw(data)
 
-    def read(self, nbytes: int, timeout: Optional[float]) -> bytes:
+    def read(self, nbytes: int, timeout: float | None) -> bytes:
         self._check_is_open()
 
         # Read a GPIB message
@@ -135,7 +134,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
             f"The read message did not contain expected bytes of data ({len(ret)} != {nbytes}."
         )
 
-    def read_until(self, message_terminator: bytes, timeout: Optional[float]) -> bytes:
+    def read_until(self, message_terminator: bytes, timeout: float | None) -> bytes:
         """The specified message_terminator is ignored. Instead, the instrument must autonomously indicate the end
         of the message according to the GPIB protocol.
 
@@ -150,7 +149,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
         """
         return self.read_until_timeout(0, timeout)
 
-    def read_until_timeout(self, nbytes: int, timeout: Optional[float]) -> bytes:
+    def read_until_timeout(self, nbytes: int, timeout: float | None) -> bytes:
         """Read a single USBTMC message from the instrument.
 
         If the timeout expires before the message is received, the read is
@@ -179,7 +178,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
         except QMI_TimeoutException:
             return  # Nothing to discard.
 
-    def _read_message(self, timeout: Optional[float]) -> bytes:
+    def _read_message(self, timeout: float | None) -> bytes:
         """Read a GPIB message. A whole message is read from the device in bytes.
 
         Parameters:
