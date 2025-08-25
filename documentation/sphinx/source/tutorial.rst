@@ -83,6 +83,11 @@ Let's give it a shot:
 
 >>> nsg.get_sample()
 
+Whoops, we got an error! This is because we didn't "open" the instrument first. This is of course not necessary with a virtual instrument, but we have made it to simulate a real instrument, requiring thus "open" and "close" calls for connection.
+
+>>> nsg.open()
+>>> nsg.get_sample()
+
 This will return a single value of the simulated NoiseSineGenerator device.
 
 We can make a very basic graph of *nsg* samples as follows:
@@ -97,11 +102,12 @@ Feel free to experiment a bit with the other NoisySineGenerator methods, which y
 Also, if you want, have a look at the source code of ``qmi.instruments.dummy.noisy_sine_generator``.
 This should convince you that implementing device drivers for QMI instruments is pretty straightforward.
 
-When done, exit your Python interpreter:
+When done, close the instrument and exit your Python interpreter:
 
+>>> nsg.close()
 >>> qmi.stop()
 
-From now on, we will no longer tell you to execute ``qmi.stop()``.
+From now on, we will no longer tell you to execute ``qmi.stop()``, but don't forget to do it.
 
 Locking an instrument
 ---------------------
@@ -124,6 +130,8 @@ Create two proxies to the instrument:
 
 >>> nsg1 = qmi.get_instrument("lock_demo.nsg")
 >>> nsg2 = qmi.get_instrument("lock_demo.nsg")
+>>> nsg1.open()
+>>> nsg2.open()
 
 Recall that there is only one NSG instrument and only one instance of the ``NoisySineGenerator`` class.
 Let's lock the instrument:
@@ -183,7 +191,7 @@ However, if you find yourself in a situation in which the locking proxy was lost
 >>> nsg2.is_locked()
 False
 
-It is also possible to unlock from another instrument proxy by providing the context name as well. See the example below, how to get from another context the instrument proxy.
+It is also possible to unlock from another instrument proxy by providing the context name as well. See the example below, how to get from another context the instrument proxy. In a new terminal window, start up Python and do the following:
 
 >>> import qmi
 >>> qmi.start("client")
@@ -283,6 +291,7 @@ another Python session in a separate terminal window:
 >>> qmi.start("hello_world")
 >>> qmi.context().connect_to_peer("instr_server")
 >>> nsg = qmi.get_instrument("instr_server.nsg")
+>>> nsg.open()
 >>> nsg.get_sample()
 
 This example demonstrates how the second Python program is able to access
@@ -330,6 +339,7 @@ You can also use the `autoconnect` option in ``get_instrument`` to skip the step
 >>> import qmi
 >>> qmi.start("hello_world")
 >>> nsg = qmi.get_instrument("instr_server.nsg", auto_connect=True, host_port="145.90.38.138:54704")
+>>> nsg.open()
 >>> nsg.get_sample()
 >>> -86.43253254643
 
@@ -379,12 +389,9 @@ Run the new script by typing the following command in a shell terminal::
 
     python3 measure_demo.py
 
-Note that the script uses :py:class:`qmi.utils.context_managers.start_stop` to
-start and stop the QMI framework.
-This is just a convenient way to make sure that ``qmi.start()`` and ``qmi.stop()``
-will always be called.
-Similarly, the `QMI_Instrument` objects are equipped with context managers that open and close the
-the instrument, calling ``nsg.open()`` and ``nsg.close()`` at the creation and destruction of the instance.
+Note that the script uses :py:class:`qmi.utils.context_managers.start_stop` to start and stop the QMI framework.
+This is just a convenient way to make sure that ``qmi.start()`` and ``qmi.stop()`` will always be called.
+Similarly, the `QMI_Instrument` objects are equipped with context managers that open and close the the instrument, calling ``nsg.open()`` and ``nsg.close()`` at the creation and destruction of the instance.
 
 .. note::
     Some users prefer to invoke scripts from an interactive Python session,
