@@ -7,10 +7,9 @@ import random
 
 from qmi.core.context import QMI_Context
 from qmi.core.instrument import QMI_Instrument
-from qmi.core.rpc import rpc_method, class_docstring_wrapper
+from qmi.core.rpc import rpc_method
 
 
-@class_docstring_wrapper
 class NoisySineGenerator(QMI_Instrument):
     """Simulated instrument, useful for testing."""
 

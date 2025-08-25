@@ -818,27 +818,6 @@ def is_rpc_method(object: Any) -> bool:
     return inspect.isfunction(object) and getattr(object, "_rpc_method", False)
 
 
-def class_docstring_wrapper(cls: _T) -> _T:
-    """Decorator for instrument class objects to include a list of RPC methods in their docstrings."""
-    methods = []
-    for name, member in inspect.getmembers(cls, is_rpc_method):
-        if name.startswith("_"):
-            continue
-
-        signature = str(inspect.signature(member)).replace("(self, ", "(").replace("(self", "(")
-        # docstring = member.__doc__
-        method_str = f"{name}{signature}"
-        # if docstring is not None:
-        #     method_str += f"\n\t{docstring}"
-        #
-        methods.append(method_str)
-
-    doc = cls.__doc__ or ''
-    doc += '\n\nRPC methods:\n' + '\n'.join(f'- {m}' for m in methods)
-    cls.__doc__ = doc
-    return cls
-
-
 class _RpcObjectMetaClass(ABCMeta):
     """Meta-class used to create `QMI_RpcObject` and its subclasses.
 
@@ -1041,6 +1020,9 @@ def make_interface_descriptor(rpc_object_class: Type[QMI_RpcObject],
     if signal_declaration_class is None:
         signal_declaration_class = rpc_object_class
 
+    # Get the class docstring for updating it with info
+    doc = rpc_object_class.__doc__ or ''
+    doc += '\n\nRPC methods:\n'
     # Extract RPC method declarations.
     methods = []
     for name, member in inspect.getmembers(rpc_object_class, is_rpc_method):
@@ -1050,13 +1032,18 @@ def make_interface_descriptor(rpc_object_class: Type[QMI_RpcObject],
         signature = str(inspect.signature(member))
         docstring = member.__doc__
         methods.append(RpcMethodDescriptor(name, signature, docstring))
+        if not name.startswith("_"):
+            signature_doc = signature.replace("(self, ", "(").replace("(self", "(")
+            doc += f"  - {name}{signature_doc}\n"
 
     # Extract signal declarations.
+    doc += '\nsignals:\n'
     signals = []
     for signal_description in signal_declaration_class._qmi_signals:
         name = signal_description.name
         arg_types = "(" + ", ".join(arg_type.__name__ for arg_type in signal_description.arg_types) + ")"
         signals.append(RpcSignalDescriptor(name, arg_types))
+        doc += f"  - {name}{arg_types}\n"
 
     # Extract constant declarations.
     constant_names = set()
@@ -1065,16 +1052,19 @@ def make_interface_descriptor(rpc_object_class: Type[QMI_RpcObject],
             constant_names.update(getattr(base, "_rpc_constants"))
 
     # Extract constant values.
+    doc += '\nconstants:\n'
     constants = []
     for constant_name in constant_names:
         assert hasattr(rpc_object_class, constant_name)
         constant_value = getattr(rpc_object_class, constant_name)
         assert not inspect.isfunction(constant_value)
         constants.append(RpcConstantDescriptor(constant_name, constant_value))
+        doc += f"  - {constant_name}={constant_value}\n"
 
     # Create interface descriptor.
-    return RpcInterfaceDescriptor(rpc_object_class.__module__, rpc_object_class.__name__, rpc_object_class.__doc__,
-                                  constants, methods, signals)
+    return RpcInterfaceDescriptor(
+        rpc_object_class.__module__, rpc_object_class.__name__, doc, constants, methods, signals
+    )
 
 
 class _RpcThread(QMI_Thread):
