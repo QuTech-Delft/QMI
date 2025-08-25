@@ -1,5 +1,6 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
+import inspect
 import logging
 import math
 import time
@@ -13,7 +14,8 @@ from qmi.core.exceptions import (
     QMI_MessageDeliveryException, QMI_UsageException, QMI_InvalidOperationException, QMI_DuplicateNameException
 )
 from qmi.core.rpc import (
-    QMI_RpcObject, rpc_method, QMI_RpcTimeoutException, QMI_RpcFuture, QMI_RpcProxy, QMI_RpcNonBlockingProxy
+    QMI_RpcObject, QMI_RpcTimeoutException, QMI_RpcFuture, QMI_RpcProxy, QMI_RpcNonBlockingProxy,
+    rpc_method, is_rpc_method
 )
 from threading import Timer
 
@@ -120,6 +122,43 @@ class TestRpcProxy(unittest.TestCase):
 
 class TestRPC(unittest.TestCase):
 
+    def _get_rpc_methods_signals_constants(self, rpc_object_class, signal_declaration_class):
+        # Get the class docstring for updating it with info
+        doc = ""
+        doc += '\n\nRPC methods:\n'
+        # Extract RPC method declarations.
+        for name, member in inspect.getmembers(rpc_object_class, is_rpc_method):
+            if name in ("lock", "unlock", "force_unlock", "is_locked"):
+                continue
+
+            signature = str(inspect.signature(member))
+            if not name.startswith("_"):
+                signature_doc = signature.replace("(self, ", "(").replace("(self", "(")
+                doc += f"  - {name}{signature_doc}\n"
+
+        # Extract signal declarations.
+        doc += '\nsignals:\n'
+        for signal_description in signal_declaration_class._qmi_signals:
+            name = signal_description.name
+            arg_types = "(" + ", ".join(arg_type.__name__ for arg_type in signal_description.arg_types) + ")"
+            doc += f"  - {name}{arg_types}\n"
+
+        # Extract constant declarations.
+        constant_names = set()
+        for base in inspect.getmro(rpc_object_class):
+            if hasattr(base, "_rpc_constants"):
+                constant_names.update(getattr(base, "_rpc_constants"))
+
+        # Extract constant values.
+        doc += '\nconstants:\n'
+        for constant_name in constant_names:
+            assert hasattr(rpc_object_class, constant_name)
+            constant_value = getattr(rpc_object_class, constant_name)
+            assert not inspect.isfunction(constant_value)
+            doc += f"  - {constant_name}={constant_value}\n"
+
+        return doc
+
     def setUp(self):
 
         # Suppress warnings.
@@ -161,6 +200,9 @@ class TestRPC(unittest.TestCase):
 
     def test_blocking_rpc(self):
         """Test for blocking RPC calls."""
+        # Get class documentation and update it with RPC methods, signals and constants listing
+        orig_doc = MyRpcTestClass.__doc__
+        orig_doc += self._get_rpc_methods_signals_constants(MyRpcTestClass, MyRpcTestClass)
         # Instantiate the class, as a thing to be serviced from context c1.
         # This gives us a proxy to the instance.
         proxy1 = self.c1.make_rpc_object("tc1", MyRpcTestClass)
@@ -179,7 +221,7 @@ class TestRPC(unittest.TestCase):
         result = proxy2.remote_sqrt(256.0)
         self.assertEqual(result, 16.0)
         # Assert also that docstring gets passed to proxy.
-        self.assertEqual(MyRpcTestClass.__doc__, proxy1.__doc__)
+        self.assertEqual(orig_doc, proxy1.__doc__)
         self.assertEqual(proxy1.__doc__, proxy2.__doc__)
 
         # Check exception behavior.
@@ -187,7 +229,7 @@ class TestRPC(unittest.TestCase):
             proxy2.remote_sqrt(-1.0)
 
     def test_blocking_rpc_timeout(self):
-
+        """Test timeout for blocking RPC method calls."""
         # Instantiate class in context c1.
         proxy1 = self.c1.make_rpc_object("tc1", MyRpcTestClass)
 
@@ -203,7 +245,10 @@ class TestRPC(unittest.TestCase):
             proxy2.remote_sqrt(1024, rpc_timeout=1.0)
 
     def test_nonblocking_rpc(self):
-
+        """Test for non-blocking RPC calls."""
+        # Get class documentation and update it with RPC methods, signals and constants listing
+        orig_doc = MyRpcTestClass.__doc__
+        orig_doc += self._get_rpc_methods_signals_constants(MyRpcTestClass, MyRpcTestClass)
         # Instantiate the class, as a thing to be serviced from context c1.
         # This gives us a proxy to the instance.
         proxy1 = self.c1.make_rpc_object("tc1", MyRpcTestClass)
@@ -229,7 +274,7 @@ class TestRPC(unittest.TestCase):
         result = future.wait()
         self.assertEqual(result, 16.0)
         # Assert also that docstring gets passed to proxy.
-        self.assertEqual(MyRpcTestClass.__doc__, proxy1.__doc__)
+        self.assertEqual(orig_doc, proxy1.__doc__)
         self.assertEqual(proxy1.__doc__, proxy2.__doc__)
 
         # Check exception behavior.
@@ -310,6 +355,9 @@ class TestRPC(unittest.TestCase):
 
     def test_subclass(self):
 
+        # Get class documentation and update it with RPC methods, signals and constants listing
+        orig_doc = MyRpcSubClass.__doc__
+        orig_doc += self._get_rpc_methods_signals_constants(MyRpcSubClass, MyRpcSubClass)
         # Make instance of MyRpcSubClass in the first context.
         proxy1 = self.c1.make_rpc_object("tc1", MyRpcSubClass)
 
@@ -324,7 +372,7 @@ class TestRPC(unittest.TestCase):
         result = proxy2.remote_sqrt(100.0)
         self.assertAlmostEqual(result, 10.0)
         # Assert also that docstring gets passed to proxy.
-        self.assertEqual(MyRpcSubClass.__doc__, proxy1.__doc__)
+        self.assertEqual(orig_doc, proxy1.__doc__)
         self.assertEqual(proxy1.__doc__, proxy2.__doc__)
 
     def test_constants(self):
