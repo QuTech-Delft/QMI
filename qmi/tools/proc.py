@@ -335,8 +335,9 @@ def start_local_process(context_name: str) -> int:
     except (OSError, subprocess.SubprocessError) as exc:
         raise ProcessException(f"Can not start program ({type(exc).__name__}: {str(exc)})")
 
-    # Close output log file in parent process.
-    output_file.close()
+    finally:
+        # Close output log file in parent process.
+        output_file.close()
 
     # Wait and check if managed process is running.
     time.sleep(1)
@@ -1077,7 +1078,7 @@ def proc_status(cfg: CfgQmi, context_name: str | None) -> int:
     return ret
 
 
-def main() -> int:
+def run() -> int:
     """Main routine of QMI process manager.
 
     Returns:
@@ -1151,4 +1152,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())
