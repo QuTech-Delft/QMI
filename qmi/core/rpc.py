@@ -84,51 +84,53 @@ Since QMI V0.29.1 it is also possible to lock and unlock with a custom token fro
 other proxies as well, as long as the contexts for the other proxies have the same name.
 
 Example 1::
-        # Two proxies in same context.
-        proxy1 = context.make_rpc_object("my_object", MyRpcTestClass)
-        proxy2 = context.get_rpc_object_by_name("my_context.my_object")
-        custom_token = "thisismineallmine"
 
-        proxy1.lock(lock_token=custom_token)
-        proxy2.is_locked()  # Returns True
-        proxy2.unlock(lock_token=custom_token)
-        proxy2.is_locked()  # Returns False
+    # Two proxies in same context.
+    proxy1 = context.make_rpc_object("my_object", MyRpcTestClass)
+    proxy2 = context.get_rpc_object_by_name("my_context.my_object")
+    custom_token = "thisismineallmine"
+
+    proxy1.lock(lock_token=custom_token)
+    proxy2.is_locked()  # Returns True
+    proxy2.unlock(lock_token=custom_token)
+    proxy2.is_locked()  # Returns False
 
 Example 2::
-        # Three proxies in different contexts. The first one serves as an "object provider".
-        c1 = QMI_Context("c1", config)
-        c1.start()
-        c1_port = c1.get_tcp_server_port()
-        c1_address = "localhost:{}".format(c1_port)
-        # Instantiate class in context c1 as object provider.
-        proxy1 = c1.make_rpc_object("tc1", MyRpcTestClass)
 
-        # Now make another context, and get a proxy to the object
-        custom_token = "block"
-        c2 = QMI_Context("c2", config)
-        c2.start()
-        c2.connect_to_peer("c1", c1_address)
-        proxy2 = c2.get_rpc_object_by_name("c1.tc1")
-        proxy2.is_locked()  # Returns False
-        proxy2.lock(lock_token=custom_token)
-        proxy2.is_locked()  # Returns True
-        # And then close it
-        c2.stop()
+    # Three proxies in different contexts. The first one serves as an "object provider".
+    c1 = QMI_Context("c1", config)
+    c1.start()
+    c1_port = c1.get_tcp_server_port()
+    c1_address = "localhost:{}".format(c1_port)
+    # Instantiate class in context c1 as object provider.
+    proxy1 = c1.make_rpc_object("tc1", MyRpcTestClass)
 
-        # Then start third context with the same name as second context, obtain the object and unlock it.
-        c3 = QMI_Context("c2", config)
-        c3.start()
-        c3.connect_to_peer("c1", c1_address)
-        proxy3 = c3.get_rpc_object_by_name("c1.tc1")
-        proxy3.is_locked()  # Returns True
-        proxy3.unlock()  # Returns False as it fails without the correct token
-        proxy3.unlock(lock_token=custom_token)  # Now succeeds and returns True
-        proxy3.is_locked()  # Returns False
-        # And then close it
-        c3.stop()
+    # Now make another context, and get a proxy to the object
+    custom_token = "block"
+    c2 = QMI_Context("c2", config)
+    c2.start()
+    c2.connect_to_peer("c1", c1_address)
+    proxy2 = c2.get_rpc_object_by_name("c1.tc1")
+    proxy2.is_locked()  # Returns False
+    proxy2.lock(lock_token=custom_token)
+    proxy2.is_locked()  # Returns True
+    # And then close it
+    c2.stop()
 
-        # Then finally stop the "object provider"
-        c1.stop()
+    # Then start third context with the same name as second context, obtain the object and unlock it.
+    c3 = QMI_Context("c2", config)
+    c3.start()
+    c3.connect_to_peer("c1", c1_address)
+    proxy3 = c3.get_rpc_object_by_name("c1.tc1")
+    proxy3.is_locked()  # Returns True
+    proxy3.unlock()  # Returns False as it fails without the correct token
+    proxy3.unlock(lock_token=custom_token)  # Now succeeds and returns True
+    proxy3.is_locked()  # Returns False
+    # And then close it
+    c3.stop()
+
+    # Then finally stop the "object provider"
+    c1.stop()
 
 Reference
 #########
