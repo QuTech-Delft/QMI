@@ -206,9 +206,8 @@ and presentation of the code.
 
 For __init__ function a few conventions can be made:
   - When in instrument class, do not try to open the instrument in __init__, as we have the ``open`` function for it.
-  - Try to declare all necessary class attributes with type and possibly an initial value, but such that ``Optional``
-    and ``None`` is avoided as much as possible so that we do not need to do any assert ``self.xxx is not None``
-    later on.
+  - Try to declare all necessary class attributes with type and possibly an initial value, but such that ``None`` is
+    avoided as much as possible so that we do not need to do any assert ``self.xxx is not None`` later on.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ The use of ``__del__()`` methods
