@@ -7,7 +7,6 @@ This driver has only been tested under Linux. In principle it should also work u
 after creating a virtual COM port for the internal USB serial port in the instrument.
 """
 
-from dataclasses import dataclass
 import logging
 import time
 
@@ -24,75 +23,13 @@ from qmi.instruments.thorlabs.apt_protocol import (
     AptProtocol,
     AptChannelState,
     AptChannelStopMode,
+    VelocityParams,
+    HomeParams,
+    MotorStatus,
 )
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
-
-
-@dataclass
-class VelocityParams:
-    """Velocity parameters for the K10CR1.
-
-    Attributes:
-        max_velocity:    Maximum velocity in degrees/second.
-        acceleration:    Acceleration in degrees/second/second.
-    """
-    max_velocity: float
-    acceleration: float
-
-
-@dataclass
-class HomeParams:
-    """Homing parameters for the K10CR1.
-
-    Attributes:
-        home_direction:  Direction of moving to home (1 = forward, 2 = reverse).
-        limit_switch:    Limit switch to use for homing (1 = reverse, 4 = forward).
-        home_velocity:   Homing velocity in degrees/second.
-        offset_distance: Distance of home position from home limit switch (in degrees).
-    """
-    home_direction:     AptChannelHomeDirection
-    limit_switch:       AptChannelHomeLimitSwitch
-    home_velocity:      float
-    offset_distance:    float
-
-
-@dataclass
-class MotorStatus:
-    """Status bits of the K10CR1 motorized stage.
-
-    Some of the status bits do not seem to work with the K10CR1.
-
-    Attributes:
-        moving_forward:     True if the motor is moving in forward direction.
-        moving_reverse:     True if the motor is moving in reverse direction.
-                            It looks like `move_forward` and `move_reverse` are both
-                            active when the stage is moving, regardless of the actual
-                            direction of movement.
-        jogging_forward:    True if the motor is jogging in forward direction.
-        jogging_reverse:    True if the motor is jogging in reverse direction.
-                            It looks like `jogging_reverse` is also active when jogging
-                            in forward direction, while `jogging_forward` is never active.
-        homing:             True if the motor is homing.
-        homed:              True if homing has been completed.
-        motion_error:       True if an excessive position error is detected.
-        current_limit:      True if the motor current limit has been reached.
-        channel_enabled:    True if the motor drive channel is enabled.
-    """
-    forward_limit:      bool
-    reverse_limit:      bool
-    moving_forward:     bool
-    moving_reverse:     bool
-    jogging_forward:    bool
-    jogging_reverse:    bool
-    homing:             bool
-    homed:              bool
-    tracking:           bool
-    settled:            bool
-    motion_error:       bool
-    current_limit:      bool
-    channel_enabled:    bool
 
 
 class Thorlabs_K10CR1(QMI_Instrument):
@@ -136,7 +73,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
             QMI_InstrumentException: If not connected to a K10CR1 device.
             QMI_TimeoutException:    If the instrument does not answer our request.
         """
-
         # Send request message.
         req_msg = self._apt_protocol.create(APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_REQ_INFO.value])
         reply_msg = self._apt_protocol.create(
@@ -150,7 +86,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         model_str = resp.model_number.decode("iso8859-1")
         if model_str != "K10CR1":
             raise QMI_InstrumentException(
-                "Driver only supports K10CR1 but instrument identifies as {!r}".format(model_str)
+                f"Driver only supports K10CR1 but instrument identifies as {model_str!r}"
             )
 
     @rpc_method

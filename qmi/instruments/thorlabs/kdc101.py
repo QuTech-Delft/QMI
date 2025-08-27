@@ -4,7 +4,6 @@ This driver communicates with the device via a USB serial port, using the Thorla
 see the document "Thorlabs APT Controllers Host-Controller Communications Protocol", issue 25 from Thorlabs.
 """
 
-from dataclasses import dataclass
 import logging
 import time
 
@@ -21,79 +20,28 @@ from qmi.instruments.thorlabs.apt_protocol import (
     AptProtocol,
     AptChannelState,
     AptChannelStopMode,
+    VelocityParams,
+    HomeParams,
+    MotorStatus,
 )
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
+ACTUATOR_TRAVEL_RANGES = {
+    "Z906": 6.0,
+    "Z912": 12.0,
+    "Z925": 25.0
+}
 
-@dataclass
-class VelocityParams:
-    """Velocity parameters for the KDC101.
 
-    Attributes:
-        max_velocity:    Maximum velocity in degrees/second.
-        acceleration:    Acceleration in degrees/second/second.
+class Thorlabs_Kdc101(QMI_Instrument):
+    """Instrument driver for the Thorlabs KDC101 Brushed DC Servo Motor Controller.
+
+    This controller can be used with Z9 series 6mm, 12mm and 25mm linear actuators.
+    An adaptation of the driver could be made in the future to also allow the use of the linear translation and
+    rotation stages, and goniometers.
     """
-    max_velocity: float
-    acceleration: float
-
-
-@dataclass
-class HomeParams:
-    """Homing parameters for the KDC101.
-
-    Attributes:
-        home_direction:  Direction of moving to home (1 = forward, 2 = reverse).
-        limit_switch:    Limit switch to use for homing (1 = reverse, 4 = forward).
-        home_velocity:   Homing velocity in degrees/second.
-        offset_distance: Distance of home position from home limit switch (in degrees).
-    """
-    home_direction:     AptChannelHomeDirection
-    limit_switch:       AptChannelHomeLimitSwitch
-    home_velocity:      float
-    offset_distance:    float
-
-
-@dataclass
-class MotorStatus:
-    """Status bits of the KDC101 motorized stage.
-
-    Some of the status bits do not seem to work with the KDC101.
-
-    Attributes:
-        moving_forward:     True if the motor is moving in forward direction.
-        moving_reverse:     True if the motor is moving in reverse direction.
-                            It looks like `move_forward` and `move_reverse` are both
-                            active when the stage is moving, regardless of the actual
-                            direction of movement.
-        jogging_forward:    True if the motor is jogging in forward direction.
-        jogging_reverse:    True if the motor is jogging in reverse direction.
-                            It looks like `jogging_reverse` is also active when jogging
-                            in forward direction, while `jogging_forward` is never active.
-        homing:             True if the motor is homing.
-        homed:              True if homing has been completed.
-        motion_error:       True if an excessive position error is detected.
-        current_limit:      True if the motor current limit has been reached.
-        channel_enabled:    True if the motor drive channel is enabled.
-    """
-    forward_limit:      bool
-    reverse_limit:      bool
-    moving_forward:     bool
-    moving_reverse:     bool
-    jogging_forward:    bool
-    jogging_reverse:    bool
-    homing:             bool
-    homed:              bool
-    tracking:           bool
-    settled:            bool
-    motion_error:       bool
-    current_limit:      bool
-    channel_enabled:    bool
-
-
-class Thorlabs_KDC101(QMI_Instrument):
-    """Instrument driver for the Thorlabs KDC101 Brushed DC Servo Motor Controller."""
 
     DEFAULT_RESPONSE_TIMEOUT = 1.0
 
@@ -117,7 +65,7 @@ class Thorlabs_KDC101(QMI_Instrument):
     # Number of channels
     NUMBER_OF_CHANNELS = 1
 
-    def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
+    def __init__(self, context: QMI_Context, name: str, transport: str, actuator: str) -> None:
         """Initialize driver.
 
         The motorized mount presents itself as a USB serial port.
@@ -127,12 +75,14 @@ class Thorlabs_KDC101(QMI_Instrument):
         Parameters:
             name:      Name for this instrument instance.
             transport: Transport descriptor to access the instrument.
+            actuator:  The actuator model. For this driver, currently allowed models are:
+                       Z906, Z906V, Z912, Z912B, Z912V, Z912BV, Z925B and Z925BV.
         """
         super().__init__(context, name)
         self._transport = create_transport(transport, default_attributes={"baudrate": 115200, "rtscts": True})
         assert isinstance(self._transport, QMI_SerialTransport)
         self._apt_protocol = AptProtocol(self._transport, default_timeout=self.DEFAULT_RESPONSE_TIMEOUT)
-        self._travel_range = 12.0  # Actuator travel range.
+        self._travel_range = ACTUATOR_TRAVEL_RANGES[actuator[:4]]
 
     def _check_kdc101(self) -> None:
         """Check that the connected device is a Thorlabs KDC101.
@@ -141,7 +91,6 @@ class Thorlabs_KDC101(QMI_Instrument):
             QMI_InstrumentException: If not connected to a KDC101 device.
             QMI_TimeoutException:    If the instrument does not answer our request.
         """
-
         # Send request message.
         req_msg = self._apt_protocol.create(APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_REQ_INFO.value])
         reply_msg = self._apt_protocol.create(
@@ -155,7 +104,7 @@ class Thorlabs_KDC101(QMI_Instrument):
         model_str = resp.model_number.decode("iso8859-1")
         if model_str != "KDC101":
             raise QMI_InstrumentException(
-                "Driver only supports KDC101 but instrument identifies as {!r}".format(model_str)
+                f"Driver only supports KDC101 but instrument identifies as {model_str!r}"
             )
 
     @rpc_method
@@ -476,7 +425,7 @@ class Thorlabs_KDC101(QMI_Instrument):
             offset_distance:    Distance of home position from home limit switch (in mm).
         """
 
-        if home_velocity <= 0 or home_velocity > 2.6:
+        if 0 >= home_velocity > 2.6:
             raise ValueError(f"Invalid value for {home_velocity=}")
         if 0 > offset_distance >= self._travel_range:
             raise ValueError(f"Invalid value for {offset_distance=}")

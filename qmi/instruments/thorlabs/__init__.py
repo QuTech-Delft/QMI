@@ -2,13 +2,15 @@
 Thorlabs Inc.; motorized mounts, optical power meter, temperature controller, environmental sensors.
 
 The qmi.instruments.thorlabs package provides support for:
+- KDC101 Brushed DC Servo Motor Controller,
 - K10CR1 rotational mount,
 - MFF10X filter flip mounts,
+- MPC320 Polarisation Controller,
 - PM100D power meter,
-- TSP01, TSP01B environmental sensors,
-- MPC320 Polarisation Controller.
+- TSP01, TSP01B environmental sensors.
 """
 
+from qmi.instruments.thorlabs.kdc101 import Thorlabs_Kdc101
 from qmi.instruments.thorlabs.pm100d import SensorInfo
 from qmi.instruments.thorlabs.tc200 import Tc200Status
 from qmi.instruments.thorlabs.apt_protocol import (
