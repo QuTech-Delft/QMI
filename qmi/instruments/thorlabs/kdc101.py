@@ -47,7 +47,7 @@ class HomeParams:
         home_direction:  Direction of moving to home (1 = forward, 2 = reverse).
         limit_switch:    Limit switch to use for homing (1 = reverse, 4 = forward).
         home_velocity:   Homing velocity in degrees/second.
-        offset_distance: Distance of home postion from home limit switch (in degrees).
+        offset_distance: Distance of home position from home limit switch (in degrees).
     """
     home_direction:     AptChannelHomeDirection
     limit_switch:       AptChannelHomeLimitSwitch
@@ -125,13 +125,14 @@ class Thorlabs_KDC101(QMI_Instrument):
         e.g. "serial:/dev/ttyUSB1"
 
         Parameters:
-            name: Name for this instrument instance.
+            name:      Name for this instrument instance.
             transport: Transport descriptor to access the instrument.
         """
         super().__init__(context, name)
         self._transport = create_transport(transport, default_attributes={"baudrate": 115200, "rtscts": True})
         assert isinstance(self._transport, QMI_SerialTransport)
         self._apt_protocol = AptProtocol(self._transport, default_timeout=self.DEFAULT_RESPONSE_TIMEOUT)
+        self._travel_range = 12.0  # Actuator travel range.
 
     def _check_kdc101(self) -> None:
         """Check that the connected device is a Thorlabs KDC101.
@@ -167,23 +168,13 @@ class Thorlabs_KDC101(QMI_Instrument):
             # Wait and discard partial data, as recommended by the APT protocol documentation.
             time.sleep(0.050)
             self._transport.discard_read()
-
-            # NOTE: The APT doc says we should wait another 50 ms and then enable RTS.
-            #   We can not easily do this because our transport layer does not support explicit set/clear RTS.
-            #   Skip this step for now; we can try it later if there are communication problems.
-
-            # Check that this device is a KDC101 motor.
-            # Otherwise we should not talk to it, since we don't want to send
-            # inappropriate commands to some unsupported device.
             self._check_kdc101()
 
         except Exception:
-            # Close the transport if an error occurred during initialization
-            # of the instrument.
+            # Close the transport if an error occurred during initialization of the instrument.
             self._transport.close()
             raise
 
-        # Mark this instrument as open.
         super().open()
 
     @rpc_method
@@ -222,6 +213,7 @@ class Thorlabs_KDC101(QMI_Instrument):
             MotorStatus: The received motor status bits.
         """
         self._check_is_open()
+
         # Send request message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_STATUS_BITS.value],
@@ -253,11 +245,7 @@ class Thorlabs_KDC101(QMI_Instrument):
 
     @rpc_method
     def identify(self) -> None:
-        """Make the yellow LED on the instrument flash for a few seconds.
-
-        Parameters:
-
-        """
+        """Make the yellow LED on the instrument flash for a few seconds."""
         self._check_is_open()
 
         # Send command message.
@@ -270,9 +258,6 @@ class Thorlabs_KDC101(QMI_Instrument):
     @rpc_method
     def get_chan_enable_state(self) -> bool:
         """Return the enable state of the motor drive channel.
-
-        Parameters:
-
 
         Returns:
             boolean: True if the channel is enabled, False if the channel is disabled.
@@ -307,7 +292,6 @@ class Thorlabs_KDC101(QMI_Instrument):
         The drive channel is by default enabled at power-up.
 
         Parameters:
-
             enable:  Boolean to indicate new state. True for enable, False for disable.
         """
         self._check_is_open()
@@ -330,11 +314,8 @@ class Thorlabs_KDC101(QMI_Instrument):
         been homed, this function will return the current position
         relative to the position at power-up.
 
-        Parameters:
-
-
         Returns:
-            position: The absolute position if stage is homed, otherwise relative position.
+            position: The absolute position if stage is homed, otherwise relative position. In mm.
         """
         self._check_is_open()
 
@@ -349,14 +330,11 @@ class Thorlabs_KDC101(QMI_Instrument):
 
         # Receive response
         resp = self._apt_protocol.ask(req_msg, reply_msg)
-        return resp.position / self.DISPLACEMENT_PER_ENCODER_COUNT
+        return resp.position * self.DISPLACEMENT_PER_ENCODER_COUNT
 
     @rpc_method
     def get_velocity_params(self) -> VelocityParams:
         """Return the current maximum velocity and acceleration.
-
-        Parameters:
-
 
         Returns:
             params: Maximum velocity and acceleration in mm/s and mm/s^2, respectively.
@@ -389,11 +367,10 @@ class Thorlabs_KDC101(QMI_Instrument):
             max_velocity: Maximum velocity in mm/s.
             acceleration: Acceleration in mm/s^2.
         """
-
         if max_velocity <= 0 or max_velocity > self.MAX_VELOCITY:
-            raise ValueError("Invalid range for max_velocity")
+            raise ValueError(f"Invalid value for {max_velocity=}")
         if acceleration <= 0 or acceleration > self.MAX_ACCELERATION:
-            raise ValueError("Invalid range for acceleration")
+            raise ValueError(f"Invalid value for {acceleration=}")
 
         self._check_is_open()
 
@@ -411,8 +388,11 @@ class Thorlabs_KDC101(QMI_Instrument):
 
     @rpc_method
     def get_backlash_distance(self) -> float:
-        """Return the backlash distance in degrees."""
+        """Get the backlash distance.
 
+        Returns:
+            backlash_dist: The backlash distance in millimeters.
+        """
         self._check_is_open()
 
         # Send request message.
@@ -427,7 +407,7 @@ class Thorlabs_KDC101(QMI_Instrument):
         # Receive response
         resp = self._apt_protocol.ask(req_msg, reply_msg)
 
-        return resp.backlash_dist / self.DISPLACEMENT_PER_ENCODER_COUNT
+        return resp.backlash_dist * self.DISPLACEMENT_PER_ENCODER_COUNT
 
     @rpc_method
     def set_backlash_distance(self, backlash: float) -> None:
@@ -438,29 +418,27 @@ class Thorlabs_KDC101(QMI_Instrument):
         by the backlash distance, then moves back to the target in forward direction.
 
         Parameters:
-            backlash: Backlash distance in degrees, or 0 to disable.
+            backlash: Backlash distance in millimeters, or 0 to disable.
         """
-
-        # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
-        raw_dist = int(round(backlash * self.DISPLACEMENT_PER_ENCODER_COUNT))
-        if abs(raw_dist) >= 2**31:
-            raise ValueError("Backlash distance out of valid range")
+        # Check that the backlash distance is sensible.
+        if abs(backlash) > self._travel_range / 2.0:
+            raise ValueError("Backlash distance larger than half of travel range")
 
         self._check_is_open()
 
+        # Convert distance to microsteps.
+        raw_dist = int(round(backlash / self.DISPLACEMENT_PER_ENCODER_COUNT))
         # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_GEN_MOVE_PARAMS.value],
             chan_ident=self.NUMBER_OF_CHANNELS,
             backlash_dist=raw_dist
         )
-
         self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def get_home_params(self) -> HomeParams:
         """Return the homing parameters."""
-
         self._check_is_open()
 
         # Send request message.
@@ -479,14 +457,12 @@ class Thorlabs_KDC101(QMI_Instrument):
             home_direction=AptChannelHomeDirection(resp.home_dir),
             limit_switch=AptChannelHomeLimitSwitch(resp.limit_switch),
             home_velocity=(resp.home_velocity / self.VELOCITY_SCALING_FACTOR),
-            offset_distance=(resp.offset_dist / self.DISPLACEMENT_PER_ENCODER_COUNT)
+            offset_distance=(resp.offset_dist * self.DISPLACEMENT_PER_ENCODER_COUNT)
         )
 
     @rpc_method
     def set_home_params(
         self,
-        home_direction: AptChannelHomeDirection,
-        limit_switch: AptChannelHomeLimitSwitch,
         home_velocity: float,
         offset_distance: float
     ) -> None:
@@ -496,28 +472,23 @@ class Thorlabs_KDC101(QMI_Instrument):
         not be adjusted from the factory defaults.
 
         Parameters:
-            home_direction:     Direction of moving to home (should be HomeDirection.REVERSE).
-            limit_switch:       Limit switch to use for homing (should be HomeLimitSwitch.REVERSE).
-            home_velocity:      Homing velocity in degrees/second (max 5).
-            offset_distance:    Distance of home position from home limit switch (in degrees).
+            home_velocity:      Homing velocity in mm/second (max 2.6).
+            offset_distance:    Distance of home position from home limit switch (in mm).
         """
 
-        if home_direction != AptChannelHomeDirection.REVERSE:
-            raise ValueError("Invalid value for home_direction")
-        if limit_switch != AptChannelHomeLimitSwitch.REVERSE:
-            raise ValueError("Invalid value for limit_switch")
-        if home_velocity <= 0 or home_velocity > 5:
-            raise ValueError("Invalid range for home_velocity")
-
-        # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
-        raw_dist = int(round(offset_distance * self.DISPLACEMENT_PER_ENCODER_COUNT))
-        if abs(raw_dist) >= 2**31:
-            raise ValueError("Invalid range for offset_distance")
+        if home_velocity <= 0 or home_velocity > 2.6:
+            raise ValueError(f"Invalid value for {home_velocity=}")
+        if 0 > offset_distance >= self._travel_range:
+            raise ValueError(f"Invalid value for {offset_distance=}")
 
         self._check_is_open()
 
-        # Send command message.
+        home_direction = AptChannelHomeDirection.REVERSE
+        limit_switch = AptChannelHomeLimitSwitch.REVERSE
+        # Convert values.
         raw_velocity = int(round(home_velocity * self.VELOCITY_SCALING_FACTOR))
+        raw_dist = int(round(offset_distance / self.DISPLACEMENT_PER_ENCODER_COUNT))
+        # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_HOME_PARAMS.value],
             chan_ident=self.NUMBER_OF_CHANNELS,
@@ -573,16 +544,15 @@ class Thorlabs_KDC101(QMI_Instrument):
         Use ``wait_move_complete()`` to wait until the move is finished.
 
         Parameters:
-            distance: Relative move distance in degrees.
+            distance: Relative move distance in millimeters.
         """
-
-        # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
-        raw_dist = int(round(distance * self.DISPLACEMENT_PER_ENCODER_COUNT))
-        if abs(raw_dist) >= 2**31:
-            raise ValueError("Relative distance out of valid range")
+        if abs(distance) > self._travel_range:
+            raise ValueError("Relative distance larger than travel range")
 
         self._check_is_open()
 
+        # Convert distance to microsteps.
+        raw_dist = int(round(distance / self.DISPLACEMENT_PER_ENCODER_COUNT))
         # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_RELATIVE.value],
@@ -603,22 +573,16 @@ class Thorlabs_KDC101(QMI_Instrument):
         been homed, the position parameter of this function will
         be interpreted relative to the position at power-up.
 
-        Note that the stage supports absolute positions above 360 degrees
-        and will not automatically reduce such positions module 360.
-        It is therefore possible that the stage must rotate more than
-        a full turn in order to reach a specific absolute position.
-
         Parameters:
-            position: Absolute target position in degrees.
+            position: Absolute target position in millimeters.
         """
-
-        # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
-        raw_pos = int(round(position * self.DISPLACEMENT_PER_ENCODER_COUNT))
-        if abs(raw_pos) >= 2**31:
+        if 0.0 > position > self._travel_range:
             raise ValueError("Absolute position out of valid range")
 
         self._check_is_open()
 
+        # Convert distance to microsteps.
+        raw_pos = int(round(position / self.DISPLACEMENT_PER_ENCODER_COUNT))
         # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_ABSOLUTE.value],

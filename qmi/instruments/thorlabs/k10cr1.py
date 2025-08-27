@@ -50,7 +50,7 @@ class HomeParams:
         home_direction:  Direction of moving to home (1 = forward, 2 = reverse).
         limit_switch:    Limit switch to use for homing (1 = reverse, 4 = forward).
         home_velocity:   Homing velocity in degrees/second.
-        offset_distance: Distance of home postion from home limit switch (in degrees).
+        offset_distance: Distance of home position from home limit switch (in degrees).
     """
     home_direction:     AptChannelHomeDirection
     limit_switch:       AptChannelHomeLimitSwitch
@@ -117,7 +117,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         e.g. "serial:/dev/ttyUSB1"
 
         Parameters:
-            name: Name for this instrument instance.
+            name:      Name for this instrument instance.
             transport: Transport descriptor to access the instrument.
         """
         super().__init__(context, name)
@@ -174,12 +174,10 @@ class Thorlabs_K10CR1(QMI_Instrument):
             self._check_k10cr1()
 
         except Exception:
-            # Close the transport if an error occurred during initialization
-            # of the instrument.
+            # Close the transport if an error occurred during initialization of the instrument.
             self._transport.close()
             raise
 
-        # Mark this instrument as open.
         super().open()
 
     @rpc_method
@@ -331,7 +329,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
     @rpc_method
     def get_velocity_params(self) -> VelocityParams:
         """Return the current maximum velocity and acceleration."""
-
         self._check_is_open()
 
         # Send request message.
@@ -360,11 +357,10 @@ class Thorlabs_K10CR1(QMI_Instrument):
             max_velocity: Maximum velocity in degrees/second (max 10).
             acceleration: Acceleration in degree/second/second (max 20).
         """
-
         if max_velocity <= 0 or max_velocity > 10:
-            raise ValueError("Invalid range for max_velocity")
+            raise ValueError(f"Invalid value for {max_velocity=}")
         if acceleration <= 0 or acceleration > 20:
-            raise ValueError("Invalid range for acceleration")
+            raise ValueError(f"Invalid value for {acceleration=}")
 
         self._check_is_open()
 
@@ -383,7 +379,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
     @rpc_method
     def get_backlash_distance(self) -> float:
         """Return the backlash distance in degrees."""
-
         self._check_is_open()
 
         # Send request message.
@@ -411,7 +406,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
         Parameters:
             backlash: Backlash distance in degrees, or 0 to disable.
         """
-
         # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
         raw_dist = int(round(backlash * self.MICROSTEPS_PER_DEGREE))
         if abs(raw_dist) >= 2**31:
@@ -472,13 +466,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
             home_velocity:      Homing velocity in degrees/second (max 5).
             offset_distance:    Distance of home position from home limit switch (in degrees).
         """
-
         if home_direction != AptChannelHomeDirection.REVERSE:
             raise ValueError("Invalid value for home_direction")
         if limit_switch != AptChannelHomeLimitSwitch.REVERSE:
             raise ValueError("Invalid value for limit_switch")
         if home_velocity <= 0 or home_velocity > 5:
-            raise ValueError("Invalid range for home_velocity")
+            raise ValueError(f"Invalid value for {home_velocity=}")
 
         # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
         raw_dist = int(round(offset_distance * self.MICROSTEPS_PER_DEGREE))
@@ -546,7 +539,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
         Parameters:
             distance: Relative move distance in degrees.
         """
-
         # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
         raw_dist = int(round(distance * self.MICROSTEPS_PER_DEGREE))
         if abs(raw_dist) >= 2**31:
@@ -582,7 +574,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
         Parameters:
             position: Absolute target position in degrees.
         """
-
         # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
         raw_pos = int(round(position * self.MICROSTEPS_PER_DEGREE))
         if abs(raw_pos) >= 2**31:
