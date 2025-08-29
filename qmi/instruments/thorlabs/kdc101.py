@@ -281,7 +281,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
 
         # Receive response
         resp = self._apt_protocol.ask(req_msg, reply_msg)
-        return resp.position * self.DISPLACEMENT_PER_ENCODER_COUNT / 2048
+        return resp.position * self.DISPLACEMENT_PER_ENCODER_COUNT
 
     @rpc_method
     def get_velocity_params(self) -> VelocityParams:
@@ -408,7 +408,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
             home_direction=AptChannelHomeDirection(resp.home_dir),
             limit_switch=AptChannelHomeLimitSwitch(resp.limit_switch),
             home_velocity=(resp.home_velocity / self.VELOCITY_SCALING_FACTOR),
-            offset_distance=(resp.offset_dist * self.DISPLACEMENT_PER_ENCODER_COUNT / 2048)
+            offset_distance=(resp.offset_dist * self.DISPLACEMENT_PER_ENCODER_COUNT)
         )
 
     @rpc_method

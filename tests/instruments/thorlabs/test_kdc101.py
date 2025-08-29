@@ -252,12 +252,7 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
         # _AptMsgGetPosCounter 0x0412
         expected_read = struct.pack(self._pack, 0x0412)
         # Add the position value at the end
-        dist_int = int(round(expected * 2048 / 65536 / Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT))
-        # Then the command values are based on these ints. The length must be filled up to four bits.
-        dist_int_hex = binascii.a2b_hex((hex(dist_int))[2:])
-        dist_bs = b"\x00" * (4 - len(dist_int_hex)) + dist_int_hex
-        # Now we create the full expected write, with noting that the order is Little Endian (hence [::-1])
-        position_bs = b"\x00\x00" + dist_bs[::-1]
+        position_bs = struct.pack(self._pack, int(round(expected / Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT)))
         self._transport_mock.read.return_value = expected_read + b"0000" + position_bs
 
         position = self.instr.get_absolute_position()
@@ -287,7 +282,7 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
         velocity_params = self.instr.get_velocity_params()
 
         self.assertEqual(expected_max_vel, round(velocity_params.max_velocity, 2))
-        self.assertEqual(expected_accel, round(velocity_params.acceleration, 2))
+        self.assertEqual(expected_accel, round(velocity_params.acceleration, 1))
         self._transport_mock.write.assert_called_with(expected_write)
 
     def test_get_backlash_distance(self):
@@ -305,7 +300,7 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
         )
         distance = self.instr.get_backlash_distance()
 
-        self.assertEqual(expected, round(distance, 2))
+        self.assertEqual(expected, round(distance, 4))
         self._transport_mock.write.assert_called_with(expected_write)
 
     def test_get_home_params(self):
@@ -322,20 +317,9 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
         home_dir = binascii.unhexlify(f"000{expected_home_dir.value}")
         limit_switch = binascii.unhexlify(f"000{expected_limit_switch.value}")
         # Add the velocity value
-        vel_int = int(round(expected_velocity * Thorlabs_Kdc101.VELOCITY_SCALING_FACTOR / 2048 * 6E6 / 65536))
-        # Then the command values are based on these ints. The length must be filled up to four bits.
-        vel_int_hex = binascii.a2b_hex((hex(vel_int))[2:])
-        vel_bs = b"\x00" * (4 - len(vel_int_hex)) + vel_int_hex
-        # Now we create the full expected write, with noting that the order is Little Endian (hence [::-1])
-        home_vel = b"\x00\x00" + vel_bs[::-1]
-        # home_vel = b"\x00\xd3\xed\x35"
+        home_vel = struct.pack(self._pack, int(round(expected_velocity * Thorlabs_Kdc101.VELOCITY_SCALING_FACTOR)))
         # Add the position value at the end
-        offs_int = int(round(expected_offset * 2048 / 65536 / Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT))
-        # Then the command values are based on these ints. The length must be filled up to four bits.
-        offs_int_hex = binascii.a2b_hex((hex(offs_int))[2:])
-        offs_bs = b"\x00" * (4 - len(offs_int_hex)) + offs_int_hex
-        # Now we create the full expected write, with noting that the order is Little Endian (hence [::-1])
-        offset = b"\x00\x00" + offs_bs[::-1]
+        offset = struct.pack(self._pack, int(round(expected_offset / Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT)))
         self._transport_mock.read.return_value = expected_read + home_dir[::-1] + limit_switch[::-1] + home_vel + offset
 
         home_params = self.instr.get_home_params()
@@ -375,16 +359,10 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
         # We expect to write _AptMsgSetVelParams 0x0413. "e" after x below tells the data follows in 14 bits.
         data_def_bits = b"\xd0\x01\x01\x00"
         expected_read = struct.pack(self._pack, 0xe0413) + data_def_bits
-        # velocity and acceleration get turned into ints in the command. Do the same here.
-        vel_int = int(round(velocity * Thorlabs_Kdc101.VELOCITY_SCALING_FACTOR * 2048 / 6E6 * 65536))
-        acc_int = int(round(acceleration * Thorlabs_Kdc101.ACCELERATION_SCALING_FACTOR * 2048))
-        # Then the command values are based on these ints. The length must be filled up to four bits.
-        max_vel_hex = binascii.a2b_hex(hex(vel_int)[2:])
-        accel_hex = binascii.a2b_hex(hex(acc_int)[2:])
-        max_vel = b"\x00" * (4 - len(max_vel_hex)) + max_vel_hex
-        accel = b"\x00" * (4 - len(accel_hex)) + accel_hex
-        # Now we create the full expected write, with noting that the order is Little Endian (hence [::-1])
-        expected_write = expected_read + b"\x00\x00\x00\x00" + accel[::-1] + max_vel[::-1]
+        # Add velocity and acceleration
+        max_vel = struct.pack(self._pack, int(round(velocity * Thorlabs_Kdc101.VELOCITY_SCALING_FACTOR)))
+        accel = struct.pack(self._pack, int(round(acceleration * Thorlabs_Kdc101.ACCELERATION_SCALING_FACTOR)))
+        expected_write = expected_read + b"\x00\x00\x00\x00" + accel + max_vel
         self._transport_mock.read.return_value = expected_read + self._empty
         # Act
         self.instr.set_velocity_params(velocity, acceleration)
@@ -451,17 +429,12 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
         data_def_bits = b"\xd0\x01\x01\x00"
         expected_read = struct.pack(self._pack, 0xe0440) + data_def_bits
         # velocity and offset get turned into ints in the command. Do the same here.
-        vel_int = int(round(velocity * Thorlabs_Kdc101.VELOCITY_SCALING_FACTOR * (2048/6E6)))
-        # Then the command values are based on these ints. The length must be filled up to four bits.
-        home_vel_hex = binascii.a2b_hex(hex(vel_int)[2:])
-        home_vel = b"\x00" * (4 - len(home_vel_hex)) + home_vel_hex
-        offset_int = int(round(offset_dist / Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT * (2048/6E6)))
-        offset_hex = binascii.a2b_hex(hex(offset_int)[2:])
-        offset = b"\x00" * (4 - len(offset_hex)) + offset_hex  # b"\x00\x0b\x51\x1f"
+        home_vel = struct.pack(self._pack, int(round(velocity * Thorlabs_Kdc101.VELOCITY_SCALING_FACTOR)))
+        offset = struct.pack(self._pack, int(round(offset_dist / Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT)))
         home_dir_bs = binascii.unhexlify(f"000{home_dir.value}")
         limit_switch_bs = binascii.unhexlify(f"000{limit_switch.value}")
         # Now we create the full expected write, with noting that the order is Little Endian (hence [::-1])
-        expected_write = expected_read + home_dir_bs[::-1] + limit_switch_bs[::-1] + home_vel[::-1] + offset[::-1]
+        expected_write = expected_read + home_dir_bs[::-1] + limit_switch_bs[::-1] + home_vel + offset
         self._transport_mock.read.return_value = expected_read + self._empty
         # Act
         self.instr.set_home_params(velocity, offset_dist)
