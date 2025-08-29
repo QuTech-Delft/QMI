@@ -137,7 +137,7 @@ class TestRPC(unittest.TestCase):
                 doc += f"  - {name}{signature_doc}\n"
 
         # Extract signal declarations.
-        doc += '\nsignals:\n'
+        doc += '\nQMI signals:\n'
         for signal_description in signal_declaration_class._qmi_signals:
             name = signal_description.name
             arg_types = "(" + ", ".join(arg_type.__name__ for arg_type in signal_description.arg_types) + ")"
@@ -150,7 +150,7 @@ class TestRPC(unittest.TestCase):
                 constant_names.update(getattr(base, "_rpc_constants"))
 
         # Extract constant values.
-        doc += '\nconstants:\n'
+        doc += '\nRPC constants:\n'
         for constant_name in constant_names:
             assert hasattr(rpc_object_class, constant_name)
             constant_value = getattr(rpc_object_class, constant_name)
