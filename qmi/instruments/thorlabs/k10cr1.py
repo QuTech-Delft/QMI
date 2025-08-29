@@ -37,14 +37,16 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
     DEFAULT_RESPONSE_TIMEOUT = 1.0
 
-    # Number of microsteps per degree of rotation.
+    # Number of microsteps per degree of rotation. Full revolution is 409600 micro-steps with rotation of 3 degrees.
     MICROSTEPS_PER_DEGREE = 409600.0 / 3.0
 
-    # Internal velocity setting for 1 degree/second.
+    # Internal velocity factor for 1 degree/second. Maximum velocity in degrees/second
     VELOCITY_FACTOR = 7329109.0
+    MAX_VELOCITY = 10
 
-    # Internal acceleration setting for 1 degree/second/second.
+    # Internal acceleration factor for 1 degree/second/second. Maximum acceleration in degrees/second^2
     ACCELERATION_FACTOR = 1502.0
+    MAX_ACCELERATION = 20
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize driver.
@@ -62,8 +64,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         assert isinstance(self._transport, QMI_SerialTransport)
         self._apt_protocol = AptProtocol(self._transport, default_timeout=self.DEFAULT_RESPONSE_TIMEOUT)
 
-        # The APT protocol supports multiple channels.
-        # The K10CR1 only uses channel 1.
+        # The APT protocol supports multiple channels, but the K10CR1 only uses channel 1.
         self._channel = 1
 
     def _check_k10cr1(self) -> None:
@@ -293,9 +294,9 @@ class Thorlabs_K10CR1(QMI_Instrument):
             max_velocity: Maximum velocity in degrees/second (max 10).
             acceleration: Acceleration in degree/second/second (max 20).
         """
-        if max_velocity <= 0 or max_velocity > 10:
+        if not 0 < max_velocity <= self.MAX_VELOCITY:
             raise ValueError(f"Invalid value for {max_velocity=}")
-        if acceleration <= 0 or acceleration > 20:
+        if not 0 < acceleration <= self.MAX_ACCELERATION:
             raise ValueError(f"Invalid value for {acceleration=}")
 
         self._check_is_open()
@@ -361,7 +362,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
     @rpc_method
     def get_home_params(self) -> HomeParams:
         """Return the homing parameters."""
-
         self._check_is_open()
 
         # Send request message.
@@ -406,7 +406,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
             raise ValueError("Invalid value for home_direction")
         if limit_switch != AptChannelHomeLimitSwitch.REVERSE:
             raise ValueError("Invalid value for limit_switch")
-        if home_velocity <= 0 or home_velocity > 5:
+        if not 0 < home_velocity <= 5:
             raise ValueError(f"Invalid value for {home_velocity=}")
 
         # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.

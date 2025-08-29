@@ -1,7 +1,7 @@
 """Instrument driver for the Thorlabs KDC101 Brushed DC Servo Motor Controller.
 
 This driver communicates with the device via a USB serial port, using the Thorlabs APT protocol. For details,
-see the document "Thorlabs APT Controllers Host-Controller Communications Protocol", issue 25 from Thorlabs.
+see the document "Thorlabs APT Controllers Host-Controller Communications Protocol", issue 41 from Thorlabs.
 """
 
 import logging
@@ -27,7 +27,7 @@ from qmi.instruments.thorlabs.apt_protocol import (
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
-T = 2048 / 6E6
+T = 2048 / 6E6  # Sampling interval constant for KDC101, as described in p. 39 of documentation
 ACTUATOR_TRAVEL_RANGES = {
     "Z906": 6.0,
     "Z912": 12.0,
@@ -36,7 +36,8 @@ ACTUATOR_TRAVEL_RANGES = {
 
 
 class Thorlabs_Kdc101(QMI_Instrument):
-    """Instrument driver for the Thorlabs KDC101 Brushed DC Servo Motor Controller.
+    """Instrument driver for the Thorlabs KDC101 Brushed DC Servo Motor Controller. This driver should be
+    compatible also with TDC001 and KVS30 controllers.
 
     This controller can be used with Z9 series 6mm, 12mm and 25mm linear actuators.
     An adaptation of the driver could be made in the future to also allow the use of the linear translation and
@@ -56,12 +57,12 @@ class Thorlabs_Kdc101(QMI_Instrument):
 
     # Maximum velocity for controlled profiles
     MAX_VELOCITY = 2.3  # 2.6 if "ripples" are allowed in the move profile.
-    # Velocity scaling factor, VEL_APT = EncCnt × T × 65536 × Vel, where T = 2048 / (6 × 106).
+    # Velocity scaling factor, VEL_APT = EncCnt × T × 65536 × Vel, where T = 2048 / (6 × 10^6).
     VELOCITY_SCALING_FACTOR = 772981.3692 * T * 65536  # * DISPLACEMENT_PER_ENCODER_COUNT
 
     # Maximum acceleration
     MAX_ACCELERATION = 4.0
-    # Acceleration scaling factor, ACC_APT = EncCnt × T^2 × 65536 × Acc, where T = 2048 / (6 × 106).
+    # Acceleration scaling factor, ACC_APT = EncCnt × T^2 × 65536 × Acc, where T = 2048 / (6 × 10^6).
     ACCELERATION_SCALING_FACTOR = 263.8443072 * T**2 * 65536  # * DISPLACEMENT_PER_ENCODER_COUNT
     
     # Number of channels

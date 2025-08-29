@@ -318,7 +318,7 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
         limit_switch = binascii.unhexlify(f"000{expected_limit_switch.value}")
         # Add the velocity value
         home_vel = struct.pack(self._pack, int(round(expected_velocity * Thorlabs_Kdc101.VELOCITY_SCALING_FACTOR)))
-        # Add the position value at the end
+        # Add the offset value at the end
         offset = struct.pack(self._pack, int(round(expected_offset / Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT)))
         self._transport_mock.read.return_value = expected_read + home_dir[::-1] + limit_switch[::-1] + home_vel + offset
 

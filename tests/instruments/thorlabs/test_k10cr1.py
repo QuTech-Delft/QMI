@@ -190,7 +190,7 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
 
         motor_status = self.instr.get_motor_status()
 
-        self.assertFalse(any(list(motor_status.__dict__.values())))  # Check all statuses are "false"
+        self.assertFalse(all(list(motor_status.__dict__.values())))  # Check all statuses are "false"
         self._transport_mock.write.assert_called_with(expected_write)
 
     def test_identify(self):
@@ -258,7 +258,7 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         # _AptMsgGetPosCounter 0x0412
         expected_read = struct.pack(self._pack, 0x0412)
         # Add the position value at the end
-        position_bs = b"\x00\x30\x01\x01"
+        position_bs = struct.pack(self._pack, int(round(expected * Thorlabs_K10Cr1.MICROSTEPS_PER_DEGREE)))
         self._transport_mock.read.return_value = expected_read + b"0000" + position_bs
 
         position = self.instr.get_absolute_position()
@@ -273,9 +273,9 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         # _AptMsgReqVelParams 0x0414
         expected_write = struct.pack(self._pack, 0x10414) + b"P\x01"  # This is 5001 == 0x1389
         # _AptMsgGetVelParams 0x0415
-        # Manually define the bit strings
-        max_vel = struct.pack(self._pack, int(round(expected_max_vel * Thorlabs_K10Cr1.VELOCITY_FACTOR)))
-        accel = struct.pack(self._pack, int(round(expected_accel * Thorlabs_K10Cr1.ACCELERATION_FACTOR)))
+        # Define the bit strings
+        max_vel = struct.pack(self._pack, int(round(expected_max_vel * VELOCITY_FACTOR)))
+        accel = struct.pack(self._pack, int(round(expected_accel * ACCELERATION_FACTOR)))
         self._transport_mock.read.return_value = (
             struct.pack(self._pack, 0x0415) +
             struct.pack("<h", 0) +
@@ -287,8 +287,8 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
 
         velocity_params = self.instr.get_velocity_params()
 
-        self.assertEqual(round(velocity_params.max_velocity, 2), expected_max_vel)
-        self.assertEqual(round(velocity_params.acceleration, 2), expected_accel)
+        self.assertEqual(expected_max_vel, round(velocity_params.max_velocity, 2))
+        self.assertEqual(expected_accel, round(velocity_params.acceleration, 2))
         self._transport_mock.write.assert_called_with(expected_write)
 
     def test_get_backlash_distance(self):
@@ -302,7 +302,7 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
             struct.pack(self._pack, 0x043C) +
             struct.pack("<h", 0) +
             struct.pack("<h", 1) +  # chan ident
-            struct.pack(self._pack, int(round(expected * Thorlabs_K10Cr1.MICROSTEPS_PER_DEGREE)))
+            struct.pack(self._pack, int(round(expected * MICROSTEPS_PER_DEGREE)))
         )
         distance = self.instr.get_backlash_distance()
 
@@ -322,8 +322,10 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         # manually define the bit strings
         home_dir = binascii.unhexlify(f"000{expected_home_dir.value}")
         limit_switch = binascii.unhexlify(f"000{expected_limit_switch.value}")
-        home_vel = b"\x00\xd3\xed\x35"
-        offset = b"\x00\xb0\x6b\x04"
+        # Add the velocity value
+        home_vel = struct.pack(self._pack, int(round(expected_velocity * VELOCITY_FACTOR)))
+        # Add the position value at the end
+        offset = struct.pack(self._pack, int(round(expected_offset * MICROSTEPS_PER_DEGREE)))
         self._transport_mock.read.return_value = expected_read + home_dir[::-1] + limit_switch[::-1] + home_vel + offset
 
         home_params = self.instr.get_home_params()
@@ -364,15 +366,10 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         data_def_bits = b"\xd0\x01\x01\x00"
         expected_read = struct.pack(self._pack, 0xe0413) + data_def_bits
         # velocity and acceleration get turned into ints in the command. Do the same here.
-        vel_int = int(round(velocity * VELOCITY_FACTOR))
-        acc_int = int(round(acceleration * ACCELERATION_FACTOR))
-        # Then the command values are based on these ints. The length must be filled up to four bits.
-        max_vel_hex = binascii.a2b_hex(hex(vel_int)[2:])
-        accel_hex = binascii.a2b_hex(hex(acc_int)[2:])
-        max_vel = b"\x00" * (4 - len(max_vel_hex)) + max_vel_hex
-        accel = b"\x00" * (4 - len(accel_hex)) + accel_hex
-        # Now we create the full expected write, with noting that the order is Little Endian (hence [::-1])
-        expected_write = expected_read + b"\x00\x00\x00\x00" + accel[::-1] + max_vel[::-1]
+        # Add velocity and acceleration
+        max_vel = struct.pack(self._pack, int(round(velocity * VELOCITY_FACTOR)))
+        accel = struct.pack(self._pack, int(round(acceleration * ACCELERATION_FACTOR)))
+        expected_write = expected_read + b"\x00\x00\x00\x00" + accel + max_vel
         self._transport_mock.read.return_value = expected_read + self._empty
         # Act
         self.instr.set_velocity_params(velocity, acceleration)
@@ -381,19 +378,22 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
 
     def test_set_velocity_params_values_out_of_range(self):
         """Test set_velocity_params raises exceptions at invalid values."""
-        max_velocity = 12.345
-        acceleration = -43.210
-        expected1 = f"Invalid value for {max_velocity=}"
-        expected2 = f"Invalid value for {acceleration=}"
-        with self.assertRaises(ValueError) as exc1:
-            self.instr.set_velocity_params(max_velocity, acceleration)
+        invalid_velocities = [0, Thorlabs_K10Cr1.MAX_VELOCITY + 0.1]
+        invalid_accelerations = [0, Thorlabs_K10Cr1.MAX_ACCELERATION + 0.1]
+        for max_velocity in invalid_velocities:
+            expected1 = f"Invalid value for {max_velocity=}"
+            with self.assertRaises(ValueError) as exc1:
+                self.instr.set_velocity_params(max_velocity, 0.0)
+
+            self.assertEqual(expected1, str(exc1.exception))
 
         valid_velocity = 1.2345
-        with self.assertRaises(ValueError) as exc2:
-            self.instr.set_velocity_params(valid_velocity, acceleration)
+        for acceleration in invalid_accelerations:
+            expected2 = f"Invalid value for {acceleration=}"
+            with self.assertRaises(ValueError) as exc2:
+                self.instr.set_velocity_params(valid_velocity, acceleration)
 
-        self.assertEqual(expected1, str(exc1.exception))
-        self.assertEqual(expected2, str(exc2.exception))
+            self.assertEqual(expected2, str(exc2.exception))
 
     def test_set_backlash_distance(self):
         """Test setting a backlash distance."""
@@ -536,9 +536,12 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
     def test_move_relative_out_of_range(self):
         """Test that the move_relative excepts if not within uint32 range."""
         too_far_distances = [-2**31 / MICROSTEPS_PER_DEGREE, 2**31 / MICROSTEPS_PER_DEGREE]
+        exception = "Relative distance out of valid range"
         for distance in too_far_distances:
-            with self.assertRaises(ValueError):
+            with self.assertRaises(ValueError) as exc:
                 self.instr.move_relative(distance)
+
+            self.assertEqual(exception, str(exc.exception))
 
     def test_move_absolute(self):
         """Test moving a relative distance."""
@@ -563,9 +566,12 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
     def test_move_absolute_out_of_range(self):
         """Test that the move_absolute excepts if not within uint32 range."""
         too_far_distances = [-2**31 / MICROSTEPS_PER_DEGREE, 2**31 / MICROSTEPS_PER_DEGREE]
+        exception = "Absolute position out of valid range"
         for distance in too_far_distances:
-            with self.assertRaises(ValueError):
+            with self.assertRaises(ValueError) as exc:
                 self.instr.move_absolute(distance)
+
+            self.assertEqual(exception, str(exc.exception))
 
     def test_wait_move_complete(self):
         """See that a move is completed. We need to get False for all motor moves values."""
