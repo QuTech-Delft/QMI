@@ -27,7 +27,7 @@ from qmi.instruments.thorlabs.apt_protocol import (
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
-
+T = 2048 / 6E6
 ACTUATOR_TRAVEL_RANGES = {
     "Z906": 6.0,
     "Z912": 12.0,
@@ -54,13 +54,15 @@ class Thorlabs_Kdc101(QMI_Instrument):
     # Linear displacement of the lead screw per encoder count
     DISPLACEMENT_PER_ENCODER_COUNT = 1.0 / ENCODER_COUNTS_PER_ROTATION
 
-    # Maximum velocity for controlled profiles and velocity scaling factor, in mm/s.
-    MAX_VELOCITY = 2.3
-    VELOCITY_SCALING_FACTOR = 772981.3692
+    # Maximum velocity for controlled profiles
+    MAX_VELOCITY = 2.3  # 2.6 if "ripples" are allowed in the move profile.
+    # Velocity scaling factor, VEL_APT = EncCnt × T × 65536 × Vel, where T = 2048 / (6 × 106).
+    VELOCITY_SCALING_FACTOR = 772981.3692 * T * 65536  # * DISPLACEMENT_PER_ENCODER_COUNT
 
-    # Maximum acceleration and acceleration scaling factor, in mm/s^2
+    # Maximum acceleration
     MAX_ACCELERATION = 4.0
-    ACCELERATION_SCALING_FACTOR = 263.8443072
+    # Acceleration scaling factor, ACC_APT = EncCnt × T^2 × 65536 × Acc, where T = 2048 / (6 × 106).
+    ACCELERATION_SCALING_FACTOR = 263.8443072 * T**2 * 65536  # * DISPLACEMENT_PER_ENCODER_COUNT
     
     # Number of channels
     NUMBER_OF_CHANNELS = 1
@@ -279,7 +281,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
 
         # Receive response
         resp = self._apt_protocol.ask(req_msg, reply_msg)
-        return resp.position * self.DISPLACEMENT_PER_ENCODER_COUNT
+        return resp.position * self.DISPLACEMENT_PER_ENCODER_COUNT / 2048
 
     @rpc_method
     def get_velocity_params(self) -> VelocityParams:
@@ -316,9 +318,9 @@ class Thorlabs_Kdc101(QMI_Instrument):
             max_velocity: Maximum velocity in mm/s.
             acceleration: Acceleration in mm/s^2.
         """
-        if max_velocity <= 0 or max_velocity > self.MAX_VELOCITY:
+        if not 0 < max_velocity <= self.MAX_VELOCITY:
             raise ValueError(f"Invalid value for {max_velocity=}")
-        if acceleration <= 0 or acceleration > self.MAX_ACCELERATION:
+        if not 0 < acceleration <= self.MAX_ACCELERATION:
             raise ValueError(f"Invalid value for {acceleration=}")
 
         self._check_is_open()
@@ -406,7 +408,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
             home_direction=AptChannelHomeDirection(resp.home_dir),
             limit_switch=AptChannelHomeLimitSwitch(resp.limit_switch),
             home_velocity=(resp.home_velocity / self.VELOCITY_SCALING_FACTOR),
-            offset_distance=(resp.offset_dist * self.DISPLACEMENT_PER_ENCODER_COUNT)
+            offset_distance=(resp.offset_dist * self.DISPLACEMENT_PER_ENCODER_COUNT / 2048)
         )
 
     @rpc_method
@@ -424,10 +426,9 @@ class Thorlabs_Kdc101(QMI_Instrument):
             home_velocity:      Homing velocity in mm/second (max 2.6).
             offset_distance:    Distance of home position from home limit switch (in mm).
         """
-
-        if 0 >= home_velocity > 2.6:
+        if not 0 < home_velocity <= 2.6:
             raise ValueError(f"Invalid value for {home_velocity=}")
-        if 0 > offset_distance >= self._travel_range:
+        if not 0 <= offset_distance <= self._travel_range:
             raise ValueError(f"Invalid value for {offset_distance=}")
 
         self._check_is_open()
@@ -525,7 +526,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
         Parameters:
             position: Absolute target position in millimeters.
         """
-        if 0.0 > position > self._travel_range:
+        if not 0.0 < position < self._travel_range:
             raise ValueError("Absolute position out of valid range")
 
         self._check_is_open()

@@ -54,8 +54,8 @@ class VelocityParams:
     """Velocity parameters for the controller.
 
     Attributes:
-        max_velocity:    Maximum velocity in degrees/second.
-        acceleration:    Acceleration in degrees/second/second.
+        max_velocity:    Maximum velocity in degrees/second or mm/second.
+        acceleration:    Acceleration in degrees/second/second or mm/second/second.
     """
     max_velocity: float
     acceleration: float
@@ -68,8 +68,8 @@ class HomeParams:
     Attributes:
         home_direction:  Direction of moving to home (1 = forward, 2 = reverse).
         limit_switch:    Limit switch to use for homing (1 = reverse, 4 = forward).
-        home_velocity:   Homing velocity in degrees/second.
-        offset_distance: Distance of home position from home limit switch (in degrees).
+        home_velocity:   Homing velocity in degrees/second or mm/second.
+        offset_distance: Distance of home position from home limit switch (in degrees or mm).
     """
     home_direction:     AptChannelHomeDirection
     limit_switch:       AptChannelHomeLimitSwitch

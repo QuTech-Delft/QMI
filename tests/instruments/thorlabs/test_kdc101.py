@@ -101,7 +101,7 @@ class TestThorlabsKdc101(unittest.TestCase):
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
         expected_read = struct.pack("<l", 0x0006) + b"\x81\x5A"
         # We expect wrong model message to be
-        exception = "Driver only supports KDC101 but instrument identifies as T10FN2"
+        exception = "Driver only supports KDC101 but instrument identifies as 'T10FN2'"
         # The request+data has to be 90 bytes long and should include model type string at right spot.
         self._transport_mock.read.side_effect = [expected_read, b"FN2\0T10" * 12]
         with self.assertRaises(QMI_InstrumentException) as exc:
@@ -152,7 +152,7 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
     def test_get_idn(self):
         """Test the get_idn method."""
         # First two values are hardcoded, and the two latter are based on the standard return value for read in `setUp`
-        expected_idn = ["Thorlabs", "KDC101", 3223601, "3.2.3"]
+        expected_idn = ["Thorlabs", "KDC101", 3223601, "2.2.3"]
         # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
         expected_write = struct.pack(self._pack, 0x0005) + b"P\x01"  # This is 5001 == 0x1389
 
@@ -246,24 +246,29 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
 
     def test_get_absolute_position(self):
         """Test get_absolute_position method returns expected position."""
-        expected = 487.78
+        expected = 4.321
         # _AptMsgReqPosCounter 0x0411
         expected_write = struct.pack(self._pack, 0x10411) + b"P\x01"  # This is 5001 == 0x1389
         # _AptMsgGetPosCounter 0x0412
         expected_read = struct.pack(self._pack, 0x0412)
         # Add the position value at the end
-        position_bs = b"\x00\x30\x01\x01"
+        dist_int = int(round(expected * 2048 / 65536 / Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT))
+        # Then the command values are based on these ints. The length must be filled up to four bits.
+        dist_int_hex = binascii.a2b_hex((hex(dist_int))[2:])
+        dist_bs = b"\x00" * (4 - len(dist_int_hex)) + dist_int_hex
+        # Now we create the full expected write, with noting that the order is Little Endian (hence [::-1])
+        position_bs = b"\x00\x00" + dist_bs[::-1]
         self._transport_mock.read.return_value = expected_read + b"0000" + position_bs
 
         position = self.instr.get_absolute_position()
 
-        self.assertEqual(expected, round(position, 2))
+        self.assertEqual(expected, round(position, 3))
         self._transport_mock.write.assert_called_with(expected_write)
 
     def test_get_velocity_params(self):
         """Test get_velocity_params returns velocity and acceleration."""
-        expected_max_vel = 123.45
-        expected_accel = 543.21
+        expected_max_vel = 2.3
+        expected_accel = 4.0
         # _AptMsgReqVelParams 0x0414
         expected_write = struct.pack(self._pack, 0x10414) + b"P\x01"  # This is 5001 == 0x1389
         # _AptMsgGetVelParams 0x0415
@@ -281,13 +286,13 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
 
         velocity_params = self.instr.get_velocity_params()
 
-        self.assertEqual(round(velocity_params.max_velocity, 2), expected_max_vel)
-        self.assertEqual(round(velocity_params.acceleration, 2), expected_accel)
+        self.assertEqual(expected_max_vel, round(velocity_params.max_velocity, 2))
+        self.assertEqual(expected_accel, round(velocity_params.acceleration, 2))
         self._transport_mock.write.assert_called_with(expected_write)
 
     def test_get_backlash_distance(self):
         """Test get_backlash_distance method returns expected value."""
-        expected = 123.45
+        expected = 1.2345
         # _AptMsgReqGenMoveParams 0x043B
         expected_write = struct.pack(self._pack, 0x1043B) + b"P\x01"  # This is 5001 == 0x1389
         # _AptMsgGetPosCounter 0x043C
@@ -307,8 +312,8 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
         """Test get_home_params returns velocity and acceleration."""
         expected_home_dir = AptChannelHomeDirection.FORWARD
         expected_limit_switch = AptChannelHomeLimitSwitch.FORWARD
-        expected_velocity = 1170.5
-        expected_offset = 2146.33
+        expected_velocity = 2.6
+        expected_offset = 0.15
         # _AptMsgReqHomeParams 0x0441
         expected_write = struct.pack(self._pack, 0x10441) + b"P\x01"  # This is 5001 == 0x1389
         # _AptMsgGetHomeParams 0x0442
@@ -316,8 +321,21 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
         # manually define the bit strings
         home_dir = binascii.unhexlify(f"000{expected_home_dir.value}")
         limit_switch = binascii.unhexlify(f"000{expected_limit_switch.value}")
-        home_vel = b"\x00\xd3\xed\x35"
-        offset = b"\x00\xb0\x6b\x04"
+        # Add the velocity value
+        vel_int = int(round(expected_velocity * Thorlabs_Kdc101.VELOCITY_SCALING_FACTOR / 2048 * 6E6 / 65536))
+        # Then the command values are based on these ints. The length must be filled up to four bits.
+        vel_int_hex = binascii.a2b_hex((hex(vel_int))[2:])
+        vel_bs = b"\x00" * (4 - len(vel_int_hex)) + vel_int_hex
+        # Now we create the full expected write, with noting that the order is Little Endian (hence [::-1])
+        home_vel = b"\x00\x00" + vel_bs[::-1]
+        # home_vel = b"\x00\xd3\xed\x35"
+        # Add the position value at the end
+        offs_int = int(round(expected_offset * 2048 / 65536 / Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT))
+        # Then the command values are based on these ints. The length must be filled up to four bits.
+        offs_int_hex = binascii.a2b_hex((hex(offs_int))[2:])
+        offs_bs = b"\x00" * (4 - len(offs_int_hex)) + offs_int_hex
+        # Now we create the full expected write, with noting that the order is Little Endian (hence [::-1])
+        offset = b"\x00\x00" + offs_bs[::-1]
         self._transport_mock.read.return_value = expected_read + home_dir[::-1] + limit_switch[::-1] + home_vel + offset
 
         home_params = self.instr.get_home_params()
@@ -352,14 +370,14 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
     def test_set_velocity_params(self):
         """Test set_velocity_params can be used to set velocity and acceleration."""
         # Values to set
-        velocity = 1.2345
-        acceleration = 5.4321
+        velocity = 2.3
+        acceleration = 3.21
         # We expect to write _AptMsgSetVelParams 0x0413. "e" after x below tells the data follows in 14 bits.
         data_def_bits = b"\xd0\x01\x01\x00"
         expected_read = struct.pack(self._pack, 0xe0413) + data_def_bits
         # velocity and acceleration get turned into ints in the command. Do the same here.
-        vel_int = int(round(velocity / Thorlabs_Kdc101.VELOCITY_SCALING_FACTOR))
-        acc_int = int(round(acceleration / Thorlabs_Kdc101.ACCELERATION_SCALING_FACTOR))
+        vel_int = int(round(velocity * Thorlabs_Kdc101.VELOCITY_SCALING_FACTOR * 2048 / 6E6 * 65536))
+        acc_int = int(round(acceleration * Thorlabs_Kdc101.ACCELERATION_SCALING_FACTOR * 2048))
         # Then the command values are based on these ints. The length must be filled up to four bits.
         max_vel_hex = binascii.a2b_hex(hex(vel_int)[2:])
         accel_hex = binascii.a2b_hex(hex(acc_int)[2:])
@@ -375,29 +393,32 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
 
     def test_set_velocity_params_values_out_of_range(self):
         """Test set_velocity_params raises exceptions at invalid values."""
-        max_velocity = 12.345
-        acceleration = -43.210
-        expected1 = f"Invalid value for {max_velocity=}"
-        expected2 = f"Invalid value for {acceleration=}"
-        with self.assertRaises(ValueError) as exc1:
-            self.instr.set_velocity_params(max_velocity, acceleration)
+        invalid_velocities = [0, Thorlabs_Kdc101.MAX_VELOCITY + 0.1]
+        invalid_accelerations = [0, Thorlabs_Kdc101.MAX_ACCELERATION + 0.1]
+        for max_velocity in invalid_velocities:
+            expected1 = f"Invalid value for {max_velocity=}"
+            with self.assertRaises(ValueError) as exc1:
+                self.instr.set_velocity_params(max_velocity, 0.0)
+
+            self.assertEqual(expected1, str(exc1.exception))
 
         valid_velocity = 1.2345
-        with self.assertRaises(ValueError) as exc2:
-            self.instr.set_velocity_params(valid_velocity, acceleration)
+        for acceleration in invalid_accelerations:
+            expected2 = f"Invalid value for {acceleration=}"
+            with self.assertRaises(ValueError) as exc2:
+                self.instr.set_velocity_params(valid_velocity, acceleration)
 
-        self.assertEqual(str(exc1.exception), expected1)
-        self.assertEqual(str(exc2.exception), expected2)
+            self.assertEqual(expected2, str(exc2.exception))
 
     def test_set_backlash_distance(self):
         """Test setting a backlash distance."""
         # Values to set
-        distance = Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT / 20.0
+        distance = 0.2
         # We expect to write _AptMsgSetGenMoveParams 0x043A. "6" after x below tells the data follows in 6 bits.
         data_def_bits = b"\xd0\x01"
         expected_read = struct.pack(self._pack, 0x6043A) + data_def_bits
         # velocity and acceleration get turned into ints in the command. Do the same here.
-        dist_int = int(round(distance * Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT))
+        dist_int = int(round(distance / Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT))
         # Then the command values are based on these ints. The length must be filled up to four bits.
         dist_int_hex = binascii.a2b_hex((hex(dist_int))[2:])
         dist_bs = b"\x00" * (4 - len(dist_int_hex)) + dist_int_hex
@@ -430,11 +451,13 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
         data_def_bits = b"\xd0\x01\x01\x00"
         expected_read = struct.pack(self._pack, 0xe0440) + data_def_bits
         # velocity and offset get turned into ints in the command. Do the same here.
-        vel_int = int(round(velocity / Thorlabs_Kdc101.VELOCITY_SCALING_FACTOR))
+        vel_int = int(round(velocity * Thorlabs_Kdc101.VELOCITY_SCALING_FACTOR * (2048/6E6)))
         # Then the command values are based on these ints. The length must be filled up to four bits.
         home_vel_hex = binascii.a2b_hex(hex(vel_int)[2:])
         home_vel = b"\x00" * (4 - len(home_vel_hex)) + home_vel_hex
-        offset = b"\x00\x0b\x51\x1f"
+        offset_int = int(round(offset_dist / Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT * (2048/6E6)))
+        offset_hex = binascii.a2b_hex(hex(offset_int)[2:])
+        offset = b"\x00" * (4 - len(offset_hex)) + offset_hex  # b"\x00\x0b\x51\x1f"
         home_dir_bs = binascii.unhexlify(f"000{home_dir.value}")
         limit_switch_bs = binascii.unhexlify(f"000{limit_switch.value}")
         # Now we create the full expected write, with noting that the order is Little Endian (hence [::-1])
@@ -507,7 +530,7 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
     def test_move_relative(self):
         """Test moving a relative distance."""
         # Values to set
-        distance = Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT / 20.0
+        distance = 0.2
         # We expect to write _AptMsgMoveRelative 0x0448. "6" after x below tells the data follows in 6 bits.
         data_def_bits = b"\xd0\x01"
         expected_read = struct.pack(self._pack, 0x60448) + data_def_bits
@@ -537,7 +560,7 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
     def test_move_absolute(self):
         """Test moving a relative distance."""
         # Values to set
-        distance = Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT / 20.0
+        distance = 0.2
         # We expect to write _AptMsgMoveAbsolute 0x0453. "6" after x below tells the data follows in 6 bits.
         data_def_bits = b"\xd0\x01"
         expected_read = struct.pack(self._pack, 0x60453) + data_def_bits
@@ -557,7 +580,7 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
     def test_move_absolute_out_of_range(self):
         """Test that the move_absolute excepts if not within uint32 range."""
         too_far_distances = [-0.1, self.instr._travel_range + 1.0]
-        exception = "Relative distance larger than travel range"
+        exception = "Absolute position out of valid range"
         for distance in too_far_distances:
             with self.assertRaises(ValueError) as exc:
                 self.instr.move_absolute(distance)

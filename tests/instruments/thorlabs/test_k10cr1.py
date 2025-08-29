@@ -96,7 +96,7 @@ class TestThorlabsK10cr1(unittest.TestCase):
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
         expected_read = struct.pack("<l", 0x0006) + b"\x81\x5A"
         # We expect wrong model message to be
-        exception = "Driver only supports K10CR1 but instrument identifies as T10FN2"
+        exception = "Driver only supports K10CR1 but instrument identifies as 'T10FN2'"
         # The request+data has to be 90 bytes long and should include model type string at right spot.
         self._transport_mock.read.side_effect = [expected_read, b"FN2\0T10" * 12]
         with self.assertRaises(QMI_InstrumentException) as exc:
