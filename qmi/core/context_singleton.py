@@ -237,11 +237,11 @@ def _connect_to_peers() -> None:
         # Get host and port number of peer context.
         peercfg = cfg.contexts.get(peername)
         if not peercfg:
-            raise QMI_ConfigurationException("Can not connect to unknown peer {!r}".format(peername))
+            raise QMI_ConfigurationException(f"Can not connect to unknown peer {peername!r}")
         peer_host = peercfg.host
         peer_port = peercfg.tcp_server_port
         if (not peer_host) or (not peer_port):
-            raise QMI_ConfigurationException("Missing host/port for peer context {!r}".format(peername))
+            raise QMI_ConfigurationException(f"Missing host/port for peer context {peername!r}")
 
         # Connect to peer.
         peer_address = format_address_and_port((peer_host, peer_port))

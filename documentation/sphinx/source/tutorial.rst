@@ -77,14 +77,14 @@ We can look at the documentation of the Proxy instance:
 
 >>> help(nsg)
 
-This prints the docstring of the NoisySineGenerator class. We can look at all variables of the proxy with
-
->>> vars(nsg)
-
-which prints a long dictionary of info, which might be hard to read. But it does also give the docstring of the class and lists all RPC methods, for example.
+This prints the docstring of the NoisySineGenerator class. It does also give a listing of all RPC methods, signals and class constants of the proxy instance as well.
 
 As we can read in the help, our noisy sine generator ``nsg`` supports a bunch of methods, including the ``get_sample()`` method.
-Let's give it a shot:
+We can retrieve that method's docstring as well by typing
+
+>>> help(nsg.get_sample)
+
+Now, let's give it a shot and see what happens:
 
 >>> nsg.get_sample()
 
@@ -93,7 +93,7 @@ Whoops, we got an error! This is because we didn't "open" the instrument first. 
 >>> nsg.open()
 >>> nsg.get_sample()
 
-This will return a single value of the simulated NoiseSineGenerator device.
+Now we get returned a single value of the simulated NoiseSineGenerator device.
 
 We can make a very basic graph of *nsg* samples as follows:
 

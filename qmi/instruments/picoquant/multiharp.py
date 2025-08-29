@@ -10,7 +10,6 @@ import ctypes
 import enum
 import logging
 from fractions import Fraction
-from typing import List, Tuple
 
 import numpy as np
 
@@ -312,7 +311,7 @@ class PicoQuant_MultiHarp150(_PicoquantHarp):
         _logger.info("[%s] Initialized device with mode %s and source %s", self._name, mode.value, refsource.value)
 
     @rpc_method
-    def get_module_info(self) -> List[Tuple[int, int]]:
+    def get_module_info(self) -> list[tuple[int, int]]:
         self._check_is_open()
         info = []
         with self._device_lock:
@@ -413,7 +412,7 @@ class PicoQuant_MultiHarp150(_PicoquantHarp):
             self._lib.SetTriggerOutput(self._devidx, period)
 
     @rpc_method
-    def get_flags(self) -> List[str]:
+    def get_flags(self) -> list[str]:
         self._check_is_open()
         with self._device_lock:
             bitset = ctypes.c_int()
@@ -458,7 +457,7 @@ class PicoQuant_MultiHarp150(_PicoquantHarp):
         return starttime
 
     @rpc_method
-    def get_warnings(self) -> List[str]:
+    def get_warnings(self) -> list[str]:
         self._check_is_open()
         with self._device_lock:
             bitset = ctypes.c_int()
@@ -466,7 +465,7 @@ class PicoQuant_MultiHarp150(_PicoquantHarp):
             return [warning.name for warning in _WARNING if bitset.value & warning.value]
 
     @rpc_method
-    def get_all_count_rates(self) -> Tuple[int, Tuple[int, ...]]:
+    def get_all_count_rates(self) -> tuple[int, tuple[int, ...]]:
         """Get count rates of SYNC and INPUT channels.
 
         This can be used as a replacement of :func:`get_sync_rate()` and :func:`get_count_rate()`

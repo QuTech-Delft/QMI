@@ -1,7 +1,5 @@
 """Extension of the QMI_UsbTmcTransport class utilizing usb.core with libusb1 backend and pyvisa packages."""
 
-from typing import Optional
-
 import os, sys
 from qmi.core.exceptions import QMI_TimeoutException, QMI_TransportDescriptorException, QMI_InstrumentException,\
     QMI_RuntimeException
@@ -26,7 +24,7 @@ class QMI_VisaUsbTmcTransport(QMI_UsbTmcTransport):
 
     def __init__(self, vendorid: int, productid: int, serialnr: str) -> None:
         super().__init__(vendorid, productid, serialnr)
-        self._device: Optional[pyvisa.ResourceManager] = None
+        self._device: pyvisa.ResourceManager | None = None
 
     def _open_transport(self) -> None:
         visa_resource = f"USB::0x{self.vendorid:04x}::0x{self.productid:04x}::{self.serialnr}::INSTR"

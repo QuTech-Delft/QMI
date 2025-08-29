@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.50.0-beta.0] - Unreleased
 
 ### Added
+- A QMI RPC proxy object docstring is now automatically expanded with:
+  - A list of RPC methods
+  - A list of signals
+  - A list of class constants
 
 ### Changed
 - The Thorlabs APT protocol is now the same for both K10CR1 and MPC320 instruments.

@@ -24,13 +24,13 @@ class QMI_LittleEndianStructure(ctypes.LittleEndianStructure):
             if isinstance(value, (QMI_LittleEndianStructure, int, float, bytes)):
                 vstr = repr(value)
             elif isinstance(value, ctypes.Array):
-                vstr = "[{}]".format(", ".join(repr(e) for e in value))
+                vstr = f"[{', '.join((repr(e) for e in value))}]"
             else:
                 _logger.error("Unhandled type: %s %s", type(value), value)
                 vstr = repr(value)
-            fstr = "{}={}".format(fname, vstr)
+            fstr = f"{fname}={vstr}"
             fstr_list.append(fstr)
-        return "{}({})".format(self.__class__.__name__, ", ".join(fstr_list))
+        return f"{self.__class__.__name__}({', '.join(fstr_list)})"
 
 
 @enum.unique
