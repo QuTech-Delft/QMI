@@ -27,12 +27,6 @@ from qmi.instruments.thorlabs.apt_protocol import (
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
-T = 2048 / 6E6  # Sampling interval constant for KDC101, as described in p. 39 of documentation
-ACTUATOR_TRAVEL_RANGES = {
-    "Z906": 6.0,
-    "Z912": 12.0,
-    "Z925": 25.0
-}
 
 
 class Thorlabs_Kdc101(QMI_Instrument):
@@ -43,8 +37,9 @@ class Thorlabs_Kdc101(QMI_Instrument):
     An adaptation of the driver could be made in the future to also allow the use of the linear translation and
     rotation stages, and goniometers.
     """
+    _rpc_constants = ["RESPONSE_TIMEOUT"]
 
-    DEFAULT_RESPONSE_TIMEOUT = 1.0
+    RESPONSE_TIMEOUT = 1.0
 
     # Z9 series motors: Number of rotations per 1.0mm lead screw displacement.
     ROTATIONS_PER_MM = 67.49
@@ -54,6 +49,9 @@ class Thorlabs_Kdc101(QMI_Instrument):
 
     # Linear displacement of the lead screw per encoder count
     DISPLACEMENT_PER_ENCODER_COUNT = 1.0 / ENCODER_COUNTS_PER_ROTATION
+
+    # Sampling interval constant for KDC101, as described in p. 39 of documentation
+    T = 2048 / 6E6
 
     # Maximum velocity for controlled profiles
     MAX_VELOCITY = 2.3  # 2.6 if "ripples" are allowed in the move profile.
@@ -67,6 +65,12 @@ class Thorlabs_Kdc101(QMI_Instrument):
 
     # Number of channels
     NUMBER_OF_CHANNELS = 1
+
+    ACTUATOR_TRAVEL_RANGES = {
+        "Z906": 6.0,
+        "Z912": 12.0,
+        "Z925": 25.0
+    }
 
     def __init__(self, context: QMI_Context, name: str, transport: str, actuator: str) -> None:
         """Initialize driver.
@@ -84,9 +88,9 @@ class Thorlabs_Kdc101(QMI_Instrument):
         super().__init__(context, name)
         self._transport = create_transport(transport, default_attributes={"baudrate": 115200, "rtscts": True})
         assert isinstance(self._transport, QMI_SerialTransport)
-        self._apt_protocol = AptProtocol(self._transport, default_timeout=self.DEFAULT_RESPONSE_TIMEOUT)
+        self._apt_protocol = AptProtocol(self._transport, default_timeout=self.RESPONSE_TIMEOUT)
         try:
-            self._travel_range = ACTUATOR_TRAVEL_RANGES[actuator[:4]]
+            self._travel_range = self.ACTUATOR_TRAVEL_RANGES[actuator[:4]]
         except KeyError:
             raise NotImplementedError(f"Actuator type {actuator} has not been implemented")
 
@@ -583,7 +587,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
 
             # Wait for a short while, or until the motor sends a new message.
             try:
-                msg = self._apt_protocol.read_message(timeout=min(self.DEFAULT_RESPONSE_TIMEOUT, time_left))
+                msg = self._apt_protocol.read_message(timeout=min(self.RESPONSE_TIMEOUT, time_left))
             except QMI_TimeoutException:
                 # No message from the motor.
                 # This is normal and expected if the motor is still moving.

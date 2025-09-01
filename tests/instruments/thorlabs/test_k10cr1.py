@@ -10,7 +10,7 @@ from qmi.instruments.thorlabs.apt_protocol import AptChannelHomeDirection, AptCh
 
 from tests.patcher import PatcherQmiContext
 
-Thorlabs_K10Cr1.DEFAULT_RESPONSE_TIMEOUT = 0.01
+Thorlabs_K10Cr1.RESPONSE_TIMEOUT = 0.01
 # Number of microsteps per degree of rotation.
 MICROSTEPS_PER_DEGREE = 409600.0 / 3.0
 # Internal velocity setting for 1 degree/second.
@@ -616,7 +616,7 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
             self.instr.wait_move_complete(1.0)
 
         self._transport_mock.write.assert_called_with(expected_write)
-        self._transport_mock.read.assert_called_once_with(nbytes=6, timeout=Thorlabs_K10Cr1.DEFAULT_RESPONSE_TIMEOUT)
+        self._transport_mock.read.assert_called_once_with(nbytes=6, timeout=Thorlabs_K10Cr1.RESPONSE_TIMEOUT)
 
 
 if __name__ == '__main__':

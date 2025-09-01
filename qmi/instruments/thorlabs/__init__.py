@@ -10,12 +10,13 @@ The qmi.instruments.thorlabs package provides support for:
 - TSP01, TSP01B environmental sensors.
 """
 
-from qmi.instruments.thorlabs.kdc101 import Thorlabs_Kdc101
 from qmi.instruments.thorlabs.pm100d import SensorInfo
 from qmi.instruments.thorlabs.tc200 import Tc200Status
 from qmi.instruments.thorlabs.apt_protocol import (
     AptChannelState, AptChannelStopMode, AptChannelJogDirection, AptChannelHomeDirection, AptChannelHomeLimitSwitch
 )
+from qmi.instruments.thorlabs.kdc101 import Thorlabs_Kdc101
+from qmi.instruments.thorlabs.mpc320 import Thorlabs_Mpc320
 
 # Alternative, QMI naming convention approved names
 from qmi.instruments.thorlabs.k10cr1 import Thorlabs_K10CR1 as Thorlabs_K10Cr1
@@ -27,4 +28,3 @@ from qmi.instruments.thorlabs.pm100d import Thorlabs_PM101U as Thorlabs_Pm101u
 from qmi.instruments.thorlabs.tc200 import Thorlabs_TC200 as Thorlabs_Tc200
 from qmi.instruments.thorlabs.tsp01 import Thorlabs_TSP01 as Thorlabs_Tsp01
 from qmi.instruments.thorlabs.tsp01b import Thorlabs_TSP01B as Thorlabs_Tsp01b
-from qmi.instruments.thorlabs.mpc320 import Thorlabs_Mpc320

@@ -10,7 +10,7 @@ from qmi.instruments.thorlabs.apt_protocol import AptChannelHomeDirection, AptCh
 
 from tests.patcher import PatcherQmiContext
 
-Thorlabs_Kdc101.DEFAULT_RESPONSE_TIMEOUT = 0.01
+Thorlabs_Kdc101.RESPONSE_TIMEOUT = 0.01
 
 
 class TestThorlabsKdc101Init(unittest.TestCase):
@@ -650,7 +650,7 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
             self.instr.wait_move_complete(1.0)
 
         self._transport_mock.write.assert_called_with(expected_write)
-        self._transport_mock.read.assert_called_once_with(nbytes=6, timeout=Thorlabs_Kdc101.DEFAULT_RESPONSE_TIMEOUT)
+        self._transport_mock.read.assert_called_once_with(nbytes=6, timeout=Thorlabs_Kdc101.RESPONSE_TIMEOUT)
 
 
 if __name__ == '__main__':
