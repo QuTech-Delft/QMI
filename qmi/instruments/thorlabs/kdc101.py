@@ -8,7 +8,7 @@ import logging
 import time
 
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
+from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException, QMI_UsageException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.transport import create_transport, QMI_SerialTransport
@@ -85,7 +85,10 @@ class Thorlabs_Kdc101(QMI_Instrument):
         self._transport = create_transport(transport, default_attributes={"baudrate": 115200, "rtscts": True})
         assert isinstance(self._transport, QMI_SerialTransport)
         self._apt_protocol = AptProtocol(self._transport, default_timeout=self.DEFAULT_RESPONSE_TIMEOUT)
-        self._travel_range = ACTUATOR_TRAVEL_RANGES[actuator[:4]]
+        try:
+            self._travel_range = ACTUATOR_TRAVEL_RANGES[actuator[:4]]
+        except KeyError:
+            raise NotImplementedError(f"Actuator type {actuator} has not been implemented")
 
     def _check_kdc101(self) -> None:
         """Check that the connected device is a Thorlabs KDC101.

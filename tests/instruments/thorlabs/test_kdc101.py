@@ -13,7 +13,54 @@ from tests.patcher import PatcherQmiContext
 Thorlabs_Kdc101.DEFAULT_RESPONSE_TIMEOUT = 0.01
 
 
-class TestThorlabsKdc101(unittest.TestCase):
+class TestThorlabsKdc101Init(unittest.TestCase):
+
+    def setUp(self):
+        self._transport_mock = unittest.mock.MagicMock(spec=QMI_SerialTransport)
+        self._transport_mock._safe_serial.in_waiting = 0
+        self._transport_mock._safe_serial.out_waiting = 0
+
+    def test_init_successful(self):
+        """Test that the instrument is created without issues. Happy flow."""
+        expected_travel_range_1 = 6
+        expected_travel_range_2 = 12
+        expected_travel_range_3 = 25
+        with unittest.mock.patch(
+                'qmi.instruments.thorlabs.kdc101.create_transport',
+                return_value=self._transport_mock):
+            self.instr1: Thorlabs_Kdc101 = Thorlabs_Kdc101(PatcherQmiContext(), "instr", "transport_descriptor", "Z906")
+
+        self.assertEqual(expected_travel_range_1, self.instr1._travel_range)
+
+        with unittest.mock.patch(
+                'qmi.instruments.thorlabs.kdc101.create_transport',
+                return_value=self._transport_mock):
+            self.instr2: Thorlabs_Kdc101 = Thorlabs_Kdc101(PatcherQmiContext(), "instr", "transport_descriptor", "Z912")
+
+        self.assertEqual(expected_travel_range_2, self.instr2._travel_range)
+
+        with unittest.mock.patch(
+                'qmi.instruments.thorlabs.kdc101.create_transport',
+                return_value=self._transport_mock):
+            self.instr3: Thorlabs_Kdc101 = Thorlabs_Kdc101(PatcherQmiContext(), "instr", "transport_descriptor", "Z925")
+
+        self.assertEqual(expected_travel_range_3, self.instr3._travel_range)
+
+    def test_init_excepts_not_implemented(self):
+        """Test that the init fails with a not implemented actuator type."""
+        funky_act = "Z950"
+        expected = f"Actuator type {funky_act} has not been implemented"
+        with unittest.mock.patch(
+                'qmi.instruments.thorlabs.kdc101.create_transport',
+                return_value=self._transport_mock):
+            with self.assertRaises(NotImplementedError) as n_err:
+                self.instr: Thorlabs_Kdc101 = Thorlabs_Kdc101(
+                    PatcherQmiContext(), "instr", "transport_descriptor", funky_act)
+
+            self.assertEqual(expected, str(n_err.exception))
+
+
+class TestThorlabsKdc101OpenClose(unittest.TestCase):
 
     def setUp(self):
         self._transport_mock = unittest.mock.MagicMock(spec=QMI_SerialTransport)
