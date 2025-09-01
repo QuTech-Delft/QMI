@@ -58,13 +58,13 @@ class Thorlabs_Kdc101(QMI_Instrument):
     # Maximum velocity for controlled profiles
     MAX_VELOCITY = 2.3  # 2.6 if "ripples" are allowed in the move profile.
     # Velocity scaling factor, VEL_APT = EncCnt × T × 65536 × Vel, where T = 2048 / (6 × 10^6).
-    VELOCITY_SCALING_FACTOR = 772981.3692 * T * 65536  # * DISPLACEMENT_PER_ENCODER_COUNT
+    VELOCITY_SCALING_FACTOR = 772981.3692 * T * 65536
 
     # Maximum acceleration
     MAX_ACCELERATION = 4.0
     # Acceleration scaling factor, ACC_APT = EncCnt × T^2 × 65536 × Acc, where T = 2048 / (6 × 10^6).
-    ACCELERATION_SCALING_FACTOR = 263.8443072 * T**2 * 65536  # * DISPLACEMENT_PER_ENCODER_COUNT
-    
+    ACCELERATION_SCALING_FACTOR = 263.8443072 * T * 65536  # Using T**2 gives acc readout that is out-of-range!
+
     # Number of channels
     NUMBER_OF_CHANNELS = 1
 
@@ -530,7 +530,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
         Parameters:
             position: Absolute target position in millimeters.
         """
-        if not 0.0 < position < self._travel_range:
+        if not 0.0 <= position <= self._travel_range:
             raise ValueError("Absolute position out of valid range")
 
         self._check_is_open()
