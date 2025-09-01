@@ -7,10 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.51.0-beta.0] - Unreleased
 
 ### Added
-- A QMI RPC proxy object docstring is now automatically expanded with:
-  - A list of RPC methods
-  - A list of signals
-  - A list of class constants
+- Thorlabs KDC101 controller QMI driver. It can at the moment control Z906, Z912 and Z925 actuators.
 
 ### Changed
 
