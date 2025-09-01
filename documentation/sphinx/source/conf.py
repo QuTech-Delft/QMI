@@ -24,7 +24,7 @@ copyright = '2019-2024, QuTech — Delft, The Netherlands'
 author = 'QuTech'
 
 # The full version, including alpha/beta/rc tags
-release = '0.50.0-beta.0'
+release = '0.50.0'
 
 # The default master_doc used to be 'index', but it was changed to 'contents'.
 # Override that here (maybe rename the file to the new default later).
