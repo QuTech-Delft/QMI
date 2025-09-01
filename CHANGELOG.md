@@ -4,7 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.50.0-beta.0] - Unreleased
+## [0.51.0-beta.0] - Unreleased
+
+### Added
+- A QMI RPC proxy object docstring is now automatically expanded with:
+  - A list of RPC methods
+  - A list of signals
+  - A list of class constants
+
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.50.0] - 2025-09-01
 
 ### Added
 - A QMI RPC proxy object docstring is now automatically expanded with:

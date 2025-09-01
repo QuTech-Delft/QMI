@@ -1039,7 +1039,7 @@ def make_interface_descriptor(rpc_object_class: Type[QMI_RpcObject],
             doc += f"  - {name}{signature_doc}\n"
 
     # Extract signal declarations.
-    doc += '\nsignals:\n'
+    doc += '\nQMI signals:\n'
     signals = []
     for signal_description in signal_declaration_class._qmi_signals:
         name = signal_description.name
@@ -1054,7 +1054,7 @@ def make_interface_descriptor(rpc_object_class: Type[QMI_RpcObject],
             constant_names.update(getattr(base, "_rpc_constants"))
 
     # Extract constant values.
-    doc += '\nconstants:\n'
+    doc += '\nRPC constants:\n'
     constants = []
     for constant_name in constant_names:
         assert hasattr(rpc_object_class, constant_name)
