@@ -37,31 +37,47 @@ class Thorlabs_Kdc101(QMI_Instrument):
     An adaptation of the driver could be made in the future to also allow the use of the linear translation and
     rotation stages, and goniometers.
     """
-    _rpc_constants = ["RESPONSE_TIMEOUT"]
+    _rpc_constants = ["RESPONSE_TIMEOUT", "MAX_VELOCITY", "MAX_ACCELERATION"]
 
     RESPONSE_TIMEOUT = 1.0
 
     # Z9 series motors: Number of rotations per 1.0mm lead screw displacement.
     ROTATIONS_PER_MM = 67.49
+    # Gearbox ratio
+    GEARBOX_RATIO = {
+        "Z900": 67.49,
+        "PRMTZ8": 67.0,
+    }
 
     # Encoder counts per revolution of the lead screw.
-    ENCODER_COUNTS_PER_ROTATION = 512 * ROTATIONS_PER_MM
-
-    # Linear displacement of the lead screw per encoder count
-    DISPLACEMENT_PER_ENCODER_COUNT = 1.0 / ENCODER_COUNTS_PER_ROTATION
+    ENCODER_COUNTS_PER_ROTATION = {
+        "Z900": 512 * GEARBOX_RATIO["Z900"],
+        "PRMTZ8": 1919.6418578623391,
+    }
 
     # Sampling interval constant for KDC101, as described in p. 39 of documentation
     T = 2048 / 6E6
 
     # Maximum velocity for controlled profiles
-    MAX_VELOCITY = 2.3  # 2.6 if "ripples" are allowed in the move profile.
+    MAX_VELOCITY = {
+        "Z900": 2.3,  # 2.6 if "ripples" are allowed in the move profile.
+        "PRMTZ8": 25.0,
+    }
     # Velocity scaling factor, VEL_APT = EncCnt × T × 65536 × Vel, where T = 2048 / (6 × 10^6).
-    VELOCITY_SCALING_FACTOR = 772981.3692 * T * 65536
-
+    VELOCITY_SCALING_FACTOR = {
+        "Z900": 772981.3692 * T * 65536,
+        "PRMTZ8": 42941.66 * T * 65536,
+    }
     # Maximum acceleration
-    MAX_ACCELERATION = 4.0
+    MAX_ACCELERATION = {
+        "Z900": 4.0,
+        "PRMTZ8": 20.0,
+    }
     # Acceleration scaling factor, ACC_APT = EncCnt × T^2 × 65536 × Acc, where T = 2048 / (6 × 10^6).
-    ACCELERATION_SCALING_FACTOR = 263.8443072 * T * 65536  # Using T**2 gives acc readout that is out-of-range!
+    ACCELERATION_SCALING_FACTOR = {
+        "Z900": 263.8443072 * T * 65536,  # Using T**2 gives acc readout that is out-of-range!
+        "PRMTZ8": 14.66 * T**2 * 65536,
+    }
 
     # Number of channels
     NUMBER_OF_CHANNELS = 1
@@ -69,7 +85,8 @@ class Thorlabs_Kdc101(QMI_Instrument):
     ACTUATOR_TRAVEL_RANGES = {
         "Z906": 6.0,
         "Z912": 12.0,
-        "Z925": 25.0
+        "Z925": 25.0,
+        "PRMTZ8": 360.0,
     }
 
     def __init__(self, context: QMI_Context, name: str, transport: str, actuator: str) -> None:
@@ -83,14 +100,28 @@ class Thorlabs_Kdc101(QMI_Instrument):
             name:      Name for this instrument instance.
             transport: Transport descriptor to access the instrument.
             actuator:  The actuator model. For this driver, currently allowed models are:
-                       Z906, Z906V, Z912, Z912B, Z912V, Z912BV, Z925B and Z925BV.
+                       Z906, Z912, Z925 and PRMTZ8.
         """
         super().__init__(context, name)
         self._transport = create_transport(transport, default_attributes={"baudrate": 115200, "rtscts": True})
         assert isinstance(self._transport, QMI_SerialTransport)
         self._apt_protocol = AptProtocol(self._transport, default_timeout=self.RESPONSE_TIMEOUT)
+        if actuator.startswith("Z9"):
+            actuator = actuator[:4]
+            self._series = actuator[:2] + "00"
+
+        else:
+            self._series = actuator
+
         try:
-            self._travel_range = self.ACTUATOR_TRAVEL_RANGES[actuator[:4]]
+            self._travel_range = self.ACTUATOR_TRAVEL_RANGES[actuator]
+            # Linear or rotational displacement of the lead screw per encoder count
+            self._displacement_per_encoder_count = 1.0 / self.ENCODER_COUNTS_PER_ROTATION[self._series]
+            self._velocity_scaling_factor = self.VELOCITY_SCALING_FACTOR[self._series]
+            self._acceleration_scaling_factor = self.ACCELERATION_SCALING_FACTOR[self._series]
+            self._max_velocity = self.MAX_VELOCITY[self._series]
+            self._max_acceleration = self.MAX_ACCELERATION[self._series]
+
         except KeyError:
             raise NotImplementedError(f"Actuator type {actuator} has not been implemented")
 
@@ -289,7 +320,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
 
         # Receive response
         resp = self._apt_protocol.ask(req_msg, reply_msg)
-        return resp.position * self.DISPLACEMENT_PER_ENCODER_COUNT
+        return resp.position * self._displacement_per_encoder_count
 
     @rpc_method
     def get_velocity_params(self) -> VelocityParams:
@@ -312,8 +343,8 @@ class Thorlabs_Kdc101(QMI_Instrument):
         # Receive response
         resp = self._apt_protocol.ask(req_msg, reply_msg)
         return VelocityParams(
-            max_velocity=(resp.max_vel / self.VELOCITY_SCALING_FACTOR),
-            acceleration=(resp.accel / self.ACCELERATION_SCALING_FACTOR)
+            max_velocity=(resp.max_vel / self._velocity_scaling_factor),
+            acceleration=(resp.accel / self._acceleration_scaling_factor)
         )
 
     @rpc_method
@@ -334,8 +365,8 @@ class Thorlabs_Kdc101(QMI_Instrument):
         self._check_is_open()
 
         # Send command message. Note that documentation describes 'min_vel' to be always zero.
-        max_vel = int(round(max_velocity * self.VELOCITY_SCALING_FACTOR))
-        accel = int(round(acceleration * self.ACCELERATION_SCALING_FACTOR))
+        max_vel = int(round(max_velocity * self._velocity_scaling_factor))
+        accel = int(round(acceleration * self._acceleration_scaling_factor))
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
             chan_ident=self.NUMBER_OF_CHANNELS,
@@ -366,7 +397,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
         # Receive response
         resp = self._apt_protocol.ask(req_msg, reply_msg)
 
-        return resp.backlash_dist * self.DISPLACEMENT_PER_ENCODER_COUNT
+        return resp.backlash_dist * self._displacement_per_encoder_count
 
     @rpc_method
     def set_backlash_distance(self, backlash: float) -> None:
@@ -386,7 +417,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
         self._check_is_open()
 
         # Convert distance to microsteps.
-        raw_dist = int(round(backlash / self.DISPLACEMENT_PER_ENCODER_COUNT))
+        raw_dist = int(round(backlash / self._displacement_per_encoder_count))
         # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_GEN_MOVE_PARAMS.value],
@@ -415,8 +446,8 @@ class Thorlabs_Kdc101(QMI_Instrument):
         return HomeParams(
             home_direction=AptChannelHomeDirection(resp.home_dir),
             limit_switch=AptChannelHomeLimitSwitch(resp.limit_switch),
-            home_velocity=(resp.home_velocity / self.VELOCITY_SCALING_FACTOR),
-            offset_distance=(resp.offset_dist * self.DISPLACEMENT_PER_ENCODER_COUNT)
+            home_velocity=(resp.home_velocity / self._velocity_scaling_factor),
+            offset_distance=(resp.offset_dist * self._displacement_per_encoder_count)
         )
 
     @rpc_method
@@ -444,8 +475,8 @@ class Thorlabs_Kdc101(QMI_Instrument):
         home_direction = AptChannelHomeDirection.REVERSE
         limit_switch = AptChannelHomeLimitSwitch.REVERSE
         # Convert values.
-        raw_velocity = int(round(home_velocity * self.VELOCITY_SCALING_FACTOR))
-        raw_dist = int(round(offset_distance / self.DISPLACEMENT_PER_ENCODER_COUNT))
+        raw_velocity = int(round(home_velocity * self._velocity_scaling_factor))
+        raw_dist = int(round(offset_distance / self._displacement_per_encoder_count))
         # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_HOME_PARAMS.value],
@@ -510,7 +541,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
         self._check_is_open()
 
         # Convert distance to microsteps.
-        raw_dist = int(round(distance / self.DISPLACEMENT_PER_ENCODER_COUNT))
+        raw_dist = int(round(distance / self._displacement_per_encoder_count))
         # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_RELATIVE.value],
@@ -540,7 +571,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
         self._check_is_open()
 
         # Convert distance to microsteps.
-        raw_pos = int(round(position / self.DISPLACEMENT_PER_ENCODER_COUNT))
+        raw_pos = int(round(position / self._displacement_per_encoder_count))
         # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_ABSOLUTE.value],

@@ -71,7 +71,13 @@ class Thorlabs_Mpc320(QMI_Instrument):
     """
     Driver for a Thorlabs MPC320 motorised fibre polarisation controller.
     """
-    _rpc_constants = ["DEFAULT_RESPONSE_TIMEOUT"]
+    _rpc_constants = [
+        "DEFAULT_RESPONSE_TIMEOUT",
+        "MIN_POSITION_DEGREES",
+        "MAX_POSITION_DEGREES",
+        "MIN_VELOCITY_PERC",
+        "MAX_VELOCITY_PERC",
+    ]
 
     DEFAULT_RESPONSE_TIMEOUT = 0.5
 

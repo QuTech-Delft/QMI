@@ -34,7 +34,7 @@ _logger = logging.getLogger(__name__)
 
 class Thorlabs_K10CR1(QMI_Instrument):
     """Instrument driver for the Thorlabs K10CR1/M motorized rotational mount."""
-    _rpc_constants = ["RESPONSE_TIMEOUT"]
+    _rpc_constants = ["RESPONSE_TIMEOUT", "MAX_VELOCITY", "MAX_ACCELERATION"]
 
     RESPONSE_TIMEOUT = 1.0
 
