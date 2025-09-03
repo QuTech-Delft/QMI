@@ -14,6 +14,7 @@ from qmi.core.rpc import rpc_method
 from qmi.core.transport import create_transport, QMI_SerialTransport
 from qmi.instruments.thorlabs.apt_packets import AptMessageId
 from qmi.instruments.thorlabs.apt_protocol import (
+    _AptMessage,
     APT_MESSAGE_TYPE_TABLE,
     AptChannelHomeDirection,
     AptChannelHomeLimitSwitch,
@@ -37,12 +38,10 @@ class Thorlabs_Kdc101(QMI_Instrument):
     An adaptation of the driver could be made in the future to also allow the use of the linear translation and
     rotation stages, and goniometers.
     """
-    _rpc_constants = ["RESPONSE_TIMEOUT", "MAX_VELOCITY", "MAX_ACCELERATION"]
+    _rpc_constants = ["RESPONSE_TIMEOUT"]
 
     RESPONSE_TIMEOUT = 1.0
 
-    # Z9 series motors: Number of rotations per 1.0mm lead screw displacement.
-    ROTATIONS_PER_MM = 67.49
     # Gearbox ratio
     GEARBOX_RATIO = {
         "Z900": 67.49,
@@ -52,7 +51,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
     # Encoder counts per revolution of the lead screw.
     ENCODER_COUNTS_PER_ROTATION = {
         "Z900": 512 * GEARBOX_RATIO["Z900"],
-        "PRMTZ8": 1919.6418578623391,
+        "PRMTZ8": 1919.6418578623391,  # From APT documentation. Bit less than 2arcsec.
     }
 
     # Sampling interval constant for KDC101, as described in p. 39 of documentation
@@ -60,7 +59,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
 
     # Maximum velocity for controlled profiles
     MAX_VELOCITY = {
-        "Z900": 2.3,  # 2.6 if "ripples" are allowed in the move profile.
+        "Z900": 2.6,  # 2.3 if "ripples" are not allowed in the move profile.
         "PRMTZ8": 25.0,
     }
     # Velocity scaling factor, VEL_APT = EncCnt × T × 65536 × Vel, where T = 2048 / (6 × 10^6).
@@ -125,6 +124,33 @@ class Thorlabs_Kdc101(QMI_Instrument):
         except KeyError:
             raise NotImplementedError(f"Actuator type {actuator} has not been implemented")
 
+        # Keep track of max velocity and acceleration parameters. Initialize with zero value.
+        self._current_max_vel = 0.0
+        self._current_accel = 0.0
+
+    def _get_velocity_params(self) -> _AptMessage:
+        """Update and return the current maximum velocity and acceleration.
+
+        Returns:
+            resp: Maximum velocity and acceleration in encoder units.
+        """
+        # Send request message.
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_VEL_PARAMS.value],
+            chan_ident=self.NUMBER_OF_CHANNELS
+        )
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_VEL_PARAMS.value]
+        )
+
+        # Receive response
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
+        # Update tracked values
+        self._current_max_vel = resp.max_vel
+        self._current_accel = resp.current_accel
+
+        return resp
+
     def _check_kdc101(self) -> None:
         """Check that the connected device is a Thorlabs KDC101.
 
@@ -147,6 +173,9 @@ class Thorlabs_Kdc101(QMI_Instrument):
             raise QMI_InstrumentException(
                 f"Driver only supports KDC101 but instrument identifies as {model_str!r}"
             )
+
+        # Update the current velocity and acceleration parameters for tracking
+        self._get_velocity_params()
 
     @rpc_method
     def open(self) -> None:
@@ -323,58 +352,70 @@ class Thorlabs_Kdc101(QMI_Instrument):
         return resp.position * self._displacement_per_encoder_count
 
     @rpc_method
-    def get_velocity_params(self) -> VelocityParams:
-        """Return the current maximum velocity and acceleration.
-
-        Returns:
-            params: Maximum velocity and acceleration in mm/s and mm/s^2, respectively.
-        """
+    def get_velocity(self) -> float:
+        """Return the current velocity."""
         self._check_is_open()
 
-        # Send request message.
-        req_msg = self._apt_protocol.create(
-            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_VEL_PARAMS.value],
-            chan_ident=self.NUMBER_OF_CHANNELS
-        )
-        reply_msg = self._apt_protocol.create(
-            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_VEL_PARAMS.value]
-        )
-
-        # Receive response
-        resp = self._apt_protocol.ask(req_msg, reply_msg)
-        return VelocityParams(
-            max_velocity=(resp.max_vel / self._velocity_scaling_factor),
-            acceleration=(resp.accel / self._acceleration_scaling_factor)
-        )
+        resp = self._get_velocity_params()
+        return resp.max_vel / self._velocity_scaling_factor
 
     @rpc_method
-    def set_velocity_params(self, max_velocity: float, acceleration: float) -> None:
-        """Set the maximum velocity and acceleration.
+    def get_acceleration(self) -> float:
+        """Return the current acceleration."""
+        self._check_is_open()
 
-        These settings will be applied for subsequent absolute and relative moves.
+        resp = self._get_velocity_params()
+        return resp.accel / self._acceleration_scaling_factor
+
+    @rpc_method
+    def set_velocity(self, max_velocity: float) -> None:
+        """Set the maximum velocity for moves.
+
+        This setting will be applied for subsequent absolute and relative moves.
 
         Parameters:
-            max_velocity: Maximum velocity in mm/s.
-            acceleration: Acceleration in mm/s^2.
+            max_velocity: Maximum velocity in degrees/second (max 10).
         """
-        if not 0 < max_velocity <= self.MAX_VELOCITY:
-            raise ValueError(f"Invalid value for {max_velocity=}")
-        if not 0 < acceleration <= self.MAX_ACCELERATION:
-            raise ValueError(f"Invalid value for {acceleration=}")
-
         self._check_is_open()
+        if not 0 < max_velocity <= self._max_velocity:
+            raise ValueError(f"Invalid value for {max_velocity=}")
 
         # Send command message. Note that documentation describes 'min_vel' to be always zero.
         max_vel = int(round(max_velocity * self._velocity_scaling_factor))
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
+            chan_ident=self.NUMBER_OF_CHANNELS,
+            min_vel=0,
+            accel=self._current_accel,
+            max_vel=max_vel
+        )
+        self._apt_protocol.send_message(req_msg)
+        self._current_max_vel = max_vel
+
+    @rpc_method
+    def set_acceleration(self, acceleration: float) -> None:
+        """Set the maximum acceleration for moves.
+
+        This setting will be applied for subsequent absolute and relative moves.
+
+        Parameters:
+            acceleration: Maximum acceleration in degrees/second (max 10).
+        """
+        self._check_is_open()
+        if not 0 < acceleration <= self._max_acceleration:
+            raise ValueError(f"Invalid value for {acceleration=}")
+
+        # Send command message. Note that documentation describes 'min_vel' to be always zero.
         accel = int(round(acceleration * self._acceleration_scaling_factor))
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
             chan_ident=self.NUMBER_OF_CHANNELS,
             min_vel=0,
             accel=accel,
-            max_vel=max_vel
+            max_vel=self._current_max_vel
         )
         self._apt_protocol.send_message(req_msg)
+        self._current_accel = accel
 
     @rpc_method
     def get_backlash_distance(self) -> float:
@@ -458,14 +499,11 @@ class Thorlabs_Kdc101(QMI_Instrument):
     ) -> None:
         """Set the homing parameters.
 
-        WARNING: The KDC101 manual recommends that these settings should
-        not be adjusted from the factory defaults.
-
         Parameters:
-            home_velocity:      Homing velocity in mm/second (max 2.6).
+            home_velocity:      Homing velocity in mm/second or degrees/second.
             offset_distance:    Distance of home position from home limit switch (in mm).
         """
-        if not 0 < home_velocity <= 2.6:
+        if not 0 < home_velocity <= self._max_velocity:
             raise ValueError(f"Invalid value for {home_velocity=}")
         if not 0 <= offset_distance <= self._travel_range:
             raise ValueError(f"Invalid value for {offset_distance=}")

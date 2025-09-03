@@ -22,6 +22,7 @@ ACCELERATION_FACTOR = 1502.0
 class TestThorlabsK10cr1(unittest.TestCase):
 
     def setUp(self):
+        self._pack = "<l"
         self._transport_mock = unittest.mock.MagicMock(spec=QMI_SerialTransport)
         self._transport_mock._safe_serial.in_waiting = 0
         self._transport_mock._safe_serial.out_waiting = 0
@@ -35,22 +36,42 @@ class TestThorlabsK10cr1(unittest.TestCase):
 
     def test_open_close(self):
         """Test opening and closing the instrument"""
+        expected_max_vel = 123.45
+        expected_accel = 543.21
+
         # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
-        expected_write = struct.pack("<l", 0x0005) + b"P\x01"  # This is 5001 == 0x1389
+        expected_write = [struct.pack(self._pack, 0x0005) + b"P\x01"]  # This is 5001 == 0x1389
+        # _AptMsgReqVelParams 0x0414
+        expected_write.append(struct.pack(self._pack, 0x10414) + b"P\x01")  # This is 5001 == 0x1389
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
-        expected_read = struct.pack("<l", 0x0006)
+        expected_read = [struct.pack(self._pack, 0x0006) + b"\x00" * 2 + b"CR1\0K10" * 12]
+        # _AptMsgGetVelParams 0x0415
+        # Define the bit strings
+        max_vel = struct.pack(self._pack, int(round(expected_max_vel * VELOCITY_FACTOR)))
+        accel = struct.pack(self._pack, int(round(expected_accel * ACCELERATION_FACTOR)))
+        expected_read.append = [
+            struct.pack(self._pack, 0x0415) +
+            struct.pack("<h", 0) +
+            struct.pack("<h", 1) +  # chan ident
+            struct.pack(self._pack, 0) +  # min velocity, always 0
+            accel +
+            max_vel
+        ]
         # The request+data has to be 90 bytes long and should include string "K10CR1" at right spot.
-        self._transport_mock.read.return_value = expected_read + b"\x00" * 2 + b"CR1\0K10" * 12
+        self._transport_mock.read.side_effect = expected_read
         self.instr.open()
-        self.instr.close()
         # Assert
-        self._transport_mock.write.assert_called_with(expected_write)
+        self.assertEqual(expected_max_vel, round(self.instr._current_max_vel, 2))
+        self.assertEqual(expected_accel, round(self.instr._current_accel, 2))
+        self._transport_mock.write.assert_has_calls(expected_write)
+
+        self.instr.close()
 
     def test_open_close_expects_with_timeout_when_correct_message_type_not_received(self):
         """Test opening the instrument fails if we give wrong (but otherwise valid) message id to the call"""
         expected_exception = "Expected message type {} not received.".format(_AptMsgHwGetInfo)
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo) but we give 0x0412
-        expected_read = struct.pack("<l", 0x0412) + b"\x00\x00"
+        expected_read = struct.pack(self._pack, 0x0412) + b"\x00\x00"
         self._transport_mock.read.return_value = expected_read + b"K10CR1"
         with self.assertRaises(QMI_TimeoutException) as exc:
             self.instr.open()
@@ -67,7 +88,7 @@ class TestThorlabsK10cr1(unittest.TestCase):
     def test_open_excepts_with_timeout(self):
         """Test opening the instrument time-outs and raises QMI_InstrumentException"""
         # Long APT messages start with 0x80. Give unknown message ID 0x8080
-        long_apt_msg = struct.pack("<l", 0x0006) + b"\x81\x5A"
+        long_apt_msg = struct.pack(self._pack, 0x0006) + b"\x81\x5A"
         expected_exception = "Received partial message (message_id=0x{:04x}, data_length=0, data=b'')".format(0x0006)
         # Make a long APT message to go into the loop where more data should be read, and cause timeout
         self._transport_mock.read.side_effect = [long_apt_msg, QMI_TimeoutException]
@@ -79,9 +100,9 @@ class TestThorlabsK10cr1(unittest.TestCase):
     def test_open_with_no_pending_message(self):
         """Test opening the instrument and no pending message in buffer."""
         # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
-        expected_write = struct.pack("<l", 0x0005) + b"P\x01"  # This is 5001 == 0x1389
+        expected_write = struct.pack(self._pack, 0x0005) + b"P\x01"  # This is 5001 == 0x1389
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
-        expected_read = struct.pack("<l", 0x0006) + b"\x81\x5A"
+        expected_read = struct.pack(self._pack, 0x0006) + b"\x81\x5A"
         # The request+data has to be 90 bytes long and should include string "K10CR1" at right spot.
         self._transport_mock.read.side_effect = [expected_read, b"CR1\0K10" * 12]
         self.instr.open()
