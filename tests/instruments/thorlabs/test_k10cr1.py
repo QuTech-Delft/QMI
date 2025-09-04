@@ -138,6 +138,12 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
     def setUp(self):
         self._pack = "<l"
         self._empty = b"\x00" * 2
+        self._displacement = 1 / 409600.0 * 3.0
+        self._vel_scaling = 7329109.0
+        self._acc_scaling = 1502.0
+        self._max_vel = 10
+        self._max_acc = 20
+        # Mock serial transport
         self._transport_mock = unittest.mock.MagicMock(spec=QMI_SerialTransport)
         self._transport_mock._safe_serial.in_waiting = 0
         self._transport_mock._safe_serial.out_waiting = 0
@@ -179,8 +185,7 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         expected_write = struct.pack(self._pack, 0x10429) + b"P\x01"  # This is 5001 == 0x1389
         expected_read = struct.pack(self._pack, 0x042A)
         # Let's get all expected values as "True". The bit order is in reverse pairs.
-        # self._transport_mock.read.return_value = expected_read + self._empty + b"\x00\x00\xfb\xff\x00\x81"
-        self._transport_mock.read.return_value = expected_read + b"\x50\x01" + b"\x01" * 32 + b"\x00\x81"
+        self._transport_mock.read.return_value = expected_read + b"\x50\x01" + b"\xff" * 32 + b"\x00\x81"
 
         motor_status = self.instr.get_motor_status()
 
@@ -431,7 +436,6 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         # Then we expect to write _AptMsgSetVelParams 0x0413. "e" after x below tells the data follows in 14 bits.
         data_def_bits = b"\xd0\x01\x01\x00"
         read_side_effect.append(struct.pack(self._pack, 0xe0413) + data_def_bits + self._empty)
-        # velocity and acceleration get turned into ints in the command. Do the same here.
         # Add velocity and acceleration
         max_vel = struct.pack(self._pack, int(round(velocity * VELOCITY_FACTOR)))
         accel = struct.pack(self._pack, int(round(old_accel * ACCELERATION_FACTOR)))
@@ -478,7 +482,7 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         # Assert
         self._transport_mock.write.assert_has_calls(expected_write)
 
-    def test_set_velocity_already_Set(self):
+    def test_set_velocity_already_set(self):
         """Test set_velocity does not try to set velocity when value is already set."""
         # Value to set
         velocity = 1.2345
@@ -552,6 +556,26 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         self.instr.set_velocity_params(velocity, acceleration)
         # Assert
         self._transport_mock.write.assert_called_with(expected_write)
+
+    def test_set_velocity_value_out_of_range(self):
+        """Test set_velocity raises exceptions at invalid values."""
+        invalid_velocities = [0, self._max_vel + 0.1]
+        for max_velocity in invalid_velocities:
+            expected = f"Invalid value for {max_velocity=}"
+            with self.assertRaises(ValueError) as exc:
+                self.instr.set_velocity(max_velocity)
+
+            self.assertEqual(expected, str(exc.exception))
+
+    def test_set_acceleration_value_out_of_range(self):
+        """Test set_acceleration raises exceptions at invalid values."""
+        invalid_accelerations = [0, self._max_acc + 0.1]
+        for acceleration in invalid_accelerations:
+            expected = f"Invalid value for {acceleration=}"
+            with self.assertRaises(ValueError) as exc:
+                self.instr.set_acceleration(acceleration)
+
+            self.assertEqual(expected, str(exc.exception))
 
     def test_set_velocity_params_values_out_of_range(self):
         """Test set_velocity_params raises exceptions at invalid values."""
