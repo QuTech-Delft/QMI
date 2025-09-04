@@ -21,7 +21,6 @@ from qmi.instruments.thorlabs.apt_protocol import (
     AptProtocol,
     AptChannelState,
     AptChannelStopMode,
-    VelocityParams,
     HomeParams,
     MotorStatus,
 )
@@ -124,10 +123,6 @@ class Thorlabs_Kdc101(QMI_Instrument):
         except KeyError:
             raise NotImplementedError(f"Actuator type {actuator} has not been implemented")
 
-        # Keep track of max velocity and acceleration parameters. Initialize with zero value.
-        self._current_max_vel = 0.0
-        self._current_accel = 0.0
-
     def _get_velocity_params(self) -> _AptMessage:
         """Update and return the current maximum velocity and acceleration.
 
@@ -173,9 +168,6 @@ class Thorlabs_Kdc101(QMI_Instrument):
             raise QMI_InstrumentException(
                 f"Driver only supports KDC101 but instrument identifies as {model_str!r}"
             )
-
-        # Update the current velocity and acceleration parameters for tracking
-        self._get_velocity_params()
 
     @rpc_method
     def open(self) -> None:

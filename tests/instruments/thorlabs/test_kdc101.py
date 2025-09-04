@@ -299,7 +299,7 @@ class TestThorlabsKdc101Methods(unittest.TestCase):
         # _AptMsgGetPosCounter 0x0412
         expected_read = struct.pack(self._pack, 0x0412)
         # Add the position value at the end
-        position_bs = struct.pack(self._pack, int(round(expected / Thorlabs_Kdc101.DISPLACEMENT_PER_ENCODER_COUNT)))
+        position_bs = struct.pack(self._pack, int(round(expected / self.instr._displacement_per_encoder_count)))
         self._transport_mock.read.return_value = expected_read + b"0000" + position_bs
 
         position = self.instr.get_absolute_position()

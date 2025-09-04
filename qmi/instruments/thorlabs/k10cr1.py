@@ -70,10 +70,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # The APT protocol supports multiple channels, but the K10CR1 only uses channel 1.
         self._channel = 1
 
-        # Keep track of max velocity and acceleration parameters. Initialize with zero value.
-        self._current_max_vel = 0.0
-        self._current_accel = 0.0
-
     def _get_velocity_params(self) -> _AptMessage:
         """Update and return the current maximum velocity and acceleration.
 
@@ -91,9 +87,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Receive response
         resp = self._apt_protocol.ask(req_msg, reply_msg)
-        # Update tracked values
-        self._current_max_vel = resp.max_vel
-        self._current_accel = resp.current_accel
 
         return resp
 
@@ -119,9 +112,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
             raise QMI_InstrumentException(
                 f"Driver only supports K10CR1 but instrument identifies as {model_str!r}"
             )
-
-        # Update the current velocity and acceleration parameters for tracking
-        self._get_velocity_params()
 
     @rpc_method
     def open(self) -> None:
@@ -351,17 +341,21 @@ class Thorlabs_K10CR1(QMI_Instrument):
         if not 0 < max_velocity <= self.MAX_VELOCITY:
             raise ValueError(f"Invalid value for {max_velocity=}")
 
-        # Send command message. Note that documentation describes 'min_vel' to be always zero.
+        # Get current values and check with set value
+        current_values = self._get_velocity_params()
         max_vel = int(round(max_velocity * self.VELOCITY_FACTOR))
+        if current_values.max_vel == max_vel:
+            return  # Already set
+
+        # Send command message. Note that documentation describes 'min_vel' to be always zero.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
             chan_ident=self._channel,
             min_vel=0,
-            accel=self._current_accel,
+            accel=current_values.accel,
             max_vel=max_vel
         )
         self._apt_protocol.send_message(req_msg)
-        self._current_max_vel = max_vel
 
     @rpc_method
     def set_acceleration(self, acceleration: float) -> None:
@@ -376,17 +370,21 @@ class Thorlabs_K10CR1(QMI_Instrument):
         if not 0 < acceleration <= self.MAX_ACCELERATION:
             raise ValueError(f"Invalid value for {acceleration=}")
 
-        # Send command message. Note that documentation describes 'min_vel' to be always zero.
+        # Get current values and check with set value
+        current_values = self._get_velocity_params()
         accel = int(round(acceleration * self.ACCELERATION_FACTOR))
+        if current_values.accel == accel:
+            return   # Already set
+
+        # Send command message. Note that documentation describes 'min_vel' to be always zero.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
             chan_ident=self._channel,
             min_vel=0,
             accel=accel,
-            max_vel=self._current_max_vel
+            max_vel=current_values.max_vel
         )
         self._apt_protocol.send_message(req_msg)
-        self._current_accel = accel
 
     @rpc_method
     def set_velocity_params(self, max_velocity: float, acceleration: float) -> None:
@@ -398,11 +396,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
             max_velocity: Maximum velocity in degrees/second (max 10).
             acceleration: Acceleration in degree/second/second (max 20).
         """
-        warnings.warn(
-            f"{self.set_velocity_params.__name__} has been deprecated. " +
-            f"Please use {self.set_velocity.__name__} and {self.set_acceleration.__name__} instead.",
-            DeprecationWarning
-        )
         self._check_is_open()
         if not 0 < max_velocity <= self.MAX_VELOCITY:
             raise ValueError(f"Invalid value for {max_velocity=}")

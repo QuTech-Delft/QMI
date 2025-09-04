@@ -36,34 +36,15 @@ class TestThorlabsK10cr1(unittest.TestCase):
 
     def test_open_close(self):
         """Test opening and closing the instrument"""
-        expected_max_vel = 123.45
-        expected_accel = 543.21
-
         # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
-        expected_write = [struct.pack(self._pack, 0x0005) + b"P\x01"]  # This is 5001 == 0x1389
-        # _AptMsgReqVelParams 0x0414
-        expected_write.append(struct.pack(self._pack, 0x10414) + b"P\x01")  # This is 5001 == 0x1389
+        expected_write = struct.pack(self._pack, 0x0005) + b"P\x01"  # This is 5001 == 0x1389
         # We expect as response MESSAGE_ID 0x0006 (_AptMsgHwGetInfo)
-        expected_read = [struct.pack(self._pack, 0x0006) + b"\x00" * 2 + b"CR1\0K10" * 12]
-        # _AptMsgGetVelParams 0x0415
-        # Define the bit strings
-        max_vel = struct.pack(self._pack, int(round(expected_max_vel * VELOCITY_FACTOR)))
-        accel = struct.pack(self._pack, int(round(expected_accel * ACCELERATION_FACTOR)))
-        expected_read.append = [
-            struct.pack(self._pack, 0x0415) +
-            struct.pack("<h", 0) +
-            struct.pack("<h", 1) +  # chan ident
-            struct.pack(self._pack, 0) +  # min velocity, always 0
-            accel +
-            max_vel
-        ]
+        expected_read = struct.pack(self._pack, 0x0006) + b"\x00" * 2 + b"CR1\0K10" * 12
         # The request+data has to be 90 bytes long and should include string "K10CR1" at right spot.
-        self._transport_mock.read.side_effect = expected_read
+        self._transport_mock.read.return_value = expected_read
         self.instr.open()
         # Assert
-        self.assertEqual(expected_max_vel, round(self.instr._current_max_vel, 2))
-        self.assertEqual(expected_accel, round(self.instr._current_accel, 2))
-        self._transport_mock.write.assert_has_calls(expected_write)
+        self._transport_mock.write.assert_called_with(expected_write)
 
         self.instr.close()
 
@@ -287,6 +268,52 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         self.assertEqual(round(position, 2), expected)
         self._transport_mock.write.assert_called_with(expected_write)
 
+    def test_get_velocity(self):
+        """Test get_velocity returns velocity."""
+        expected_max_vel = 123.45
+        # _AptMsgReqVelParams 0x0414
+        expected_write = struct.pack(self._pack, 0x10414) + b"P\x01"  # This is 5001 == 0x1389
+        # _AptMsgGetVelParams 0x0415
+        # Define the bit strings
+        max_vel = struct.pack(self._pack, int(round(expected_max_vel * VELOCITY_FACTOR)))
+        accel = struct.pack(self._pack, int(round(543.21 * ACCELERATION_FACTOR)))
+        self._transport_mock.read.return_value = (
+            struct.pack(self._pack, 0x0415) +
+            struct.pack("<h", 0) +
+            struct.pack("<h", 1) +  # chan ident
+            struct.pack(self._pack, 0) +  # min velocity, always 0
+            accel +
+            max_vel
+        )
+
+        velocity = self.instr.get_velocity()
+
+        self.assertEqual(expected_max_vel, round(velocity, 2))
+        self._transport_mock.write.assert_called_with(expected_write)
+
+    def test_get_acceleration(self):
+        """Test get_acceleration returns acceleration."""
+        expected_accel = 543.21
+        # _AptMsgReqVelParams 0x0414
+        expected_write = struct.pack(self._pack, 0x10414) + b"P\x01"  # This is 5001 == 0x1389
+        # _AptMsgGetVelParams 0x0415
+        # Define the bit strings
+        max_vel = struct.pack(self._pack, int(round(123.45 * VELOCITY_FACTOR)))
+        accel = struct.pack(self._pack, int(round(expected_accel * ACCELERATION_FACTOR)))
+        self._transport_mock.read.return_value = (
+            struct.pack(self._pack, 0x0415) +
+            struct.pack("<h", 0) +
+            struct.pack("<h", 1) +  # chan ident
+            struct.pack(self._pack, 0) +  # min velocity, always 0
+            accel +
+            max_vel
+        )
+
+        acceleration = self.instr.get_acceleration()
+
+        self.assertEqual(expected_accel, round(acceleration, 2))
+        self._transport_mock.write.assert_called_with(expected_write)
+
     def test_get_velocity_params(self):
         """Test get_velocity_params returns velocity and acceleration."""
         expected_max_vel = 123.45
@@ -376,6 +403,134 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
 
         self.instr.set_chan_enable_state(False)
 
+        self._transport_mock.write.assert_called_with(expected_write)
+
+    def test_set_velocity(self):
+        """Test set_velocity can be used to set velocity."""
+        # Value to set
+        velocity = 1.2345
+        # "previous values"
+        old_vel = 2.3145
+        old_accel = 5.4321
+        # The method first calls to get current values with
+        # _AptMsgReqVelParams 0x0414
+        expected_write = [unittest.mock.call(struct.pack(self._pack, 0x10414) + b"P\x01")]  # This is 5001 == 0x1389
+        # _AptMsgGetVelParams 0x0415
+        # Define the bit strings
+        max_vel = struct.pack(self._pack, int(round(old_vel * VELOCITY_FACTOR)))
+        accel = struct.pack(self._pack, int(round(old_accel * ACCELERATION_FACTOR)))
+        read_side_effect = [(
+            struct.pack(self._pack, 0x0415) +
+            struct.pack("<h", 0) +
+            struct.pack("<h", 1) +  # chan ident
+            struct.pack(self._pack, 0) +  # min velocity, always 0
+            accel +
+            max_vel
+        )]
+        # Then we expect to write _AptMsgSetVelParams 0x0413. "e" after x below tells the data follows in 14 bits.
+        data_def_bits = b"\xd0\x01\x01\x00"
+        read_side_effect.append(struct.pack(self._pack, 0xe0413) + data_def_bits + self._empty)
+        # velocity and acceleration get turned into ints in the command. Do the same here.
+        # Add velocity and acceleration
+        max_vel = struct.pack(self._pack, int(round(velocity * VELOCITY_FACTOR)))
+        accel = struct.pack(self._pack, int(round(old_accel * ACCELERATION_FACTOR)))
+        expected_write.append(unittest.mock.call(read_side_effect[1] + self._empty + accel + max_vel))
+        self._transport_mock.read.side_effect = read_side_effect
+        # Act
+        self.instr.set_velocity(velocity)
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_write)
+
+    def test_set_acceleration(self):
+        """Test set_acceleration can be used to set acceleration."""
+        # Values to set
+        acceleration = 5.4321
+        # "previous values"
+        old_vel = 2.3145
+        old_accel = 3.5421
+        # The method first calls to get current values with
+        # _AptMsgReqVelParams 0x0414
+        expected_write = [unittest.mock.call(struct.pack(self._pack, 0x10414) + b"P\x01")]  # This is 5001 == 0x1389
+        # _AptMsgGetVelParams 0x0415
+        # Define the bit strings
+        max_vel = struct.pack(self._pack, int(round(old_vel * VELOCITY_FACTOR)))
+        accel = struct.pack(self._pack, int(round(old_accel * ACCELERATION_FACTOR)))
+        read_side_effect = [(
+                struct.pack(self._pack, 0x0415) +
+                struct.pack("<h", 0) +
+                struct.pack("<h", 1) +  # chan ident
+                struct.pack(self._pack, 0) +  # min velocity, always 0
+                accel +
+                max_vel
+        )]
+        # Then we expect to write _AptMsgSetVelParams 0x0413. "e" after x below tells the data follows in 14 bits.
+        data_def_bits = b"\xd0\x01\x01\x00"
+        read_side_effect.append(struct.pack(self._pack, 0xe0413) + data_def_bits + self._empty)
+        # velocity and acceleration get turned into ints in the command. Do the same here.
+        # Add velocity and acceleration
+        max_vel = struct.pack(self._pack, int(round(old_vel * VELOCITY_FACTOR)))
+        accel = struct.pack(self._pack, int(round(acceleration * ACCELERATION_FACTOR)))
+        expected_write.append(unittest.mock.call(read_side_effect[1] + self._empty + accel + max_vel))
+        self._transport_mock.read.side_effect = read_side_effect
+        # Act
+        self.instr.set_acceleration(acceleration)
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_write)
+
+    def test_set_velocity_already_Set(self):
+        """Test set_velocity does not try to set velocity when value is already set."""
+        # Value to set
+        velocity = 1.2345
+        # "previous values"
+        old_vel = velocity
+        old_accel = 5.4321
+        # The method first calls to get current values with
+        # _AptMsgReqVelParams 0x0414
+        expected_write = struct.pack(self._pack, 0x10414) + b"P\x01"  # This is 5001 == 0x1389
+        # _AptMsgGetVelParams 0x0415
+        # Define the bit strings
+        max_vel = struct.pack(self._pack, int(round(old_vel * VELOCITY_FACTOR)))
+        accel = struct.pack(self._pack, int(round(old_accel * ACCELERATION_FACTOR)))
+        read_side_effect = [(
+            struct.pack(self._pack, 0x0415) +
+            struct.pack("<h", 0) +
+            struct.pack("<h", 1) +  # chan ident
+            struct.pack(self._pack, 0) +  # min velocity, always 0
+            accel +
+            max_vel
+        )]
+        self._transport_mock.read.side_effect = read_side_effect
+        # Act
+        self.instr.set_velocity(velocity)
+        # Assert
+        self._transport_mock.write.assert_called_with(expected_write)
+
+    def test_set_acceleration_already_set(self):
+        """Test set_acceleration will not set acceleration if the value is already set."""
+        # Values to set
+        acceleration = 5.4321
+        # "previous values"
+        old_vel = 2.3145
+        old_accel = acceleration
+        # The method first calls to get current values with
+        # _AptMsgReqVelParams 0x0414
+        expected_write = struct.pack(self._pack, 0x10414) + b"P\x01"  # This is 5001 == 0x1389
+        # _AptMsgGetVelParams 0x0415
+        # Define the bit strings
+        max_vel = struct.pack(self._pack, int(round(old_vel * VELOCITY_FACTOR)))
+        accel = struct.pack(self._pack, int(round(old_accel * ACCELERATION_FACTOR)))
+        read_side_effect = [(
+                struct.pack(self._pack, 0x0415) +
+                struct.pack("<h", 0) +
+                struct.pack("<h", 1) +  # chan ident
+                struct.pack(self._pack, 0) +  # min velocity, always 0
+                accel +
+                max_vel
+        )]
+        self._transport_mock.read.side_effect = read_side_effect
+        # Act
+        self.instr.set_acceleration(acceleration)
+        # Assert
         self._transport_mock.write.assert_called_with(expected_write)
 
     def test_set_velocity_params(self):
