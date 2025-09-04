@@ -3,7 +3,6 @@
 This driver communicates with the device via a USB serial port, using the Thorlabs APT protocol. For details,
 see the document "Thorlabs APT Controllers Host-Controller Communications Protocol", issue 41 from Thorlabs.
 """
-
 import logging
 import time
 
@@ -74,7 +73,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
     # Acceleration scaling factor, ACC_APT = EncCnt × T^2 × 65536 × Acc, where T = 2048 / (6 × 10^6).
     ACCELERATION_SCALING_FACTOR = {
         "Z900": 263.8443072 * T * 65536,  # Using T**2 gives acc readout that is out-of-range!
-        "PRMTZ8": 14.66 * T**2 * 65536,
+        "PRMTZ8": 14.66 * T * 65536,
     }
 
     # Number of channels
@@ -139,12 +138,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
         )
 
         # Receive response
-        resp = self._apt_protocol.ask(req_msg, reply_msg)
-        # Update tracked values
-        self._current_max_vel = resp.max_vel
-        self._current_accel = resp.current_accel
-
-        return resp
+        return self._apt_protocol.ask(req_msg, reply_msg)
 
     def _check_kdc101(self) -> None:
         """Check that the connected device is a Thorlabs KDC101.
@@ -237,21 +231,20 @@ class Thorlabs_Kdc101(QMI_Instrument):
         resp = self._apt_protocol.ask(req_msg, reply_msg)
 
         # Decode motor status bits.
-        status_bits = resp.status_bits
         return MotorStatus(
-            forward_limit=((status_bits & 0x01) != 0),
-            reverse_limit=((status_bits & 0x02) != 0),
-            moving_forward=((status_bits & 0x10) != 0),
-            moving_reverse=((status_bits & 0x20) != 0),
-            jogging_forward=((status_bits & 0x40) != 0),
-            jogging_reverse=((status_bits & 0x80) != 0),
-            homing=((status_bits & 0x200) != 0),
-            homed=((status_bits & 0x400) != 0),
-            tracking=((status_bits & 0x1000) != 0),
-            settled=((status_bits & 0x2000) != 0),
-            motion_error=((status_bits & 0x4000) != 0),
-            current_limit=((status_bits & 0x01000000) != 0),
-            channel_enabled=((status_bits & 0x80000000) != 0)
+            forward_limit=bool(resp.forward_limit),
+            reverse_limit=bool(resp.reverse_limit),
+            moving_forward=bool(resp.moving_forward),
+            moving_reverse=bool(resp.moving_reverse),
+            jogging_forward=bool(resp.jogging_forward),
+            jogging_reverse=bool(resp.jogging_reverse),
+            homing=bool(resp.homing),
+            homed=bool(resp.homed),
+            tracking=bool(resp.tracking),
+            settled=bool(resp.settled),
+            motion_error=bool(resp.motion_error),
+            current_limit=bool(resp.current_limit),
+            channel_enabled=bool(resp.output_enabled)
         )
 
     @rpc_method
@@ -372,17 +365,21 @@ class Thorlabs_Kdc101(QMI_Instrument):
         if not 0 < max_velocity <= self._max_velocity:
             raise ValueError(f"Invalid value for {max_velocity=}")
 
-        # Send command message. Note that documentation describes 'min_vel' to be always zero.
+        # Get current values and check with set value
+        current_values = self._get_velocity_params()
         max_vel = int(round(max_velocity * self._velocity_scaling_factor))
+        if current_values.max_vel == max_vel:
+            return  # Already set
+
+        # Send command message. Note that documentation describes 'min_vel' to be always zero.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
             chan_ident=self.NUMBER_OF_CHANNELS,
             min_vel=0,
-            accel=self._current_accel,
+            accel=current_values.accel,
             max_vel=max_vel
         )
         self._apt_protocol.send_message(req_msg)
-        self._current_max_vel = max_vel
 
     @rpc_method
     def set_acceleration(self, acceleration: float) -> None:
@@ -397,17 +394,21 @@ class Thorlabs_Kdc101(QMI_Instrument):
         if not 0 < acceleration <= self._max_acceleration:
             raise ValueError(f"Invalid value for {acceleration=}")
 
-        # Send command message. Note that documentation describes 'min_vel' to be always zero.
+        # Get current values and check with set value
+        current_values = self._get_velocity_params()
         accel = int(round(acceleration * self._acceleration_scaling_factor))
+        if current_values.accel == accel:
+            return   # Already set
+
+        # Send command message. Note that documentation describes 'min_vel' to be always zero.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
             chan_ident=self.NUMBER_OF_CHANNELS,
             min_vel=0,
             accel=accel,
-            max_vel=self._current_max_vel
+            max_vel=current_values.max_vel
         )
         self._apt_protocol.send_message(req_msg)
-        self._current_accel = accel
 
     @rpc_method
     def get_backlash_distance(self) -> float:

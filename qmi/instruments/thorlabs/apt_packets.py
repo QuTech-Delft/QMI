@@ -336,7 +336,38 @@ class _AptMsgGetStatusBits(_AptMessageHeader):
     MESSAGE_ID = AptMessageId.MOT_GET_STATUS_BITS.value
     _fields_: ClassVar[list[tuple[str, type]]] = [
         ("chan_ident", apt_word),
-        ("status_bits", apt_dword),
+        ("forward_limit", apt_byte, 1),
+        ("reverse_limit", apt_byte, 1),
+        ("forward_software_limit", apt_byte, 1),
+        ("reverse_software_limit", apt_byte, 1),
+        ("moving_forward", apt_byte, 1),
+        ("moving_reverse", apt_byte, 1),
+        ("jogging_forward", apt_byte, 1),
+        ("jogging_reverse", apt_byte, 1),
+        ("connected", apt_byte, 1),
+        ("homing", apt_byte, 1),
+        ("homed", apt_byte, 1),
+        ("initializing", apt_byte, 1),  # For 3-phase brushless motors only
+        ("tracking", apt_byte, 1),
+        ("settled", apt_byte, 1),
+        ("motion_error", apt_byte, 1),
+        ("instruction_error", apt_byte, 1),
+        ("interlock", apt_byte, 1),
+        ("overheat", apt_byte, 1),
+        ("voltage_fault", apt_byte, 1),
+        ("commutation_error", apt_byte, 1),
+        ("DI1", apt_byte, 1),
+        ("DI2", apt_byte, 1),
+        ("DI3", apt_byte, 1),
+        ("DI4", apt_byte, 1),
+        ("motor_overload", apt_byte, 1),
+        ("encoder_fault", apt_byte, 1),
+        ("current_limit", apt_byte, 1),
+        ("current_fault", apt_byte, 1),
+        ("power_ok", apt_byte, 1),
+        ("moving", apt_byte, 1),
+        ("unknown_error", apt_byte, 1),
+        ("output_enabled", apt_byte, 1)
     ]
 
 

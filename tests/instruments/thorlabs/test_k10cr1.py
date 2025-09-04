@@ -179,7 +179,8 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
         expected_write = struct.pack(self._pack, 0x10429) + b"P\x01"  # This is 5001 == 0x1389
         expected_read = struct.pack(self._pack, 0x042A)
         # Let's get all expected values as "True". The bit order is in reverse pairs.
-        self._transport_mock.read.return_value = expected_read + self._empty + b"\x00\x00\xfb\xff\x00\x81"
+        # self._transport_mock.read.return_value = expected_read + self._empty + b"\x00\x00\xfb\xff\x00\x81"
+        self._transport_mock.read.return_value = expected_read + b"\x50\x01" + b"\x01" * 32 + b"\x00\x81"
 
         motor_status = self.instr.get_motor_status()
 
@@ -188,7 +189,7 @@ class TestThorlabsK10cr1Methods(unittest.TestCase):
 
         # Let's get all expected values as "False"
         self._transport_mock.read.reset_mock()
-        self._transport_mock.read.return_value = expected_read + b"\x00\x00\x00\x00\x00\x00\x00\x00"
+        self._transport_mock.read.return_value = expected_read + b"\x00" * 36
 
         motor_status = self.instr.get_motor_status()
 

@@ -86,9 +86,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         )
 
         # Receive response
-        resp = self._apt_protocol.ask(req_msg, reply_msg)
-
-        return resp
+        return self._apt_protocol.ask(req_msg, reply_msg)
 
     def _check_k10cr1(self) -> None:
         """Check that the connected device is a Thorlabs K10CR1.
@@ -185,21 +183,20 @@ class Thorlabs_K10CR1(QMI_Instrument):
         resp = self._apt_protocol.ask(req_msg, reply_msg)
 
         # Decode motor status bits.
-        status_bits = resp.status_bits
         return MotorStatus(
-            forward_limit=((status_bits & 0x01) != 0),
-            reverse_limit=((status_bits & 0x02) != 0),
-            moving_forward=((status_bits & 0x10) != 0),
-            moving_reverse=((status_bits & 0x20) != 0),
-            jogging_forward=((status_bits & 0x40) != 0),
-            jogging_reverse=((status_bits & 0x80) != 0),
-            homing=((status_bits & 0x200) != 0),
-            homed=((status_bits & 0x400) != 0),
-            tracking=((status_bits & 0x1000) != 0),
-            settled=((status_bits & 0x2000) != 0),
-            motion_error=((status_bits & 0x4000) != 0),
-            current_limit=((status_bits & 0x01000000) != 0),
-            channel_enabled=((status_bits & 0x80000000) != 0)
+            forward_limit=bool(resp.forward_limit),
+            reverse_limit=bool(resp.reverse_limit),
+            moving_forward=bool(resp.moving_forward),
+            moving_reverse=bool(resp.moving_reverse),
+            jogging_forward=bool(resp.jogging_forward),
+            jogging_reverse=bool(resp.jogging_reverse),
+            homing=bool(resp.homing),
+            homed=bool(resp.homed),
+            tracking=bool(resp.tracking),
+            settled=bool(resp.settled),
+            motion_error=bool(resp.motion_error),
+            current_limit=bool(resp.current_limit),
+            channel_enabled=bool(resp.output_enabled)
         )
 
     @rpc_method
