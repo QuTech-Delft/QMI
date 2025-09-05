@@ -4,6 +4,7 @@ here https://www.thorlabs.com/Software/Motion%20Control/APT_Communications_Proto
 """
 
 from ctypes import sizeof
+from dataclasses import dataclass
 from enum import Enum
 import logging
 import time
@@ -46,6 +47,71 @@ class AptChannelHomeLimitSwitch(Enum):
     """Possible values for the ``limit_switch`` field in the homing parameters."""
     REVERSE = 0x01
     FORWARD = 0x04
+
+
+@dataclass
+class VelocityParams:
+    """Velocity parameters for the controller.
+
+    Attributes:
+        max_velocity:    Maximum velocity in degrees/second or mm/second.
+        acceleration:    Acceleration in degrees/second/second or mm/second/second.
+    """
+    max_velocity: float
+    acceleration: float
+
+
+@dataclass
+class HomeParams:
+    """Homing parameters for the controller.
+
+    Attributes:
+        home_direction:  Direction of moving to home (1 = forward, 2 = reverse).
+        limit_switch:    Limit switch to use for homing (1 = reverse, 4 = forward).
+        home_velocity:   Homing velocity in degrees/second or mm/second.
+        offset_distance: Distance of home position from home limit switch (in degrees or mm).
+    """
+    home_direction:     AptChannelHomeDirection
+    limit_switch:       AptChannelHomeLimitSwitch
+    home_velocity:      float
+    offset_distance:    float
+
+
+@dataclass
+class MotorStatus:
+    """Status bits of motor controller.
+
+    Note: Some of the status bits do not seem to work with the K10CR1.
+
+    Attributes:
+        moving_forward:     True if the motor is moving in forward direction.
+        moving_reverse:     True if the motor is moving in reverse direction.
+                            It looks like `move_forward` and `move_reverse` are both
+                            active when the stage is moving, regardless of the actual
+                            direction of movement.
+        jogging_forward:    True if the motor is jogging in forward direction.
+        jogging_reverse:    True if the motor is jogging in reverse direction.
+                            It looks like `jogging_reverse` is also active when jogging
+                            in forward direction, while `jogging_forward` is never active.
+        homing:             True if the motor is homing.
+        homed:              True if homing has been completed.
+        motion_error:       True if an excessive position error is detected.
+        current_limit:      True if the motor current limit has been reached.
+        channel_enabled:    True if the motor drive channel is enabled.
+    """
+    forward_limit:      bool
+    reverse_limit:      bool
+    moving_forward:     bool
+    moving_reverse:     bool
+    jogging_forward:    bool
+    jogging_reverse:    bool
+    homing:             bool
+    homed:              bool
+    tracking:           bool
+    settled:            bool
+    motion_error:       bool
+    current_limit:      bool
+    channel_enabled:    bool
 
 
 class AptProtocol:

@@ -24,43 +24,6 @@ apt_char = c_char
 apt_byte = c_uint8
 
 
-class AptStatusBits(Enum):
-    """Status bits for a status update message."""
-
-    P_MOT_SB_CWHARDLIMIT = 0x00000001  # clockwise hardware limit switch
-    P_MOT_SB_CCWHARDLIMIT = 0x00000002  # counter clockwise hardware limit switch
-    P_MOT_SB_CWSOFTLIMIT = 0x00000004  # clockwise software limit switch
-    P_MOT_SB_CCWSOFTLIMIT = 0x00000008  # counter clockwise software limit switch
-    P_MOT_SB_INMOTIONCW = 0x00000010  # in motion, clockwise direction
-    P_MOT_SB_INMOTIONCCW = 0x00000020  # in motion, counter clockwise direction
-    P_MOT_SB_JOGGINGCW = 0x00000040  # jogging in clockwise direction
-    P_MOT_SB_JOGGINGCCW = 0x00000080  # jogging in counter clockwise direction
-    P_MOT_SB_CONNECTED = 0x00000100  # motor recognised by controller
-    P_MOT_SB_HOMING = 0x00000200  # motor is homing
-    P_MOT_SB_HOMED = 0x00000400  # motor is homed
-    P_MOT_SB_INITIALISING = 0x00000800  # motor performing phase initialisation
-    P_MOT_SB_TRACKING = 0x00001000  # actual position is within the tracking window
-    P_MOT_SB_SETTLED = 0x00002000  # motor not moving and at target position
-    P_MOT_SB_POSITIONERERROR = 0x00004000  # actual position outside margin specified around trajectory position
-    P_MOT_SB_INSTRERROR = 0x00008000  # unable to execute command
-    P_MOT_SB_INTERLOCK = 0x00010000  # used in controllers where a seperate signal is used to enable the motor
-    P_MOT_SB_OVERTEMP = 0x00020000  # motor or motor power driver electronics reached maximum temperature
-    P_MOT_SB_BUSVOLTFAULT = 0x00040000  # low supply voltage
-    P_MOT_SB_COMMUTATIONERROR = 0x00080000  # problem with motor commutation. Can only be recovered with power cycle
-    P_MOT_SB_DIGIP1 = 0x00100000  # state of digital input 1
-    P_MOT_SB_DIGIP2 = 0x00200000  # state of digital input 2
-    P_MOT_SB_DIGIP4 = 0x00400000  # state of digital input 3
-    P_MOT_SB_DIGIP8 = 0x00800000  # state of digital input 4
-    P_MOT_SB_OVERLOAD = 0x01000000  # some form of motor overload
-    P_MOT_SB_ENCODERFAULT = 0x02000000  # encoder fault
-    P_MOT_SB_OVERCURRENT = 0x04000000  # motor exceeded continuous current limit
-    P_MOT_SB_BUSCURRENTFAULT = 0x08000000  # excessive current being drawn from motor power supply
-    P_MOT_SB_POWEROK = 0x10000000  # controller power supplies operating normally
-    P_MOT_SB_ACTIVE = 0x20000000  # controller executing motion commend
-    P_MOT_SB_ERROR = 0x40000000  # indicates an error condition
-    P_MOT_SB_ENABLED = 0x80000000  # motor output enabled, with controller maintaining position
-
-
 class AptMessageId(Enum):
     """Message IDs for devices using the APT protocol."""
 
@@ -141,7 +104,7 @@ class _AptMessageHeader(_AptMessage):
     This is also the base class for long messages (header + data).
     """
     _pack_ = 1
-    _fields_: ClassVar[list[tuple[str, type]]] = [
+    _fields_: ClassVar[list[tuple[str, type] | tuple[str, type, int]]] = [
         ('message_id', apt_word),
         ('data_length', apt_word),
         ('dest', apt_byte),
@@ -334,9 +297,40 @@ class _AptMsgGetStatusBits(_AptMessageHeader):
         status_bits:   Channel status_bits.
     """
     MESSAGE_ID = AptMessageId.MOT_GET_STATUS_BITS.value
-    _fields_: ClassVar[list[tuple[str, type]]] = [
+    _fields_: ClassVar[list[tuple[str, type] | tuple[str, type, int]]] = [
         ("chan_ident", apt_word),
-        ("status_bits", apt_dword),
+        ("forward_limit", apt_byte, 1),
+        ("reverse_limit", apt_byte, 1),
+        ("forward_software_limit", apt_byte, 1),
+        ("reverse_software_limit", apt_byte, 1),
+        ("moving_forward", apt_byte, 1),
+        ("moving_reverse", apt_byte, 1),
+        ("jogging_forward", apt_byte, 1),
+        ("jogging_reverse", apt_byte, 1),
+        ("connected", apt_byte, 1),
+        ("homing", apt_byte, 1),
+        ("homed", apt_byte, 1),
+        ("initializing", apt_byte, 1),  # For 3-phase brushless motors only
+        ("tracking", apt_byte, 1),
+        ("settled", apt_byte, 1),
+        ("motion_error", apt_byte, 1),
+        ("instruction_error", apt_byte, 1),
+        ("interlock", apt_byte, 1),
+        ("overheat", apt_byte, 1),
+        ("voltage_fault", apt_byte, 1),
+        ("commutation_error", apt_byte, 1),
+        ("DI1", apt_byte, 1),
+        ("DI2", apt_byte, 1),
+        ("DI3", apt_byte, 1),
+        ("DI4", apt_byte, 1),
+        ("motor_overload", apt_byte, 1),
+        ("encoder_fault", apt_byte, 1),
+        ("current_limit", apt_byte, 1),
+        ("current_fault", apt_byte, 1),
+        ("power_ok", apt_byte, 1),
+        ("moving", apt_byte, 1),
+        ("unknown_error", apt_byte, 1),
+        ("output_enabled", apt_byte, 1)
     ]
 
 

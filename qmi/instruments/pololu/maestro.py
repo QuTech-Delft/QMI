@@ -1,4 +1,4 @@
-"""Instrument driver for the Polulo maestro servo controller"""
+"""Instrument driver for the Pololu maestro servo controller"""
 
 import logging
 from typing import Dict, Generator, List, Optional, Tuple
