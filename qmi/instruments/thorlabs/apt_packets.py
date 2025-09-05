@@ -104,7 +104,7 @@ class _AptMessageHeader(_AptMessage):
     This is also the base class for long messages (header + data).
     """
     _pack_ = 1
-    _fields_: ClassVar[list[tuple[str, type]] | tuple[str, type, int]] = [
+    _fields_: ClassVar[list[tuple[str, type] | tuple[str, type, int]]] = [
         ('message_id', apt_word),
         ('data_length', apt_word),
         ('dest', apt_byte),
@@ -297,7 +297,7 @@ class _AptMsgGetStatusBits(_AptMessageHeader):
         status_bits:   Channel status_bits.
     """
     MESSAGE_ID = AptMessageId.MOT_GET_STATUS_BITS.value
-    _fields_: ClassVar[list[tuple[str, type]]] = [
+    _fields_: ClassVar[list[tuple[str, type] | tuple[str, type, int]]] = [
         ("chan_ident", apt_word),
         ("forward_limit", apt_byte, 1),
         ("reverse_limit", apt_byte, 1),
