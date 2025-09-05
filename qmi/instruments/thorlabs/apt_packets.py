@@ -104,7 +104,7 @@ class _AptMessageHeader(_AptMessage):
     This is also the base class for long messages (header + data).
     """
     _pack_ = 1
-    _fields_: ClassVar[list[tuple[str, type]]] = [
+    _fields_: ClassVar[list[tuple[str, type]] | tuple[str, type, int]] = [
         ('message_id', apt_word),
         ('data_length', apt_word),
         ('dest', apt_byte),
