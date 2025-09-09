@@ -32,7 +32,9 @@ class Thorlabs_Kdc101(QMI_Instrument):
     """Instrument driver for the Thorlabs KDC101 Brushed DC Servo Motor Controller. This driver should be
     compatible also with TDC001 and KVS30 controllers.
 
-    This controller can be used with Z9 series 6mm, 12mm and 25mm linear actuators.
+    This controller can be used with::
+     - Z9 series 6mm, 12mm and 25mm linear actuators.
+     - PRMTZ8 360 degrees rotation stage.
     An adaptation of the driver could be made in the future to also allow the use of the linear translation and
     rotation stages, and goniometers.
     """

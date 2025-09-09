@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.51.0-beta.0] - Unreleased
 
 ### Added
-- Thorlabs KDC101 controller QMI driver. It can at the moment control Z906, Z912 and Z925 actuators.
+- Thorlabs KDC101 controller QMI driver. It can at the moment control Z906, Z912 and Z925 actuators and PRMTZ8 rotation stage.
 
 ### Changed
 
