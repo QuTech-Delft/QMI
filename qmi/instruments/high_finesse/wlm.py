@@ -13,7 +13,7 @@ import logging
 import numpy as np
 
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_InstrumentException
+from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.instruments.high_finesse.support import wlmConst
@@ -87,35 +87,6 @@ class HighFinesse_Wlm(QMI_Instrument):
         super().close()
 
     @rpc_method
-    def start_server(self) -> bool:
-        """Start the device server if it is not running already.
-
-        Returns:
-             True if the server was started, or False if already running.
-        """
-        wlm_count = self._lib.dll.GetWLMCount(0)
-        _logger.info("[%s] Starting server, current wlm count = %d", self._name, wlm_count)
-        if wlm_count == 0:
-            status = self._lib.dll.ControlWLMEx(wlmConst.cCtrlWLMWait, 0, 0, 10_000, 0)
-            _logger.debug("[%s] Started server with status = %d", self._name, status)
-            status = self._lib.dll.Operation(wlmConst.cCtrlStartMeasurement)
-            _logger.debug("[%s] Started measurement with status = %d", self._name, status)
-            return True
-
-        return False
-
-    @rpc_method
-    def stop_server(self) -> None:
-        """Stop the device server if it is running."""
-        wlm_count = self._lib.dll.GetWLMCount(0)
-        _logger.info("[%s] Stopping server, current wlm count = %d", self._name, wlm_count)
-        if wlm_count > 0:
-            status = self._lib.dll.Operation(wlmConst.cCtrlStopAll)
-            _logger.debug("[%s] Stopped measurement with status = %d", self._name, status)
-            status = self._lib.dll.ControlWLM(wlmConst.cCtrlWLMExit, 0, 0)
-            _logger.debug("[%s] Stopped server with status = %d", self._name, status)
-
-    @rpc_method
     def get_version(self) -> str:
         """Get the WLM version as a string.
 
@@ -144,6 +115,133 @@ class HighFinesse_Wlm(QMI_Instrument):
             serial=None,
             version=".".join([version, revision])
         )
+
+    @rpc_method
+    def start_server(
+            self,
+            action: int = wlmConst.cCtrlWLMHide | wlmConst.cCtrlWLMWait,
+            app_start: str | int = 0,
+            version: str | int = 0,
+            delay: int = 10_000,
+            extra_ret: int = 0,
+    ) -> bool:
+        """Start the device server with given parameters, if it is not running already.
+
+        Parameters:
+            action:    This parameter determines whether the server is to be shown, hidden, started or terminated.
+                       show and hide options can be combined with one of the following values in order to suppress
+                       error and information messages::
+                       - cCtrlWLMStart-Silent: On start no error and information messages will be displayed.
+                       - cCtrlWLMSilent: Like the previous but suppresses error and information messages while running.
+                       And with the ControlWLMEx function it additionally can be combined with the following value in
+                       order to wait until the operation is finished::
+                       - cCtrlWLMWait: Causes the call not to return until the operation is finished or the
+                                       specified timeout (Delay parameter) has elapsed.
+                       Default value is to hide and wait.
+            app_start: If `action` is cCtrlWLMShow or CtrlWLMHide, it also is possible to start the server software
+                       (or any other) with giving `app_start` as a pointer to a zero terminated file name string of a
+                       certain executable file. Default is 0, i.e. detect automatically.
+            version:   If `app_start` is 0, `version` can be used to give version number of the WLM or LSA. Default
+                       is 0 which uses either last accessed | only active server or if no server is active, the last
+                       _installed_ WLM or LSA is started, unless `action` was set to cCtrlWLMExit.
+            delay:     If `action` has been set also with wait option, waits `delay` milliseconds(?), or until the
+                       operation is complete, before continuing. Set to -1 for infinite delay. Default is 10000ms.
+            extra_ret: Set to 1 to get extended return information when starting the WLM or LSA with show or hide, and
+                       wait `action` options. Default is 0 (standard return information).
+
+        Returns:
+             True if the server was started, or False if already running.
+        """
+        self._check_is_open()
+        wlm_count = self._lib.dll.GetWLMCount(0)
+        _logger.info("[%s] Starting server, current wlm count = %d", self._name, wlm_count)
+        if wlm_count == 0:
+            if app_start and action not in (
+                    wlmConst.cCtrlWLMShow, wlmConst.cCtrlWLMHide,
+                    wlmConst.cCtrlWLMShow | wlmConst.cCtrlWLMWait,
+                    wlmConst.cCtrlWLMHide | wlmConst.cCtrlWLMWait,
+                    wlmConst.cCtrlWLMShow | wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMStartSilent,
+                    wlmConst.cCtrlWLMHide | wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMStartSilent,
+                    wlmConst.cCtrlWLMShow | wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMSilent,
+                    wlmConst.cCtrlWLMHide | wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMSilent,
+            ):
+                _logger.warning("Cannot use 'app_start' if 'action' does not include cCtrlWLMShow or cCtrlWLMHide.")
+                app_start = 0
+
+            if version and app_start:
+                _logger.warning("Cannot use 'version' if 'app_start' is not 0.")
+                version = 0
+
+            elif version and action == wlmConst.cCtrlWLMExit:
+                _logger.warning("Cannot use 'version' if 'action' is cCtrlWLMExit.")
+                version = 0
+
+            if delay != 0 and action not in (
+                    wlmConst.cCtrlWLMWait,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMShow,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMHide,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMStartSilent,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMShow | wlmConst.cCtrlWLMStartSilent,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMHide | wlmConst.cCtrlWLMStartSilent,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMStartSilent,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMShow | wlmConst.cCtrlWLMSilent,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMHide | wlmConst.cCtrlWLMSilent,
+            ):
+                _logger.warning("Cannot use 'delay' if 'action' does not include cCtrlWLMWait.")
+                delay = 0
+
+            if extra_ret and action not in (
+                    wlmConst.cCtrlWLMShow, wlmConst.cCtrlWLMHide, wlmConst.cCtrlWLMWait,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMShow,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMHide,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMStartSilent,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMShow | wlmConst.cCtrlWLMStartSilent,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMHide | wlmConst.cCtrlWLMStartSilent,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMStartSilent,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMShow | wlmConst.cCtrlWLMSilent,
+                    wlmConst.cCtrlWLMWait | wlmConst.cCtrlWLMHide | wlmConst.cCtrlWLMSilent,
+            ):
+                _logger.warning("No extra return information can be given with 'action' {action}.")
+                extra_ret = 0
+
+            status = self._lib.dll.ControlWLMEx(action, app_start, version, delay, extra_ret)
+            _logger.debug("[%s] Started server with status = %d", self._name, status)
+            if status <= 0:
+                self._check_for_error_code(status, "ControlWLMEx")
+
+            return True
+
+        return False
+
+    @rpc_method
+    def stop_server(self) -> None:
+        """Stop the device server if it is running."""
+        self._check_is_open()
+        wlm_count = self._lib.dll.GetWLMCount(0)
+        _logger.info("[%s] Stopping server, current wlm count = %d", self._name, wlm_count)
+        if wlm_count > 0:
+            status = self._lib.dll.Operation(wlmConst.cCtrlStopAll)
+            _logger.debug("[%s] Stopped measurement with status = %d", self._name, status)
+            status = self._lib.dll.ControlWLM(wlmConst.cCtrlWLMExit, 0, 0)
+            _logger.debug("[%s] Stopped server with status = %d", self._name, status)
+
+    @rpc_method
+    def start_measurement(self) -> None:
+        """Start measurement operation."""
+        self._check_is_open()
+        status = self._lib.dll.Operation(wlmConst.cCtrlStartMeasurement)
+        _logger.debug("[%s] Started measurement with status = %d", self._name, status)
+        if status <= 0:
+            self._check_for_error_code(status, "Operation")
+
+    @rpc_method
+    def stop_all(self) -> None:
+        """Stop all operations."""
+        self._check_is_open()
+        status = self._lib.dll.Operation(wlmConst.cCtrlStopAll)
+        _logger.debug("[%s] Started measurement with status = %d", self._name, status)
+        if status <= 0:
+            self._check_for_error_code(status, "Operation")
 
     @rpc_method
     def get_operation_state(self) -> int:
@@ -179,6 +277,46 @@ class HighFinesse_Wlm(QMI_Instrument):
         frequency = self._lib.dll.GetFrequencyNum(channel, 0.0)
 
         return self._check_for_error_code(frequency, "GetFrequencyNum")
+
+    @rpc_method
+    def calibrate(self, laser_type: int, unit: int, value: float, channel: int = 1):
+        """Perform a WLM or LSA channel calibration based on a light of a reference source.
+        The calibration only works if no measurement is active.
+
+        Parameters:
+            laser_type: "cHeNe633", red HeNe laser; the allowed wavelength range is 632.99 to 632.993 nm.
+                        "cNeL", shipped neon lamp. This option is available only with Laser Spectrum
+                                Analysers and WS/5, WS/6 and some WS/7 Wavelength Meters.
+                        "cOther", any other stabilized reference single mode laser. This option is available
+                        only with WS/7, WS/Ultimate and modern WS/5 and WS/6 Wavelength
+                        Meters. The allowed calibration wavelength range is::
+                          - 450 to 0900 nm with standard and UV Wavelength Meters
+                          - 600 to 1750 nm with IR Wavelength Meters
+                          - 632 to 2000 nm with IR2 Wavelength Meters
+                        "cFreeHeNe", a free running red HeNe laser. This option is available only with WS/7
+                        Wavelength Meters. The needed calibration wavelength is a distinctive value
+                        for the special laser, it is published with the laser if the option is purchased.
+            unit:       The physical unit which the Value parameter is interpreted in. Available are
+                        cReturnWavelengthVac, cReturnWavelengthAir, cReturnFrequency,
+                        cReturnWavenumber and cReturnPhotonEnergy.
+            value:      The wavelength, frequency or energy value the calibration is performed on. This value must
+                        match the connected laser and is interpreted in the unit of the Unit parameter above.
+            channel:    The switch (multiplexer) channel used for calibration with versions which dispose of the switch
+                        option (Note: With channels other than 1, the switch mode must be set in advance.). With
+                        Wavelength Meters or Laser Spectrum Analysers without fiber switch option, 1 must be used here.
+        """
+        self._check_is_open()
+        if laser_type not in (wlmConst.cHeNe633, wlmConst.cNeL, wlmConst.cOther, wlmConst.cFreeHeNe):
+            raise QMI_UsageException(f"Invalid laser type {laser_type}.")
+
+        if unit not in range(5):
+            raise QMI_UsageException(f"Invalid physical unit {unit}.")
+
+        self._check_channel(channel)
+
+        ret_val = self._lib.dll.Calibration(laser_type, unit, value, channel)
+        self._check_for_error_code(ret_val, "Calibration")
+
 
     @rpc_method
     def get_wavelength(self, channel: int) -> float:
