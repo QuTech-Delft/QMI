@@ -317,6 +317,101 @@ class HighFinesse_Wlm(QMI_Instrument):
         ret_val = self._lib.dll.Calibration(laser_type, unit, value, channel)
         self._check_for_error_code(ret_val, "Calibration")
 
+    @rpc_method
+    def get_auto_calibration_mode(self) -> bool:
+        """Get the current auto calibration mode parameter.
+
+        Returns:
+            boolean: True if auto calibration mode is on, else False.
+        """
+        self._check_is_open()
+
+        ret_val = self._lib.dll.GetAutoCalMode(0)
+        if ret_val not in [0, 1]:
+            self._check_for_error_code(ret_val, "GetAutoCalMode")
+
+        return bool(ret_val)
+
+    @rpc_method
+    def set_auto_calibration_mode(self, mode: bool) -> None:
+        """Set auto calibration mode parameter.
+
+        Parameters:
+            mode: True if auto calibration mode is to be set on, else False.
+        """
+        self._check_is_open()
+
+        ret_val = self._lib.dll.SetAutoCalMode(int(mode))
+        self._check_for_error_code(ret_val, "SetAutoCalMode")
+
+    @rpc_method
+    def get_auto_calibration_settings(self) -> tuple[int, str]:
+        """Get the auto calibration settings.
+
+        Returns:
+            period:   The calibration period value.
+            unit_str: The unit of the calibration period value.
+        """
+        period = ctypes.POINTER(ctypes.c_long)
+        unit = ctypes.POINTER(ctypes.c_long)
+        ret_val = self._lib.dll.GetAutoCalSetting(wlmConst.cmiAutoCalPeriod, period, 0, 0)
+        if ret_val < 1:
+            # Return value is an error code.
+            self._check_for_error_code(ret_val, "GetAutoCalSetting")
+
+        ret_val = self._lib.dll.GetAutoCalSetting(wlmConst.cmiAutoCalUnit, unit, 0, 0)
+        if ret_val < 1:
+            # Return value is an error code.
+            self._check_for_error_code(ret_val, "GetAutoCalSetting")
+
+        unit_str = "once on start"
+        if unit.value == wlmConst.cACOnceOnStart:
+            period.value = 1  # The value is now meaningless, so set it to return 1
+
+        elif unit.value == wlmConst.cACMeasurements:
+            unit_str = "measurements"
+
+        elif unit.value == wlmConst.cACDays:
+            unit_str = "days"
+
+        elif unit.value == wlmConst.cACHours:
+            unit_str = "hours"
+
+        elif unit.value == wlmConst.cACMinutes:
+            unit_str = "minutes"
+
+        return period.value, unit_str
+
+    @rpc_method
+    def set_auto_calibration_settings(self, period: int, unit: str) -> None:
+        """Set the auto calibration settings.
+
+        Parameters:
+            period: The calibration period value.
+            unit:   The unit of the calibration period value.
+        """
+        unit_int = wlmConst.cACOnceOnStart
+        if unit.lower() == "measurements":
+            unit_int = wlmConst.cACMeasurements
+
+        elif unit.lower() == "days":
+            unit_int = wlmConst.cACDays
+
+        elif unit.lower() == "hours":
+            unit_int = wlmConst.cACHours
+
+        elif unit.lower() == "minutes":
+            unit_int = wlmConst.cACMinutes
+
+        ret_val = self._lib.dll.SetAutoCalSetting(wlmConst.cmiAutoCalPeriod, period, 0, 0)
+        if ret_val < 1:
+            # Return value is an error code.
+            self._check_for_error_code(ret_val, "SetAutoCalSetting")
+
+        ret_val = self._lib.dll.SetAutoCalSetting(wlmConst.cmiAutoCalUnit, unit_int, 0, 0)
+        if ret_val < 1:
+            # Return value is an error code.
+            self._check_for_error_code(ret_val, "SetAutoCalSetting")
 
     @rpc_method
     def get_wavelength(self, channel: int) -> float:
