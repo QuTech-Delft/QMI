@@ -1,18 +1,13 @@
-"""Instrument driver for the Thorlabs K10CR1/M motorized rotational mount.
+"""Instrument driver for the Thorlabs KDC101 Brushed DC Servo Motor Controller.
 
 This driver communicates with the device via a USB serial port, using the Thorlabs APT protocol. For details,
-see the document "Thorlabs APT Controllers Host-Controller Communications Protocol", issue 25 from Thorlabs.
-
-This driver has only been tested under Linux. In principle it should also work under Windows
-after creating a virtual COM port for the internal USB serial port in the instrument.
+see the document "Thorlabs APT Controllers Host-Controller Communications Protocol", issue 41 from Thorlabs.
 """
-
 import logging
 import time
-import warnings
 
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
+from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException, QMI_UsageException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.transport import create_transport, QMI_SerialTransport
@@ -25,7 +20,6 @@ from qmi.instruments.thorlabs.apt_protocol import (
     AptProtocol,
     AptChannelState,
     AptChannelStopMode,
-    VelocityParams,
     HomeParams,
     MotorStatus,
 )
@@ -34,24 +28,67 @@ from qmi.instruments.thorlabs.apt_protocol import (
 _logger = logging.getLogger(__name__)
 
 
-class Thorlabs_K10CR1(QMI_Instrument):
-    """Instrument driver for the Thorlabs K10CR1/M motorized rotational mount."""
-    _rpc_constants = ["RESPONSE_TIMEOUT", "MAX_VELOCITY", "MAX_ACCELERATION"]
+class Thorlabs_Kdc101(QMI_Instrument):
+    """Instrument driver for the Thorlabs KDC101 Brushed DC Servo Motor Controller. This driver should be
+    compatible also with TDC001 and KVS30 controllers.
+
+    This controller can be used with::
+     - Z9 series 6mm, 12mm and 25mm linear actuators.
+     - PRMTZ8 360 degrees rotation stage.
+    An adaptation of the driver could be made in the future to also allow the use of the linear translation and
+    rotation stages, and goniometers.
+    """
+    _rpc_constants = ["RESPONSE_TIMEOUT"]
 
     RESPONSE_TIMEOUT = 1.0
 
-    # Number of microsteps per degree of rotation. Full revolution is 409600 micro-steps with rotation of 3 degrees.
-    MICROSTEPS_PER_DEGREE = 409600.0 / 3.0
+    # Gearbox ratio
+    GEARBOX_RATIO = {
+        "Z900": 67.49,
+        "PRMTZ8": 67.0,
+    }
 
-    # Internal velocity factor for 1 degree/second. Maximum velocity in degrees/second
-    VELOCITY_FACTOR = 7329109.0
-    MAX_VELOCITY = 10
+    # Encoder counts per revolution of the lead screw.
+    ENCODER_COUNTS_PER_ROTATION = {
+        "Z900": 512 * GEARBOX_RATIO["Z900"],
+        "PRMTZ8": 1919.6418578623391,  # From APT documentation. Bit less than 2arcsec.
+    }
 
-    # Internal acceleration factor for 1 degree/second/second. Maximum acceleration in degrees/second^2
-    ACCELERATION_FACTOR = 1502.0
-    MAX_ACCELERATION = 20
+    # Sampling interval constant for KDC101, as described in p. 39 of documentation
+    T = 2048 / 6E6
 
-    def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
+    # Maximum velocity for controlled profiles
+    MAX_VELOCITY = {
+        "Z900": 2.6,  # 2.3 if "ripples" are not allowed in the move profile.
+        "PRMTZ8": 25.0,
+    }
+    # Velocity scaling factor, VEL_APT = EncCnt × T × 65536 × Vel, where T = 2048 / (6 × 10^6).
+    VELOCITY_SCALING_FACTOR = {
+        "Z900": 772981.3692 * T * 65536,
+        "PRMTZ8": 42941.66 * T * 65536,
+    }
+    # Maximum acceleration
+    MAX_ACCELERATION = {
+        "Z900": 4.0,
+        "PRMTZ8": 20.0,
+    }
+    # Acceleration scaling factor, ACC_APT = EncCnt × T^2 × 65536 × Acc, where T = 2048 / (6 × 10^6).
+    ACCELERATION_SCALING_FACTOR = {
+        "Z900": 263.8443072 * T * 65536,  # Using T**2 gives acc readout that is out-of-range!
+        "PRMTZ8": 14.66 * T * 65536,
+    }
+
+    # Number of channels
+    NUMBER_OF_CHANNELS = 1
+
+    ACTUATOR_TRAVEL_RANGES = {
+        "Z906": 6.0,
+        "Z912": 12.0,
+        "Z925": 25.0,
+        "PRMTZ8": 360.0,
+    }
+
+    def __init__(self, context: QMI_Context, name: str, transport: str, actuator: str) -> None:
         """Initialize driver.
 
         The motorized mount presents itself as a USB serial port.
@@ -61,14 +98,31 @@ class Thorlabs_K10CR1(QMI_Instrument):
         Parameters:
             name:      Name for this instrument instance.
             transport: Transport descriptor to access the instrument.
+            actuator:  The actuator model. For this driver, currently allowed models are:
+                       Z906, Z912, Z925 and PRMTZ8.
         """
         super().__init__(context, name)
         self._transport = create_transport(transport, default_attributes={"baudrate": 115200, "rtscts": True})
         assert isinstance(self._transport, QMI_SerialTransport)
         self._apt_protocol = AptProtocol(self._transport, default_timeout=self.RESPONSE_TIMEOUT)
+        if actuator.startswith("Z9"):
+            actuator = actuator[:4]
+            self._series = actuator[:2] + "00"
 
-        # The APT protocol supports multiple channels, but the K10CR1 only uses channel 1.
-        self._channel = 1
+        else:
+            self._series = actuator
+
+        try:
+            self._travel_range = self.ACTUATOR_TRAVEL_RANGES[actuator]
+            # Linear or rotational displacement of the lead screw per encoder count
+            self._displacement_per_encoder_count = 1.0 / self.ENCODER_COUNTS_PER_ROTATION[self._series]
+            self._velocity_scaling_factor = self.VELOCITY_SCALING_FACTOR[self._series]
+            self._acceleration_scaling_factor = self.ACCELERATION_SCALING_FACTOR[self._series]
+            self._max_velocity = self.MAX_VELOCITY[self._series]
+            self._max_acceleration = self.MAX_ACCELERATION[self._series]
+
+        except KeyError:
+            raise NotImplementedError(f"Actuator type {actuator} has not been implemented")
 
     def _get_velocity_params(self) -> _AptMessage:
         """Update and return the current maximum velocity and acceleration.
@@ -79,7 +133,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # Send request message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_VEL_PARAMS.value],
-            chan_ident=self._channel
+            chan_ident=self.NUMBER_OF_CHANNELS
         )
         reply_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_VEL_PARAMS.value]
@@ -88,11 +142,11 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # Receive response
         return self._apt_protocol.ask(req_msg, reply_msg)
 
-    def _check_k10cr1(self) -> None:
-        """Check that the connected device is a Thorlabs K10CR1.
+    def _check_kdc101(self) -> None:
+        """Check that the connected device is a Thorlabs KDC101.
 
         Raises:
-            QMI_InstrumentException: If not connected to a K10CR1 device.
+            QMI_InstrumentException: If not connected to a KDC101 device.
             QMI_TimeoutException:    If the instrument does not answer our request.
         """
         # Send request message.
@@ -104,11 +158,11 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # Receive response
         resp = self._apt_protocol.ask(req_msg, reply_msg)
 
-        # Check that this is a K10CR1 device.
+        # Check that this is a KDC101 device.
         model_str = resp.model_number.decode("iso8859-1")
-        if model_str != "K10CR1":
+        if model_str != "KDC101":
             raise QMI_InstrumentException(
-                f"Driver only supports K10CR1 but instrument identifies as {model_str!r}"
+                f"Driver only supports KDC101 but instrument identifies as {model_str!r}"
             )
 
     @rpc_method
@@ -121,15 +175,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
             # Wait and discard partial data, as recommended by the APT protocol documentation.
             time.sleep(0.050)
             self._transport.discard_read()
-
-            # NOTE: The APT doc says we should wait another 50 ms and then enable RTS.
-            #   We can not easily do this because our transport layer does not support explicit set/clear RTS.
-            #   Skip this step for now; we can try it later if there are communication problems.
-
-            # Check that this device is a K10CR1 motor.
-            # Otherwise we should not talk to it, since we don't want to send
-            # inappropriate commands to some unsupported device.
-            self._check_k10cr1()
+            self._check_kdc101()
 
         except Exception:
             # Close the transport if an error occurred during initialization of the instrument.
@@ -168,13 +214,17 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
     @rpc_method
     def get_motor_status(self) -> MotorStatus:
-        """Return the motor status bits."""
+        """Return the motor status bits.
+
+        Returns:
+            MotorStatus: The received motor status bits.
+        """
         self._check_is_open()
 
         # Send request message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_STATUS_BITS.value],
-            chan_ident=self._channel
+            chan_ident=self.NUMBER_OF_CHANNELS
         )
         reply_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_STATUS_BITS.value]
@@ -207,19 +257,23 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_IDENTIFY.value],
-            chan_ident=self._channel
+            chan_ident=self.NUMBER_OF_CHANNELS
         )
         self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def get_chan_enable_state(self) -> bool:
-        """Return the enable state of the motor drive channel."""
+        """Return the enable state of the motor drive channel.
+
+        Returns:
+            boolean: True if the channel is enabled, False if the channel is disabled.
+        """
         self._check_is_open()
 
         # Send request message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_REQ_CHANENABLESTATE.value],
-            chan_ident=self._channel
+            chan_ident=self.NUMBER_OF_CHANNELS
         )
         reply_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_GET_CHANENABLESTATE.value]
@@ -242,6 +296,9 @@ class Thorlabs_K10CR1(QMI_Instrument):
         position and can be moved through external force.
 
         The drive channel is by default enabled at power-up.
+
+        Parameters:
+            enable:  Boolean to indicate new state. True for enable, False for disable.
         """
         self._check_is_open()
 
@@ -249,31 +306,29 @@ class Thorlabs_K10CR1(QMI_Instrument):
         enable_state = AptChannelState.ENABLE if enable else AptChannelState.DISABLE
         set_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_SET_CHANENABLESTATE.value],
-            chan_ident=self._channel,
+            chan_ident=self.NUMBER_OF_CHANNELS,
             enable_state=enable_state.value,
         )
         self._apt_protocol.send_message(set_msg)
 
     @rpc_method
     def get_absolute_position(self) -> float:
-        """Return the absolute position of the stage in degrees.
+        """Return the absolute position of the stage in millimeters.
 
         After power-up, the absolute position of the stage will be
         unknown until the stage is homed. If the stage has not yet
         been homed, this function will return the current position
         relative to the position at power-up.
 
-        Note that the absolute position can exceed the range of
-        -360 .. +360 degrees when the stage has rotated a full turn.
-        The absolute position counter overflows after 43 full turns
-        and may then return incorrect results.
+        Returns:
+            position: The absolute position if stage is homed, otherwise relative position. In mm.
         """
         self._check_is_open()
 
         # Send request message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_POS_COUNTER.value],
-            chan_ident=self._channel
+            chan_ident=self.NUMBER_OF_CHANNELS
         )
         reply_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_POS_COUNTER.value]
@@ -281,7 +336,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Receive response
         resp = self._apt_protocol.ask(req_msg, reply_msg)
-        return resp.position / self.MICROSTEPS_PER_DEGREE
+        return resp.position * self._displacement_per_encoder_count
 
     @rpc_method
     def get_velocity(self) -> float:
@@ -289,7 +344,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         resp = self._get_velocity_params()
-        return resp.max_vel / self.VELOCITY_FACTOR
+        return resp.max_vel / self._velocity_scaling_factor
 
     @rpc_method
     def get_acceleration(self) -> float:
@@ -297,33 +352,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         resp = self._get_velocity_params()
-        return resp.accel / self.ACCELERATION_FACTOR
-
-    @rpc_method
-    def get_velocity_params(self) -> VelocityParams:
-        """Return the current maximum velocity and acceleration."""
-        self._check_is_open()
-        warnings.warn(
-            f"{self.get_velocity_params.__name__} has been deprecated. " +
-            f"Please use {self.get_velocity.__name__} and {self.get_acceleration.__name__} instead.",
-            DeprecationWarning
-        )
-
-        # Send request message.
-        req_msg = self._apt_protocol.create(
-            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_VEL_PARAMS.value],
-            chan_ident=self._channel
-        )
-        reply_msg = self._apt_protocol.create(
-            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_VEL_PARAMS.value]
-        )
-
-        # Receive response
-        resp = self._apt_protocol.ask(req_msg, reply_msg)
-        return VelocityParams(
-            max_velocity=(resp.max_vel / self.VELOCITY_FACTOR),
-            acceleration=(resp.accel / self.ACCELERATION_FACTOR)
-        )
+        return resp.accel / self._acceleration_scaling_factor
 
     @rpc_method
     def set_velocity(self, max_velocity: float) -> None:
@@ -335,19 +364,19 @@ class Thorlabs_K10CR1(QMI_Instrument):
             max_velocity: Maximum velocity in degrees/second (max 10).
         """
         self._check_is_open()
-        if not 0 < max_velocity <= self.MAX_VELOCITY:
+        if not 0 < max_velocity <= self._max_velocity:
             raise ValueError(f"Invalid value for {max_velocity=}")
 
         # Get current values and check with set value
         current_values = self._get_velocity_params()
-        max_vel = int(round(max_velocity * self.VELOCITY_FACTOR))
+        max_vel = int(round(max_velocity * self._velocity_scaling_factor))
         if current_values.max_vel == max_vel:
             return  # Already set
 
         # Send command message. Note that documentation describes 'min_vel' to be always zero.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
-            chan_ident=self._channel,
+            chan_ident=self.NUMBER_OF_CHANNELS,
             min_vel=0,
             accel=current_values.accel,
             max_vel=max_vel
@@ -364,19 +393,19 @@ class Thorlabs_K10CR1(QMI_Instrument):
             acceleration: Maximum acceleration in degrees/second (max 10).
         """
         self._check_is_open()
-        if not 0 < acceleration <= self.MAX_ACCELERATION:
+        if not 0 < acceleration <= self._max_acceleration:
             raise ValueError(f"Invalid value for {acceleration=}")
 
         # Get current values and check with set value
         current_values = self._get_velocity_params()
-        accel = int(round(acceleration * self.ACCELERATION_FACTOR))
+        accel = int(round(acceleration * self._acceleration_scaling_factor))
         if current_values.accel == accel:
             return   # Already set
 
         # Send command message. Note that documentation describes 'min_vel' to be always zero.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
-            chan_ident=self._channel,
+            chan_ident=self.NUMBER_OF_CHANNELS,
             min_vel=0,
             accel=accel,
             max_vel=current_values.max_vel
@@ -384,42 +413,18 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._apt_protocol.send_message(req_msg)
 
     @rpc_method
-    def set_velocity_params(self, max_velocity: float, acceleration: float) -> None:
-        """Set the maximum velocity and acceleration.
-
-        These settings will be applied for subsequent absolute and relative moves.
-
-        Parameters:
-            max_velocity: Maximum velocity in degrees/second (max 10).
-            acceleration: Acceleration in degree/second/second (max 20).
-        """
-        self._check_is_open()
-        if not 0 < max_velocity <= self.MAX_VELOCITY:
-            raise ValueError(f"Invalid value for {max_velocity=}")
-        if not 0 < acceleration <= self.MAX_ACCELERATION:
-            raise ValueError(f"Invalid value for {acceleration=}")
-
-        # Send command message. Note that documentation describes 'min_vel' to be always zero.
-        max_vel = int(round(max_velocity * self.VELOCITY_FACTOR))
-        accel = int(round(acceleration * self.ACCELERATION_FACTOR))
-        req_msg = self._apt_protocol.create(
-            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
-            chan_ident=self._channel,
-            min_vel=0,
-            accel=accel,
-            max_vel=max_vel
-        )
-        self._apt_protocol.send_message(req_msg)
-
-    @rpc_method
     def get_backlash_distance(self) -> float:
-        """Return the backlash distance in degrees."""
+        """Get the backlash distance.
+
+        Returns:
+            backlash_dist: The backlash distance in millimeters.
+        """
         self._check_is_open()
 
         # Send request message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_GEN_MOVE_PARAMS.value],
-            chan_ident=self._channel
+            chan_ident=self.NUMBER_OF_CHANNELS
         )
         reply_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_GEN_MOVE_PARAMS.value]
@@ -428,7 +433,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # Receive response
         resp = self._apt_protocol.ask(req_msg, reply_msg)
 
-        return resp.backlash_dist / self.MICROSTEPS_PER_DEGREE
+        return resp.backlash_dist * self._displacement_per_encoder_count
 
     @rpc_method
     def set_backlash_distance(self, backlash: float) -> None:
@@ -439,22 +444,22 @@ class Thorlabs_K10CR1(QMI_Instrument):
         by the backlash distance, then moves back to the target in forward direction.
 
         Parameters:
-            backlash: Backlash distance in degrees, or 0 to disable.
+            backlash: Backlash distance in millimeters, or 0 to disable.
         """
-        # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
-        raw_dist = int(round(backlash * self.MICROSTEPS_PER_DEGREE))
-        if abs(raw_dist) >= 2**31:
-            raise ValueError("Backlash distance out of valid range")
+        # Check that the backlash distance is sensible.
+        if abs(backlash) > self._travel_range / 2.0:
+            raise ValueError("Backlash distance larger than half of travel range")
 
         self._check_is_open()
 
+        # Convert distance to microsteps.
+        raw_dist = int(round(backlash / self._displacement_per_encoder_count))
         # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_GEN_MOVE_PARAMS.value],
-            chan_ident=self._channel,
+            chan_ident=self.NUMBER_OF_CHANNELS,
             backlash_dist=raw_dist
         )
-
         self._apt_protocol.send_message(req_msg)
 
     @rpc_method
@@ -465,7 +470,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # Send request message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_HOME_PARAMS.value],
-            chan_ident=self._channel
+            chan_ident=self.NUMBER_OF_CHANNELS
         )
         reply_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_HOME_PARAMS.value]
@@ -477,48 +482,38 @@ class Thorlabs_K10CR1(QMI_Instrument):
         return HomeParams(
             home_direction=AptChannelHomeDirection(resp.home_dir),
             limit_switch=AptChannelHomeLimitSwitch(resp.limit_switch),
-            home_velocity=(resp.home_velocity / self.VELOCITY_FACTOR),
-            offset_distance=(resp.offset_dist / self.MICROSTEPS_PER_DEGREE)
+            home_velocity=(resp.home_velocity / self._velocity_scaling_factor),
+            offset_distance=(resp.offset_dist * self._displacement_per_encoder_count)
         )
 
     @rpc_method
     def set_home_params(
         self,
-        home_direction: AptChannelHomeDirection,
-        limit_switch: AptChannelHomeLimitSwitch,
         home_velocity: float,
         offset_distance: float
     ) -> None:
         """Set the homing parameters.
 
-        WARNING: The K10CR1 manual recommends that these settings should
-        not be adjusted from the factory defaults.
-
         Parameters:
-            home_direction:     Direction of moving to home (should be HomeDirection.REVERSE).
-            limit_switch:       Limit switch to use for homing (should be HomeLimitSwitch.REVERSE).
-            home_velocity:      Homing velocity in degrees/second (max 5).
-            offset_distance:    Distance of home position from home limit switch (in degrees).
+            home_velocity:      Homing velocity in mm/second or degrees/second.
+            offset_distance:    Distance of home position from home limit switch (in mm).
         """
-        if home_direction != AptChannelHomeDirection.REVERSE:
-            raise ValueError("Invalid value for home_direction")
-        if limit_switch != AptChannelHomeLimitSwitch.REVERSE:
-            raise ValueError("Invalid value for limit_switch")
-        if not 0 < home_velocity <= 5:
+        if not 0 < home_velocity <= self._max_velocity:
             raise ValueError(f"Invalid value for {home_velocity=}")
-
-        # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
-        raw_dist = int(round(offset_distance * self.MICROSTEPS_PER_DEGREE))
-        if abs(raw_dist) >= 2**31:
-            raise ValueError("Invalid range for offset_distance")
+        if not 0 <= offset_distance <= self._travel_range:
+            raise ValueError(f"Invalid value for {offset_distance=}")
 
         self._check_is_open()
 
+        home_direction = AptChannelHomeDirection.REVERSE
+        limit_switch = AptChannelHomeLimitSwitch.REVERSE
+        # Convert values.
+        raw_velocity = int(round(home_velocity * self._velocity_scaling_factor))
+        raw_dist = int(round(offset_distance / self._displacement_per_encoder_count))
         # Send command message.
-        raw_velocity = int(round(home_velocity * self.VELOCITY_FACTOR))
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_HOME_PARAMS.value],
-            chan_ident=self._channel,
+            chan_ident=self.NUMBER_OF_CHANNELS,
             home_dir=home_direction.value,
             limit_switch=limit_switch.value,
             home_velocity=raw_velocity,
@@ -542,7 +537,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         stop_mode = AptChannelStopMode.IMMEDIATE if immediate_stop else AptChannelStopMode.PROFILED
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_STOP.value],
-            chan_ident=self._channel,
+            chan_ident=self.NUMBER_OF_CHANNELS,
             stop_mode=stop_mode.value,
         )
         self._apt_protocol.send_message(req_msg)
@@ -559,7 +554,7 @@ class Thorlabs_K10CR1(QMI_Instrument):
         # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_HOME.value],
-            chan_ident=self._channel,
+            chan_ident=self.NUMBER_OF_CHANNELS,
         )
         self._apt_protocol.send_message(req_msg)
 
@@ -571,19 +566,19 @@ class Thorlabs_K10CR1(QMI_Instrument):
         Use ``wait_move_complete()`` to wait until the move is finished.
 
         Parameters:
-            distance: Relative move distance in degrees.
+            distance: Relative move distance in millimeters.
         """
-        # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
-        raw_dist = int(round(distance * self.MICROSTEPS_PER_DEGREE))
-        if abs(raw_dist) >= 2**31:
-            raise ValueError("Relative distance out of valid range")
+        if abs(distance) > self._travel_range:
+            raise ValueError("Relative distance larger than travel range")
 
         self._check_is_open()
 
+        # Convert distance to microsteps.
+        raw_dist = int(round(distance / self._displacement_per_encoder_count))
         # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_RELATIVE.value],
-            chan_ident=self._channel,
+            chan_ident=self.NUMBER_OF_CHANNELS,
             rel_dist=raw_dist
         )
         self._apt_protocol.send_message(req_msg)
@@ -600,25 +595,20 @@ class Thorlabs_K10CR1(QMI_Instrument):
         been homed, the position parameter of this function will
         be interpreted relative to the position at power-up.
 
-        Note that the stage supports absolute positions above 360 degrees
-        and will not automatically reduce such positions module 360.
-        It is therefore possible that the stage must rotate more than
-        a full turn in order to reach a specific absolute position.
-
         Parameters:
-            position: Absolute target position in degrees.
+            position: Absolute target position in millimeters.
         """
-        # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
-        raw_pos = int(round(position * self.MICROSTEPS_PER_DEGREE))
-        if abs(raw_pos) >= 2**31:
+        if not 0.0 <= position <= self._travel_range:
             raise ValueError("Absolute position out of valid range")
 
         self._check_is_open()
 
+        # Convert distance to microsteps.
+        raw_pos = int(round(position / self._displacement_per_encoder_count))
         # Send command message.
         req_msg = self._apt_protocol.create(
             APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_ABSOLUTE.value],
-            chan_ident=self._channel,
+            chan_ident=self.NUMBER_OF_CHANNELS,
             abs_position=raw_pos,
         )
         self._apt_protocol.send_message(req_msg)
