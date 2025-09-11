@@ -29,6 +29,19 @@ class HighFinesse_Wlm(QMI_Instrument):
     This driver automatically detects the platform of the client and will load the respective driver library
     (wlmData.dll for Windows, libwlmData.so for Linux, and libwlmData.dylib for MacOS). Make sure that the library is
     available on your system and that the wlmData.ini file contains the IP address of the server.
+
+    For obtaining data and pattern arrays, according to documentation, the data type, size and location of the data
+    should be known. Also, the data has to be 'uncovered' first. Otherwise, arrays will not be exported. For getting
+    array data from analysis or grating mode, the respective mode must be active in the main program.
+    When obtaining array data, the following commands should be deployed (order is not strict):
+    ```python
+    > wlm.set_pattern|analysis_data(<index>, True)  # <index> for pattern only
+    > data_size = wlm.get_pattern|analysis_data_size()
+    > array_size = wlm.get_pattern|analysis_array_size()
+    > data = get_pattern_data(<channel: int | None>, index, data_size, array_size)  # pattern<num> data
+    > data = get_wavelength_data(data_size, array_size)  # analysis data axis x
+    > data = get_amplitude_data(data_size, array_size)  # analysis data axis y
+    ```
     """
     # TODO: This could set with GetChannelsCount call after super().open().
     MAX_CHANNEL_NUMBER = 8
@@ -75,6 +88,53 @@ class HighFinesse_Wlm(QMI_Instrument):
         _logger.error("[%s] %s error: %s", self._name, method, err_msg)
 
         raise QMI_InstrumentException(f"Error received from library call '{method}': {err_msg}")
+
+    def _get_analysis_data(
+            self, ordinate: str, data_size: int, array_size: int
+    ) -> np.typing.NDArray[np.short | np.float32 | np.double]:
+        """This function returns a copy of spectral analysis data as an array.
+
+        Note that to get data exported from the instrument, the exporting must first be enabled with SetAnalysis.
+
+        Parameters:
+            ordinate:   To select if to get wavelength or amplitude array of the spectral data. Possible values are
+                        'wl' and 'amp'.
+            data_size:  Size of a data point.
+            array_size: Data array size.
+
+        Returns:
+            analysis_data: An array of data of the given ordinate.
+        """
+        if ordinate.lower() == "wl":
+            index = wlmConst.cSignalAnalysisX
+
+        elif ordinate.lower() == "amp":
+            index = wlmConst.cSignalAnalysisY
+
+        else:
+            raise QMI_UsageException("Analysis data can be only retrieved from x or y axis index.")
+
+        if data_size == 2:
+            data_array = np.zeros(array_size, dtype=ctypes.c_short)
+            c_ptr = ctypes.POINTER(ctypes.c_short)
+        elif data_size == 4:
+            data_array = np.zeros(array_size, dtype=ctypes.c_float)
+            c_ptr = ctypes.POINTER(ctypes.c_float)
+        elif data_size == 8:
+            data_array = np.zeros(array_size, dtype=ctypes.c_double)
+            c_ptr = ctypes.POINTER(ctypes.c_double)
+        else:
+            raise QMI_InstrumentException(f"Got an unexpected analysis data size {data_size}")
+
+        ret_val = self._lib.dll.GetAnalysisData(index, data_array.ctypes.data_as(c_ptr))
+        if ret_val == 0:
+            # The channel and/or index was not (correctly) enabled.
+            _logger.debug("[%s] GetAnalysisData error, perhaps SetAnalysis was not run first?", self._name)
+
+        else:
+            self._check_for_error_code(ret_val, "GetAnalysisData")
+
+        return data_array
 
     @rpc_method
     def open(self) -> None:
@@ -231,8 +291,7 @@ class HighFinesse_Wlm(QMI_Instrument):
         self._check_is_open()
         status = self._lib.dll.Operation(wlmConst.cCtrlStartMeasurement)
         _logger.debug("[%s] Started measurement with status = %d", self._name, status)
-        if status <= 0:
-            self._check_for_error_code(status, "Operation")
+        self._check_for_error_code(status, "Operation")
 
     @rpc_method
     def stop_all(self) -> None:
@@ -240,8 +299,7 @@ class HighFinesse_Wlm(QMI_Instrument):
         self._check_is_open()
         status = self._lib.dll.Operation(wlmConst.cCtrlStopAll)
         _logger.debug("[%s] Started measurement with status = %d", self._name, status)
-        if status <= 0:
-            self._check_for_error_code(status, "Operation")
+        self._check_for_error_code(status, "Operation")
 
     @rpc_method
     def get_operation_state(self) -> int:
@@ -354,16 +412,13 @@ class HighFinesse_Wlm(QMI_Instrument):
         """
         period = ctypes.POINTER(ctypes.c_long)
         unit = ctypes.POINTER(ctypes.c_long)
+        # First use the call to set period
         ret_val = self._lib.dll.GetAutoCalSetting(wlmConst.cmiAutoCalPeriod, period, 0, 0)
-        if ret_val < 1:
-            # Return value is an error code.
-            self._check_for_error_code(ret_val, "GetAutoCalSetting")
-
+        self._check_for_error_code(ret_val, "GetAutoCalSetting")
+        # Then use the call to set unit
         ret_val = self._lib.dll.GetAutoCalSetting(wlmConst.cmiAutoCalUnit, unit, 0, 0)
-        if ret_val < 1:
-            # Return value is an error code.
-            self._check_for_error_code(ret_val, "GetAutoCalSetting")
-
+        self._check_for_error_code(ret_val, "GetAutoCalSetting")
+        # Handle the values returned from pointers
         unit_str = "once on start"
         if unit.value == wlmConst.cACOnceOnStart:
             period.value = 1  # The value is now meaningless, so set it to return 1
@@ -403,15 +458,136 @@ class HighFinesse_Wlm(QMI_Instrument):
         elif unit.lower() == "minutes":
             unit_int = wlmConst.cACMinutes
 
+        # First use the call to set period
         ret_val = self._lib.dll.SetAutoCalSetting(wlmConst.cmiAutoCalPeriod, period, 0, 0)
-        if ret_val < 1:
-            # Return value is an error code.
-            self._check_for_error_code(ret_val, "SetAutoCalSetting")
-
+        self._check_for_error_code(ret_val, "SetAutoCalSetting")
+        # Then use the call to set unit
         ret_val = self._lib.dll.SetAutoCalSetting(wlmConst.cmiAutoCalUnit, unit_int, 0, 0)
-        if ret_val < 1:
+        self._check_for_error_code(ret_val, "SetAutoCalSetting")
+
+    @rpc_method
+    def get_active_channel(self, mode: int) -> str | int:
+        """Returns the currently active measurement channel number in given mode.
+        NOTE:: A builtin neon lamp channel is treated like a rear port.
+
+        Parameters:
+            mode: Controls the interpretation of the return value. Following values are possible::
+                    1. The channel is given in serial order, simply in the return value. This order is, first all
+                        channels at the front port and appended all channels at the rear port (if any).
+                    2. The channel is given in separated order. The low word of the return value contains the
+                        channel number related to the specific port, the high order word contains the port
+                        number, 1 for the front, 2 for the rear port.
+                    3. The channel is given in separated order. The return value contains the channel number
+                        related to the specific port and the port parameter contains the port number.
+
+        Returns:
+            channel: The channel number in mode 1, or a channel string indicating "front" or "rear" port
+                      with "F" or "R", respectively, followed by the channel number.
+        """
+        port = ctypes.POINTER(ctypes.c_long)
+        ret_val = self._lib.dll.GetActiveChannel(mode, port, 0)
+        self._check_for_error_code(ret_val, "GetActiveChannel")
+
+        if mode == 3:
+            port_str = "F" if port.value == 1 else "R"
+            return f"{port_str}{ret_val}"
+
+        elif mode == 2:
+            high_word = (ret_val >> 16)
+            low_word = (ret_val & 0xFFFF)
+            if high_word not in (1, 2):
+                raise ValueError(f"Unexpected port value {high_word}")
+
+            if low_word not in range(1, self.MAX_CHANNEL_NUMBER + 1):
+                raise ValueError(f"Unexpected channel number {low_word}")
+
+            port_str = "F" if high_word == 1 else "R"
+            return f"{port_str}{low_word}"
+
+        return ret_val
+
+    @rpc_method
+    def set_active_channel(self, channel: int, mode: int = 1, port: str = "F") -> None:
+        """Set the currently active measurement channel in non-switch mode.
+        NOTE:: A builtin neon lamp channel is treated like a rear port.
+
+        Parameters:
+            channel: The channel number.
+            mode:    Controls the interpretation of the return value. Following values are possible::
+                       1. The channel needs to be given in serial order in the CH parameter. This order is, first all
+                          channels at the front port and appended all channels at the rear port (if any). Default.
+                       2. The channel is given in separated order. The low word of the CH parameter must
+                          contain the channel number related to the specific port, the high order word the port
+                          number, 1 for the front, 2 for the rear port.
+                       3. The channel again is treated in separated order. Overhand the channel number related
+                          to the specific port in the CH parameter and the front or rear port in the Port parameter,
+                          1 for the front, 2 for the rear port.
+            port:    If you have set Mode to 3, indicate the port here: "F" for the front (default),
+                     "R" for the rear port.
+        """
+        self._check_channel(channel)  # TODO: We need an advanced check for different modes.
+        if mode not in (1, 2, 3):
+            raise ValueError(f"Invalid mode: {mode}")
+
+        if port.upper() not in ("F", "R"):
+            raise ValueError(f"Invalid port: {port}")
+
+        port_int = 1 if port.upper() == "F" else 2
+        # TODO: should port_int be 0 if 'mode' is not 3?
+        ret_val = self._lib.dll.SetActiveChannel(mode, port_int, channel, 0)
+        self._check_for_error_code(ret_val, "SetActiveChannel")
+
+    @rpc_method
+    def get_switcher_mode(self) -> int:
+        """Returns the current switcher mode of the optional multichannel switch.
+
+        Returns:
+            mode: The switcher mode.
+        """
+        ret_val = self._lib.dll.GetSwitcherMode(0)
+        if ret_val < 0:
             # Return value is an error code.
-            self._check_for_error_code(ret_val, "SetAutoCalSetting")
+            self._check_for_error_code(ret_val, "GetSwitcherMode")
+
+        return ret_val
+
+    @rpc_method
+    def set_switcher_mode(self, mode: int) -> None:
+        """Set the mode of the optional multichannel switch on or off.
+
+        Parameters:
+            mode: New mode value. must be 0 (off) or 1 (on).
+
+        Raises:
+            ValueError: If the new mode value is not valid (0 or 1).
+        """
+        if mode not in (0, 1):
+            raise ValueError(f"Switch mode must be 0 or 1. Not {mode}")
+
+        ret_val = self._lib.dll.SetSwitcherMode(mode)
+        # Return value is an error code.
+        self._check_for_error_code(ret_val, "SetSwitcherMode")
+
+    @rpc_method
+    def get_switcher_channel(self) -> int:
+        """Returns the currently active (signal) channel of the optional multichannel switch.
+
+        Returns:
+            channel: The switcher channel number.
+        """
+        ret_val = self._lib.dll.GetSwitcherChannel(0)
+        return self._check_for_error_code(ret_val, "GetSwitcherChannel")
+
+    @rpc_method
+    def set_switcher_channel(self, channel: int) -> None:
+        """Set the currently active (signal) channel of the optional multichannel switch in non-switch mode.
+
+        Parameters:
+            channel: The channel number.
+        """
+        self._check_channel(channel)
+        ret_val = self._lib.dll.SetSwitcherChannel(channel)
+        self._check_for_error_code(ret_val, "SetSwitcherChannel")
 
     @rpc_method
     def get_wavelength(self, channel: int) -> float:
@@ -450,7 +626,87 @@ class HighFinesse_Wlm(QMI_Instrument):
         return self._check_for_error_code(power, "GetPowerNum")
 
     @rpc_method
-    def set_data_pattern(self, index: int = 1, enable: bool = True) -> None:
+    def get_analysis_data_size(self) -> int:
+        """Obtain the analysis data point size. Successful inquiry should return value
+        2, 4 or 8, referring to a short integer, floating point or double precision data.
+        Note that this value does not change during a measurement.
+
+        Returns:
+            data_size: The returned data size.
+        """
+        data_size = self._lib.dll.GetAnalysisItemSize(wlmConst.cSignalAnalysis)
+        return self._check_for_error_code(data_size, "GetAnalysisItemSize")
+
+    @rpc_method
+    def get_analysis_array_size(self) -> int:
+        """Obtain the analysis data array size.
+        Note that this value does not change during a measurement.
+
+        Returns:
+            array_size: How many data points can be exported in a data array.
+        """
+        array_size = self._lib.dll.GetAnalysisItemCount(wlmConst.cSignalAnalysis)
+        return self._check_for_error_code(array_size, "GetAnalysisItemCount")
+
+    @rpc_method
+    def set_analysis_data(self, enable: bool) -> None:
+        """Set if analysis array is to be exported. This should be set as true to enable exporting analysis data
+        to an array."""
+        state = wlmConst.cAnalysisEnable if enable else wlmConst.cAnalysisDisable
+        ret_val = self._lib.dll.SetAnalysis(wlmConst.cSignalAnalysis, state)
+        self._check_for_error_code(ret_val, "SetAnalysis")
+
+    @rpc_method
+    def get_wavelength_data_location(self) -> int:
+        """Get the memory start location of the wavelength data."""
+        location = self._lib.dll.GetAnalysis(wlmConst.cSignalAnalysisX)
+        return self._check_for_error_code(location, "GetAnalysis")
+
+    @rpc_method
+    def get_amplitude_data_location(self) -> int:
+        """Get the memory start location of the amplitude data."""
+        location = self._lib.dll.GetAnalysis(wlmConst.cSignalAnalysisY)
+        return self._check_for_error_code(location, "GetAnalysis")
+
+    @rpc_method
+    def get_wavelength_data(
+            self, data_size: int, array_size: int
+    ) -> np.typing.NDArray[np.short | np.float32 | np.double]:
+        """This function returns a copy of spectral analysis wavelength data as an array."""
+        return self._get_analysis_data("wl", data_size, array_size)
+        
+    @rpc_method
+    def get_amplitude_data(
+        self, data_size: int, array_size: int
+    ) -> np.typing.NDArray[np.short | np.float32 | np.double]:
+        """This function returns a copy of spectral analysis amplitude data as an array."""
+        return self._get_analysis_data("amp", data_size, array_size)
+
+    @rpc_method
+    def get_pattern_data_size(self) -> int:
+        """Obtain the pattern data point size. Successful inquiry should return value
+        2, 4 or 8, referring to a short integer, long integer or double precision data.
+        Note that this value does not change during a measurement.
+
+        Returns:
+            data_size: The returned data size.
+        """
+        data_size = self._lib.dll.GetPatternItemSize(wlmConst.cSignalAnalysis)
+        return self._check_for_error_code(data_size, "GetPatternItemSize")
+
+    @rpc_method
+    def get_pattern_array_size(self) -> int:
+        """Obtain the pattern data array size.
+        Note that this value does not change during a measurement.
+
+        Returns:
+            array_size: How many data points can be exported in a data array.
+        """
+        array_size = self._lib.dll.GetPatternItemCount(wlmConst.cSignalAnalysis)
+        return self._check_for_error_code(array_size, "GetPatternItemCount")
+
+    @rpc_method
+    def set_pattern_data(self, index: int = 1, enable: bool = True) -> None:
         """Enable or disable a pattern index to export data from instrument.
 
         Parameters:
@@ -464,17 +720,12 @@ class HighFinesse_Wlm(QMI_Instrument):
                       the Fizeau interferometers for the 2nd pulse.
                     - 3 : cSignal2WideInterferometer. Only in Double Pulse versions! Additional long
                       interferometer array for 2nd pulse.
-
-                    With SetAnalysis only the following value is possible (with LSA and resolver versions):
-                    - 4 : cSignalAnalysis[X]. The [X] array[s] of the spectral analysis data.
-                    - 5 : cSignalAnalysisY. The Y array of the spectral analysis data.
-
             enable: True to enable data pattern (default), False to disable.
 
         Raises:
             ValueError: With invalid index number.
         """
-        if index not in range(6):
+        if index not in range(4):
             raise ValueError(f"Invalid data pattern index number {index}")
 
         if enable:
@@ -489,16 +740,41 @@ class HighFinesse_Wlm(QMI_Instrument):
         self._check_for_error_code(ret_val, "SetPattern")
 
     @rpc_method
-    def get_data_pattern_data(
-        self, channel: int, index: int, arr_size: int
-    ) -> np.typing.NDArray[np.int16]:
+    def get_pattern_location(self, channel: int | None, index: int) -> int:
+        """Get the memory location of an exported array.
+
+        Parameters:
+            channel: The signal number (1 to 8) in case of a WLM with multichannel switch or with double pulse
+                     option (MLC). For WLMs without these options 1 should be overhanded.
+            index:   Array identifier index. See 'set_data_pattern' for possible values.
+
+        Returns:
+            location: The pattern memory location.
+        """
+        if index not in range(4):
+            raise ValueError(f"Invalid data pattern index number {index}")
+
+        if channel is None:
+            location = self._lib.dll.GetPattern(index)
+            return self._check_for_error_code(location, "GetPattern")
+
+        else:
+            self._check_channel(channel)
+            location = self._lib.dll.GetPatternNum(channel, index)
+            return self._check_for_error_code(location, "GetPatternNum")
+
+    @rpc_method
+    def get_pattern_data(
+        self, channel: int | None, index: int, data_size: int, array_size: int
+    ) -> np.typing.NDArray[np.short | np.long | np.double]:
         """Get data from the given data pattern. It must be set first with `set_data_pattern`.
 
         Parameters:
-            channel:  The signal number (1 to 8) in case of a WLM with multichannel switch or with double pulse
-                      option (MLC). For WLMs without these options 1 should be overhanded.
-            index:    Index number to get the data pattern from. Must be in range [0 .. 5]. See also 'set_data_pattern'.
-            arr_size: A batch size for reading data pattern.
+            channel:    The signal number (1 to 8) in case of a WLM with multichannel switch or with double pulse
+                        option (MLC). For WLMs without these options 1 should be overhanded.
+            index:      Index number to get the data pattern from. See 'set_data_pattern' for definitions.
+            data_size:  Size of a data point.
+            array_size: Data array size.
 
         Returns:
             pattern_array: Data array from the data pattern.
@@ -507,19 +783,35 @@ class HighFinesse_Wlm(QMI_Instrument):
             ValueError: With invalid index number.
         """
         _logger.debug("[%s] Getting data pattern data on channel %d and index %i", self._name, channel, index)
-        if index not in range(6):
+        if index not in range(4):
             raise ValueError(f"Invalid data pattern index number {index}")
 
-        self._check_channel(channel)
-        pattern_array = np.zeros(arr_size, dtype=ctypes.c_short)
-        c_short_ptr = ctypes.POINTER(ctypes.c_short)
-        ret_val = self._lib.dll.GetPatternDataNum(channel, index, pattern_array.ctypes.data_as(c_short_ptr))
+        if data_size == 2:
+            pattern_array = np.zeros(array_size, dtype=ctypes.c_short)
+            c_ptr = ctypes.POINTER(ctypes.c_short)
+        elif data_size == 4:
+            pattern_array = np.zeros(array_size, dtype=ctypes.c_long)
+            c_ptr = ctypes.POINTER(ctypes.c_long)
+        elif data_size == 8:
+            pattern_array = np.zeros(array_size, dtype=ctypes.c_double)
+            c_ptr = ctypes.POINTER(ctypes.c_double)
+        else:
+            raise QMI_InstrumentException(f"Got an unexpected pattern data size {data_size}")
+
+        if channel is None:
+            ret_val = self._lib.dll.GetPatternData(index, pattern_array.ctypes.data_as(c_ptr))
+            func = "GetPatternData"
+        else:
+            self._check_channel(channel)
+            ret_val = self._lib.dll.GetPatternDataNum(channel, index, pattern_array.ctypes.data_as(c_ptr))
+            func = "GetPatternDataNum"
+
         if ret_val == 0:
             # The channel and/or index was not (correctly) enabled.
-            _logger.debug("[%s] GetPatternDataNum error, perhaps SetPattern was not run first?", self._name)
+            _logger.debug("[%s] %s error, perhaps SetPattern was not run first?", self._name, func)
 
         elif ret_val not in [0, 1]:
             # Return value is an error code.
-            self._check_for_error_code(ret_val, "GetPatternDataNum")
+            self._check_for_error_code(ret_val, func)
 
         return pattern_array
