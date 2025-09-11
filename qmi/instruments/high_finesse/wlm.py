@@ -43,7 +43,6 @@ class HighFinesse_Wlm(QMI_Instrument):
     > data = get_amplitude_data(data_size, array_size)  # analysis data axis y
     ```
     """
-    # TODO: This could set with GetChannelsCount call after super().open().
     MAX_CHANNEL_NUMBER = 8
 
     def __init__(self, context: QMI_Context, name: str) -> None:
