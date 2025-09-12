@@ -8,8 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Thorlabs KDC101 controller QMI driver. It can at the moment control Z906, Z912 and Z925 actuators and PRMTZ8 rotation stage.
+- New QMI driver for Agiltron FF1x8 optical switch
 
 ### Changed
+- The Agiltron FF optical switch QMI drivers have now common base class in `qmi.instruments.agiltron._ff_optical_switch`
+- Refactored also unit-tests for Agiltron FF optical switches.
 
 ### Fixed
 

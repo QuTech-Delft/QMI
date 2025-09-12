@@ -1,5 +1,5 @@
 """
-QMI driver for the Agiltron FF 1x4 optical switch driver.
+QMI driver for the Agiltron FF 1x8 optical switch driver.
 
 The protocol implemented in this driver is documented in the document
 'Command_List_for_CL-LB_Switch_Driver_5-20-2020.doc'
@@ -16,10 +16,10 @@ from qmi.instruments.agiltron._ff_optical_switch import Agiltron_FfOpticalSwitch
 _logger = logging.getLogger(__name__)
 
 
-class Agiltron_FF1x4(Agiltron_FfOpticalSwitch):
-    """QMI driver for the Agiltron FF 1x4 optical switch driver.
+class Agiltron_FF1x8(Agiltron_FfOpticalSwitch):
+    """QMI driver for the Agiltron FF 1x8 optical switch driver.
 
     Attributes:
         CHANNELS: The number of channels in the switch.
     """
-    CHANNELS = 4
+    CHANNELS = 8
