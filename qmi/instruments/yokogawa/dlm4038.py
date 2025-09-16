@@ -351,9 +351,9 @@ class Yokogawa_DLM4038(QMI_Instrument):
         self._scpi_protocol.write(":WAV:FORM BYTE")
         _ = self.get_number_data_points()
         self._scpi_protocol.write(f":FILE:SAVE:NAME {name}")
-        if data_type == "binary":
+        if data_type.lower() == "binary":
             self._scpi_protocol.write(":FILE:SAVE:BINary:EXECute")
-        elif data_type == "ascii":
+        elif data_type.lower() == "ascii":
             self._scpi_protocol.write(":FILE:SAVE:ASCii:EXECute")
         else:
             raise QMI_InstrumentException(f"Unexpected data type, got {data_type}")
@@ -431,9 +431,9 @@ class Yokogawa_DLM4038(QMI_Instrument):
             select_files: Optional parameter to select only the "last" file (default) or "all" the files.
             data_type:    Specify with type: 'binary' for raw data and 'ascii' for csv data file.
         """
-        if data_type == "binary":
+        if data_type.lower() == "binary":
             data_type = "BINary"
-        elif data_type == "ascii":
+        elif data_type.lower() == "ascii":
             data_type = "ASCii"
         else:
             raise QMI_InstrumentException(f"Unexpected data type, got {data_type}")
