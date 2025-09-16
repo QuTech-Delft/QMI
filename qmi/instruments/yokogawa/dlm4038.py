@@ -260,7 +260,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
         if channels == "all":
             channels = list(range(1, self.CHANNELS + 1))
 
-        v_max = self._channel_value_getter(channels, "MAXimum:VALUE", 19, "MEASURE")
+        v_max = self._channel_value_getter(channels, "MAXimum:VALUE", 19, "MEASure")  # TODO: Test with HW
 
         return np.array(v_max, dtype=float)
 
@@ -318,7 +318,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
         """
         Gets the number of data points that will be saved.
         """
-        return int(self._scpi_protocol.ask(":WAVeform:LENGth?")[10:-1])
+        return int(self._scpi_protocol.ask(":WAVeform:LENGth?")[10:-1])  # TODO: range 10:-1 needs to be checked with HW
 
     @rpc_method
     def set_average(self, average: int) -> None:

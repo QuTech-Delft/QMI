@@ -460,7 +460,7 @@ class TestMethodsCase(unittest.TestCase):
         expected_writes = []
         side_effect = []
         for channel in channels:
-            expected_writes.append(unittest.mock.call(f":MEASure:CHANNEL{channel}:MAXimum:VALUE?\n".encode()))
+            expected_writes.append(unittest.mock.call(f":MEASure:CHANnel{channel}:MAXimum:VALUE?\n".encode()))
             side_effect.append(b"CHANnel:MAXimum:VAL" + f"{expected_max_waveform:.1f}\n".encode())
 
         self._transport_mock.read_until.side_effect = side_effect
@@ -661,7 +661,7 @@ class TestMethodsCase(unittest.TestCase):
             unittest.mock.call(":START\n".encode()),
         ]
         # Act
-        self.yokogawa.save_file(name, type=expected_type.lower(), waiting_time=waiting_time)
+        self.yokogawa.save_file(name, data_type=expected_type.lower(), waiting_time=waiting_time)
         # Assert
         self._transport_mock.write.assert_has_calls(expected_writes)
 
@@ -745,38 +745,83 @@ class TestMethodsCase(unittest.TestCase):
         # Assert
         copy_patch.assert_has_calls(expected_calls)
 
-    # def test_delete_file(self):
-    #     """Test delete_file method using default 'last' and 'binary' file selections."""
-    #     # Arrange
-    #     name = "no"
-    #     ftype = "BINary"
-    #     contents = [f"{name.upper()}00{f}.csv" for f in range(8)]
-    #     label = "007"
-    #     expected_file_name = name.upper() + label + ".csv"
-    #     # Act
-    #     with patch("qmi.instruments.yokogawa.dlm4038.os.listdir", return_value=contents):
-    #         self.yokogawa.delete_file(name)
-    #
-    #     # Assert
-    #     delete_patch.assert_called_once_with(f"{self.def_path}{expected_file_name}", dest)
-    #
-    # def test_delete_file_all(self):
-    #     """Test find_file_name method using 'all' files selection."""
-    #     # Arrange
-    #     name = "no"
-    #     dest = "another_dir"
-    #     contents = [f"{name.upper()}00{f}.csv" for f in range(8)]
-    #     expected_calls = [
-    #         unittest.mock.call(f"{self.def_path}{f}", dest) for f in contents
-    #     ]
-    #     # Act
-    #     with patch(
-    #             "qmi.instruments.yokogawa.dlm4038.os.listdir", return_value=contents
-    #     ), patch("qmi.instruments.yokogawa.dlm4038.shutil.delete") as delete_patch:
-    #         self.yokogawa.delete_file(name, dest, "all")
-    #
-    #     # Assert
-    #     delete_patch.assert_has_calls(expected_calls)
+    def test_delete_file(self):
+        """Test delete_file method using default 'last' and 'binary' file selections."""
+        # Arrange
+        name = "no"
+        ftype = "BINary"
+        contents = [f"{name.upper()}00{f}.csv" for f in range(8)]
+        label = "007"
+        file_name = name.upper() + label
+        expected_writes = [
+            unittest.mock.call(":STOP\n".encode()),
+            unittest.mock.call(f':FILE:DELete:{ftype}:EXECute "{file_name}"\n'.encode()),
+            unittest.mock.call(":START\n".encode()),
+        ]
+        # Act
+        with patch("qmi.instruments.yokogawa.dlm4038.os.listdir", return_value=contents):
+            self.yokogawa.delete_file(name)
+
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_writes)
+
+    def test_delete_file_ascii(self):
+        """Test delete_file method using default 'last' and 'ascii' file selections."""
+        # Arrange
+        name = "no"
+        ftype = "ASCii"
+        contents = [f"{name.upper()}00{f}.csv" for f in range(8)]
+        label = "007"
+        file_name = name.upper() + label
+        expected_writes = [
+            unittest.mock.call(":STOP\n".encode()),
+            unittest.mock.call(f':FILE:DELete:{ftype}:EXECute "{file_name}"\n'.encode()),
+            unittest.mock.call(":START\n".encode()),
+        ]
+        # Act
+        with patch("qmi.instruments.yokogawa.dlm4038.os.listdir", return_value=contents):
+            self.yokogawa.delete_file(name, data_type=ftype.lower())
+
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_writes)
+
+    def test_delete_file_all(self):
+        """Test find_file_name method using 'all' files selection."""
+        # Arrange
+        name = "no"
+        ftype = "BINary"
+        contents = [f"{name.upper()}00{f}.csv" for f in range(8)]
+        file_names = [f"{name[:-4]}" for name in contents]
+        expected_writes = [unittest.mock.call(":STOP\n".encode())]
+        expected_writes += [
+            unittest.mock.call(f':FILE:DELete:{ftype}:EXECute "{file_name}"\n'.encode()) for file_name in file_names
+        ]
+        expected_writes += [unittest.mock.call(":START\n".encode())]
+        # Act
+        with patch("qmi.instruments.yokogawa.dlm4038.os.listdir", return_value=contents):
+            self.yokogawa.delete_file(name, "all")
+
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_writes)
+
+    def test_delete_file_all_ascii(self):
+        """Test find_file_name method using 'all' and 'ascii' files selection."""
+        # Arrange
+        name = "no"
+        ftype = "ASCii"
+        contents = [f"{name.upper()}00{f}.csv" for f in range(8)]
+        file_names = [f"{name[:-4]}" for name in contents]
+        expected_writes = [unittest.mock.call(":STOP\n".encode())]
+        expected_writes += [
+            unittest.mock.call(f':FILE:DELete:{ftype}:EXECute "{file_name}"\n'.encode()) for file_name in file_names
+        ]
+        expected_writes += [unittest.mock.call(":START\n".encode())]
+        # Act
+        with patch("qmi.instruments.yokogawa.dlm4038.os.listdir", return_value=contents):
+            self.yokogawa.delete_file(name, "all", ftype.lower())
+
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_writes)
 
 
 if __name__ == '__main__':
