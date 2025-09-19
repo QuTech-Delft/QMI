@@ -153,7 +153,17 @@ class TestMethodsCase(unittest.TestCase):
         """Test set_high_resolution method with "on"."""
         # Arrange
         high_res = True
-        expected_write = f":ACQUIRE:RESOLUTION {high_res}\n".encode()
+        expected_write = f":ACQUIRE:RESOLUTION ON\n".encode()
+        # Act
+        self.yokogawa.set_high_resolution(high_res)
+        # Assert
+        self._transport_mock.write.assert_called_once_with(expected_write)
+
+    def test_set_high_resolution_off(self):
+        """Test set_high_resolution method with "off"."""
+        # Arrange
+        high_res = False
+        expected_write = f":ACQUIRE:RESOLUTION OFF\n".encode()
         # Act
         self.yokogawa.set_high_resolution(high_res)
         # Assert
@@ -597,7 +607,7 @@ class TestMethodsCase(unittest.TestCase):
         # Arrange
         expected_ndp = int(1.5E6)
         expected_write = b":WAVeform:LENGth?\n"
-        return_value = b"WAVeform:LENG" + f"{expected_ndp}\n".encode()
+        return_value = b"WAVE:LENG:" + f"{expected_ndp}\n".encode()
         self._transport_mock.read_until.return_value = return_value
         # Act
         ndp = self.yokogawa.get_number_data_points()

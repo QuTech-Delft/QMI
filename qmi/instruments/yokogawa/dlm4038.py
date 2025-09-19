@@ -4,8 +4,11 @@ Instrument driver for the Yokogawa DLM4038 Oscilloscope. The instrument can be c
 If the instrument is connected over ethernet, use the vxi11 protocol by passing the transport description
 "vxi11:ip-address". If the mass storage function (over USB) is used, the scope directory needs to be specific
 (default is "O:/").
-Connecting to the instrument through USB is also possible but has not been tested. In that case, the transport
-description is likely to be either "usbtmc:<vendorid>:<productid>:<serialnr>" or with a GPIB adapter "gbip:<address>".
+
+Connecting to the instrument through USB is also possible but could not be tested. The testing was done on a
+Windows 11 PC but the installation of the device driver to recognize the instrument correctly through USB was
+not successful. In principle, the transport descriptor is likely to be either
+"usbtmc:vendorid=0x0b21:productid=0x0038:serialnr=<serialnr>", or with a GPIB adapter "gbip:<address>".
 """
 
 import logging
@@ -151,7 +154,9 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Parameters:
             state: True to set High Resolution mode on, False to set it off.
         """
-        self._scpi_protocol.write(":ACQUIRE:RESOLUTION " + str(state))
+        # self._scpi_protocol.write(":ACQUIRE:RESOLUTION " + str(state))
+        state_str = "ON" if state else "OFF"
+        self._scpi_protocol.write(":ACQUIRE:RESOLUTION " + state_str)
 
     @rpc_method
     def turn_channel_on(self, channels: int | list[int] | str) -> None:
@@ -293,7 +298,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Parameters:
             channel: The trigger channel number.
         """
-        self._scpi_protocol.ask(f":TRIGger:ATRigger:SIMPle:SOURce {channel}")
+        self._scpi_protocol.write(f":TRIGger:ATRigger:SIMPle:SOURce {channel}")
 
     @rpc_method
     def set_trigger_level(self, voltage: float) -> None:
@@ -318,7 +323,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
         """
         Gets the number of data points that will be saved.
         """
-        return int(self._scpi_protocol.ask(":WAVeform:LENGth?")[10:-1])  # TODO: range 10:-1 needs to be checked with HW
+        return int(self._scpi_protocol.ask(":WAVeform:LENGth?")[10:])  # TODO: range 10:-1 needs to be checked with HW
 
     @rpc_method
     def set_average(self, average: int) -> None:
