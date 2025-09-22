@@ -55,7 +55,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
     def _channels_check(self, channels: int | list[int] | str) -> int | list[int]:
         """Check for string type 'all' and return 'channels' as a list of integers"""
-        if channels.lower() == "all":
+        if isinstance(channels, str) and channels.lower() == "all":
             return list(range(1, self.CHANNELS + 1))
 
         assert not isinstance(channels, str)
