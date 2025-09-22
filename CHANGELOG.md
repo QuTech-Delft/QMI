@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored also unit-tests for Agiltron FF optical switches.
 
 ### Fixed
+- In `usbtmc.py` now doing `.strip()` on `dev.serial_number` string to avoid SNs with whitespace character(s).
 
 ### Removed
 
