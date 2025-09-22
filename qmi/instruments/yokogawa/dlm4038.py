@@ -53,6 +53,24 @@ class Yokogawa_DLM4038(QMI_Instrument):
         self._scpi_protocol = ScpiProtocol(self._transport, default_timeout=timeout)
         self._directory_oscilloscope = directory
 
+    def _channels_check(self, channels: int | list[int] | str) -> int | list[int]:
+        """Check for string type 'all' and return 'channels' as a list of integers"""
+        if channels == "all":
+            return list(range(1, self.CHANNELS + 1))
+
+        return channels
+
+    @staticmethod
+    def _data_type_check(data_type: str) -> str:
+        """Check the data type string and return in SCPI style."""
+        if data_type.lower() == "binary":
+            data_type = "BINary"
+        elif data_type.lower() == "ascii":
+            data_type = "ASCii"
+        else:
+            raise QMI_InstrumentException(f"Unexpected data type, got {data_type}")
+        return data_type
+
     def _channel_value_setter(
             self, channels: int | list[int], values: str | list[int | float], parameter: str, unit: str = ""
     ) -> None:
@@ -165,10 +183,8 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Parameters:
             channels: A single channel number or a list of selected channels. Use "all" for all channels.
         """
-        if channels == "all":
-            channels = list(range(1, self.CHANNELS + 1))
-
-        self._channel_value_setter(channels, "ON", "DISPlay")
+        checked_chs = self._channels_check(channels)
+        self._channel_value_setter(checked_chs, "ON", "DISPlay")
 
     @rpc_method
     def turn_channel_off(self, channels: int | list[int] | str) -> None:
@@ -177,10 +193,8 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Parameters:
             channels: A single channel number or a list of selected channels. Use "all" for all channels.
         """
-        if channels == "all":
-            channels = list(range(1, self.CHANNELS + 1))
-
-        self._channel_value_setter(channels, "OFF", "DISPlay")
+        checked_chs = self._channels_check(channels)
+        self._channel_value_setter(checked_chs, "OFF", "DISPlay")
 
     @rpc_method
     def set_voltage_offset(self, channels: int | list[int] | str, v_offset: float | list[float]) -> None:
@@ -194,10 +208,8 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Raises:
             QMI_UsageException: If the given input channels and v_offset parameters do not match.
         """
-        if channels == "all":
-            channels = list(range(1, self.CHANNELS + 1))
-
-        self._channel_value_setter(channels, v_offset, "OFFset", "V")
+        checked_chs = self._channels_check(channels)
+        self._channel_value_setter(checked_chs, v_offset, "OFFset", "V")
 
     @rpc_method
     def get_voltage_offset(self, channels: int | list[int] | str) -> np.ndarray:
@@ -209,10 +221,8 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Returns:
             v_offset: An array of offset values, respective to the size of given input channels.
         """
-        if channels == "all":
-            channels = list(range(1, self.CHANNELS + 1))
-
-        v_offset = self._channel_value_getter(channels, "OFFset", 11)
+        checked_chs = self._channels_check(channels)
+        v_offset = self._channel_value_getter(checked_chs, "OFFset", 11)
 
         return np.array(v_offset, dtype=float)
 
@@ -228,10 +238,8 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Raises:
             QMI_UsageException: If the given input channels and v_division parameters do not match.
         """
-        if channels == "all":
-            channels = list(range(1, self.CHANNELS + 1))
-
-        self._channel_value_setter(channels, v_division, "VDIV", "V")
+        checked_chs = self._channels_check(channels)
+        self._channel_value_setter(checked_chs, v_division, "VDIV", "V")
 
     @rpc_method
     def get_voltage_division(self, channels: int | list[int] | str) -> np.ndarray:
@@ -243,10 +251,8 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Returns:
             v_division: An array of division values, respective to the size of given input channels.
         """
-        if channels == "all":
-            channels = list(range(1, self.CHANNELS + 1))
-
-        v_division = self._channel_value_getter(channels, "VDIV", 12)
+        checked_chs = self._channels_check(channels)
+        v_division = self._channel_value_getter(checked_chs, "VDIV", 12)
 
         return np.array(v_division, dtype=float)
 
@@ -262,9 +268,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Returns:
             v_max: An array of waveform maximum voltage values, respective to the size of given input channels.
         """
-        if channels == "all":
-            channels = list(range(1, self.CHANNELS + 1))
-
+        checked_chs = self._channels_check(channels)
         v_max = self._channel_value_getter(channels, "MAXimum:VALUE", 19, "MEASure")  # TODO: Test with HW
 
         return np.array(v_max, dtype=float)
@@ -274,20 +278,16 @@ class Yokogawa_DLM4038(QMI_Instrument):
         """
         Changes the position of the specified channels in volts.
         """
-        if channels == "all":
-            channels = list(range(1, self.CHANNELS + 1))
-
-        self._channel_value_setter(channels, position, "POSition")
+        checked_chs = self._channels_check(channels)
+        self._channel_value_setter(checked_chs, position, "POSition")
 
     @rpc_method
     def get_channel_position(self, channels: int | list[int] | str) -> np.ndarray:
         """
         Returns the current position for the specified channels in volts.
         """
-        if channels == "all":
-            channels = list(range(1, self.CHANNELS + 1))
-
-        position = self._channel_value_getter(channels, "POSition", 11)
+        checked_chs = self._channels_check(channels)
+        position = self._channel_value_getter(checked_chs, "POSition", 11)
 
         return np.array(position, dtype=float)
 
@@ -350,19 +350,15 @@ class Yokogawa_DLM4038(QMI_Instrument):
             data_type:    Specify with type: 'binary' for raw data and 'ascii' for csv data.
             waiting_time: Time to wait for saving the file. In seconds.
         """
-        # Stops in order to acquire the data
+        data_type = self._data_type_check(data_type)
+
+        # Stop in order to acquire the data
         self._scpi_protocol.write(":STOP")
         # Parameters of the saved file
         self._scpi_protocol.write(":WAV:FORM BYTE")
         _ = self.get_number_data_points()
         self._scpi_protocol.write(f":FILE:SAVE:NAME {name}")
-        if data_type.lower() == "binary":
-            self._scpi_protocol.write(":FILE:SAVE:BINary:EXECute")
-        elif data_type.lower() == "ascii":
-            self._scpi_protocol.write(":FILE:SAVE:ASCii:EXECute")
-        else:
-            raise QMI_InstrumentException(f"Unexpected data type, got {data_type}")
-
+        self._scpi_protocol.write(f":FILE:SAVE:{data_type}:EXECute")
         # waits until the save is completed
         time.sleep(waiting_time)
         # Starts again, notice that at least a time of 10*time_division is needed to get a full spectrum after starting
@@ -436,13 +432,9 @@ class Yokogawa_DLM4038(QMI_Instrument):
             select_files: Optional parameter to select only the "last" file (default) or "all" the files.
             data_type:    Specify with type: 'binary' for raw data and 'ascii' for csv data file.
         """
-        if data_type.lower() == "binary":
-            data_type = "BINary"
-        elif data_type.lower() == "ascii":
-            data_type = "ASCii"
-        else:
-            raise QMI_InstrumentException(f"Unexpected data type, got {data_type}")
+        data_type = self._data_type_check(data_type)
 
+        # Stops in order to delete the data
         self.stop()
         file_names: str | list[str] = self.find_file_name(name, select_files)
         if select_files == "last":
@@ -451,4 +443,5 @@ class Yokogawa_DLM4038(QMI_Instrument):
         for f in file_names:
             self._scpi_protocol.write(f':FILE:DELete:{data_type}:EXECute "{f[:-4]}"')
 
+        # Starts again, notice that at least a time of 10*time_division is needed to get a full spectrum after starting
         self.start()
