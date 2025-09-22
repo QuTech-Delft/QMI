@@ -680,18 +680,12 @@ class TestMethodsCase(unittest.TestCase):
         # Arrange
         name = "no"
         unexpected_type = "BINasc"
-        expected_writes = [
-            unittest.mock.call(":STOP\n".encode()),
-            unittest.mock.call(":WAV:FORM BYTE\n".encode()),
-            unittest.mock.call(":WAVeform:LENGth?\n".encode()),
-            unittest.mock.call(f":FILE:SAVE:NAME {name}\n".encode()),
-        ]
         # Act
         with self.assertRaises(QMI_InstrumentException):
             self.yokogawa.save_file(name, unexpected_type)
 
         # Assert
-        self._transport_mock.write.assert_has_calls(expected_writes)
+        self._transport_mock.write.assert_not_called()
 
     def test_find_file_name(self):
         """Test find_file_name method using default 'last' file selection."""
@@ -699,13 +693,13 @@ class TestMethodsCase(unittest.TestCase):
         name = "no"
         contents = [f"{name.upper()}00{f}.csv" for f in range(8)]
         label = "007"
-        expected_file_name = name.upper() + label + ".csv"
+        expected_file_name = [name.upper() + label + ".csv"]
         # Act
         with patch("qmi.instruments.yokogawa.dlm4038.os.listdir", return_value=contents):
             last_file = self.yokogawa.find_file_name(name)
 
         # Assert
-        self.assertEqual(expected_file_name, last_file)
+        self.assertListEqual(expected_file_name, last_file)
 
     def test_find_file_name_all(self):
         """Test find_file_name method using 'all' files selection."""
