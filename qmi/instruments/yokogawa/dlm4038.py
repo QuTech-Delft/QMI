@@ -55,9 +55,10 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
     def _channels_check(self, channels: int | list[int] | str) -> int | list[int]:
         """Check for string type 'all' and return 'channels' as a list of integers"""
-        if channels == "all":
+        if channels.lower() == "all":
             return list(range(1, self.CHANNELS + 1))
 
+        assert not isinstance(channels, str)
         return channels
 
     @staticmethod
@@ -273,7 +274,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
             v_max: An array of waveform maximum voltage values, respective to the size of given input channels.
         """
         checked_chs = self._channels_check(channels)
-        v_max = self._channel_value_getter(channels, "MAXimum:VALUE", 19, "MEASure")  # TODO: Test with HW
+        v_max = self._channel_value_getter(checked_chs, "MAXimum:VALUE", 19, "MEASure")
 
         return np.array(v_max, dtype=float)
 
@@ -369,7 +370,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
         self._scpi_protocol.write(":START")
 
     @rpc_method
-    def find_file_name(self, name: str, select_files: str = "last") -> str | list[str]:
+    def find_file_name(self, name: str, select_files: str = "last") -> list[str]:
         """Finds the files in the oscilloscope with names 'nameXXX.csv'.
         It can be chosen whether to return the last file created with that name (higher XXX) with select_files = 'last'
         or to return all of them with select_files = 'all'.
@@ -390,7 +391,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
                 file_name = list_files[-i - 1]
                 if file_name.find(name) >= 0:
                     if len(file_name) == len(name) + 7:
-                        return file_name
+                        return [file_name]
 
         elif select_files == "all":
             # Start routine to get all files with the same name
@@ -400,7 +401,11 @@ class Yokogawa_DLM4038(QMI_Instrument):
                 if file_name.find(name) >= 0:
                     file_names.append(file_name)
 
-            return file_names
+            if len(file_names) > 0:
+                return file_names
+
+        else:
+            raise QMI_UsageException(f"Invalid file selection '{select_files}")
 
         raise QMI_InstrumentException(f"Could not find any files starting with '{name}'")
 
@@ -418,10 +423,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
             select_files: Optional parameter to select only the "last" file (default) or "all" the files.
 
         """
-        file_names: str | list[str] = self.find_file_name(name, select_files)
-        if select_files == "last":
-            file_names = [file_names]
-
+        file_names = self.find_file_name(name, select_files)
         for f in file_names:
             shutil.copy(f"{self._directory_oscilloscope}{f}", destination)
 
@@ -440,10 +442,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
         # Stops in order to delete the data
         self.stop()
-        file_names: str | list[str] = self.find_file_name(name, select_files)
-        if select_files == "last":
-            file_names = [file_names]
-
+        file_names = self.find_file_name(name, select_files)
         for f in file_names:
             self._scpi_protocol.write(f':FILE:DELete:{data_type}:EXECute "{f[:-4]}"')
 
