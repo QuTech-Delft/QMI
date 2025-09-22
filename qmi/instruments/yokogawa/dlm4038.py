@@ -72,7 +72,11 @@ class Yokogawa_DLM4038(QMI_Instrument):
         return data_type
 
     def _channel_value_setter(
-            self, channels: int | list[int], values: str | list[int | float], parameter: str, unit: str = ""
+            self,
+            channels: int | list[int],
+            values: str | int | float | list[int | float],
+            parameter: str,
+            unit: str = ""
     ) -> None:
         """A helper function to handle logic on setting diverse lengths of various channel parameters."""
         if isinstance(channels, int) and (
