@@ -41,8 +41,13 @@ Modifications by Joris van Rantwijk:
  - Ignore EOM flag when device sends partial data.
  - Always call set_configuration() to synchronize data toggle.
  - Clear Bulk-IN endpoint during initialization to synchronize data toggle.
+
+ Modification by HK Ervasti:
+ - .strip() `dev.serial_number` string to avoid SNs with whitespace character(s).
+ - Logging import and a `_logger` instance with some 'debug' logging lines.
 """
 
+import logging
 import usb.core
 import usb.util
 import struct
@@ -50,6 +55,8 @@ import time
 import os
 import re
 import sys
+
+_logger = logging.getLogger(__file__)
 
 # constants
 USBTMC_bInterfaceClass    = 0xFE
@@ -200,7 +207,7 @@ def list_resources():
         # Attempt to read serial number.
         iSerial = None
         try:
-            iSerial = dev.serial_number
+            iSerial = dev.serial_number.strip()
         except:
             # Maybe not set or user does not have read privilege.
             pass
@@ -224,6 +231,7 @@ def find_device(idVendor=None, idProduct=None, iSerial=None):
 
     for dev in devs:
         # Match VID and PID
+        _logger.debug("Trying to match %s:%s with %s:%s", dev.idVendor, dev.idProduct, idVendor, idProduct)
         found = dev.idVendor == idVendor and dev.idProduct == idProduct
 
         if idVendor == 0x0957 and idProduct == 0x2918:
@@ -251,10 +259,11 @@ def find_device(idVendor=None, idProduct=None, iSerial=None):
 
             # Try reading serial number
             try:
-                s = dev.serial_number
+                s = dev.serial_number.strip()
             except:
                 pass
 
+            _logger.debug("Trying to match serial number %s with %s", iSerial, s)
             if iSerial == s:
                 return dev
 
@@ -491,7 +500,7 @@ class Instrument(object):
         U2722A boot 0x4218, usbtmc 0x4118
         U2723A boot 0x4418, usbtmc 0x4318
         """
-        serial = self.device.serial_number
+        serial = self.device.serial_number.strip()
         new_id = 0
 
         if self.device.idProduct == 0x2818:
