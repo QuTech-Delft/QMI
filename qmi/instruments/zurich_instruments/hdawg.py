@@ -21,10 +21,11 @@ if typing.TYPE_CHECKING:
     import zhinst.toolkit
     import zhinst.toolkit.driver
     import zhinst.toolkit.driver.devices
+    import zhinst.toolkit.driver.modules
     import zhinst.toolkit.driver.nodes
     import zhinst.toolkit.driver.nodes.awg as awg
     import zhinst.toolkit.nodetree
-    # import zhinst.toolkit.session
+    import zhinst.toolkit.session
     import zhinst.core
     import zhinst.utils
 else:
@@ -380,7 +381,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         _logger.info("[%s] Opening connection to instrument", self._name)
 
         # This may fail!
-        self._daq_server = zhinst.core.ziDAQServer(self._server_host, self._server_port, api_level=6)
+        # self._daq_server = zhinst.core.ziDAQServer(self._server_host, self._server_port, api_level=6)
+        self._daq_server = self._session.daq_server
 
         # Connect to the device.
         self._device = typing.cast(
@@ -390,7 +392,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # If the device is already connected, this is a no-op.
         self.daq_server.connectDevice(self._device_name, "1GbE")
 
-        self._awg_module = self.daq_server.awgModule()
+        # self._awg_module = self.daq_server.awgModule()
+        self._awg_module = typing.cast(zhinst.core.AwgModule, self._session.modules.create_awg_module()._raw_module)
 
         self.awg_module.set("device", self._device_name)
         self.awg_module.set("index", 0)  # only support 1x8 mode, so only one AWG module
