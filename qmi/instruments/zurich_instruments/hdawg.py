@@ -393,7 +393,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self.daq_server.connectDevice(self._device_name, "1GbE")
 
         # self._awg_module = self.daq_server.awgModule()
-        self._awg_module = typing.cast(zhinst.core.AwgModule, self._session.modules.create_awg_module()._raw_module)
+        # self._awg_module = typing.cast(zhinst.core.AwgModule, self._session.modules.create_awg_module()._raw_module)
+        self._awg_module = typing.cast(zhinst.core.AwgModule, self._session.modules.awg)
 
         self.awg_module.set("device", self._device_name)
         self.awg_module.set("index", 0)  # only support 1x8 mode, so only one AWG module
