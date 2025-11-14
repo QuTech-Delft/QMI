@@ -233,15 +233,15 @@ def _parse_attribute_value(s: str) -> Union[int, float, str]:
         # Quoted string.
         quote_char = s[0]
         if quote_char not in ('"', "'"):
-            raise ValueError("Invalid attribute value syntax {!r}".format(s))
+            raise ValueError(f"Invalid attribute value syntax {s!r}")
         if not s[1:].endswith(quote_char):
-            raise ValueError("Invalid attribute value syntax {!r}".format(s))
+            raise ValueError(f"Invalid attribute value syntax {s!r}")
         # Strip quotes.
         s = s[1:-1]
         # Check for non-escaped occurrences of quote symbol.
         t = re.sub("\\\\.", "", s)
         if quote_char in t:
-            raise ValueError("Invalid attribute value syntax {!r}".format(s))
+            raise ValueError(f"Invalid attribute value syntax {s!r}")
         # Expand escape sequences.
         s = re.sub("\\\\(['\"abfnrtv]|\\\\|[0-7]{1,3}|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4})", replace_esc, s)
         return s
@@ -286,18 +286,18 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group) -> None:
     # Special attributes for axis labels / units.
     for axis in range(ndim - 1):
         if dataset.axis_label[axis]:
-            ds.attrs["QMI_DataSet_axis{}_label".format(axis)] = dataset.axis_label[axis]
+            ds.attrs[f"QMI_DataSet_axis{axis}_label"] = dataset.axis_label[axis]
 
         if dataset.axis_unit[axis]:
-            ds.attrs["QMI_DataSet_axis{}_unit".format(axis)] = dataset.axis_unit[axis]
+            ds.attrs[f"QMI_DataSet_axis{axis}_unit"] = dataset.axis_unit[axis]
 
     # Special attributes for column labels / units.
     for col in range(ncol):
         if dataset.column_label[col]:
-            ds.attrs["QMI_DataSet_column{}_label".format(col)] = dataset.column_label[col]
+            ds.attrs[f"QMI_DataSet_column{col}_label"] = dataset.column_label[col]
 
         if dataset.column_unit[col]:
-            ds.attrs["QMI_DataSet_column{}_unit".format(col)] = dataset.column_unit[col]
+            ds.attrs[f"QMI_DataSet_column{col}_unit"] = dataset.column_unit[col]
 
     # Dimension scales.
     for axis in range(ndim - 1):
@@ -306,7 +306,7 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group) -> None:
 
         if dataset.axis_scale[axis] is not None:
             # Create an extra dataset to hold the dimension scale.
-            scale_name = dataset.name + "_axis{}_scale".format(axis)
+            scale_name = dataset.name + f"_axis{axis}_scale"
             ds_scale = hdf_group.create_dataset(scale_name, data=dataset.axis_scale[axis])
             # Attach the dimension scale to the axis.
             ds_scale.make_scale(scale_name)
@@ -315,7 +315,7 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group) -> None:
     # Custom attributes.
     for (name, value) in dataset.attrs.items():
         if name.startswith("QMI_DataSet") or name.startswith("DIMENSION_"):
-            raise ValueError("Invalid use of special attribute name {!r}".format(name))
+            raise ValueError(f"Invalid use of special attribute name {name!r}")
 
         ds.attrs[name] = value
 
@@ -356,19 +356,19 @@ def read_dataset_from_hdf5(ds: h5py.Dataset) -> DataSet:
 
     # Read special attributes for labels.
     for axis in range(ndim - 1):
-        dataset.axis_label[axis] = ds.attrs.get("QMI_DataSet_axis{}_label".format(axis), "")
-        dataset.axis_unit[axis] = ds.attrs.get("QMI_DataSet_axis{}_unit".format(axis), "")
+        dataset.axis_label[axis] = ds.attrs.get(f"QMI_DataSet_axis{axis}_label", "")
+        dataset.axis_unit[axis] = ds.attrs.get(f"QMI_DataSet_axis{axis}_unit", "")
 
     for col in range(ncol):
-        dataset.column_label[col] = ds.attrs.get("QMI_DataSet_column{}_label".format(col), "")
-        dataset.column_unit[col] = ds.attrs.get("QMI_DataSet_column{}_unit".format(col), "")
+        dataset.column_label[col] = ds.attrs.get(f"QMI_DataSet_column{col}_label", "")
+        dataset.column_unit[col] = ds.attrs.get(f"QMI_DataSet_column{col}_unit", "")
 
     # Read dimension scales.
     for axis in range(ndim - 1):
         if len(ds.dims[axis]) > 0:
             scale = ds.dims[axis][0]
             if scale.shape != (dataset.data.shape[axis],):
-                raise ValueError("Invalid shape of dimension scale for axis {}".format(axis))
+                raise ValueError(f"Invalid shape of dimension scale for axis {axis}")
             dataset.axis_scale[axis] = scale[:]
 
     # Read custom attributes.
@@ -402,13 +402,13 @@ def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
     if ndim > 2:
         # Create special axis index columns.
         for axis in range(ndim - 1):
-            special_column_label.append("axis{}_index".format(axis))
+            special_column_label.append(f"axis{axis}_index")
             special_column_unit.append("")
 
     # Create special axis scale columns if needed.
     for axis in range(ndim - 1):
         if dataset.axis_scale[axis] is not None:
-            special_column_label.append("axis{}_scale".format(axis))
+            special_column_label.append(f"axis{axis}_scale")
             special_column_unit.append(dataset.axis_unit[axis])
 
     # Prepare attributes.
@@ -427,32 +427,32 @@ def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
 
     # Axis labels / units.
     for axis in range(ndim - 1):
-        attrs["QMI_DataSet_axis{}_size".format(axis)] = dataset.data.shape[axis]
+        attrs[f"QMI_DataSet_axis{axis}_size"] = dataset.data.shape[axis]
         if dataset.axis_label[axis]:
-            attrs["QMI_DataSet_axis{}_label".format(axis)] = dataset.axis_label[axis]
+            attrs[f"QMI_DataSet_axis{axis}_label"] = dataset.axis_label[axis]
         if dataset.axis_unit[axis]:
-            attrs["QMI_DataSet_axis{}_unit".format(axis)] = dataset.axis_unit[axis]
+            attrs[f"QMI_DataSet_axis{axis}_unit"] = dataset.axis_unit[axis]
 
     # Column labels / units.
     column_label = special_column_label + dataset.column_label
     column_unit = special_column_unit + dataset.column_unit
     for col in range(len(column_label)):
         if column_label[col]:
-            attrs["QMI_DataSet_column{}_label".format(col)] = column_label[col]
+            attrs[f"QMI_DataSet_column{col}_label"] = column_label[col]
 
         if column_unit[col]:
-            attrs["QMI_DataSet_column{}_unit".format(col)] = column_unit[col]
+            attrs[f"QMI_DataSet_column{col}_unit"] = column_unit[col]
 
     # Custom attributes.
     for (name, val) in dataset.attrs.items():
         if name.startswith("QMI_DataSet"):
-            raise ValueError("Invalid use of special attribute name {!r}".format(name))
+            raise ValueError(f"Invalid use of special attribute name {name!r}")
 
         if not name:
             raise ValueError("Invalid use of empty attribute name")
 
         if ':' in name:
-            raise ValueError("Invalid character ':' in attribute name {!r}".format(name))
+            raise ValueError(f"Invalid character ':' in attribute name {name!r}")
 
         attrs[name] = val
 
@@ -491,7 +491,7 @@ def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
 
     # Write attributes.
     for (name, value) in attrs.items():
-        fh.write("# {}: {!r}\n". format(name, value))
+        fh.write(f"# {name}: {value!r}\n")
 
     fh.write("#\n")
 
@@ -512,11 +512,11 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
     # Check marker line.
     line = fh.readline().strip()
     if line != "# QMI_DataSet":
-        raise ValueError("Invalid file format; expecting marker but got {!r}".format(line))
+        raise ValueError(f"Invalid file format; expecting marker but got {line!r}")
 
     line = fh.readline().strip()
     if line != "#":
-        raise ValueError("Invalid file format; expecting separator but got {!r}".format(line))
+        raise ValueError(f"Invalid file format; expecting separator but got {line!r}")
 
     # Read attributes.
     attrs = {}
@@ -528,12 +528,12 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
         # Read attribute.
         p = line.find(":")
         if (not line.startswith("# ")) or (p < 0):
-            raise ValueError("Invalid file format; expecting attribute but got {!r}".format(line))
+            raise ValueError(f"Invalid file format; expecting attribute but got {line!r}")
 
         name = line[2:p]
         value = line[p+1:].strip()
         if not name:
-            raise ValueError("Invalid file format; expecting attribute but got {!r}".format(line))
+            raise ValueError(f"Invalid file format; expecting attribute but got {line!r}")
 
         attrs[name] = _parse_attribute_value(value)
 
@@ -553,9 +553,9 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
 
     shape_list: List[int] = []
     for axis in range(ndim - 1):
-        axis_size = attrs["QMI_DataSet_axis{}_size".format(axis)]
+        axis_size = attrs[f"QMI_DataSet_axis{axis}_size"]
         if not isinstance(axis_size, int):
-            raise ValueError("Invalid value for attribute QMI_DataSet_axis{}_size".format(axis))
+            raise ValueError(f"Invalid value for attribute QMI_DataSet_axis{axis}_size")
         shape_list.append(axis_size)
     shape_list.append(ncol)
     shape = tuple(shape_list)
@@ -563,11 +563,11 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
     # Verify number of rows.
     expect_rows = np.prod(shape[:-1])
     if nrow != expect_rows:
-        raise ValueError("Expecting {} rows but got {} rows".format(expect_rows, nrow))
+        raise ValueError(f"Expecting {expect_rows} rows but got {nrow} rows")
 
     # Verify number of columns.
     if total_columns < ncol:
-        raise ValueError("Expecting at least {} columns but got {} columns".format(ncol, total_columns))
+        raise ValueError(f"Expecting at least {ncol} columns but got {total_columns} columns")
     num_special_columns = total_columns - ncol
 
     # Extract and reshape actual data.
@@ -581,18 +581,18 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
 
     # Set axis labels and units.
     for axis in range(ndim - 1):
-        dataset.axis_label[axis] = str(attrs.get("QMI_DataSet_axis{}_label".format(axis), ""))
-        dataset.axis_unit[axis] = str(attrs.get("QMI_DataSet_axis{}_unit".format(axis), ""))
+        dataset.axis_label[axis] = str(attrs.get(f"QMI_DataSet_axis{axis}_label", ""))
+        dataset.axis_unit[axis] = str(attrs.get(f"QMI_DataSet_axis{axis}_unit", ""))
 
     for col in range(ncol):
-        dataset.column_label[col] = str(attrs.get("QMI_DataSet_column{}_label".format(num_special_columns + col), ""))
-        dataset.column_unit[col] = str(attrs.get("QMI_DataSet_column{}_unit".format(num_special_columns + col), ""))
+        dataset.column_label[col] = str(attrs.get(f"QMI_DataSet_column{num_special_columns + col}_label", ""))
+        dataset.column_unit[col] = str(attrs.get(f"QMI_DataSet_column{num_special_columns + col}_unit", ""))
 
     # Verify index columns and extract axis scales.
     for col in range(num_special_columns):
-        label = attrs.get("QMI_DataSet_column{}_label".format(col))
+        label = attrs.get(f"QMI_DataSet_column{col}_label")
         if not isinstance(label, str):
-            raise ValueError("Missing label for special column {}".format(col))
+            raise ValueError(f"Missing label for special column {col}")
 
         if label.startswith("axis") and label.endswith("_index"):
             # Verify index column.
@@ -602,7 +602,7 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
             inner_rows = int(np.prod(dataset.data.shape[axis+1:-1], dtype=np.int32))
             idx = np.tile(np.repeat(np.arange(n), inner_rows), outer_rows)
             if not np.all(rawdata[:, col].astype(np.int64) == idx):
-                raise ValueError("Inconsistent index data for axis {}".format(axis))
+                raise ValueError(f"Inconsistent index data for axis {axis}")
 
         elif label.startswith("axis") and label.endswith("_scale"):
             # Set axis scale.
@@ -613,7 +613,7 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
             scale = rawdata[0:n*inner_rows:inner_rows, col]
             scale_raw = np.tile(np.repeat(scale, inner_rows), outer_rows)
             if not np.all(rawdata[:, col] == scale_raw):
-                raise ValueError("Inconsistent scale data for axis {}".format(axis))
+                raise ValueError(f"Inconsistent scale data for axis {axis}")
 
             dataset.axis_scale[axis] = scale
 

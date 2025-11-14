@@ -20,11 +20,11 @@ sys.path.insert(0, os.path.abspath('../../..'))
 # -- Project information -----------------------------------------------------
 
 project = 'QMI'
-copyright = '2019-2023, QuTech — Delft, The Netherlands'
+copyright = '2019-2024, QuTech — Delft, The Netherlands'
 author = 'QuTech'
 
 # The full version, including alpha/beta/rc tags
-release = '0.45.0-beta.0'
+release = '0.51.0-beta.0'
 
 # The default master_doc used to be 'index', but it was changed to 'contents'.
 # Override that here (maybe rename the file to the new default later).

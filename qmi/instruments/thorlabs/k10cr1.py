@@ -1,515 +1,115 @@
 """Instrument driver for the Thorlabs K10CR1/M motorized rotational mount.
 
-This driver communicates with the device via a USB serial port,
-using the Thorlabs APT protocol. For details, see the document
-"Thorlabs APT Controllers Host-Controller Communications Protocol",
-issue 25 from Thorlabs.
+This driver communicates with the device via a USB serial port, using the Thorlabs APT protocol. For details,
+see the document "Thorlabs APT Controllers Host-Controller Communications Protocol", issue 25 from Thorlabs.
 
-This driver has only been tested under Linux. In principle it should also
-work under Windows, but that would require somehow creating a virtual COM port
-for the internal USB serial port in the instrument.
+This driver has only been tested under Linux. In principle it should also work under Windows
+after creating a virtual COM port for the internal USB serial port in the instrument.
 """
 
-import ctypes
-import contextlib
-import enum
 import logging
 import time
-from typing import Any, Dict, List, NamedTuple, Tuple, Type
+import warnings
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
-from qmi.core.transport import create_transport
+from qmi.core.transport import create_transport, QMI_SerialTransport
+from qmi.instruments.thorlabs.apt_packets import AptMessageId
+from qmi.instruments.thorlabs.apt_protocol import (
+    _AptMessage,
+    APT_MESSAGE_TYPE_TABLE,
+    AptChannelHomeDirection,
+    AptChannelHomeLimitSwitch,
+    AptProtocol,
+    AptChannelState,
+    AptChannelStopMode,
+    VelocityParams,
+    HomeParams,
+    MotorStatus,
+)
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
 
-_APT_HOST_ADDRESS = 0x01    # Address of the computer in the APT protocol.
-_APT_DEVICE_ADDRESS = 0x50  # Address of the device in the APT protocol.
-
-
-class _AptMessage(ctypes.LittleEndianStructure):
-    """Base class for APT protocol messages."""
-
-    _pack_ = 1
-
-    @classmethod
-    def create(cls, **kwargs: Any) -> "_AptMessage":
-        """Return a new message instance.
-
-        Message ID, destination address, source address and data length
-        (if applicable) will already be filled in. Other fields may be
-        specified as keyword arguments.
-        """
-        message_size = ctypes.sizeof(cls)
-        if message_size > 6:
-            # This is a long APT message (header + data).
-            # Long APT messages are identified by bit 7 in the destination field.
-            return cls(message_id=cls.MESSAGE_ID,
-                       data_length=(message_size - 6),
-                       dest=(_APT_DEVICE_ADDRESS | 0x80),
-                       source=_APT_HOST_ADDRESS,
-                       **kwargs)
-        else:
-            # This is a short APT message (header only).
-            return cls(message_id=cls.MESSAGE_ID,
-                       dest=_APT_DEVICE_ADDRESS,
-                       source=_APT_HOST_ADDRESS,
-                       **kwargs)
-
-
-class _AptMessageHeader(_AptMessage):
-    """Generic message header for the APT protocol.
-
-    This is also the base class for long messages (header + data).
-    """
-    _pack_ = 1
-    _fields_: List[Tuple[str, type]] = [
-        ('message_id',  ctypes.c_uint16),
-        ('data_length', ctypes.c_uint16),
-        ('dest',        ctypes.c_uint8),
-        ('source',      ctypes.c_uint8)
-    ]
-
-
-def _apt_short_message_fields(fields: List[Tuple[str, type]]) -> List[Tuple[str, type]]:
-    """Helper function to create the field list for a short APT message.
-
-    The message consists of only a 6-byte header, including 2 bytes space
-    for optional parameter fields.
-    """
-
-    # APT short message format:
-    #   2 bytes:  uint16  message_id
-    #   2 bytes:  uint16  data_length
-    #   1 byte:           param1
-    #   1 byte:           param2
-    #   1 byte:   uint8   dest
-    #   1 byte:   uint8   source
-
-    # Calculate size of data fields.
-    data_length = 0
-    for (par_name, par_type) in fields:
-        data_length += ctypes.sizeof(par_type)
-    assert data_length <= 2
-
-    # Build field list for ctypes structure.
-    all_fields: List[Tuple[str, type]] = []
-    all_fields.append(("message_id", ctypes.c_uint16))
-    all_fields += fields
-    if data_length < 2:
-        # Add dummy field if the message uses fewer than 2 bytes for parameters.
-        all_fields.append(("_dummy", (2 - data_length) * ctypes.c_uint8))
-    all_fields.append(("dest", ctypes.c_uint8))
-    all_fields.append(("source", ctypes.c_uint8))
-
-    return all_fields
-
-
-# APT messages for the K10CR1 device.
-# See the "Thorlabs APT Controllers Host-Controller Communications Protocol".
-
-class _AptMsgIdentify(_AptMessage):
-    MESSAGE_ID = 0x0223
-    _fields_ = _apt_short_message_fields([("chan_ident", ctypes.c_uint8)])
-
-class _AptMsgSetChanEnableState(_AptMessage):
-    MESSAGE_ID = 0x0210
-    _fields_ = _apt_short_message_fields([("chan_ident", ctypes.c_uint8),
-                                          ("enable_state", ctypes.c_uint8)])
-
-class _AptMsgReqChanEnableState(_AptMessage):
-    MESSAGE_ID = 0x0211
-    _fields_ = _apt_short_message_fields([("chan_ident", ctypes.c_uint8)])
-
-class _AptMsgGetChanEnableState(_AptMessage):
-    MESSAGE_ID = 0x0212
-    _fields_ = _apt_short_message_fields([("chan_ident", ctypes.c_uint8),
-                                          ("enable_state", ctypes.c_uint8)])
-
-class _AptMsgHwReqInfo(_AptMessage):
-    MESSAGE_ID = 0x0005
-    _fields_ = _apt_short_message_fields([])
-
-class _AptMsgHwGetInfo(_AptMessageHeader):
-    MESSAGE_ID = 0x0006
-    _fields_ = [("serial_number",   ctypes.c_uint32),
-                ("model_number",    8 * ctypes.c_char),
-                ("type_",           ctypes.c_uint16),
-                ("fw_version",      4 * ctypes.c_uint8),
-                ("internal_use",    60 * ctypes.c_uint8),
-                ("hw_version",      ctypes.c_uint16),
-                ("mod_state",       ctypes.c_uint16),
-                ("nchs",            ctypes.c_uint16)]
-
-class _AptMsgReqPosCounter(_AptMessage):
-    MESSAGE_ID = 0x0411
-    _fields_ = _apt_short_message_fields([("chan_ident", ctypes.c_uint8)])
-
-class _AptMsgGetPosCounter(_AptMessageHeader):
-    MESSAGE_ID = 0x0412
-    _fields_ = [("chan_ident",      ctypes.c_uint16),
-                ("position",        ctypes.c_int32)]
-
-class _AptMsgSetVelParams(_AptMessageHeader):
-    MESSAGE_ID = 0x0413
-    _fields_ = [("chan_ident",      ctypes.c_uint16),
-                ("min_vel",         ctypes.c_int32),
-                ("accel",           ctypes.c_int32),
-                ("max_vel",         ctypes.c_int32)]
-
-class _AptMsgReqVelParams(_AptMessage):
-    MESSAGE_ID = 0x0414
-    _fields_ = _apt_short_message_fields([("chan_ident", ctypes.c_uint8)])
-
-class _AptMsgGetVelParams(_AptMessageHeader):
-    MESSAGE_ID = 0x0415
-    _fields_ = [("chan_ident",      ctypes.c_uint16),
-                ("min_vel",         ctypes.c_int32),
-                ("accel",           ctypes.c_int32),
-                ("max_vel",         ctypes.c_int32)]
-
-class _AptMsgSetGenMoveParams(_AptMessageHeader):
-    MESSAGE_ID = 0x043A
-    _fields_ = [("chan_ident",      ctypes.c_uint16),
-                ("backlash_dist",   ctypes.c_int32)]
-
-class _AptMsgReqGenMoveParams(_AptMessage):
-    MESSAGE_ID = 0x043B
-    _fields_ = _apt_short_message_fields([("chan_ident", ctypes.c_uint8)])
-
-class _AptMsgGetGenMoveParams(_AptMessageHeader):
-    MESSAGE_ID = 0x043C
-    _fields_ = [("chan_ident",      ctypes.c_uint16),
-                ("backlash_dist",   ctypes.c_int32)]
-
-class _AptMsgSetHomeParams(_AptMessageHeader):
-    MESSAGE_ID = 0x0440
-    _fields_ = [("chan_ident",      ctypes.c_uint16),
-                ("home_dir",        ctypes.c_uint16),
-                ("limit_switch",    ctypes.c_uint16),
-                ("home_velocity",   ctypes.c_int32),
-                ("offset_dist",     ctypes.c_int32)]
-
-class _AptMsgReqHomeParams(_AptMessage):
-    MESSAGE_ID = 0x0441
-    _fields_ = _apt_short_message_fields([("chan_ident", ctypes.c_uint8)])
-
-class _AptMsgGetHomeParams(_AptMessageHeader):
-    MESSAGE_ID = 0x0442
-    _fields_ = [("chan_ident",      ctypes.c_uint16),
-                ("home_dir",        ctypes.c_uint16),
-                ("limit_switch",    ctypes.c_uint16),
-                ("home_velocity",   ctypes.c_int32),
-                ("offset_dist",     ctypes.c_int32)]
-
-class _AptMsgMoveHome(_AptMessage):
-    MESSAGE_ID = 0x0443
-    _fields_ = _apt_short_message_fields([("chan_ident", ctypes.c_uint8)])
-
-class _AptMsgMoveHomed(_AptMessage):
-    MESSAGE_ID = 0x0444
-    _fields_ = _apt_short_message_fields([("chan_ident", ctypes.c_uint8)])
-
-class _AptMsgMoveRelative(_AptMessageHeader):
-    MESSAGE_ID = 0x0448
-    _fields_ = [("chan_ident",      ctypes.c_uint16),
-                ("rel_dist",        ctypes.c_int32)]
-
-class _AptMsgMoveAbsolute(_AptMessageHeader):
-    MESSAGE_ID = 0x0453
-    _fields_ = [("chan_ident",      ctypes.c_uint16),
-                ("abs_position",    ctypes.c_int32)]
-
-class _AptMsgMoveCompleted(_AptMessageHeader):
-    MESSAGE_ID = 0x0464
-    _fields_ = [("chan_ident",      ctypes.c_uint16),
-                ("position",        ctypes.c_int32),
-                ("velocity",        ctypes.c_uint16),
-                ("reserved",        ctypes.c_uint16),
-                ("status_bits",     ctypes.c_uint32)]
-
-class _AptMsgMoveStop(_AptMessage):
-    MESSAGE_ID = 0x0465
-    _fields_ = _apt_short_message_fields([("chan_ident", ctypes.c_uint8),
-                                          ("stop_mode", ctypes.c_uint8)])
-
-class _AptMsgMoveStopped(_AptMessageHeader):
-    MESSAGE_ID = 0x0466
-    _fields_ = [("chan_ident",      ctypes.c_uint16),
-                ("position",        ctypes.c_int32),
-                ("velocity",        ctypes.c_uint16),
-                ("reserved",        ctypes.c_uint16),
-                ("status_bits",     ctypes.c_uint32)]
-
-class _AptMsgReqStatusBits(_AptMessage):
-    MESSAGE_ID = 0x0429
-    _fields_ = _apt_short_message_fields([("chan_ident", ctypes.c_uint8)])
-
-class _AptMsgGetStatusBits(_AptMessageHeader):
-    MESSAGE_ID = 0x042A
-    _fields_ = [("chan_ident",      ctypes.c_uint16),
-                ("status_bits",     ctypes.c_uint32)]
-
-
-# Build a table, mapping message ID to the corresponding Python class.
-_apt_message_type_table: Dict[int, Type["_AptMessage"]] = {
-    _AptMsgIdentify.MESSAGE_ID:             _AptMsgIdentify,
-    _AptMsgSetChanEnableState.MESSAGE_ID:   _AptMsgSetChanEnableState,
-    _AptMsgReqChanEnableState.MESSAGE_ID:   _AptMsgReqChanEnableState,
-    _AptMsgGetChanEnableState.MESSAGE_ID:   _AptMsgGetChanEnableState,
-    _AptMsgHwReqInfo.MESSAGE_ID:            _AptMsgHwReqInfo,
-    _AptMsgHwGetInfo.MESSAGE_ID:            _AptMsgHwGetInfo,
-    _AptMsgReqPosCounter.MESSAGE_ID:        _AptMsgReqPosCounter,
-    _AptMsgGetPosCounter.MESSAGE_ID:        _AptMsgGetPosCounter,
-    _AptMsgSetVelParams.MESSAGE_ID:         _AptMsgSetVelParams,
-    _AptMsgReqVelParams.MESSAGE_ID:         _AptMsgReqVelParams,
-    _AptMsgGetVelParams.MESSAGE_ID:         _AptMsgGetVelParams,
-    _AptMsgSetGenMoveParams.MESSAGE_ID:     _AptMsgSetGenMoveParams,
-    _AptMsgReqGenMoveParams.MESSAGE_ID:     _AptMsgReqGenMoveParams,
-    _AptMsgGetGenMoveParams.MESSAGE_ID:     _AptMsgGetGenMoveParams,
-    _AptMsgSetHomeParams.MESSAGE_ID:        _AptMsgSetHomeParams,
-    _AptMsgReqHomeParams.MESSAGE_ID:        _AptMsgReqHomeParams,
-    _AptMsgGetHomeParams.MESSAGE_ID:        _AptMsgGetHomeParams,
-    _AptMsgMoveHome.MESSAGE_ID:             _AptMsgMoveHome,
-    _AptMsgMoveHomed.MESSAGE_ID:            _AptMsgMoveHomed,
-    _AptMsgMoveRelative.MESSAGE_ID:         _AptMsgMoveRelative,
-    _AptMsgMoveAbsolute.MESSAGE_ID:         _AptMsgMoveAbsolute,
-    _AptMsgMoveCompleted.MESSAGE_ID:        _AptMsgMoveCompleted,
-    _AptMsgMoveStop.MESSAGE_ID:             _AptMsgMoveStop,
-    _AptMsgMoveStopped.MESSAGE_ID:          _AptMsgMoveStopped,
-    _AptMsgReqStatusBits.MESSAGE_ID:        _AptMsgReqStatusBits,
-    _AptMsgGetStatusBits.MESSAGE_ID:        _AptMsgGetStatusBits,
-}
-
-
-class VelocityParams(NamedTuple):
-    """Velocity parameters for the K10CR1.
-
-    Attributes:
-        max_velocity:    Maximum velocity in degrees/second.
-        acceleration:    Acceleration in degrees/second/second.
-    """
-    max_velocity: float
-    acceleration: float
-
-
-class HomeDirection(enum.IntEnum):
-    """Possible values for the ``home_direction`` field in the homing parameters."""
-    FORWARD = 1
-    REVERSE = 2
-
-
-class HomeLimitSwitch(enum.IntEnum):
-    """Possible values for the ``limit_switch`` field in the homing parameters."""
-    REVERSE = 1
-    FORWARD = 4
-
-
-class HomeParams(NamedTuple):
-    """Homing parameters for the K10CR1.
-
-    Attributes:
-        home_direction:  Direction of moving to home (1 = forward, 2 = reverse).
-        limit_switch:    Limit switch to use for homing (1 = reverse, 4 = forward).
-        home_velocity:   Homing velocity in degrees/second.
-        offset_distance: Distance of home postion from home limit switch (in degrees).
-    """
-    home_direction:     HomeDirection
-    limit_switch:       HomeLimitSwitch
-    home_velocity:      float
-    offset_distance:    float
-
-
-class MotorStatus(NamedTuple):
-    """Status bits of the K10CR1 motorized stage.
-
-    Some of the status bits do not seem to work with the K10CR1.
-
-    Attributes:
-        moving_forward:     True if the motor is moving in forward direction.
-        moving_reverse:     True if the motor is moving in reverse direction.
-                            It looks like `move_forward` and `move_reverse` are both
-                            active when the stage is moving, regardless of the actual
-                            direction of movement.
-        jogging_forward:    True if the motor is jogging in forward direction.
-        jogging_reverse:    True if the motor is jogging in reverse direction.
-                            It looks like `jogging_reverse` is also active when jogging
-                            in forward direction, while `jogging_forward` is never active.
-        homing:             True if the motor is homing.
-        homed:              True if homing has been completed.
-        motion_error:       True if an excessive position error is detected.
-        current_limit:      True if the motor current limit has been reached.
-        channel_enabled:    True if the motor drive channel is enabled.
-    """
-    forward_limit:      bool
-    reverse_limit:      bool
-    moving_forward:     bool
-    moving_reverse:     bool
-    jogging_forward:    bool
-    jogging_reverse:    bool
-    homing:             bool
-    homed:              bool
-    tracking:           bool
-    settled:            bool
-    motion_error:       bool
-    current_limit:      bool
-    channel_enabled:    bool
-
-
 class Thorlabs_K10CR1(QMI_Instrument):
     """Instrument driver for the Thorlabs K10CR1/M motorized rotational mount."""
+    _rpc_constants = ["RESPONSE_TIMEOUT", "MAX_VELOCITY", "MAX_ACCELERATION"]
 
-    # Number of microsteps per degree of rotation.
+    RESPONSE_TIMEOUT = 1.0
+
+    # Number of microsteps per degree of rotation. Full revolution is 409600 micro-steps with rotation of 3 degrees.
     MICROSTEPS_PER_DEGREE = 409600.0 / 3.0
 
-    # Internal velocity setting for 1 degree/second.
+    # Internal velocity factor for 1 degree/second. Maximum velocity in degrees/second
     VELOCITY_FACTOR = 7329109.0
+    MAX_VELOCITY = 10
 
-    # Internal accleration setting for 1 degree/second/second.
+    # Internal acceleration factor for 1 degree/second/second. Maximum acceleration in degrees/second^2
     ACCELERATION_FACTOR = 1502.0
+    MAX_ACCELERATION = 20
 
-    def __init__(self,
-                 context: QMI_Context,
-                 name: str,
-                 transport: str
-                 ) -> None:
+    def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize driver.
 
-        The motorized mount presents itself as an USB serial port.
+        The motorized mount presents itself as a USB serial port.
         The transport descriptor should refer to the serial port device,
         e.g. "serial:/dev/ttyUSB1"
 
         Parameters:
-            name: Name for this instrument instance.
+            name:      Name for this instrument instance.
             transport: Transport descriptor to access the instrument.
         """
         super().__init__(context, name)
         self._transport = create_transport(transport, default_attributes={"baudrate": 115200, "rtscts": True})
+        assert isinstance(self._transport, QMI_SerialTransport)
+        self._apt_protocol = AptProtocol(self._transport, default_timeout=self.RESPONSE_TIMEOUT)
 
-        # Expect a reply to normal commands within 1 second.
-        self._reply_timeout = 1.0
-
-        # The APT protocol supports multiple channels.
-        # The K10CR1 only uses channel 1.
+        # The APT protocol supports multiple channels, but the K10CR1 only uses channel 1.
         self._channel = 1
 
-    def _read_message(self, timeout: float) -> _AptMessage:
-        """Read and decode a binary message from the instrument."""
-
-        # Read message header.
-        data = self._transport.read(nbytes=6, timeout=timeout)
-
-        # Decode message header.
-        hdr = _AptMessageHeader.from_buffer_copy(data)
-
-        # Long APT messages are identified by bit 7 in the destination field.
-        if (hdr.dest & 0x80) != 0:
-            # This is a long APT message (header + data). Read the additional data.
-            try:
-                # Since we already received a partial message, the timeout
-                # only needs to account for the time it takes to receive
-                # the payload data. (The instrument will probably transmit
-                # the entire message as fast as possible).
-                # 50 ms should be more than enough.
-                data += self._transport.read(nbytes=hdr.data_length, timeout=0.050)
-            except QMI_TimeoutException:
-                # Discard pending data after receiving a partial message.
-                self._transport.discard_read()
-                raise QMI_InstrumentException("Received partial message (message_id=0x{:04x}, data_length={})"
-                                              .format(hdr.message_id, hdr.data_length))
-
-        # Decode the complete message.
-        message_type = _apt_message_type_table.get(hdr.message_id)
-        if message_type is None:
-            # Discard pending data after receiving a bad message.
-            self._transport.discard_read()
-            raise QMI_InstrumentException("Received unknown message id 0x{:04x} from instrument"
-                                          .format(hdr.message_id))
-
-        if len(data) != ctypes.sizeof(message_type):
-            # Discard pending data after receiving a bad message.
-            self._transport.discard_read()
-            raise QMI_InstrumentException(("Received incorrect message length for message id 0x{:04x} "
-                                           + "(got {} bytes while expecting {} bytes)")
-                                          .format(hdr.message_id, len(data), ctypes.sizeof(message_type)))
-
-        # Decode received message.
-        return message_type.from_buffer_copy(data)
-
-    def _wait_message(self, message_type: Type[_AptMessage], timeout: float) -> _AptMessage:
-        """Wait for a specific message type from the instrument.
-
-        Any other (valid) messages received from the instrument will be discarded.
-
-        Parameters:
-            message_type:   Type of message to wait for.
-            timeout:        Maximum time to wait for the message in seconds.
+    def _get_velocity_params(self) -> _AptMessage:
+        """Update and return the current maximum velocity and acceleration.
 
         Returns:
-            The received message.
-
-        Raises:
-            QMI_TimeoutException: If the expected message is not received within the timeout.
-            QMI_InstrumentException: If an invalid message is received.
+            resp: Maximum velocity and acceleration in encoder units.
         """
+        # Send request message.
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_VEL_PARAMS.value],
+            chan_ident=self._channel
+        )
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_VEL_PARAMS.value]
+        )
 
-        end_time = time.monotonic() + timeout
-        while True:
-
-            # Read next message from instrument.
-            tmo = max(end_time - time.monotonic(), 0)
-            msg = self._read_message(timeout=tmo)
-
-            if isinstance(msg, message_type):
-                # Got the expected message.
-                return msg
-
-            # Discard message and continue waiting.
-            _logger.debug("[%s] Ignoring message %s (message_id=0x%04x)",
-                          self._name, type(msg).__name__, msg.message_id)
-
-            if time.monotonic() > end_time:
-                raise QMI_TimeoutException(f"Expected message type {message_type} not received.")
-
-    def _send_message(self, msg: _AptMessage) -> None:
-        """Encode and send a binary message to the instrument."""
-        # Before sending a new command, do a non-blocking read to consume
-        # a potential old message from the instrument.
-        # This prevents a buildup of unhandled notification messages from
-        # the instrument after several move_XXX() commands.
-        # Suppress the timeout exception if no old message is in the buffer.
-        with contextlib.suppress(QMI_TimeoutException):
-            pending_msg = self._read_message(timeout=0.0)
-            _logger.debug("[%s] Pending message %s (message_id=0x%04x)",
-                          self._name, type(pending_msg).__name__, pending_msg.message_id)
-
-        # Now send the new command.
-        self._transport.write(bytes(msg))
+        # Receive response
+        return self._apt_protocol.ask(req_msg, reply_msg)
 
     def _check_k10cr1(self) -> None:
         """Check that the connected device is a Thorlabs K10CR1.
 
         Raises:
             QMI_InstrumentException: If not connected to a K10CR1 device.
-            QMI_TimeoutException: If the instrument does not answer our request.
+            QMI_TimeoutException:    If the instrument does not answer our request.
         """
-
         # Send request message.
-        req_msg = _AptMsgHwReqInfo.create()
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_REQ_INFO.value])
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_GET_INFO.value]
+        )
 
-        # Receive reply message.
-        reply_msg = self._wait_message(_AptMsgHwGetInfo, timeout=self._reply_timeout)
+        # Receive response
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
 
         # Check that this is a K10CR1 device.
-        model_str = reply_msg.model_number.decode("iso8859-1")
+        model_str = resp.model_number.decode("iso8859-1")
         if model_str != "K10CR1":
-            raise QMI_InstrumentException("Driver only supports K10CR1 but instrument identifies as {!r}"
-                                          .format(model_str))
+            raise QMI_InstrumentException(
+                f"Driver only supports K10CR1 but instrument identifies as {model_str!r}"
+            )
 
     @rpc_method
     def open(self) -> None:
@@ -532,12 +132,10 @@ class Thorlabs_K10CR1(QMI_Instrument):
             self._check_k10cr1()
 
         except Exception:
-            # Close the transport if an error occurred during initialization
-            # of the instrument.
+            # Close the transport if an error occurred during initialization of the instrument.
             self._transport.close()
             raise
 
-        # Mark this instrument as open.
         super().open()
 
     @rpc_method
@@ -552,18 +150,21 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send request message.
-        req_msg = _AptMsgHwReqInfo.create()
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_REQ_INFO.value])
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.HW_GET_INFO.value]
+        )
 
-        # Receive reply message.
-        reply_msg = self._wait_message(_AptMsgHwGetInfo, timeout=self._reply_timeout)
+        # Receive response
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
+        fw_version = str(resp.fw_version)
 
-        return QMI_InstrumentIdentification(vendor="Thorlabs",
-                                            model=reply_msg.model_number.decode("iso8859-1"),
-                                            serial=reply_msg.serial_number,
-                                            version="{}.{}.{}".format(reply_msg.fw_version[2],
-                                                                      reply_msg.fw_version[1],
-                                                                      reply_msg.fw_version[0]))
+        return QMI_InstrumentIdentification(
+            vendor="Thorlabs",
+            model=resp.model_number.decode("iso8859-1"),
+            serial=resp.serial_number,
+            version="{}.{}.{}".format(fw_version[2], fw_version[1], fw_version[0])
+        )
 
     @rpc_method
     def get_motor_status(self) -> MotorStatus:
@@ -571,27 +172,32 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send request message.
-        req_msg = _AptMsgReqStatusBits.create(chan_ident=self._channel)
-        self._send_message(req_msg)
-
-        # Receive reply message.
-        reply_msg = self._wait_message(_AptMsgGetStatusBits, timeout=self._reply_timeout)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_STATUS_BITS.value],
+            chan_ident=self._channel
+        )
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_STATUS_BITS.value]
+        )
+        # Receive response
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
 
         # Decode motor status bits.
-        status_bits = reply_msg.status_bits
-        return MotorStatus(forward_limit=((status_bits & 0x01) != 0),
-                           reverse_limit=((status_bits & 0x02) != 0),
-                           moving_forward=((status_bits & 0x10) != 0),
-                           moving_reverse=((status_bits & 0x20) != 0),
-                           jogging_forward=((status_bits & 0x40) != 0),
-                           jogging_reverse=((status_bits & 0x80) != 0),
-                           homing=((status_bits & 0x200) != 0),
-                           homed=((status_bits & 0x400) != 0),
-                           tracking=((status_bits & 0x1000) != 0),
-                           settled=((status_bits & 0x2000) != 0),
-                           motion_error=((status_bits & 0x4000) != 0),
-                           current_limit=((status_bits & 0x01000000) != 0),
-                           channel_enabled=((status_bits & 0x80000000) != 0))
+        return MotorStatus(
+            forward_limit=bool(resp.forward_limit),
+            reverse_limit=bool(resp.reverse_limit),
+            moving_forward=bool(resp.moving_forward),
+            moving_reverse=bool(resp.moving_reverse),
+            jogging_forward=bool(resp.jogging_forward),
+            jogging_reverse=bool(resp.jogging_reverse),
+            homing=bool(resp.homing),
+            homed=bool(resp.homed),
+            tracking=bool(resp.tracking),
+            settled=bool(resp.settled),
+            motion_error=bool(resp.motion_error),
+            current_limit=bool(resp.current_limit),
+            channel_enabled=bool(resp.output_enabled)
+        )
 
     @rpc_method
     def identify(self) -> None:
@@ -599,8 +205,11 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send command message.
-        req_msg = _AptMsgIdentify.create(chan_ident=self._channel)
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_IDENTIFY.value],
+            chan_ident=self._channel
+        )
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def get_chan_enable_state(self) -> bool:
@@ -608,12 +217,22 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send request message.
-        req_msg = _AptMsgReqChanEnableState.create(chan_ident=self._channel)
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_REQ_CHANENABLESTATE.value],
+            chan_ident=self._channel
+        )
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_GET_CHANENABLESTATE.value]
+        )
 
-        # Receive reply message.
-        reply_msg = self._wait_message(_AptMsgGetChanEnableState, timeout=self._reply_timeout)
-        return (reply_msg.enable_state == 0x01)
+        # Receive response
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
+        if resp.enable_state == AptChannelState.ENABLE.value:
+            return True
+        elif resp.enable_state == AptChannelState.DISABLE.value:
+           return False
+        else:
+            raise ValueError(f"{resp.enable_state} is not a valid channel enable state.")
 
     @rpc_method
     def set_chan_enable_state(self, enable: bool) -> None:
@@ -627,10 +246,13 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send command message.
-        enable_state = 0x01 if enable else 0x02
-        req_msg = _AptMsgSetChanEnableState.create(chan_ident=self._channel,
-                                                   enable_state=enable_state)
-        self._send_message(req_msg)
+        enable_state = AptChannelState.ENABLE if enable else AptChannelState.DISABLE
+        set_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOD_SET_CHANENABLESTATE.value],
+            chan_ident=self._channel,
+            enable_state=enable_state.value,
+        )
+        self._apt_protocol.send_message(set_msg)
 
     @rpc_method
     def get_absolute_position(self) -> float:
@@ -649,27 +271,117 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send request message.
-        req_msg = _AptMsgReqPosCounter.create(chan_ident=self._channel)
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_POS_COUNTER.value],
+            chan_ident=self._channel
+        )
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_POS_COUNTER.value]
+        )
 
-        # Receive reply message.
-        reply_msg = self._wait_message(_AptMsgGetPosCounter, timeout=self._reply_timeout)
-        return reply_msg.position / self.MICROSTEPS_PER_DEGREE
+        # Receive response
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
+        return resp.position / self.MICROSTEPS_PER_DEGREE
+
+    @rpc_method
+    def get_velocity(self) -> float:
+        """Return the current velocity."""
+        self._check_is_open()
+
+        resp = self._get_velocity_params()
+        return resp.max_vel / self.VELOCITY_FACTOR
+
+    @rpc_method
+    def get_acceleration(self) -> float:
+        """Return the current acceleration."""
+        self._check_is_open()
+
+        resp = self._get_velocity_params()
+        return resp.accel / self.ACCELERATION_FACTOR
 
     @rpc_method
     def get_velocity_params(self) -> VelocityParams:
         """Return the current maximum velocity and acceleration."""
-
         self._check_is_open()
+        warnings.warn(
+            f"{self.get_velocity_params.__name__} has been deprecated. " +
+            f"Please use {self.get_velocity.__name__} and {self.get_acceleration.__name__} instead.",
+            DeprecationWarning
+        )
 
         # Send request message.
-        req_msg = _AptMsgReqVelParams.create(chan_ident=self._channel)
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_VEL_PARAMS.value],
+            chan_ident=self._channel
+        )
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_VEL_PARAMS.value]
+        )
 
-        # Receive reply message.
-        reply_msg = self._wait_message(_AptMsgGetVelParams, timeout=self._reply_timeout)
-        return VelocityParams(max_velocity=(reply_msg.max_vel / self.VELOCITY_FACTOR),
-                              acceleration=(reply_msg.accel / self.ACCELERATION_FACTOR))
+        # Receive response
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
+        return VelocityParams(
+            max_velocity=(resp.max_vel / self.VELOCITY_FACTOR),
+            acceleration=(resp.accel / self.ACCELERATION_FACTOR)
+        )
+
+    @rpc_method
+    def set_velocity(self, max_velocity: float) -> None:
+        """Set the maximum velocity for moves.
+
+        This setting will be applied for subsequent absolute and relative moves.
+
+        Parameters:
+            max_velocity: Maximum velocity in degrees/second (max 10).
+        """
+        self._check_is_open()
+        if not 0 < max_velocity <= self.MAX_VELOCITY:
+            raise ValueError(f"Invalid value for {max_velocity=}")
+
+        # Get current values and check with set value
+        current_values = self._get_velocity_params()
+        max_vel = int(round(max_velocity * self.VELOCITY_FACTOR))
+        if current_values.max_vel == max_vel:
+            return  # Already set
+
+        # Send command message. Note that documentation describes 'min_vel' to be always zero.
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
+            chan_ident=self._channel,
+            min_vel=0,
+            accel=current_values.accel,
+            max_vel=max_vel
+        )
+        self._apt_protocol.send_message(req_msg)
+
+    @rpc_method
+    def set_acceleration(self, acceleration: float) -> None:
+        """Set the maximum acceleration for moves.
+
+        This setting will be applied for subsequent absolute and relative moves.
+
+        Parameters:
+            acceleration: Maximum acceleration in degrees/second (max 10).
+        """
+        self._check_is_open()
+        if not 0 < acceleration <= self.MAX_ACCELERATION:
+            raise ValueError(f"Invalid value for {acceleration=}")
+
+        # Get current values and check with set value
+        current_values = self._get_velocity_params()
+        accel = int(round(acceleration * self.ACCELERATION_FACTOR))
+        if current_values.accel == accel:
+            return   # Already set
+
+        # Send command message. Note that documentation describes 'min_vel' to be always zero.
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
+            chan_ident=self._channel,
+            min_vel=0,
+            accel=accel,
+            max_vel=current_values.max_vel
+        )
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def set_velocity_params(self, max_velocity: float, acceleration: float) -> None:
@@ -681,36 +393,42 @@ class Thorlabs_K10CR1(QMI_Instrument):
             max_velocity: Maximum velocity in degrees/second (max 10).
             acceleration: Acceleration in degree/second/second (max 20).
         """
-
-        if max_velocity <= 0 or max_velocity > 10:
-            raise ValueError("Invalid range for max_velocity")
-        if acceleration <= 0 or acceleration > 20:
-            raise ValueError("Invalid range for acceleration")
-
         self._check_is_open()
+        if not 0 < max_velocity <= self.MAX_VELOCITY:
+            raise ValueError(f"Invalid value for {max_velocity=}")
+        if not 0 < acceleration <= self.MAX_ACCELERATION:
+            raise ValueError(f"Invalid value for {acceleration=}")
 
-        # Send command message.
+        # Send command message. Note that documentation describes 'min_vel' to be always zero.
         max_vel = int(round(max_velocity * self.VELOCITY_FACTOR))
         accel = int(round(acceleration * self.ACCELERATION_FACTOR))
-        req_msg = _AptMsgSetVelParams.create(chan_ident=self._channel,
-                                             min_vel=0,
-                                             accel=accel,
-                                             max_vel=max_vel)
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_VEL_PARAMS.value],
+            chan_ident=self._channel,
+            min_vel=0,
+            accel=accel,
+            max_vel=max_vel
+        )
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def get_backlash_distance(self) -> float:
         """Return the backlash distance in degrees."""
-
         self._check_is_open()
 
         # Send request message.
-        req_msg = _AptMsgReqGenMoveParams.create(chan_ident=self._channel)
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_GEN_MOVE_PARAMS.value],
+            chan_ident=self._channel
+        )
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_GEN_MOVE_PARAMS.value]
+        )
 
-        # Receive reply message.
-        reply_msg = self._wait_message(_AptMsgGetGenMoveParams, timeout=self._reply_timeout)
-        return reply_msg.backlash_dist / self.MICROSTEPS_PER_DEGREE
+        # Receive response
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
+
+        return resp.backlash_dist / self.MICROSTEPS_PER_DEGREE
 
     @rpc_method
     def set_backlash_distance(self, backlash: float) -> None:
@@ -723,7 +441,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
         Parameters:
             backlash: Backlash distance in degrees, or 0 to disable.
         """
-
         # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
         raw_dist = int(round(backlash * self.MICROSTEPS_PER_DEGREE))
         if abs(raw_dist) >= 2**31:
@@ -732,34 +449,46 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send command message.
-        req_msg = _AptMsgSetGenMoveParams.create(chan_ident=self._channel,
-                                                 backlash_dist=raw_dist)
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_GEN_MOVE_PARAMS.value],
+            chan_ident=self._channel,
+            backlash_dist=raw_dist
+        )
+
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def get_home_params(self) -> HomeParams:
         """Return the homing parameters."""
-
         self._check_is_open()
 
         # Send request message.
-        req_msg = _AptMsgReqHomeParams.create(chan_ident=self._channel)
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_HOME_PARAMS.value],
+            chan_ident=self._channel
+        )
+        reply_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_HOME_PARAMS.value]
+        )
 
-        # Receive reply message.
-        reply_msg = self._wait_message(_AptMsgGetHomeParams, timeout=self._reply_timeout)
-        return HomeParams(home_direction=HomeDirection(reply_msg.home_dir),
-                          limit_switch=HomeLimitSwitch(reply_msg.limit_switch),
-                          home_velocity=(reply_msg.home_velocity / self.VELOCITY_FACTOR),
-                          offset_distance=(reply_msg.offset_dist / self.MICROSTEPS_PER_DEGREE))
+        # Receive response
+        resp = self._apt_protocol.ask(req_msg, reply_msg)
+
+        return HomeParams(
+            home_direction=AptChannelHomeDirection(resp.home_dir),
+            limit_switch=AptChannelHomeLimitSwitch(resp.limit_switch),
+            home_velocity=(resp.home_velocity / self.VELOCITY_FACTOR),
+            offset_distance=(resp.offset_dist / self.MICROSTEPS_PER_DEGREE)
+        )
 
     @rpc_method
-    def set_home_params(self,
-                        home_direction: HomeDirection,
-                        limit_switch: HomeLimitSwitch,
-                        home_velocity: float,
-                        offset_distance: float
-                        ) -> None:
+    def set_home_params(
+        self,
+        home_direction: AptChannelHomeDirection,
+        limit_switch: AptChannelHomeLimitSwitch,
+        home_velocity: float,
+        offset_distance: float
+    ) -> None:
         """Set the homing parameters.
 
         WARNING: The K10CR1 manual recommends that these settings should
@@ -771,13 +500,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
             home_velocity:      Homing velocity in degrees/second (max 5).
             offset_distance:    Distance of home position from home limit switch (in degrees).
         """
-
-        if home_direction not in (HomeDirection.FORWARD, HomeDirection.REVERSE):
+        if home_direction != AptChannelHomeDirection.REVERSE:
             raise ValueError("Invalid value for home_direction")
-        if limit_switch not in (HomeLimitSwitch.FORWARD, HomeLimitSwitch.REVERSE):
+        if limit_switch != AptChannelHomeLimitSwitch.REVERSE:
             raise ValueError("Invalid value for limit_switch")
-        if home_velocity <= 0 or home_velocity > 5:
-            raise ValueError("Invalid range for home_velocity")
+        if not 0 < home_velocity <= 5:
+            raise ValueError(f"Invalid value for {home_velocity=}")
 
         # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
         raw_dist = int(round(offset_distance * self.MICROSTEPS_PER_DEGREE))
@@ -788,12 +516,15 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
         # Send command message.
         raw_velocity = int(round(home_velocity * self.VELOCITY_FACTOR))
-        req_msg = _AptMsgSetHomeParams.create(chan_ident=self._channel,
-                                              home_dir=int(home_direction),
-                                              limit_switch=int(limit_switch),
-                                              home_velocity=raw_velocity,
-                                              offset_dist=raw_dist)
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_SET_HOME_PARAMS.value],
+            chan_ident=self._channel,
+            home_dir=home_direction.value,
+            limit_switch=limit_switch.value,
+            home_velocity=raw_velocity,
+            offset_dist=raw_dist
+        )
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def move_stop(self, immediate_stop: bool = False) -> None:
@@ -808,10 +539,13 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send command message.
-        stop_mode = 0x01 if immediate_stop else 0x02
-        req_msg = _AptMsgMoveStop.create(chan_ident=self._channel,
-                                         stop_mode=stop_mode)
-        self._send_message(req_msg)
+        stop_mode = AptChannelStopMode.IMMEDIATE if immediate_stop else AptChannelStopMode.PROFILED
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_STOP.value],
+            chan_ident=self._channel,
+            stop_mode=stop_mode.value,
+        )
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def move_home(self) -> None:
@@ -823,8 +557,11 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send command message.
-        req_msg = _AptMsgMoveHome.create(chan_ident=self._channel)
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_HOME.value],
+            chan_ident=self._channel,
+        )
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def move_relative(self, distance: float) -> None:
@@ -836,7 +573,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
         Parameters:
             distance: Relative move distance in degrees.
         """
-
         # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
         raw_dist = int(round(distance * self.MICROSTEPS_PER_DEGREE))
         if abs(raw_dist) >= 2**31:
@@ -845,9 +581,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send command message.
-        req_msg = _AptMsgMoveRelative.create(chan_ident=self._channel,
-                                             rel_dist=raw_dist)
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_RELATIVE.value],
+            chan_ident=self._channel,
+            rel_dist=raw_dist
+        )
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def move_absolute(self, position: float) -> None:
@@ -869,7 +608,6 @@ class Thorlabs_K10CR1(QMI_Instrument):
         Parameters:
             position: Absolute target position in degrees.
         """
-
         # Convert distance to microsteps and check that the value fits in a 32-bit signed integer.
         raw_pos = int(round(position * self.MICROSTEPS_PER_DEGREE))
         if abs(raw_pos) >= 2**31:
@@ -878,9 +616,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
         self._check_is_open()
 
         # Send command message.
-        req_msg = _AptMsgMoveAbsolute.create(chan_ident=self._channel,
-                                             abs_position=raw_pos)
-        self._send_message(req_msg)
+        req_msg = self._apt_protocol.create(
+            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_MOVE_ABSOLUTE.value],
+            chan_ident=self._channel,
+            abs_position=raw_pos,
+        )
+        self._apt_protocol.send_message(req_msg)
 
     @rpc_method
     def wait_move_complete(self, timeout: float) -> None:
@@ -920,11 +661,12 @@ class Thorlabs_K10CR1(QMI_Instrument):
 
             # Wait for a short while, or until the motor sends a new message.
             try:
-                msg = self._read_message(timeout=min(0.5, time_left))
+                msg = self._apt_protocol.read_message(timeout=min(self.RESPONSE_TIMEOUT, time_left))
             except QMI_TimeoutException:
                 # No message from the motor.
                 # This is normal and expected if the motor is still moving.
                 # Go around the loop again and poll the motor status.
+                time.sleep(0.01)
                 continue
 
             # Any message from the motor is most likely an announcement that

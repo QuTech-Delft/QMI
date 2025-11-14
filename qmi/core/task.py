@@ -105,9 +105,9 @@ import enum
 import inspect
 import logging
 import threading
-import typing
-from typing import Callable, Optional, Tuple, Type, Any, TypeVar, Generic
 import time
+from typing import Any, Generic, Type, TypeVar, TYPE_CHECKING
+from collections.abc import Callable
 
 from qmi.core.rpc import QMI_RpcObject, rpc_method
 from qmi.core.pubsub import SignalDescription, QMI_Signal, QMI_RegisteredSignal
@@ -152,7 +152,7 @@ class _TaskMetaClass(type):
         signals = []
         for attr_name, attr_value in inspect.getmembers(cls, lambda member: isinstance(member, QMI_Signal)):
             if not is_valid_object_name(attr_name):
-                raise QMI_UsageException("Invalid signal name {!r} in class {}".format(attr_name, cls.__name__))
+                raise QMI_UsageException(f"Invalid signal name {attr_name!r} in class {cls.__name__}")
             signals.append(SignalDescription(name=attr_name, arg_types=attr_value.arg_types))
 
         # Add the list of signals as an attribute of the newly created QMI_Task subclass.
@@ -207,8 +207,8 @@ class QMI_Task(Generic[_SET, _STS], metaclass=_TaskMetaClass):
         self._name = name
         self._stop_requested = threading.Event()
         self._settings_fifo: collections.deque = collections.deque(maxlen=1)
-        self.settings: Optional[_SET] = None
-        self.status: Optional[_STS] = None
+        self.settings: _SET | None = None
+        self.status: _STS | None = None
 
         # Create instances of QMI_RegisteredSignal for each signal type that this class may publish.
         # Insert these QMI_RegisteredSignal instances as attributes of the RpcObject instance.
@@ -262,7 +262,7 @@ class QMI_Task(Generic[_SET, _STS], metaclass=_TaskMetaClass):
         to this task, this method copies the new settings to `self.settings`
         and returns True.
 
-        Otherwise the settings remain the same and this method returns False.
+        Otherwise, the settings remain the same and this method returns False.
 
         Returns:
             True if there are new settings, False if the settings are unchanged.
@@ -319,12 +319,12 @@ class _TaskThread(QMI_Thread):
         self._task_class = task_class
         self._task_args = task_args
         self._task_kwargs = task_kwargs
-        self.task: Optional[QMI_Task] = None
-        self._exception: Optional[BaseException] = None
+        self.task: QMI_Task | None = None
+        self._exception: BaseException | None = None
         self._state = _TaskThread.State.INITIAL
         self._state_cond = threading.Condition()
         self._wait_cond_lock = threading.Lock()
-        self._wait_cond: Optional[threading.Condition] = None
+        self._wait_cond: threading.Condition | None = None
 
     def run(self) -> None:
         """Main function inside the thread."""
@@ -389,7 +389,7 @@ class _TaskThread(QMI_Thread):
 
         _logger.debug("Task thread %s completed normally", self._task_name)
 
-    def get_state(self) -> Tuple[State, Optional[BaseException]]:
+    def get_state(self) -> tuple[State, BaseException | None]:
         """Return task state and any exception that occurred in the task."""
         with self._state_cond:
             return (self._state, self._exception)
@@ -470,7 +470,7 @@ class _TaskThread(QMI_Thread):
     def wait_for_condition(self,
                            cond: threading.Condition,
                            predicate: Callable[[], bool],
-                           timeout: Optional[float]
+                           timeout: float | None
                            ) -> bool:
         """Wait until a condition becomes true, or until the task is stopped.
 
@@ -547,7 +547,7 @@ class QMI_TaskRunner(QMI_RpcObject):
     """
 
     @classmethod
-    def get_category(cls) -> Optional[str]:
+    def get_category(cls) -> str | None:
         return "task"
 
     def __init__(self,
@@ -597,10 +597,23 @@ class QMI_TaskRunner(QMI_RpcObject):
             # Clean up task and re-raise the exception here.
             self._thread.join()
             assert isinstance(exception, BaseException)
-            raise QMI_TaskInitException("Failed to initialize task {}".format(self._name)) from exception
+            raise QMI_TaskInitException(f"Failed to initialize task {self._name}") from exception
 
         assert state == _TaskThread.State.READY_TO_RUN
         assert self._thread.task is not None
+
+    @rpc_method
+    def __enter__(self):
+        """The `__enter__` methods is decorated as `rpc_method` so that `QMI_RpcProxy` can call it when using the
+        proxy with a `with` context manager. This method also calls to start the task thread."""
+        return self.start()
+
+    @rpc_method
+    def __exit__(self, *args, **kwargs):
+        """The `__exit__` methods is decorated as `rpc_method` so that `QMI_RpcProxy` can call it when using the
+        proxy with a `with` context manager. This method also calls to stop and join the task thread."""
+        self.stop()
+        self.join()
 
     def release_rpc_object(self) -> None:
         """Ensure the task is joined before it is removed from the context."""
@@ -624,7 +637,7 @@ class QMI_TaskRunner(QMI_RpcObject):
         # Check that task was not yet started.
         (state, dummy_exception) = self._thread.get_state()
         if state != _TaskThread.State.READY_TO_RUN:
-            raise QMI_UsageException("Task {} can not be started more than once".format(self._name))
+            raise QMI_UsageException(f"Task {self._name} can not be started more than once")
 
         _logger.debug("Starting task %s", self._name)
         self._thread.start_task()
@@ -683,7 +696,7 @@ class QMI_TaskRunner(QMI_RpcObject):
             # An exception occurred while running the task.
             # Re-raise the exception to report it to the application.
             assert isinstance(exception, BaseException)
-            raise QMI_TaskRunException("Task {} failed".format(self._name)) from exception
+            raise QMI_TaskRunException(f"Task {self._name} failed") from exception
 
     @rpc_method
     def is_running(self) -> bool:
@@ -916,5 +929,5 @@ class QMI_LoopTask(QMI_Task):
 
 
 # Imports needed only for static typing.
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     import qmi.core.context

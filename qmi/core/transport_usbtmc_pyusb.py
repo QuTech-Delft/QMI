@@ -1,7 +1,5 @@
 """Extension of the QMI_UsbTmcTransport class utilizing usb.core and qmi.core.usbtmc packages."""
 
-from typing import Optional
-
 import usb.core
 
 from qmi.core import usbtmc as usbtmc
@@ -11,9 +9,9 @@ from qmi.core.transport import QMI_UsbTmcTransport
 
 class QMI_PyUsbTmcTransport(QMI_UsbTmcTransport):
 
-    def __init__(self, vendorid: int, productid: int, serialnr: str):
+    def __init__(self, vendorid: int, productid: int, serialnr: str) -> None:
         super().__init__(vendorid, productid, serialnr)
-        self._device: Optional[usbtmc.Instrument] = None
+        self._device: usbtmc.Instrument | None = None
 
     def _open_transport(self) -> None:
         self._device = usbtmc.Instrument(self.vendorid, self.productid, self.serialnr)

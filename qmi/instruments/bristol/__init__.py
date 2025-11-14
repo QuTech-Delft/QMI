@@ -7,4 +7,4 @@ Currently, supported are:
 """
 
 from qmi.instruments.bristol.bristol_871a import Bristol_871A
-from qmi.instruments.bristol.fos import Bristol_FOS
+from qmi.instruments.bristol.fos import Bristol_Fos as Bristol_Fos

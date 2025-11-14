@@ -1,5 +1,34 @@
-"""Initialization of the Python logging framework for QMI."""
+"""Initialization of the Python logging framework for QMI.
 
+Logging framework can be configured using the "logging" and "log_dir" sections of the QMI configuration file, e.g.:
+
+```json
+{
+    # Log level for messages to the console.
+    "logging": {
+        "console_loglevel": "DEBUG",
+        "logfile": "debug.log",
+        "loglevels": {
+            "qmi.core.rpc": "ERROR",
+            "qmi.core.task": "ERROR"
+        },
+        "max_bytes": 1000000,
+        "backup_count": 2
+    },
+    # Directory to write various log files.
+    "log_dir": "${qmi_home}/log_dir",
+
+    "contexts": ...
+}
+```
+to show DEBUG info on the console, and to write into max three log files (the latest log and two backups) of max size
+of 1MB. The location of the log file named 'debug.log' is in 'log_dir' folder of the QMI home directory.  The loglevel
+setting is overridden with module-specific settings, for modules `qmi.core.rpc` and `qmi.core.task`, to be "ERROR".
+
+The default [`log levels`](https://docs.python.org/3/library/logging.html#logging-levels) for QMI are "INFO" for the
+log file and "WARNING" for the console. The standard log file name is 'qmi.log'.
+"""
+import os.path
 import sys
 import logging
 import logging.handlers
@@ -7,15 +36,15 @@ import threading
 import time
 import warnings
 
+from collections.abc import Callable, Mapping
 from types import TracebackType
-from typing import Dict, Callable, Mapping, Optional, Tuple, Type, Union
 
 
 # Global variable holding the file log handler (if any).
-_file_handler: Optional[logging.FileHandler] = None
+_file_handler: logging.FileHandler | None = None
 
 # Global variable holding the saved exception hook.
-_saved_except_hook: Optional[Callable] = None
+_saved_except_hook: Callable | None = None
 
 
 class _RateLimitFilter(logging.Filter):
@@ -34,7 +63,7 @@ class _RateLimitFilter(logging.Filter):
         """Initialize a rate limiting log filter.
 
         Parameters:
-            rate_limit: Maximum number of log messages per second.
+            rate_limit:  Maximum number of log messages per second.
             burst_limit: Maximum number of messages that can be "saved up" for a short burst of messages.
                          This must be at least 1.
         """
@@ -47,7 +76,7 @@ class _RateLimitFilter(logging.Filter):
         # combination of logger and log level:
         #    self._counters[(logger_name, log_level)] returns a tuple
         #      (last_update_time, bucket_level, nr_discarded_messages)
-        self._counters: Dict[Tuple[str, int], Tuple[float, float, int]] = {}
+        self._counters: dict[tuple[str, int], tuple[float, float, int]] = {}
 
     def filter(self, record: logging.LogRecord) -> bool:
 
@@ -85,8 +114,23 @@ class _RateLimitFilter(logging.Filter):
         return ret
 
 
+class WatchedRotatingFileHandler(logging.handlers.RotatingFileHandler, logging.handlers.WatchedFileHandler):
+    def __init__(self, filename, **kwargs):
+        super().__init__(filename, **kwargs)
+        self.dev, self.ino = -1, -1
+        self._statstream()
+        self._basedir = os.path.split(self.baseFilename)[0]
+
+    def emit(self, record):
+        self.reopenIfNeeded()  # WatchedFileHandler, makes sure the log file will be present.
+        if not os.path.isdir(self._basedir):  # Prevents errors if directory is also removed by chance.
+            os.makedirs(self._basedir)
+
+        super().emit(record)  # RotatingFileHandler, handles the log file rotation if log file full.
+
+
 def _makeLogFormatter(log_process: bool) -> logging.Formatter:
-    """Create a log formatter instance."""
+    """Create and return a log formatter instance."""
 
     if log_process:
         format_spec = "%(asctime)-23s | %(process)5d | %(levelname)-8s | %(name)-22s | %(message)s"
@@ -102,33 +146,39 @@ def _makeLogFormatter(log_process: bool) -> logging.Formatter:
     return fmt
 
 
-def start_logging(loglevel: Union[int, str] = logging.INFO,
-                  console_loglevel: Union[int, str] = logging.WARNING,
-                  logfile: Optional[str] = None,
-                  loglevels: Optional[Mapping[str, Union[int, str]]] = None,
-                  rate_limit: Optional[float] = None,
-                  burst_limit: int = 1
-                  ) -> None:
+def start_logging(
+    loglevel: int | str = logging.INFO,
+    console_loglevel: int | str = logging.WARNING,
+    logfile: str | None = None,
+    loglevels: Mapping[str, int | str] | None = None,
+    rate_limit: float | None = None,
+    burst_limit: int = 1,
+    max_bytes: int = 10 * 2**30,
+    backup_count: int = 5
+) -> None:
     """Initialize the Python logging framework for use by QMI.
 
-    This function sets up logging to `stderr` and optional logging to a file.
+    This function sets up logging to `stderr` and optional logging to a file. The maximum size
+    of a logfile can be given, and the number of rotating logfile count as well. The maximum total
+    logfile disk space usage will be max_bytes * backup_count.
     Logging of Python *warnings* is enabled.
     Unhandled exceptions are logged to file.
 
     This function is normally called automatically by ``qmi.start()``.
 
     Parameters:
-        loglevel: Default log level (level of the root logger).
-            Only log messages with at least this priority will be processed.
+        loglevel:         Default log level (level of the root logger).
+                          Only log messages with at least this priority will be processed.
         console_loglevel: Log level for logging to console.
-            Only log messages with at least this priority will be logged to screen.
-        logfile: Optional file name of the log file.
-            When omitted, logging to file will be disabled.
-        loglevels: Optional initial log levels for specific loggers.
-            When specified, this is a dictionary mapping logger names to
-            their initial log levels.
-        rate_limit: Maximum number of log messages per second per logger.
-        burst_limit: Maximum number of messages that can be "saved up" for a short burst of messages.
+                          Only log messages with at least this priority will be logged to screen.
+        logfile:          Optional file name of the log file.
+                          When omitted, logging to file will be disabled.
+        loglevels:        Optional initial log levels for specific loggers.
+                          When specified, this is a dictionary mapping logger names to their initial log levels.
+        rate_limit:       Maximum number of log messages per second per logger.
+        burst_limit:      Maximum number of messages that can be "saved up" for a short burst of messages.
+        max_bytes:        Maximum size of a log file in bytes. Default is 10GB = 10 * 2**30.
+        backup_count:     Number of backup files to be used. Default is 5.
     """
 
     global _file_handler
@@ -153,14 +203,14 @@ def start_logging(loglevel: Union[int, str] = logging.INFO,
     # Create log file handler.
     # This must be done as a separate step (separate from basicConfig())
     # because basicConfig() ignores subsequent calls once logging is configured.
-    # However we must support the case where logging is configured during
+    # However, we must support the case where logging is configured during
     # early initialization via QMI_DEBUG, then later re-configured to add
     # a log file after the configuration is processed.
     if logfile:
-        # Use the WatchedFileHandler class for logging to file.
-        # This handler will automatically re-open the log file if the underlying
-        # file is removed or renamed, for example as part of log rotation.
-        _file_handler = logging.handlers.WatchedFileHandler(logfile)
+        # Use the custom WatchedRotatingFileHandler class for logging to file[s].
+        # This handler will automatically create or re-open the log file if the underlying
+        # file is removed, renamed or reached its maximum size, for example as part of log rotation.
+        _file_handler = WatchedRotatingFileHandler(logfile, delay=True, maxBytes=max_bytes, backupCount=backup_count)
         fmt = _makeLogFormatter(log_process=True)
         _file_handler.setFormatter(fmt)
         # Configure rate limiting.
@@ -181,17 +231,18 @@ def start_logging(loglevel: Union[int, str] = logging.INFO,
     # Redirect warnings through the logging system.
     logging.captureWarnings(True)
 
-    # By default the Python interpreter disables many types of warnings.
+    # By default, the Python interpreter disables many types of warnings.
     # We change that here, unless explicit warning options have been specified via "python -W ...".
     if not sys.warnoptions:
         # Enable all warnings but log only the first occurrence.
         warnings.simplefilter("default")
 
 
-def _log_excepthook(type_: Type[BaseException],
-                    value: BaseException,
-                    traceback: Optional[TracebackType] = None
-                    ) -> None:
+def _log_excepthook(
+    type_: type[BaseException],
+    value: BaseException,
+    traceback: TracebackType | None = None
+) -> None:
     """Called when an uncaught exception occurs.
 
     This function logs the exception to the QMI log file (if any),

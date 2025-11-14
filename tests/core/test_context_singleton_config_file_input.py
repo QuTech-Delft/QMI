@@ -2,7 +2,9 @@
 
 """Test start/stop functionality of QMI framework with config files and optional inputs.
 """
+import logging
 import os
+from shutil import rmtree
 import unittest
 
 ORIGINAL_QMI_CONFIG = os.getenv("QMI_CONFIG")
@@ -21,8 +23,12 @@ if os.path.isfile(QMI_ENV_CONFIG_FILE):
 CONFIG_FILE_CONTEXT = """{
     # Log level for messages to the console.
     "logging": {
-        "console_loglevel": "INFO"
+        "console_loglevel": "INFO",
+        "max_bytes": 100,
+        "backup_count": 2
     },
+    # Directory to write various log files.
+    "log_dir": "${qmi_home}/log_dir",
 
     "contexts": {
         # Testing remote instrument access.
@@ -78,7 +84,12 @@ class TestContextConfigFileInputs(unittest.TestCase):
     def tearDown(self):
         # Stop context if present.
         if self.ctx_name in qmi.info():
+            log_dir = qmi.context().get_log_dir()
             qmi.stop()
+            # Careful here not to remove accidentally QMI_HOME... Which could be your home directory!
+            if log_dir.endswith("log_dir"):
+                logging.shutdown()  # Forces log file to close.
+                rmtree(log_dir)
 
         # Set these back to None to avoid false leads for later unit-tests
         qmi.core.context_singleton.QMI_CONFIG = None
@@ -99,6 +110,8 @@ class TestContextConfigFileInputs(unittest.TestCase):
         # Add extra check that we do not accidentally overwrite/delete a real QMI_CONFIG qmi.conf file
         qmi_config_path = os.path.dirname(os.path.abspath(__file__))
         qmi_config_file = os.path.join(qmi_config_path, "qmi.conf")
+        qmi_log_path = os.path.join(os.path.expanduser("~"), "log_dir")
+        qmi_log_file = os.path.join(qmi_log_path, "qmi.log")
         delete_later = False
         if not os.path.isfile(qmi_config_file):
             # First create a temporary qmi.conf file.
@@ -110,9 +123,11 @@ class TestContextConfigFileInputs(unittest.TestCase):
 
         qmi.start(self.ctx_name)
         ctx = qmi.context()
-        self.assertEqual(ctx.name, self.ctx_name)
-        self.assertEqual(ctx.get_config().config_file, qmi_config_file)
-        self.assertTrue(ctx.get_config().qmi_home is None)
+        self.assertEqual(self.ctx_name, ctx.name)
+        self.assertEqual(qmi_config_file, ctx.get_config().config_file)
+        self.assertIsNone(ctx.get_config().qmi_home)
+        self.assertEqual(qmi_log_path, ctx.get_log_dir())
+        self.assertEqual(qmi_log_file, os.path.join(ctx.get_log_dir(), "qmi.log"))
 
         if delete_later:
             os.remove(qmi_config_file)
@@ -127,6 +142,8 @@ class TestContextConfigFileInputs(unittest.TestCase):
 
         qmi.start(self.ctx_name, qmi_config_file)
         ctx = qmi.context()
+        qmi.core.context_singleton._init_logging()  # Run again to see that it does not crash on already existing log
+
         self.assertEqual(ctx.name, self.ctx_name)
         self.assertEqual(ctx.get_config().config_file, qmi_config_file)
         self.assertTrue(ctx.get_config().qmi_home is None)
@@ -160,6 +177,15 @@ class TestContextConfigFileInputs(unittest.TestCase):
 
 
 class TestContextOptionalConfigInputs(unittest.TestCase):
+
+    def setUp(self):
+        self.log_dir = ""
+
+    def tearDown(self):
+        # Careful here not to remove accidentally QMI_HOME... Which could be your home directory!
+        if self.log_dir.endswith("log_dir"):
+            logging.shutdown()  # Forces log file to close.
+            rmtree(self.log_dir)
 
     def test_01_no_conf_file_only_optional_cfg_input(self):
         # Check that not giving an input config file, but giving optional cfg input leads to use of optional context.
@@ -197,7 +223,7 @@ class TestContextOptionalConfigInputs(unittest.TestCase):
         finally:
             qmi.stop()
 
-    def test_02_conf_file_context_overriden_by_optional_cfg_input(self):
+    def test_02_conf_file_context_overridden_by_optional_cfg_input(self):
         # Check that the initial config values read from config file get overridden with optional config input
         # First create a temporary qmi.conf file.
         qmi_config_path = os.path.dirname(os.path.abspath(__file__))
@@ -235,6 +261,7 @@ class TestContextOptionalConfigInputs(unittest.TestCase):
             self.assertTrue(context_client.virtualenv_path is input_client_context["virtualenv_path"])
 
         finally:
+            self.log_dir = qmi.context().get_log_dir()
             qmi.stop()
             os.remove(qmi_config_file)
 

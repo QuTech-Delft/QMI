@@ -17,7 +17,7 @@ from enum import Enum
 import logging
 import re
 from time import sleep
-from typing import Any, Dict, Optional
+from typing import Any
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
@@ -162,12 +162,12 @@ class Tenma72_Base(QMI_Instrument):
         )
 
     @rpc_method
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """This method needs to be implemented in the inheriting classes."""
         raise NotImplementedError()
 
     @rpc_method
-    def get_current(self, output_channel: Optional[int] = None) -> float:
+    def get_current(self, output_channel: int | None = None) -> float:
         """Get the current setting.
 
         Parameters:
@@ -183,7 +183,7 @@ class Tenma72_Base(QMI_Instrument):
         return float(self._read()[:5])
 
     @rpc_method
-    def set_current(self, current: float, output_channel: Optional[int] = None) -> None:
+    def set_current(self, current: float, output_channel: int | None = None) -> None:
         """Set the current setting.
 
         Parameters:
@@ -201,7 +201,7 @@ class Tenma72_Base(QMI_Instrument):
         self._send(command)
 
     @rpc_method
-    def get_voltage(self, output_channel: Optional[int] = None) -> float:
+    def get_voltage(self, output_channel: int | None = None) -> float:
         """Get the voltage setting.
 
         Parameters:
@@ -216,7 +216,7 @@ class Tenma72_Base(QMI_Instrument):
         return float(self._read())
 
     @rpc_method
-    def set_voltage(self, voltage: float, output_channel: Optional[int] = None) -> None:
+    def set_voltage(self, voltage: float, output_channel: int | None = None) -> None:
         """Set the voltage setting.
 
         Parameters:
@@ -259,7 +259,7 @@ class Tenma72_2550(Tenma72_Base):
     MAX_CURRENT = 3
 
     @rpc_method
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get the power supply status as a dictionary of status values.
 
         Dictionary composition is:
@@ -404,7 +404,7 @@ class Tenma72_13350(Tenma72_Base):
         return super()._send(cmd)
 
     @rpc_method
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get the power supply status as a dictionary of status values.
 
         Dictionary composition is:

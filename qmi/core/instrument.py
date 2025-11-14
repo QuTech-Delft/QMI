@@ -3,8 +3,7 @@
 
 import logging
 import warnings
-import typing
-from typing import Optional, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 from qmi.core.exceptions import QMI_InvalidOperationException
 from qmi.core.rpc import QMI_RpcObject, rpc_method
@@ -17,10 +16,10 @@ _logger = logging.getLogger(__name__)
 # Named tuple to hold result of get_idn() method.
 QMI_InstrumentIdentification = NamedTuple(
     'QMI_InstrumentIdentification',
-    [('vendor', Optional[str]),
-     ('model',  Optional[str]),
-     ('serial', Optional[str]),
-     ('version', Optional[str])])
+    [('vendor', str | None),
+     ('model',  str | None),
+     ('serial', str | None),
+     ('version', str | None)])
 #QMI_InstrumentIdentification.__doc__ = """Identification information provided by many types of instruments.
 #
 #Attributes:
@@ -47,14 +46,14 @@ class QMI_Instrument(QMI_RpcObject):
     (measurements, getting and setting of parameters).
 
     Driver should implement a method `reset()` when applicable.
-    This methods returns the instrument to its default settings.
+    This method returns the instrument to its default settings.
 
     Drivers should implement a method `get_idn()` when applicable.
     This method returns an instance of `QMI_InstrumentIdentification`.
     """
 
     @classmethod
-    def get_category(cls) -> Optional[str]:
+    def get_category(cls) -> str | None:
         return "instrument"
 
     def __init__(self, context: 'qmi.core.context.QMI_Context', name: str) -> None:
@@ -66,24 +65,37 @@ class QMI_Instrument(QMI_RpcObject):
         super().__init__(context, name)
         self._is_open = False
 
+    @rpc_method
+    def __enter__(self) -> "QMI_Instrument":
+        """The `__enter__` methods is decorated as `rpc_method` so that `QMI_RpcProxy` can call it when using the
+        proxy with a `with` context manager. This method also opens the instrument."""
+        self.open()
+        return self
+
+    @rpc_method
+    def __exit__(self, *args, **kwargs) -> None:
+        """The `__exit__` methods is decorated as `rpc_method` so that `QMI_RpcProxy` can call it when using the
+        proxy with a `with` context manager. This method also closes the instrument."""
+        self.close()
+
     def release_rpc_object(self) -> None:
         """Give a warning if the instrument is removed while still open."""
         if self._is_open:
-            warnings.warn("QMI_Instrument {} removed while still open".format(self._name), ResourceWarning)
+            warnings.warn(f"QMI_Instrument {self._name} removed while still open", ResourceWarning)
 
     def _check_is_open(self) -> None:
         """Verify that the instrument is open, otherwise raise an exception."""
         if not self._is_open:
             _logger.error("Interaction with closed instrument %s not allowed", self._name)
             raise QMI_InvalidOperationException(
-                "Operation not allowed on closed instrument {}".format(self._name))
+                f"Operation not allowed on closed instrument {self._name}")
 
     def _check_is_closed(self) -> None:
         """Verify that the instrument is closed, otherwise raise an exception."""
         if self._is_open:
             _logger.error("Interaction with open instrument %s not allowed", self._name)
             raise QMI_InvalidOperationException(
-                "Operation not allowed on open instrument {}".format(self._name))
+                f"Operation not allowed on open instrument {self._name}")
 
     @rpc_method
     def is_open(self) -> bool:
@@ -98,7 +110,7 @@ class QMI_Instrument(QMI_RpcObject):
         via calls to instrument-specific methods.
 
         Subclasses can extend this method to implement instrument-specific
-        initialization. If they do, they should call ``super().open()`` as a last statement, and return its value.
+        initialization. If they do, they should call ``super().open()`` as a last statement.
         """
         self._check_is_closed()
         self._is_open = True
@@ -119,5 +131,5 @@ class QMI_Instrument(QMI_RpcObject):
 
 
 # Imports needed only for static typing.
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     import qmi.core.context

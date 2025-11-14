@@ -110,9 +110,9 @@ Reference
 import logging
 import threading
 from collections import deque
+from collections.abc import Callable
 
-import typing
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Set, Tuple, Type
+from typing import Any, NamedTuple, Type, TYPE_CHECKING
 
 from qmi.core.exceptions import (
     QMI_TimeoutException, QMI_MessageDeliveryException,
@@ -137,7 +137,7 @@ class SignalDescription(NamedTuple):
             this signal type.
     """
     name: str
-    arg_types: Tuple[Type, ...]
+    arg_types: tuple[Type, ...]
 
 
 class ReceivedSignal(NamedTuple):
@@ -177,7 +177,7 @@ class QMI_Signal:
     """
     __slots__ = ("arg_types",)
 
-    def __init__(self, arg_types: List[Type]) -> None:
+    def __init__(self, arg_types: list[Type]) -> None:
         """Declare a new signal type.
 
         Parameters:
@@ -214,7 +214,7 @@ class QMI_RegisteredSignal:
                  context: "qmi.core.context.QMI_Context",
                  publisher_name: str,
                  signal_name: str,
-                 arg_types: Tuple[Type, ...]
+                 arg_types: tuple[Type, ...]
                  ) -> None:
         """Initialize the `QMI_RegisteredSignal` instance.
 
@@ -230,7 +230,7 @@ class QMI_RegisteredSignal:
 
     def __repr__(self) -> str:
         arg_types = ", ".join(arg_type.__name__ for arg_type in self.arg_types)
-        return "<registered signal {}.{} ({})>".format(self.publisher_name, self.signal_name, arg_types)
+        return f"<registered signal {self.publisher_name}.{self.signal_name} ({arg_types})>"
 
     def publish(self, *args: Any) -> None:
         """Publish this signal.
@@ -313,7 +313,7 @@ class QMI_SignalSubscriber:
         self.context.unsubscribe_signal(self.publisher_context, self.publisher_name, self.signal_name, receiver)
 
 
-def _wait_for_condition(cond: threading.Condition, predicate: Callable[[], bool], timeout: Optional[float]) -> bool:
+def _wait_for_condition(cond: threading.Condition, predicate: Callable[[], bool], timeout: float | None) -> bool:
     """Helper function to wait for a condition.
 
     When called from the main thread, this function is equivalent to::
@@ -397,7 +397,7 @@ class QMI_SignalReceiver:
         with self._queue_cond:
             return len(self._queue)
 
-    def get_next_signal(self, timeout: Optional[float] = 0) -> ReceivedSignal:
+    def get_next_signal(self, timeout: float | None = 0) -> ReceivedSignal:
         """Return the oldest published signal waiting in the receive queue.
 
         If there is no signal waiting in the queue, optionally wait until
@@ -581,7 +581,7 @@ class _PendingSubscriptionRequest:
         self.publisher_name = publisher_name
         self.signal_name = signal_name
         self.subscribe = subscribe
-        self.receivers: Set[QMI_SignalReceiver] = set()
+        self.receivers: set[QMI_SignalReceiver] = set()
         self._completed = threading.Event()
         self._success = False
         self._error_msg = ""
@@ -602,7 +602,7 @@ class _PendingSubscriptionRequest:
         self._error_msg = error_msg
         self._completed.set()
 
-    def wait(self) -> Tuple[bool, str]:
+    def wait(self) -> tuple[bool, str]:
         """Wait until a reply is received, then return (success, error_msg)."""
         self._completed.wait()
         return (self._success, self._error_msg)
@@ -637,24 +637,24 @@ class SignalManager(QMI_MessageHandler):
 
         # Register of subscribers in the local context.
         # Map "<context>.<publisher>.<signal>" to a set of SignalReceiver objects.
-        self._local_subscriptions: Dict[str, Set[QMI_SignalReceiver]] = {}
+        self._local_subscriptions: dict[str, set[QMI_SignalReceiver]] = {}
 
         # Register of remote subscribers to locally published signals.
         # Type: { "publisher_name": { "signal_name": set_of_context_names } }
         # Map "<publisher>.<signal>" to a set of remote context names.
-        self._remote_subscriptions: Dict[str, Set[str]] = {}
+        self._remote_subscriptions: dict[str, set[str]] = {}
 
         # Register of pending subscription requests by request ID.
         # Each pending subscription request is stored in this dictionary,
         # as well as in "_pending_subscription_request_by_signal_name".
-        self._pending_subscription_request_by_request_id: Dict[str, _PendingSubscriptionRequest] = {}
+        self._pending_subscription_request_by_request_id: dict[str, _PendingSubscriptionRequest] = {}
 
         # Register of pending subscription requests by signal name.
         # This is a mapping from "<context>.<publisher>.<signal>" to
         # a corresponding PendingSubscriptionRequest, if one exists.
         # Each pending subscription request is stored in this dictionary,
         # as well as in "_pending_subscription_request_by_request_id".
-        self._pending_subscription_request_by_signal_name: Dict[str, _PendingSubscriptionRequest] = {}
+        self._pending_subscription_request_by_signal_name: dict[str, _PendingSubscriptionRequest] = {}
 
         context.register_message_handler(self)
 
@@ -676,11 +676,11 @@ class SignalManager(QMI_MessageHandler):
         if publisher_context == "":
             publisher_context = self._context.name
         if not is_valid_object_name(publisher_context):
-            raise QMI_UsageException("Invalid context name {!r}".format(publisher_context))
+            raise QMI_UsageException(f"Invalid context name {publisher_context!r}")
         if not is_valid_object_name(publisher_name):
-            raise QMI_UsageException("Invalid publisher name {!r}".format(publisher_name))
+            raise QMI_UsageException(f"Invalid publisher name {publisher_name!r}")
         if not is_valid_object_name(signal_name):
-            raise QMI_UsageException("Invalid signal name {!r}".format(signal_name))
+            raise QMI_UsageException(f"Invalid signal name {signal_name!r}")
 
         _logger.debug("Subscribing to signal %s.%s.%s", publisher_context, publisher_name, signal_name)
 
@@ -705,11 +705,11 @@ class SignalManager(QMI_MessageHandler):
         if publisher_context == "":
             publisher_context = self._context.name
         if not is_valid_object_name(publisher_context):
-            raise QMI_UsageException("Invalid context name {!r}".format(publisher_context))
+            raise QMI_UsageException(f"Invalid context name {publisher_context!r}")
         if not is_valid_object_name(publisher_name):
-            raise QMI_UsageException("Invalid publisher name {!r}".format(publisher_name))
+            raise QMI_UsageException(f"Invalid publisher name {publisher_name!r}")
         if not is_valid_object_name(signal_name):
-            raise QMI_UsageException("Invalid signal name {!r}".format(signal_name))
+            raise QMI_UsageException(f"Invalid signal name {signal_name!r}")
 
         _logger.debug("Unsubscribing from signal %s.%s.%s", publisher_context, publisher_name, signal_name)
 
@@ -776,7 +776,7 @@ class SignalManager(QMI_MessageHandler):
 
         # Check that the publisher exists as an RPC object.
         if self._context.get_rpc_object_descriptor(publisher_name) is None:
-            raise QMI_SignalSubscriptionException("Unknown RPC object {}.{}".format(publisher_context, publisher_name))
+            raise QMI_SignalSubscriptionException(f"Unknown RPC object {publisher_context}.{publisher_name}")
 
         # Add the receiver to the list of local subscribers.
         self._add_local_subscriber(publisher_context, publisher_name, signal_name, receiver)
@@ -908,7 +908,7 @@ class SignalManager(QMI_MessageHandler):
         with self._lock:
             receiver_set = self._local_subscriptions.get(full_name)
             if receiver_set is None:
-                receiver_list: List[QMI_SignalReceiver] = []
+                receiver_list: list[QMI_SignalReceiver] = []
             else:
                 receiver_list = list(receiver_set)
 
@@ -919,9 +919,9 @@ class SignalManager(QMI_MessageHandler):
         """Publish the specified signal to the QMI network."""
 
         if not is_valid_object_name(publisher_name):
-            raise QMI_UsageException("Invalid publisher name {!r}".format(publisher_name))
+            raise QMI_UsageException(f"Invalid publisher name {publisher_name!r}")
         if not is_valid_object_name(signal_name):
-            raise QMI_UsageException("Invalid signal name {!r}".format(signal_name))
+            raise QMI_UsageException(f"Invalid signal name {signal_name!r}")
 
         source_address = QMI_MessageHandlerAddress(self._context.name, publisher_name)
 
@@ -940,7 +940,7 @@ class SignalManager(QMI_MessageHandler):
         with self._lock:
             rsubs = self._remote_subscriptions.get(full_name)
             if rsubs is None:
-                rsubs_list: List[str] = []
+                rsubs_list: list[str] = []
             else:
                 # Copy list of subscribers to avoid race conditions.
                 rsubs_list = list(rsubs)
@@ -981,7 +981,7 @@ class SignalManager(QMI_MessageHandler):
             # Check that the publisher exists as a local RPC object.
             if self._context.get_rpc_object_descriptor(publisher_name) is None:
                 success = False
-                error_msg = "Unknown RPC object {}.{}".format(self._context.name, publisher_name)
+                error_msg = f"Unknown RPC object {self._context.name}.{publisher_name}"
             else:
                 # Add the remote context to the table of remote subscribers.
                 self._add_remote_subscriber(publisher_name, signal_name, subscriber_context)
@@ -990,7 +990,7 @@ class SignalManager(QMI_MessageHandler):
                 if self._context.get_rpc_object_descriptor(publisher_name) is None:
                     self._remove_remote_subscriber(publisher_name, signal_name, subscriber_context)
                     success = False
-                    error_msg = "Unknown RPC object {}.{}".format(self._context.name, publisher_name)
+                    error_msg = f"Unknown RPC object {self._context.name}.{publisher_name}"
                 else:
                     success = True
                     error_msg = ""
@@ -1106,7 +1106,7 @@ class SignalManager(QMI_MessageHandler):
         elif isinstance(message, QMI_SignalRemovedMessage):
             self._handle_remote_signal_removed(message)
         else:
-            raise QMI_RuntimeException("Unexpected message type {}".format(type(message).__name__))
+            raise QMI_RuntimeException(f"Unexpected message type {type(message).__name__}")
 
     def handle_object_removed(self, rpc_object_name: str) -> None:
         """Called when a local RPC object is removed.
@@ -1188,5 +1188,5 @@ class SignalManager(QMI_MessageHandler):
 
 
 # Imports needed only for static typing.
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     import qmi.core.context

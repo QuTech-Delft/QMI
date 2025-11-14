@@ -15,8 +15,9 @@ import tests.instruments.picotech.picosdk_stub
 from tests.instruments.picotech.ps4000a_stub import ps4000a
 sys.modules['picosdk'] = tests.instruments.picotech.picosdk_stub
 sys.modules['picosdk.ps4000a'] = tests.instruments.picotech.ps4000a_stub
-from qmi.instruments.picotech import picoscope4824, ChannelCoupling, TriggerEdge
+from qmi.instruments.picotech import picoscope4824
 from qmi.instruments.picotech import _picoscope
+from qmi.instruments.picotech._picoscope import ChannelCoupling, TriggerEdge
 
 patcher = patch("picosdk.ps4000a", autospec=True)
 picoscope4824._ps = patcher.start()

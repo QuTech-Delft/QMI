@@ -3,9 +3,8 @@
 """Unit tests for qmi.core.config_struct."""
 
 import unittest
-
 from dataclasses import field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from qmi.core.config_struct import configstruct, config_struct_from_dict, config_struct_to_dict
 from qmi.core.exceptions import QMI_ConfigurationException
@@ -103,6 +102,103 @@ class TestConfigStruct(unittest.TestCase):
         self.assertIsInstance(q2["f"], float)
         self.assertEqual(q2, data2)
 
+    def test_04_class_not_dataclass(self):
+        """The configuration class must be a dataclass"""
+        class MyConfig:
+            i:  int
+            f:  float
+
+        data1 = {"i": 5, "f": 3.0, "3": "str"}
+
+        exp_error = "Configuration class type must be a dataclass"
+        exp_error2 = "Configuration data must be a dataclass instance"
+        with self.assertRaises(TypeError) as type_err:
+            config_struct_from_dict(data1, MyConfig)
+
+        with self.assertRaises(TypeError) as type_err2:
+            config_struct_to_dict(MyConfig)
+
+        self.assertEqual(exp_error, str(type_err.exception))
+        self.assertEqual(exp_error2, str(type_err2.exception))
+
+    def test_05_no_keyword_arguments_allowed(self):
+        """The configstruct doesn't allow keyword arguments"""
+        @configstruct
+        class MyConfig:
+            i:  int
+            f:  float
+
+        exp_error = "config_struct_from_dict() got an unexpected keyword argument 'kwarg'"
+        data1 = {"i": 5, "f": 3.0}
+
+        with self.assertRaises(TypeError) as kw_err:
+            config_struct_from_dict(data1, MyConfig, kwarg=None)
+
+        self.assertEqual(exp_error, str(kw_err.exception))
+
+    def test_06_unsupported_config_type(self):
+        """configstruct dictionary inputs allow only dictionaries with keys as strings."""
+        @configstruct
+        class MyConfig:
+            d:  dict[str, int]
+
+        dict1 = {"d": {"0": 5, 1: 3.0}}
+        exp_error = "Unsupported non-string dictionary key 1 in configuration item d"
+        with self.assertRaises(QMI_ConfigurationException) as k_err:
+            config_struct_from_dict(dict1, MyConfig)
+
+        self.assertEqual(exp_error, str(k_err.exception))
+
+    def test_07_missing_dataclass_input(self):
+        """Call to get config_struct_from_dict errors when the respective class is 'forgotten' from inputs."""
+        exp_error = "config_struct_from_dict() missing 1 required positional argument: 'cls'"
+        with self.assertRaises(TypeError) as kw_err:
+            config_struct_from_dict({})
+
+        self.assertEqual(exp_error, str(kw_err.exception))
+
+    def test_08_init_missing_argument(self):
+        """The configstruct misses an argument"""
+        class MyConfig:
+            d:  dict[str, int]
+
+        exp_error = "MyConfig.__init__() missing required argument 'd'"
+        cs = configstruct(MyConfig)
+        with self.assertRaises(TypeError) as miss_err:
+            cs()
+
+        self.assertEqual(exp_error, str(miss_err.exception))
+
+    def test_09_unsupported_value_type_inner(self):
+        """Unsupported value type in _inner_config_struct_to_dict excepts."""
+        @configstruct
+        class MyConfig:
+            i:  int
+
+        exp_error = "Unsupported value type: b'5'"
+
+        data1 = {"i": 5}
+        cfg1 = config_struct_from_dict(data1, MyConfig)
+        cfg1.i = b"5"  # Overwrite the value with an unsupported type
+        with self.assertRaises(TypeError) as type_err:
+            config_struct_to_dict(cfg1)
+
+        self.assertEqual(exp_error, str(type_err.exception))
+
+    def test_10_unsupported_data_type_in_config(self):
+        """Unsupported data type in configstruct excepts (expecting tuple, got list)."""
+        @configstruct
+        class MyConfig:
+            t:  tuple
+
+        exp_error = "Type mismatch in configuration item t: got <class 'list'> while expecting <class 'tuple'>"
+
+        data1 = {"t": [5,]}
+        with self.assertRaises(QMI_ConfigurationException) as cfg_err:
+            config_struct_from_dict(data1, MyConfig)
+
+        self.assertEqual(exp_error, str(cfg_err.exception))
+
     def test_11_default_values(self):
         """Test a structure with default values for some fields."""
 
@@ -168,11 +264,11 @@ class TestConfigStruct(unittest.TestCase):
         class MyConfig:
             v:  list
             d:  dict
-            vs: List[str]
-            di: Dict[str, int]
-            t:  Tuple[int, str]
+            vs: list[str]
+            di: dict[str, int]
+            t:  tuple[int, str]
             a:  Any
-            opt: Optional[int]
+            opt: int | None
 
         data1 = {
             "v": [101, 102, 103],
@@ -205,11 +301,11 @@ class TestConfigStruct(unittest.TestCase):
         class MyConfig:
             v:  list            = field(default_factory=list)
             d:  dict            = field(default_factory=dict)
-            vs: List[str]       = field(default_factory=list)
-            di: Dict[str, int]  = field(default_factory=dict)
-            t:  Tuple[int, str] = (0, "")
+            vs: list[str]       = field(default_factory=list)
+            di: dict[str, int]  = field(default_factory=dict)
+            t:  tuple[int, str] = (0, "")
             a:  Any             = False
-            opt: Optional[int]  = None
+            opt: int | None  = None
 
         data1 = {
             "v": [101, 102, 103],
@@ -269,9 +365,9 @@ class TestConfigStruct(unittest.TestCase):
 
         @configstruct
         class MyConfig:
-            vvi: List[List[int]]
-            dvs: Dict[str, List[str]]
-            optv: Optional[List[float]] = None
+            vvi: list[list[int]]
+            dvs: dict[str, list[str]]
+            optv: list[float] | None = None
 
         data1 = {
             "vvi": [[], [1], [2, 3]],
@@ -304,11 +400,11 @@ class TestConfigStruct(unittest.TestCase):
         self.assertEqual(q2, data2)
 
     def test_16_tuple_t_dotdotdot(self):
-        """Test a Tuple[T, ...] structure field type."""
+        """Test a tuple[T, ...] structure field type."""
 
         @configstruct
         class MyConfig:
-            t:  Tuple[int, ...]
+            t:  tuple[int, ...]
 
         data1 = {
             "t": [5, 4, 3, 2, 1],
@@ -319,6 +415,33 @@ class TestConfigStruct(unittest.TestCase):
 
         q1 = config_struct_to_dict(cfg1)
 
+        self.assertEqual(q1, data1)
+
+    def test_17_typing_types(self):
+        """Test a structure with unspecified Typing field types."""
+
+        @configstruct
+        class MyConfig:
+            vs: list
+            di: dict
+            t: tuple
+
+        data1 = {
+            "vs": ["one", "two"],
+            "di": {"one": 1, "thousand": 1000},
+            "t": (5, "qqq"),
+        }
+
+        cfg1 = config_struct_from_dict(data1, MyConfig)
+        self.assertEqual(cfg1, MyConfig(
+            vs=["one", "two"],
+            di={"one": 1, "thousand": 1000},
+            t=(5, "qqq"),
+        ))
+
+        # NOTE: When transforming back to dict, tuple(s) are turned to list(s) in _dictify_list_value.
+        q1 = config_struct_to_dict(cfg1)
+        data1.update({"t": [5, "qqq"]})
         self.assertEqual(q1, data1)
 
     def test_21_sub_structs(self):
@@ -332,7 +455,7 @@ class TestConfigStruct(unittest.TestCase):
         @configstruct
         class MyConfig:
             s: MySub
-            v: List[MySub]
+            v: list[MySub]
 
         data1 = {
             "s": {"x": 100, "y": 3.1415},
@@ -413,7 +536,7 @@ class TestConfigStruct(unittest.TestCase):
         @configstruct
         class MyConfig:
             x: int
-            y: Optional[float]  # NOTE : this field is not optional because it has no default
+            y: float | None  # NOTE : this field is not optional because it has no default
             d: MySub
 
         data1 = {}
@@ -465,10 +588,10 @@ class TestConfigStruct(unittest.TestCase):
 
         @configstruct
         class MyConfig:
-            v: List[int]
+            v: list[int]
             s: str
             d: MySub
-            m: Dict[str, int] = field(default_factory=dict)
+            m: dict[str, int] = field(default_factory=dict)
 
         data1 = {"v": 5, "s": "hello", "d": {"b": False}}
         with self.assertRaises(QMI_ConfigurationException):
@@ -495,7 +618,7 @@ class TestConfigStruct(unittest.TestCase):
 
         @configstruct
         class MyConfig1:
-            x: Union[list, tuple]  # union not supported
+            x: list | tuple  # union not supported
 
         data1 = {"x": []}
         with self.assertRaises(QMI_ConfigurationException):
@@ -503,7 +626,7 @@ class TestConfigStruct(unittest.TestCase):
 
         @configstruct
         class MyConfig2:
-            x: Dict[int, int]  # integer dict key not supported
+            x: dict[int, int]  # integer dict key not supported
 
         data2 = {"x": {}}
         with self.assertRaises(QMI_ConfigurationException):
@@ -535,7 +658,7 @@ class TestConfigStruct(unittest.TestCase):
         @configstruct
         class MyConfig2:
             v: MyConfig1
-            w: Dict[str, MyConfig1]
+            w: dict[str, MyConfig1]
 
         x_val1 = 1
         x_val2 = 2
@@ -557,7 +680,7 @@ class TestConfigStruct(unittest.TestCase):
         @configstruct
         class MyConfig:
             x: int
-            y: Optional[str] = None
+            y: str | None = None
 
         x_val = 3
         my_config = MyConfig(x=x_val)

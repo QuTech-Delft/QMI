@@ -12,7 +12,7 @@ from unittest.mock import sentinel
 
 import qmi
 import qmi.core.exceptions
-from qmi.utils.context_managers import start_stop
+from qmi.utils.context_managers import start_stop, start_stop_join
 from qmi.core.pubsub import QMI_Signal, QMI_SignalReceiver
 from qmi.core.rpc import QMI_RpcObject, rpc_method
 from qmi.core.task import (
@@ -214,7 +214,6 @@ class LoopTestTask(QMI_LoopTask):
 
         if self._increase_loop:
             self._status_value += 1  # increase status value
-            # update also settings
             time.sleep(self._loop_period / 2.0)
 
         if self._error:
@@ -251,8 +250,23 @@ class LoopTestTask(QMI_LoopTask):
 
 
 class TestQMITaskContextManager(unittest.TestCase):
+    """Test the various context managers."""
+    def test_with_context_manager(self):
+        """Test the 'with' context manager run as QMI_TaskRunner."""
+        logging.getLogger("qmi.core.task").setLevel(logging.ERROR)
+        logging.getLogger("qmi.core.rpc").setLevel(logging.ERROR)
+        qmi.start("test-taskrunner")
+        with qmi.make_task(
+            "taskrunner", SimpleTestTask, False, False, 1.0, 2.0
+        ) as task:
+            task.get_status()
+
+        qmi.stop()
+        logging.getLogger("qmi.core.task").setLevel(logging.NOTSET)
+        logging.getLogger("qmi.core.rpc").setLevel(logging.NOTSET)
+
     def test_start_stop_context_manager(self):
-        # Test the context manager run as QMI_TaskRunner
+        """Test the 'start_stop' context manager run as QMI_TaskRunner."""
         logging.getLogger("qmi.core.task").setLevel(logging.ERROR)
         logging.getLogger("qmi.core.rpc").setLevel(logging.ERROR)
         qmi.start("test-taskrunner")
@@ -263,6 +277,21 @@ class TestQMITaskContextManager(unittest.TestCase):
             task.get_status()
 
         task.join()
+        qmi.stop()
+        logging.getLogger("qmi.core.task").setLevel(logging.NOTSET)
+        logging.getLogger("qmi.core.rpc").setLevel(logging.NOTSET)
+
+    def test_start_stop_join_context_manager(self):
+        """Test the 'start_stop_join' context manager run as QMI_TaskRunner."""
+        logging.getLogger("qmi.core.task").setLevel(logging.ERROR)
+        logging.getLogger("qmi.core.rpc").setLevel(logging.ERROR)
+        qmi.start("test-taskrunner2")
+        task: QMI_TaskRunner = qmi.make_task(
+            "taskrunner2", SimpleTestTask, False, False, 1.0, 2.0
+        )
+        with start_stop_join(task):
+            task.get_status()
+
         qmi.stop()
         logging.getLogger("qmi.core.task").setLevel(logging.NOTSET)
         logging.getLogger("qmi.core.rpc").setLevel(logging.NOTSET)
@@ -281,7 +310,72 @@ class TestQMITasks(unittest.TestCase):
         logging.getLogger("qmi.core.task").setLevel(logging.NOTSET)
         logging.getLogger("qmi.core.rpc").setLevel(logging.NOTSET)
 
+    def test_context_manager(self):
+        """Test the 'with' context manager does the same as start_stop_join context manager."""
+        with qmi.make_task(
+                "simple_task_init",
+                SimpleTestTask,
+                raise_exception_in_init=False,
+                raise_exception_in_run=False,
+                duration=1.0,
+                value=5,
+        ) as simple_task:
+            self.assertTrue(simple_task.is_running())
+
+        self.assertFalse(simple_task.is_running())
+
+    def test_exception_double_start(self):
+        """Test QMI_UsageException is raised if the task is started twice."""
+        with self.assertRaises(qmi.core.exceptions.QMI_UsageException):
+            task_proxy = qmi.make_task(
+                "simple_task_init",
+                SimpleTestTask,
+                raise_exception_in_init=False,
+                raise_exception_in_run=False,
+                duration=1.0,
+                value=5,
+            )
+            task_proxy.start()
+            task_proxy.start()
+
+        # Remove task proxy and re-run within context manager.
+        qmi.context().remove_rpc_object(task_proxy)
+
+        with self.assertRaises(qmi.core.exceptions.QMI_UsageException):
+            with qmi.make_task(
+                "simple_task_init",
+                SimpleTestTask,
+                raise_exception_in_init=False,
+                raise_exception_in_run=False,
+                duration=1.0,
+                value=5,
+            ) as task_proxy:
+                task_proxy.start()
+
+    def test_exception_duplicate_task(self):
+        """Test QMI_UsageException is raised if the task is created twice."""
+        task_proxy = qmi.make_task(
+            "simple_task_init",
+            SimpleTestTask,
+            raise_exception_in_init=False,
+            raise_exception_in_run=False,
+            duration=1.0,
+            value=5,
+        )
+
+        with self.assertRaises(qmi.core.exceptions.QMI_DuplicateNameException):
+            with qmi.make_task(
+                "simple_task_init",
+                SimpleTestTask,
+                raise_exception_in_init=False,
+                raise_exception_in_run=False,
+                duration=1.0,
+                value=5,
+            ) as task_proxy:
+                pass
+
     def test_exception_during_init(self):
+        """Test QMI_TaskInitException is raised."""
         with self.assertRaises(qmi.core.exceptions.QMI_TaskInitException):
             qmi.make_task(
                 "simple_task_init",
@@ -293,6 +387,7 @@ class TestQMITasks(unittest.TestCase):
             )
 
     def test_exception_during_run(self):
+        """Test QMI_TaskRunException is raised."""
         task_proxy = qmi.make_task(
             "simple_task_run",
             SimpleTestTask,
@@ -306,7 +401,23 @@ class TestQMITasks(unittest.TestCase):
         with self.assertRaises(qmi.core.exceptions.QMI_TaskRunException):
             task_proxy.join()
 
+    def test_exception_during_context_run(self):
+        """Test QMI_TaskRunException is raised within context."""
+        with self.assertRaises(qmi.core.exceptions.QMI_TaskRunException):
+            with qmi.make_task(
+                "simple_task_run",
+                SimpleTestTask,
+                raise_exception_in_init=False,
+                raise_exception_in_run=True,
+                duration=1.0,
+                value=6,
+            ) as task_proxy:
+                time.sleep(2.0)
+
+        self.assertFalse(task_proxy.is_running())
+
     def test_run_to_completion(self):
+        """Test task stops running after completion of the task."""
         task_proxy = qmi.make_task(
             "simple_task_complete",
             SimpleTestTask,
@@ -328,6 +439,7 @@ class TestQMITasks(unittest.TestCase):
         self.assertEqual(status, 7)
 
     def test_run_to_stopped(self):
+        """Test task stops running if it is called to stop."""
         task_proxy = qmi.make_task(
             "simple_task_stopped",
             SimpleTestTask,
@@ -352,7 +464,53 @@ class TestQMITasks(unittest.TestCase):
         status = task_proxy.get_status()
         self.assertIsNone(status)
 
+    def test_context_run_to_completion(self):
+        """Test task stops running after completion of the task within context manager."""
+        with qmi.make_task(
+            "simple_task_complete",
+            SimpleTestTask,
+            raise_exception_in_init=False,
+            raise_exception_in_run=False,
+            duration=1.0,
+            value=7,
+        ) as task_proxy:
+            self.assertTrue(task_proxy.is_running())
+            time.sleep(2.0)
+            self.assertFalse(task_proxy.is_running())
+            t1 = time.monotonic()
+
+        t2 = time.monotonic()
+        self.assertLess(t2 - t1, 0.1)
+        status = task_proxy.get_status()
+        self.assertEqual(status, 7)
+
+    def test_context_run_to_stopped(self):
+        """Test task stops running within context manager if it is called to stop."""
+        with qmi.make_task(
+            "simple_task_stopped",
+            SimpleTestTask,
+            raise_exception_in_init=False,
+            raise_exception_in_run=False,
+            duration=2.0,
+            value=8,
+        ) as task_proxy:
+            time.sleep(0.5)
+            self.assertTrue(task_proxy.is_running())
+            t1 = time.monotonic()
+            task_proxy.stop()
+            t2 = time.monotonic()
+            self.assertLess(t2 - t1, 0.1)
+            time.sleep(0.1)
+            self.assertFalse(task_proxy.is_running())
+            t1 = time.monotonic()
+
+        t2 = time.monotonic()
+        self.assertLess(t2 - t1, 0.1)
+        status = task_proxy.get_status()
+        self.assertIsNone(status)
+
     def test_update_settings(self):
+        """Test updating task settings."""
         task_proxy = qmi.make_task(
             "simple_task_update",
             SimpleTestTask,
@@ -379,7 +537,36 @@ class TestQMITasks(unittest.TestCase):
         self.assertEqual(status, 101)
         self.assertEqual(settings_received, new_settings)
 
+    def test_update_settings_with_context(self):
+        """Test updating task settings within a context manager."""
+        recv = QMI_SignalReceiver()
+        with qmi.make_task(
+            "simple_task_update",
+            SimpleTestTask,
+            raise_exception_in_init=False,
+            raise_exception_in_run=False,
+            duration=2.0,
+            value=9,
+        ) as task_proxy:
+            task_proxy.sig_settings_updated.subscribe(recv)
+            time.sleep(0.5)
+            old_settings = task_proxy.get_settings()
+            new_settings = SimpleTestTask.Settings("hello", 101)
+            task_proxy.set_settings(new_settings)
+            time.sleep(0.5)
+            active_settings = task_proxy.get_settings()
+            task_proxy.join()
+            status = task_proxy.get_status()
+            settings_received = recv.get_next_signal().args[0]
+
+        self.assertNotEqual(old_settings, active_settings)
+        self.assertEqual(active_settings, new_settings)
+        self.assertEqual(status, 101)
+        self.assertEqual(settings_received, new_settings)
+
     def test_get_pending_settings(self):
+        """A more complex test to obtain pending settings for slow cycle tasks, where the new settings are not updated
+        frequently."""
         event = threading.Event()
         task_proxy = qmi.make_task(
             "slow_task", SlowTestTask, duration=2.0, value=9, event=event
@@ -407,7 +594,36 @@ class TestQMITasks(unittest.TestCase):
         self.assertEqual(pending_settings, new_settings)
         self.assertIsNone(post_pending_settings)
 
+    def test_get_pending_settings_with_context(self):
+        """A more complex test to obtain pending settings for slow cycle tasks, where the new settings are not updated
+        frequently, within a context manager."""
+        event = threading.Event()
+        recv = QMI_SignalReceiver()
+        with qmi.make_task(
+            "slow_task", SlowTestTask, duration=2.0, value=9, event=event
+        ) as task_proxy:
+            task_proxy.sig_settings_updated.subscribe(recv)
+            pre_pending_settings = task_proxy.get_pending_settings()
+            new_settings = SimpleTestTask.Settings("hello", 101)
+            # When setting new settings with QMI_TaskRunner.set_settings the new settings are put into a FiFo queue.
+            task_proxy.set_settings(new_settings)
+            # The settings won't be updated in the proxy before update_settings() has been called in a LoopTask
+            # instance. This triggers obtaining the next item in the FiFo queue.
+            # In the run() of SlowTestTask class, update_settings() called only after the event is set.
+            pending_settings = task_proxy.get_pending_settings()
+            event.set()
+            time.sleep(0.4)
+            self.assertIsNone(task_proxy.get_pending_settings())
+            event.set()
+            time.sleep(0.4)
+            post_pending_settings = task_proxy.get_pending_settings()
+
+        self.assertIsNone(pre_pending_settings)
+        self.assertEqual(pending_settings, new_settings)
+        self.assertIsNone(post_pending_settings)
+
     def test_signals(self):
+        """Test the published signal in task gets added to the queue and received correctly."""
         task_proxy = qmi.make_task(
             "simple_task_signals",
             SimpleTestTask,
@@ -430,6 +646,7 @@ class TestQMITasks(unittest.TestCase):
         self.assertEqual(sig.args, (10,))
 
     def test_stop_before_start(self):
+        """Test that just making a task doesn't start it, but also does not fail if `stop()` or `join()` is called."""
         task_proxy = qmi.make_task(
             "simple_task_stop",
             SimpleTestTask,
@@ -450,6 +667,7 @@ class TestQMITasks(unittest.TestCase):
         self.assertIsNone(status)
 
     def test_receive_signals(self):
+        """Test that signals are received one cycle (0.1s) after sending, and that the task stops at -1."""
         publisher_proxy = qmi.context().make_rpc_object("test_publisher", TestPublisher)
         task_proxy = qmi.make_task(
             "receiving_task",
@@ -474,7 +692,33 @@ class TestQMITasks(unittest.TestCase):
         self.assertFalse(task_proxy.is_running())
         task_proxy.join()
 
+    def test_receive_signals_in_context(self):
+        """Test that signals are received one cycle (0.1s) after sending within a context manager."""
+        publisher_proxy = qmi.context().make_rpc_object("test_publisher", TestPublisher)
+        with qmi.make_task(
+            "receiving_task",
+            SignalWaitingTask,
+            wait_timeout=None,
+            context_id=self._ctx_qmi_id,
+        ) as task_proxy:
+            self.assertTrue(task_proxy.is_running())
+            time.sleep(0.1)
+            status = task_proxy.get_status()
+            self.assertIsNone(status)
+            publisher_proxy.send_signal(8)
+            time.sleep(0.1)
+            status = task_proxy.get_status()
+            self.assertEqual(status, 8)
+            publisher_proxy.send_signal(9)
+            time.sleep(0.1)
+            status = task_proxy.get_status()
+            self.assertEqual(status, 9)
+            publisher_proxy.send_signal(-1)
+            time.sleep(0.1)
+            self.assertFalse(task_proxy.is_running())
+
     def test_timeout_while_waiting_for_signal(self):
+        """Test when a wait times out, it raises an exception."""
         qmi.context().make_rpc_object("test_publisher", TestPublisher)
         task_proxy = qmi.make_task(
             "receiving_task",
@@ -492,6 +736,24 @@ class TestQMITasks(unittest.TestCase):
         # task will have raised a QMI_TimeoutException while waiting for a signal
         with self.assertRaises(qmi.core.exceptions.QMI_TaskRunException):
             task_proxy.join()
+
+    def test_timeout_while_waiting_for_signal_in_context(self):
+        """Test when a wait times out, it raises an exception within a context manager."""
+        qmi.context().make_rpc_object("test_publisher", TestPublisher)
+        # task will have raised a QMI_TimeoutException while waiting for a signal
+        with self.assertRaises(qmi.core.exceptions.QMI_TaskRunException):
+            with qmi.make_task(
+                "receiving_task",
+                SignalWaitingTask,
+                wait_timeout=1.0,
+                context_id=self._ctx_qmi_id,
+            ) as task_proxy:
+                time.sleep(0.1)
+                self.assertTrue(task_proxy.is_running())
+                time.sleep(1.4)
+                self.assertFalse(task_proxy.is_running())
+                status = task_proxy.get_status()
+                self.assertEqual(status, -101)  # indicates task got QMI_TimeoutException
 
     def test_stop_while_waiting_for_signal(self):
         qmi.context().make_rpc_object("test_publisher", TestPublisher)
@@ -514,13 +776,12 @@ class TestQMITasks(unittest.TestCase):
     def test_run_to_loop_finish(self):
         """Test and assert that loop runs normally from start to finish if there are no glitches."""
         # Arrange
-
         status_signals_received = []
         settings_signals_received = []
         nr_of_loops = 3
         increase_loop = False
         initial_status_value = -1
-        loop_period = 0.1
+        loop_period = 0.2
         policy = QMI_LoopTaskMissedLoopPolicy.IMMEDIATE
         status_signals_expected = list(range(initial_status_value, nr_of_loops, 1)) + [1]
         settings_signals_expected = [1] + list(range(1, 4))
@@ -542,27 +803,85 @@ class TestQMITasks(unittest.TestCase):
         task_proxy.start()
         # Test that prepare has done its job
         status_signals_received.append(task_proxy.get_status().value)
-        settings_signals_received.append(
-            receiver.get_next_signal(timeout=2 * loop_period).args[-1]
-        )
+        settings_signals_received.append(receiver.get_next_signal(timeout=loop_period).args[-1])
         # LoopTestTask does 3x 1 second loops --> should be finished after 3 seconds
         for n in range(nr_of_loops):
-            # Test that the status changes at the end of each loop, after receiver signal increments
-            while task_proxy.get_status().value == status_signals_received[-1]:
-                time.sleep(0.1 * loop_period)
+            while (status := task_proxy.get_status().value) == status_signals_received[-1]:
+                pass  # Do as fast as possible
 
-            settings_signals_received.append(
-                receiver.get_next_signal(timeout=2 * loop_period).args[-1]
-            )
-            status_signals_received.append(task_proxy.get_status().value)
+            status_signals_received.append(status)
+            if not receiver.has_signal_ready():
+                time.sleep(loop_period - (time.monotonic() % loop_period))  # synchronize
+
+            # Test that the status changes at the end of each loop, after receiver signal increments
+            settings_signals_received.append(receiver.get_next_signal(timeout=loop_period).args[-1])
 
         # Test that finalize_loop sets status back to 1
-        while task_proxy.get_status().value == status_signals_received[-1]:
-            time.sleep(0.1 * loop_period)
-
+        time.sleep(loop_period)
         status_signals_received.append(task_proxy.get_status().value)
-        time.sleep(2 * loop_period)  # Give time to finalize
+        task_proxy.join()  # Give time to finalize
         # Assert
+        self.assertListEqual(status_signals_expected, status_signals_received)
+        self.assertListEqual(settings_signals_expected, settings_signals_received)
+        self.assertFalse(task_proxy.is_running())
+
+    def test_run_to_loop_finish_in_context(self):
+        """Test and assert that loop runs normally within context manager if there are no glitches."""
+        # Arrange
+        status_signals_received = []
+        settings_signals_received = []
+        nr_of_loops = 3
+        increase_loop = False
+        initial_status_value = -1
+        loop_period = 0.2
+        policy = QMI_LoopTaskMissedLoopPolicy.IMMEDIATE
+        status_signals_expected = list(range(initial_status_value + 1, nr_of_loops, 1)) + [1]
+        settings_signals_expected = list(range(1, 4))
+        settings_receiver = QMI_SignalReceiver()
+        status_receiver = QMI_SignalReceiver()
+
+        with qmi.make_task(
+            "loop_task_finish_with",
+            LoopTestTask,
+            increase_loop=increase_loop,
+            nr_of_loops=nr_of_loops,
+            status_value=initial_status_value,
+            loop_period=loop_period,
+            policy=policy,
+        ) as task_proxy:
+            # Act
+            publisher_proxy = qmi.get_task(f"{self._ctx_qmi_id}.loop_task_finish_with")
+            publisher_proxy.sig_status_updated.subscribe(status_receiver)
+            publisher_proxy.sig_settings_updated.subscribe(settings_receiver)
+            # Test that prepare has done its job
+            status_init = task_proxy.get_status().value
+            # LoopTestTask does 3x 1 second loops --> should be finished after 3 seconds
+            for n in range(nr_of_loops):
+                # Test that the status changes at the end of each loop, after receiver signal increments
+                while not status_receiver.has_signal_ready():
+                    time.sleep(loop_period - (time.monotonic() % loop_period))  # Synchronize
+
+                status = status_receiver.get_next_signal(timeout=loop_period).args[-1]
+                if status == status_init:
+                    time.sleep(loop_period - (time.monotonic() % loop_period))  # Synchronize
+                    status = status_receiver.get_next_signal(timeout=loop_period).args[-1]
+
+                while not settings_receiver.has_signal_ready():
+                    time.sleep(loop_period - (time.monotonic() % loop_period))
+
+                setting = settings_receiver.get_next_signal(timeout=loop_period).args[-1]
+                if len(settings_signals_received) and setting == settings_signals_received[-1]:
+                    setting = settings_receiver.get_next_signal(timeout=loop_period).args[-1]
+
+                status_signals_received.append(status)
+                settings_signals_received.append(setting)
+
+            # Test that finalize_loop sets status back to 1
+            time.sleep(loop_period)
+            status_signals_received.append(task_proxy.get_status().value)
+
+        # Assert
+        self.assertEqual(initial_status_value, status_init)
         self.assertListEqual(status_signals_expected, status_signals_received)
         self.assertListEqual(settings_signals_expected, settings_signals_received)
         self.assertFalse(task_proxy.is_running())
@@ -598,9 +917,10 @@ class TestQMITasks(unittest.TestCase):
         task_proxy.start()
         for n in range(len(my_signals_expected)):
             # Test that the my_signal is sent at each loop with increasing value
-            my_signals_received.append(
-                receiver.get_next_signal(timeout=2 * loop_period).args[-1]
-            )
+            while not receiver.has_signal_ready():
+                time.sleep(loop_period - (time.monotonic() % loop_period))  # synchronize
+
+            my_signals_received.append(receiver.get_next_signal(timeout=loop_period).args[-1])
 
         # Assert
         self.assertListEqual(my_signals_expected, my_signals_received)

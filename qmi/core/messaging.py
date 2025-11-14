@@ -16,8 +16,8 @@ import random
 import socket
 import threading
 import time
-
-from typing import Callable, Dict, Generic, List, NamedTuple, Optional, Tuple, TypeVar
+from collections.abc import Callable
+from typing import Generic, NamedTuple, TypeVar
 
 import qmi
 
@@ -99,7 +99,7 @@ class QMI_RequestMessage(QMI_Message):
                  destination_address: QMI_MessageHandlerAddress
                  ) -> None:
         super().__init__(source_address, destination_address)
-        self.request_id = "{:016x}".format(random.getrandbits(64))
+        self.request_id = f"{random.getrandbits(64):016x}"
 
 
 class QMI_ReplyMessage(QMI_Message):
@@ -216,8 +216,8 @@ class _EventDrivenThread(QMI_Thread):
         def __init__(self, thread: '_EventDrivenThread') -> None:
             self._thread = thread
             self._finished = False
-            self._value = None  # type: Optional[_T]
-            self._exception = None  # type: Optional[Exception]
+            self._value = None  # type: _T | None
+            self._exception = None  # type: Exception | None
 
         def set_value(self, value: _T) -> None:
             with self._thread._cv:
@@ -233,7 +233,7 @@ class _EventDrivenThread(QMI_Thread):
                 self._finished = True
                 self._thread._cv.notify_all()
 
-        def wait(self, timeout: Optional[float] = None) -> _T:
+        def wait(self, timeout: float | None = None) -> _T:
             with self._thread._cv:
                 ok = self._thread._cv.wait_for(lambda: (self._thread._thread_finished or self._finished),
                                                timeout=timeout)
@@ -255,7 +255,7 @@ class _EventDrivenThread(QMI_Thread):
         # This variable is only valid while the thread runs
         # (i.e. _thread_initialized and not _thread_finished) and may only
         # be accessed by code running inside the thread.
-        self.event_loop = None  # type: Optional[asyncio.AbstractEventLoop]
+        self.event_loop = None  # type: asyncio.AbstractEventLoop | None
 
     def run(self) -> None:
 
@@ -502,7 +502,7 @@ class _UdpResponder(_SocketWrapper):
             _logger.warning("Received UDP packet of type %s, discarded.", type(request_packet).__name__)
 
     def _handle_context_info_request_packet(self,
-                                            incoming_address: Tuple[str, int],
+                                            incoming_address: tuple[str, int],
                                             request_packet: QMI_UdpResponderContextInfoRequestPacket
                                             ) -> None:
         """Called when a `QMI_UdpResponderContextInfoRequestPacket` is received."""
@@ -583,24 +583,24 @@ class _PeerTcpConnection(_SocketWrapper):
         self._sock = sock
         self.peer_context_alias = peer_context_alias
         self._is_incoming = is_incoming
-        self._event_loop = None  # type: Optional[asyncio.AbstractEventLoop]
-        self._socket_manager = None  # type: Optional[_SocketManager]
+        self._event_loop = None  # type: asyncio.AbstractEventLoop | None
+        self._socket_manager = None  # type: _SocketManager | None
         self._recv_buf = bytearray()
 
         # Actual peer context name initially unknown (until handshake).
-        self.peer_context_name = None  # type: Optional[str]
+        self.peer_context_name = None  # type: str | None
 
         # Actual peer context version initially unknown (until handshake).
-        self.peer_context_version = None  # type: Optional[str]
+        self.peer_context_version = None  # type: str | None
 
         # Table of pending outgoing request messages, by request ID.
-        self._pending_requests: Dict[str, Tuple[QMI_MessageHandlerAddress, QMI_MessageHandlerAddress]] = {}
+        self._pending_requests: dict[str, tuple[QMI_MessageHandlerAddress, QMI_MessageHandlerAddress]] = {}
 
         # NOTE: Do not make TCP socket non-blocking (in contrast to UDP socket)
         # because sending to the TCP socket should be a blocking operation.
 
         self.local_address = sock.getsockname()
-        self.peer_address = None  # type: Optional[Tuple[str, int]]
+        self.peer_address = None  # type: tuple[str, int] | None
         self._peer_address_str = "[unknown]"
         try:
             self.peer_address = sock.getpeername()
@@ -651,7 +651,7 @@ class _PeerTcpConnection(_SocketWrapper):
                 source_address=destination_address,
                 destination_address=source_address,
                 request_id=request_id,
-                error_msg="Connection to {} closed while waiting for reply".format(self.peer_context_name))
+                error_msg=f"Connection to {self.peer_context_name} closed while waiting for reply")
             try:
                 self._message_router.deliver_message(reply)
             except QMI_MessageDeliveryException:
@@ -712,7 +712,7 @@ class _PeerTcpConnection(_SocketWrapper):
 
             if pickled_message_size > self.MAX_MESSAGE_SIZE:
                 # Protocol violation.
-                raise QMI_RuntimeException('Protocol packet too big ({})'.format(pickled_message_size))
+                raise QMI_RuntimeException(f'Protocol packet too big ({pickled_message_size})')
 
             if len(self._recv_buf) < 9 + pickled_message_size:
                 break
@@ -849,7 +849,7 @@ class _PeerTcpConnection(_SocketWrapper):
         except (ValueError, OSError):
             _logger.warning("Error while sending error reply to %s", message.destination_address.context_id)
 
-    def receive_handshake(self, timeout: Optional[float]) -> None:
+    def receive_handshake(self, timeout: float | None) -> None:
         """Wait (blocking) until the socket receives a handshake message.
 
         This function is used when creating a client-side connection,
@@ -877,7 +877,7 @@ class _PeerTcpConnection(_SocketWrapper):
             else:
                 pickled_message_size = int.from_bytes(self._recv_buf[1:9], byteorder='little')
                 if pickled_message_size > self.MAX_MESSAGE_SIZE:
-                    raise QMI_RuntimeException('Protocol packet too big ({})'.format(pickled_message_size))
+                    raise QMI_RuntimeException(f'Protocol packet too big ({pickled_message_size})')
                 need_len = 9 + pickled_message_size
 
             # Stop when message complete.
@@ -990,8 +990,8 @@ class _SocketManager:
         self._event_loop = event_loop
         self._message_router = message_router
         self._lock = threading.Lock()
-        self._socket_wrappers = []  # type: List[_SocketWrapper]
-        self._peer_context_map = {}  # type: Dict[str, _PeerTcpConnection]
+        self._socket_wrappers = []  # type: list[_SocketWrapper]
+        self._peer_context_map = {}  # type: dict[str, _PeerTcpConnection]
         self._peer_name_counter = 0
 
     def close_all(self) -> None:
@@ -1022,7 +1022,7 @@ class _SocketManager:
 
         # Assign unique "anonymous" name for the remote side of this connection.
         self._peer_name_counter += 1
-        peer_context_alias = "$client_{}".format(self._peer_name_counter)
+        peer_context_alias = f"$client_{self._peer_name_counter}"
 
         # Wrap socket in PeerTcpConnection object.
         conn = _PeerTcpConnection(self._message_router,
@@ -1087,7 +1087,7 @@ class _SocketManager:
         """Disconnect from the specified peer context."""
         conn = self._peer_context_map.get(peer_context_name)
         if conn is None:
-            raise QMI_UnknownNameException("Unknown peer context {}".format(peer_context_name))
+            raise QMI_UnknownNameException(f"Unknown peer context {peer_context_name}")
         self.remove_peer_connection(conn)
         conn.close()
 
@@ -1105,7 +1105,7 @@ class _SocketManager:
 
         assert message.source_address.context_id == self._message_router.context_name
 
-        error_msg: Optional[str] = None
+        error_msg: str | None = None
 
         # Determine which connection to use to send this message.
         destination_context_name = message.destination_address.context_id
@@ -1125,10 +1125,10 @@ class _SocketManager:
                     message.destination_address.context_id,
                     message.destination_address.object_id,
                     type(message))
-                error_msg = "{}: {}".format(type(exc).__name__, str(exc))
+                error_msg = f"{type(exc).__name__}: {exc!s}"
         else:
             _logger.warning("Unknown message destination context %r", destination_context_name)
-            error_msg = "Unknown message destination context {}".format(destination_context_name)
+            error_msg = f"Unknown message destination context {destination_context_name}"
 
         # Generate an error reply if we fail to route a request message.
         if (error_msg is not None) and isinstance(message, QMI_RequestMessage):
@@ -1143,7 +1143,7 @@ class _SocketManager:
             except Exception:
                 _logger.exception("Unexpected exception while delivering error reply to %r", message.source_address)
 
-    def get_peer_context_names(self) -> List[str]:
+    def get_peer_context_names(self) -> list[str]:
         """Return a list of peer context names.
 
         Note that this method returns context names for outgoing connections,
@@ -1192,12 +1192,12 @@ class MessageRouter:
         self.context_name = context_name
         self.workgroup_name = workgroup_name
         self.tcp_server_port = 0
-        self._thread = None  # type: Optional[_EventDrivenThread]
-        self._socket_manager = None  # type: Optional[_SocketManager]
-        self._address_to_messagehandler_map = {}  # type: Dict[str, QMI_MessageHandler]
+        self._thread = None  # type: _EventDrivenThread | None
+        self._socket_manager = None  # type: _SocketManager | None
+        self._address_to_messagehandler_map = {}  # type: dict[str, QMI_MessageHandler]
         self._address_to_messagehandler_map_lock = threading.Lock()
-        self._cb_peer_context_added = None    # type: Optional[Callable[[str], None]]
-        self._cb_peer_context_removed = None  # type: Optional[Callable[[str], None]]
+        self._cb_peer_context_added = None    # type: Callable[[str], None] | None
+        self._cb_peer_context_removed = None  # type: Callable[[str], None] | None
         self._suppress_version_mismatch_warnings = False
 
     @property
@@ -1214,8 +1214,8 @@ class MessageRouter:
         self._suppress_version_mismatch_warnings = value
 
     def set_peer_context_callbacks(self,
-                                   cb_peer_context_added: Optional[Callable[[str], None]],
-                                   cb_peer_context_removed: Optional[Callable[[str], None]]) -> None:
+                                   cb_peer_context_added: Callable[[str], None] | None,
+                                   cb_peer_context_removed: Callable[[str], None] | None) -> None:
         """Register callback functions to be invoked when a peer context is added or removed.
 
         `cb_peer_context_added(peer_context_name)` is invoked when a new outgoing
@@ -1283,7 +1283,7 @@ class MessageRouter:
         object_id = message_handler.address.object_id
         with self._address_to_messagehandler_map_lock:
             if self._address_to_messagehandler_map.get(object_id) is not message_handler:
-                raise QMI_UnknownNameException("Unknown message handler {}".format(message_handler.address))
+                raise QMI_UnknownNameException(f"Unknown message handler {message_handler.address}")
             del self._address_to_messagehandler_map[object_id]
 
     def start_tcp_server(self, tcp_server_port: int) -> None:
@@ -1349,7 +1349,7 @@ class MessageRouter:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         else:
             sock.close()
-            raise QMI_RuntimeException("Unexpected value for sys.platform ({!r})".format(sys.platform))
+            raise QMI_RuntimeException(f"Unexpected value for sys.platform ({sys.platform!r})")
 
         # Bind the port so we can be reached from the outside.
         address = ('', udp_server_port)  # The empty string represents 'INADDR_ANY'.
@@ -1366,9 +1366,9 @@ class MessageRouter:
 
         # Check that the peer context name is valid (not anonymous) and not yet connected.
         if peer_context_name.startswith("$"):
-            raise QMI_UsageException("Invalid peer context name {}".format(peer_context_name))
+            raise QMI_UsageException(f"Invalid peer context name {peer_context_name}")
         if self._socket_manager.has_peer_context(peer_context_name):
-            raise QMI_UsageException("Duplicate connection to context {} not allowed".format(peer_context_name))
+            raise QMI_UsageException(f"Duplicate connection to context {peer_context_name} not allowed")
 
         peer_addr_parsed = parse_address_and_port(peer_address)
         _logger.info("Connecting to peer context %s at %s",
@@ -1510,7 +1510,7 @@ class MessageRouter:
                                                    .format(destination_context_name))
             socket_thread.run_in_thread_arg(socket_manager.send_message, message)
 
-    def get_peer_context_names(self) -> List[str]:
+    def get_peer_context_names(self) -> list[str]:
         """Return a list of currently connected peer context names."""
         socket_manager = self._socket_manager
         if socket_manager is not None:

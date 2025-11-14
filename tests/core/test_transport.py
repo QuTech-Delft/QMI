@@ -96,12 +96,13 @@ class TestQmiTransportFactory(unittest.TestCase):
 
     @unittest.mock.patch("qmi.core.transport.QMI_SerialTransport")
     def test_factory_serial_attributes(self, mock):
-        trans = create_transport("serial:COM3:baudrate=115200:bytesize=7:parity=E:stopbits=2")
+        trans = create_transport("serial:COM3:baudrate=115200:bytesize=7:parity=E:stopbits=2:rtscts=True")
         self.assertIs(trans, mock.return_value)
         mock.assert_called_once_with(device="COM3",
                                      baudrate=115200,
                                      bytesize=7,
                                      parity="E",
+                                     rtscts=True,
                                      stopbits=2)
 
     def test_factory_udp(self):
@@ -164,13 +165,14 @@ class TestQmiTransportFactory(unittest.TestCase):
 
     @unittest.mock.patch("qmi.core.transport.QMI_SerialTransport")
     def test_parse_serial_attrs(self, mock):
-        trans = create_transport("serial:COM3:baudrate=120:bytesize=7:parity=E:stopbits=1.5")
+        trans = create_transport("serial:COM3:baudrate=120:bytesize=7:parity=E:stopbits=1.5:rtscts=True")
         self.assertIs(trans, mock.return_value)
         mock.assert_called_once_with(device="COM3",
                                      baudrate=120,
                                      bytesize=7,
                                      parity="E",
-                                     stopbits=1.5)
+                                     stopbits=1.5,
+                                     rtscts=True)
 
     @unittest.mock.patch("qmi.core.transport.QMI_SerialTransport")
     def test_parse_serial_defaults(self, mock):
@@ -178,17 +180,23 @@ class TestQmiTransportFactory(unittest.TestCase):
                                  {"baudrate": 115200,
                                   "bytesize": 8,
                                   "parity": "N",
-                                  "stopbits": 1.0})
+                                  "stopbits": 1.0,
+                                  "rtscts": False})
         self.assertIs(trans, mock.return_value)
         mock.assert_called_once_with(device="/dev/ttyUSB0",
                                      baudrate=115200,
                                      bytesize=8,
                                      parity="N",
-                                     stopbits=1.0)
+                                     stopbits=1.0,
+                                     rtscts=False)
 
     def test_parse_serial_bad_attrtype(self):
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
             create_transport("serial:/dev/ttyS0:baudrate=fast")
+
+    def test_parse_serial_bad_booltype(self):
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            create_transport("serial:/dev/ttyS0:baudrate=115200:rtscts=0")
 
     def test_parse_serial_bad_attrname(self):
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
@@ -219,6 +227,12 @@ class TestQmiTransportFactory(unittest.TestCase):
         trans = create_transport("tcp:[2620:0:2d0:200::8]:5000")
         self.assertIs(trans, mock.return_value)
         mock.assert_called_once_with(host="2620:0:2d0:200::8", port=5000)
+
+    @unittest.mock.patch("qmi.core.transport.QMI_TcpTransport")
+    def test_parse_tcp_ipv6_range(self, mock):
+        trans = create_transport("tcp:[ 2001:db8:1234::/48]:5000")
+        self.assertIs(trans, mock.return_value)
+        mock.assert_called_once_with(host=" 2001:db8:1234::/48", port=5000)
 
     @unittest.mock.patch("qmi.core.transport.QMI_TcpTransport")
     def test_parse_tcp_attrs(self, mock):
@@ -1146,6 +1160,7 @@ class TestQmiSerialTransportInit(unittest.TestCase):
         QMI_SerialTransport("/valid/path", 9600)
         QMI_SerialTransport("COM3", 120, bytesize=7, parity="E", stopbits=1.5)
         QMI_SerialTransport("/dev/ttyUSB0", 115200, bytesize=8, parity="N", stopbits=1.0)
+        QMI_SerialTransport("/dev/ttyUSB0", 115200, bytesize=8, parity="N", stopbits=1.0, rtscts=True)
 
     def test_invalid_device_description(self):
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
@@ -1170,6 +1185,10 @@ class TestQmiSerialTransportInit(unittest.TestCase):
     def test_invalid_stopbits(self):
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
             QMI_SerialTransport("/valid/path", 9600, stopbits=1.4)
+
+    def test_invalid_rtscts(self):
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            QMI_SerialTransport("/valid/path", 9600, rtscts=3.14)
 
     @unittest.mock.patch("qmi.core.transport.serial.Serial", autospec=True)
     def test_correct_open_close(self, mocked_serial):

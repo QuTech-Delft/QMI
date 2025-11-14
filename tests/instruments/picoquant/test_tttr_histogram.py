@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from qmi.instruments.picoquant import TttrHistogram
+from qmi.instruments.picoquant.support._realtime import TttrHistogram
 
 
 class PicoQuantSomeHarpOpenTestCase(unittest.TestCase):

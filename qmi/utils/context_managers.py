@@ -1,6 +1,7 @@
 """Context managers for QMI RPC protocol contexts."""
 from contextlib import contextmanager
-from typing import Iterator, Optional, Protocol, TypeVar
+from typing import Iterator, Protocol, TypeVar
+import warnings
 
 from qmi.core.pubsub import QMI_SignalReceiver, QMI_SignalSubscriber
 
@@ -47,6 +48,12 @@ def start_stop(thing: _SS, *args, **kwargs) -> Iterator[_SS]:
 
 @contextmanager
 def start_stop_join(thing: _SSJ, *args, **kwargs) -> Iterator[_SSJ]:
+    warnings.warn(
+        "This context manager is obsoleted. The tasks can now by managed directly by their own context manager "
+        "by calling `with qmi.make_task('task_name', TaskClass, args, kwargs) as task: ...`.",
+        DeprecationWarning,
+        stacklevel=3
+    )
     thing.start(*args, **kwargs)
     try:
         yield thing
@@ -57,6 +64,12 @@ def start_stop_join(thing: _SSJ, *args, **kwargs) -> Iterator[_SSJ]:
 
 @contextmanager
 def open_close(thing: _OC) -> Iterator[_OC]:
+    warnings.warn(
+        "This context manager is obsoleted. The instruments can now by managed directly by their own context manager "
+        "by calling `with qmi.make_instrument('instr_name', InstrClass, args, kwargs) as instr: ...`.",
+        DeprecationWarning,
+        stacklevel=3
+    )
     thing.open()
     try:
         yield thing
@@ -75,7 +88,7 @@ def lock_unlock(thing: _LU, *args, **kwargs) -> Iterator[_LU]:
 
 @contextmanager
 def subscribe_unsubscribe(
-        signal: QMI_SignalSubscriber, receiver: Optional[QMI_SignalReceiver]
+        signal: QMI_SignalSubscriber, receiver: QMI_SignalReceiver | None
     ) -> Iterator[QMI_SignalReceiver]:
     receiver = receiver if receiver is not None else QMI_SignalReceiver()
     signal.subscribe(receiver)

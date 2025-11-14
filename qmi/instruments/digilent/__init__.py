@@ -1,5 +1,5 @@
 """
-Digilent, USB oscilloscope device.
+Digilent, USB oscilloscope and logic analyzer device.
 
 The qmi.instruments.digilent package provides support for:
 - Analog Discovery 2 device.

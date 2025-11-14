@@ -1,5 +1,4 @@
-#! /usr/bin/env python3
-
+#! /usr/bin/env python
 """Command line client for the Tenma 72-series power supplies."""
 
 import argparse
@@ -11,7 +10,7 @@ from qmi.instruments.tenma import *  # This may look like unused in IDE but will
 from qmi.utils.context_managers import start_stop, open_close
 
 
-def main() -> int:
+def run() -> int:
 
     parser = argparse.ArgumentParser()
     parser.description = "Command line client for the Tenma 72 series Power Supply Units."
@@ -50,7 +49,7 @@ def main() -> int:
         channel = args.channel
         if args.current is not None:
             if args.current == "get":
-                print("Current is", instr.read_current(channel), "A")
+                print("Current is", instr.get_current(channel), "A")
 
             else:
                 current = float(args.current)
@@ -59,7 +58,7 @@ def main() -> int:
 
         if args.voltage is not None:
             if args.voltage == "get":
-                print("Voltage is", instr.read_voltage(channel), "V")
+                print("Voltage is", instr.get_voltage(channel), "V")
 
             else:
                 voltage = float(args.voltage)
@@ -147,4 +146,4 @@ def parse_instrument_source(args) -> AbstractContextManager:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

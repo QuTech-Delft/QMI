@@ -4,13 +4,123 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## \[x.y.z] - Unreleased
+## [0.51.0-beta.0] - Unreleased
+
+### Added
+- Thorlabs KDC101 controller QMI driver. It can at the moment control Z906, Z912 and Z925 actuators and PRMTZ8 rotation stage.
+- New QMI driver for Agiltron FF1x8 optical switch.
+- New QMI driver for Yokogawa DLM4038 oscilloscope.
+
+### Changed
+- The Agiltron FF optical switch QMI drivers have now common base class in `qmi.instruments.agiltron._ff_optical_switch`
+- Refactored also unit-tests for Agiltron FF optical switches.
+
+### Fixed
+- In `usbtmc.py` now doing `.strip()` on `dev.serial_number` string to avoid SNs with whitespace character(s).
+
+### Removed
+
+## [0.50.0] - 2025-09-01
+
+### Added
+- A QMI RPC proxy object docstring is now automatically expanded with:
+  - A list of RPC methods
+  - A list of signals
+  - A list of class constants
+
+### Changed
+- The Thorlabs APT protocol is now the same for both K10CR1 and MPC320 instruments.
+- The handling of discarding data and waiting for data during requests in APT protocol was improved. The waiting times are now directly from the class attribute DEFAULT_RESPONSE_TIMEOUT unless otherwise defined in calls.
+- The dummy instrument now requires to be opened before using the RPC methods, by additions of open-checks.
+
+### Fixed
+- Tenma power supply unit CLI read current and voltage calls fixed to be the correct `get_...` calls.
+- Critical fix on `qmi.tools.proc` where the main program should also have `run` as the main method, not `main`.
+- The `is_move_completed` in Thorlabs_Mpc320 is fixed to work now, providing a short wait is used if it is called continuously in a loop until the response is True
+- The unittests were fixed accordingly to changes for K10CR1 and MPC320 device driver tests.
+- Corrections in documentation.
+
+### Removed
+- The obsolete Raspberry Pi relay example.
+
+## [0.49.0] - 2025-05-19
+
+### Added
+- The log file existence is checked and necessary folder structure is created if needed.
+- The log file maximum size and number of backups can now be set. Defaults are 10GB size and 5 backups (total of 60GB).
+- An example of how to define logging options, in the docstring of `logging_init.py` module.
+
+### Changed
+- All entry point functions in `bin` scripts from `main` to `run` to avoid unintended modifications of `pyproject.toml` when executing release procedure.
+- The `configstruct` wrapper from `qmi.core.config_struct` now accepts only modern typing for field. Most (but not all) of the `typing.<Type>` will not be parsed anymore by the type parser.
+- The obsoleted "python3" commands were replaced with "python" in `tools.proc`.
+
+### Fixed
+- In `context_singleton.py`, the QMI 'log_dir' path is now correctly retrieved from QMI configuration file, if it is defined.
+- For QMI configuration and log file locations, the path is made OS-independent and the `~` character, if at start of the path, is replaced with full path.
+- Fixed `pyproject.toml` not to point to incorrect qmi location for package installation, but to root by removing [tool.setuptools.packages.find] lines.
+- The 'venv' executable path was made OS-dependent ("win" or else) for creating 'venv' in `tools.proc`.
+
+### Removed
+- The support for most old `typing.<Type>` types for `configstruct` wrapper.
+
+## [0.48.0] - Accidental tag push for release, release removed
+
+## [0.47.0] - 2025-03-14
+
+### Added
+- Python 3.12, 3.13 support.
+- installing of `py-xdrlib` from GitHub source for Python 3.13 unit-tests.
+- HighFinesse Wavelength Meter (Wlm) driver with unittests, and license terms in wlmConst.py and wlmData.py.
+- `RELEASE.md` release procedure using `bump2version` with multiple configuration files.
+
+### Changed
+- `qmi_tool` script entry point to be at `main` function.
+- Package management to be done via `pyproject.toml` instead of `setup.py`.
+- Digilent and PicoTech devices' typing fixed and modernized.
+
+### Fixed
+- Full CI-test to install qmi package correctly and run unit-tests with all supported Python versions.
+- Some new typing issues, due to Mypy and Numpy updates, were fixed and respective modules were updated to 3.10+ Python style.
+- Possible fix on the badges not showing on Pypi page.
+
+### Removed
+- Python 3.8, 3.9 and 3.10 support, numpy and scipy version restrictions in dependencies.
+- `qmi_run_contexts` script as unused.
+
+
+## [0.46.0] - 2024-10-14
+
+### Added
+- The `QMI_Instrument` and `QMI_TaskRunner` (which inherit from `QMI_RpcObject`) are now equipped with specific `__enter__` and `__exit__` methods, which in the case of `QMI_Instrument`
+  also open and close the instrument when run with a `with` context manager protocol. Meanwhile `QMI_TaskRunner` starts and stops then joins a QMI task thread. In practise, these context managers
+  can be used instead of the to-be-obsoleted `open_close` and `start_stop_join` context managers. The context manager protocol cannot be used for `QMI_RpcObject` directly.
+- The Bristol FOS has now a QMI driver version that works on Windows PCs. Also the respective CLI has been added in `bin/instruments`.
+
+### Changed
+- The CI pipelines are now using reusable workflows, placed in reusable-ci-workflows.yml.
+- The file names for the different pipeline actions were also changed to be more descriptive.
+
+### Fixed
+- mypy error on `config_struct.py` by adding extra logic check `and not isinstance(val, type)` on L236.
+- Also made in `config_struct.py` in L186 also tuples to be recognized as "untyped values".
+- workflow artifacts to be of @v4 instead of @v3 that are to be deprecated. For `setup-python` @v5 even.
+- Implemented the rtscts keyword in TransportDescriptorParser for the (serial) transport factory.
+
+## [0.45.0] - 2024-07-19
 
 ### Added
 - QMI driver for TeraXion TFN in `qmi.instruments.teraxion` with CLI client.
+- QMI driver for Thorlabs MPC320 in `qmi.instruments.thorlabs`.
+
+### Changed
+- In `setup.py` limited NumPy and SciPy versions to be <2. Also added missing line for Tenma 72 PSU CLI.
+- Refactored Newport `single_axis_motion_controller.py` to use context manager to enter and exit a configuration state.
 
 ### Fixed
 - mypy errors not failing pipeline
+- In `instruments.picoquant.support._decoders` made the lexical sorting (`numpy.lexsort`) to temporarily retype the data to signed integer, as from Numpy 2.0 the integers are not allowed anymore to overflow.
+- The same fix is applied also in unit-tests.
 
 ### Removed
 - Radon workflows as radon is no longer actively maintained. Pylint has taken over as the complexity checker.

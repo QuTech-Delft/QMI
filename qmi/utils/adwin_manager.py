@@ -7,7 +7,8 @@ import logging
 import os
 import os.path
 from dataclasses import field
-from typing import Any, Dict, Iterable, List, NamedTuple, Set, Tuple, Union
+from collections.abc import Iterable
+from typing import Any, NamedTuple
 
 import numpy as np
 
@@ -48,10 +49,10 @@ class CfgAdwinProgram:
     trigger:    str
     priority:   int
     parse_parameters: bool = False
-    par:        Dict[str, int] = field(default_factory=dict)
-    fpar:       Dict[str, int] = field(default_factory=dict)
-    data:       Dict[str, int] = field(default_factory=dict)
-    par_array:  Dict[str, Tuple[int, int]] = field(default_factory=dict)  # Tuple does not get parsed correctly in JSON!
+    par:        dict[str, int] = field(default_factory=dict)
+    fpar:       dict[str, int] = field(default_factory=dict)
+    data:       dict[str, int] = field(default_factory=dict)
+    par_array:  dict[str, tuple[int, int]] = field(default_factory=dict)  # Tuple does not get parsed correctly in JSON!
 
 
 class ProgramInfo(NamedTuple):
@@ -95,7 +96,7 @@ class ProgramInfo(NamedTuple):
 
         else:
             # Use explicitly specified parameters.
-            param_items: List[Tuple[str, ParameterDesc]] = []
+            param_items: list[tuple[str, ParameterDesc]] = []
             for (name, par_index) in config.par.items():
                 param_items.append((name, ParDesc(par_index)))
             for (name, fpar_index) in config.fpar.items():
@@ -104,11 +105,12 @@ class ProgramInfo(NamedTuple):
                 (data_index, elem_index) = ref
                 param_items.append((name, ArrayElemDesc(data_index, elem_index)))
 
-            param: Dict[str, ParameterDesc] = {}
+            param: dict[str, ParameterDesc] = {}
             for (name, desc) in param_items:
                 if name in param:
-                    raise QMI_ConfigurationException("Duplicate use of parameter name {!r} in ADwin program \"{!r}\"!"
-                                                     .format(name, config.file))
+                    raise QMI_ConfigurationException(
+                        f"Duplicate use of parameter name {name!r} in ADwin program \"{config.file!r}\"!"
+                    )
                 param[name] = desc
 
             param_info = ParameterInfo(param=param, data=config.data)
@@ -161,8 +163,8 @@ class AdwinProgramLibrary:
         self._config_dir = config_dir
         self._processor_type = processor_type
         self._hardware_type = hardware_type
-        self._program_config: Dict[str, CfgAdwinProgram] = {}
-        self._program_info_cache: Dict[str, ProgramInfo] = {}
+        self._program_config: dict[str, CfgAdwinProgram] = {}
+        self._program_info_cache: dict[str, ProgramInfo] = {}
         self._read_program_config_files()
 
     def _read_program_config_files(self) -> None:
@@ -181,7 +183,7 @@ class AdwinProgramLibrary:
                         prog_cfg = config_struct_from_dict(cfg_dict, CfgAdwinProgram)
                     except (json.JSONDecodeError, QMI_ConfigurationException) as exc:
                         raise QMI_ConfigurationException(
-                            "Error reading Adwin program config {}".format(file_name)) from exc
+                            f"Error reading Adwin program config {file_name}") from exc
                     self._check_program_config(prog_name, prog_cfg)
                     self._program_config[prog_name] = prog_cfg
 
@@ -189,22 +191,25 @@ class AdwinProgramLibrary:
     def _check_program_config(prog_name: str, prog_cfg: CfgAdwinProgram) -> None:
 
         if prog_cfg.slot < 1 or prog_cfg.slot > 10:
-            raise QMI_ConfigurationException("Invalid ADwin process slot number {} for program {!r}"
-                                             .format(prog_cfg.slot, prog_name))
+            raise QMI_ConfigurationException(
+                f"Invalid ADwin process slot number {prog_cfg.slot} for program {prog_name!r}"
+            )
 
         if prog_cfg.trigger.lower() not in ("timer", "external"):
-            raise QMI_ConfigurationException("Invalid ADwin process trigger {!r} for program {!r}"
-                                             .format(prog_cfg.trigger, prog_name))
+            raise QMI_ConfigurationException(
+                f"Invalid ADwin process trigger {prog_cfg.trigger!r} for program {prog_name!r}"
+            )
 
         if ((prog_cfg.priority < -10) or (prog_cfg.priority > 10)) and (prog_cfg.priority != 1000):
-            raise QMI_ConfigurationException("Invalid ADwin process priority {} for program {!r}".
-                                             format(prog_cfg.priority, prog_name))
+            raise QMI_ConfigurationException(
+                f"Invalid ADwin process priority {prog_cfg.priority} for program {prog_name!r}"
+            )
 
         if prog_cfg.parse_parameters and (prog_cfg.par or prog_cfg.fpar or prog_cfg.data or prog_cfg.par_array):
-            raise QMI_ConfigurationException("Invalid configuration for ADwin program {!r}".format(prog_name)
+            raise QMI_ConfigurationException(f"Invalid configuration for ADwin program {prog_name!r}"
                                              + ": Can not parse source code and specify explicit parameters")
 
-    def list_programs(self) -> List[str]:
+    def list_programs(self) -> list[str]:
         """Return a list of available programs."""
         return list(self._program_config.keys())
 
@@ -310,7 +315,7 @@ class AdwinProcess:
         self._processor_type = adwin.get_processor_type()
 
     @staticmethod
-    def _get_dict_item_case_insensitive(key: str, dict_items: Dict[str, Any]):
+    def _get_dict_item_case_insensitive(key: str, dict_items: dict[str, Any]):
         for dict_item_key in dict_items.keys():
             if key.lower() == dict_item_key.lower():
                 return dict_items[dict_item_key]
@@ -320,13 +325,13 @@ class AdwinProcess:
         try:
             return self._get_dict_item_case_insensitive(par_name, self._param_info.param)
         except KeyError:
-            raise ValueError("Unknown parameter {} for process {}".format(par_name, self._name))
+            raise ValueError(f"Unknown parameter {par_name} for process {self._name}")
 
     def _get_data_idx(self, data_name):
         try:
             return self._get_dict_item_case_insensitive(data_name, self._param_info.data)
         except KeyError:
-            raise ValueError("Unknown data array {} for process {}".format(data_name, self._name))
+            raise ValueError(f"Unknown data array {data_name} for process {self._name}")
 
     def load(self) -> None:
         """Load the Adwin process but do not start it yet.
@@ -334,10 +339,10 @@ class AdwinProcess:
         If a process is already running in the same process slot number, that process will be stopped.
         """
         if "T12" in self._processor_type.upper():
-            bin_file = self._file_name + ".TC{}".format(self._process_number % 10)  # T12 and T12.1
+            bin_file = self._file_name + f".TC{self._process_number % 10}"  # T12 and T12.1
 
         else:
-            bin_file = self._file_name + ".TB{}".format(self._process_number % 10)  # T11 gets extension "TB{}".
+            bin_file = self._file_name + f".TB{self._process_number % 10}"  # T11 gets extension "TB{}".
 
         self._adwin.stop_process(self._process_number)
         self._adwin.wait_for_process(self._process_number, Adwin_Base.PROCESS_STOP_TIMEOUT)
@@ -355,8 +360,9 @@ class AdwinProcess:
             QMI_InstrumentException: If the process is already running.
         """
         if self._adwin.is_process_running(self._process_number):
-            raise QMI_InstrumentException("Can not start Adwin process {}, process {} already running"
-                                          .format(self._name, self._process_number))
+            raise QMI_InstrumentException(
+                f"Can not start Adwin process {self._name}, process {self._process_number} already running"
+            )
         self._adwin.start_process(self._process_number)
 
     def start_with_params(self, **kwargs: Any) -> None:
@@ -377,8 +383,9 @@ class AdwinProcess:
 
         # Check that process is not running.
         if self._adwin.is_process_running(self._process_number):
-            raise QMI_InstrumentException("Can not start Adwin process {}, process {} already running"
-                                          .format(self._name, self._process_number))
+            raise QMI_InstrumentException(
+                f"Can not start Adwin process {self._name}, process {self._process_number} already running"
+            )
 
         # Set parameters. Fill-in zero for unspecified parameters.
         params = {}
@@ -417,7 +424,7 @@ class AdwinProcess:
         """
         self._adwin.wait_for_process(self._process_number, timeout)
 
-    def get_par(self, par_name: str) -> Union[int, float]:
+    def get_par(self, par_name: str) -> int | float:
         """Return the current value of the specified parameter.
 
         Notes:
@@ -438,9 +445,9 @@ class AdwinProcess:
             elems = self._adwin.get_data(param_desc.data_index, param_desc.elem_index, 1)
             return elems[0]
         else:
-            raise ValueError("Unknown parameter {} for process {}".format(par_name, self._name))
+            raise ValueError(f"Unknown parameter {par_name} for process {self._name}")
 
-    def set_par(self, par_name: str, value: Union[int, float]) -> None:
+    def set_par(self, par_name: str, value: int | float) -> None:
         """Change the value of the specified parameter.
 
         Notes:
@@ -453,7 +460,7 @@ class AdwinProcess:
         param_desc = self._get_par_desc(par_name)
         if isinstance(param_desc, ParDesc):
             if not isinstance(value, int):
-                raise TypeError("Expecting integer value for parameter {} but got {}".format(par_name, value))
+                raise TypeError(f"Expecting integer value for parameter {par_name} but got {value}")
             self._adwin.set_par(param_desc.par_index, value)
         elif isinstance(param_desc, FParDesc):
             self._adwin.set_fpar(param_desc.fpar_index, value)
@@ -461,10 +468,10 @@ class AdwinProcess:
             elems = np.array([value])
             self._adwin.set_data(param_desc.data_index, param_desc.elem_index, elems)
         else:
-            raise ValueError("Unknown parameter {} for process {}".format(par_name, self._name))
+            raise ValueError(f"Unknown parameter {par_name} for process {self._name}")
 
     @staticmethod
-    def _find_sequential_ranges(seq: Iterable[int]) -> List[Tuple[int, int]]:
+    def _find_sequential_ranges(seq: Iterable[int]) -> list[tuple[int, int]]:
         """Find sequential ranges of in a sequence of integers."""
         sorted_seq = sorted(seq)
         ret = []
@@ -481,7 +488,7 @@ class AdwinProcess:
             ret.append((start_range, end_range))
         return ret
 
-    def get_par_multiple(self, params: List[str]) -> Dict[str, Union[int, float]]:
+    def get_par_multiple(self, params: list[str]) -> dict[str, int | float]:
         """Fetch multiple parameter values from the Adwin.
 
         Notes:
@@ -489,10 +496,10 @@ class AdwinProcess:
         """
 
         # Initialize result.
-        result: Dict[str, Union[int, float]] = {}
+        result: dict[str, int | float] = {}
 
         # Initialize an index of array elements to be fetched.
-        params_data: Dict[int, Dict[int, str]] = {}
+        params_data: dict[int, dict[int, str]] = {}
 
         # Fetch Par_nn and FPar_nn parameters.
         # Also build the index of array elements to be fetched.
@@ -507,7 +514,7 @@ class AdwinProcess:
                     params_data[param_desc.data_index] = {}
                 params_data[param_desc.data_index][param_desc.elem_index] = par_name
             else:
-                raise ValueError("Unknown parameter {} for process {}".format(par_name, self._name))
+                raise ValueError(f"Unknown parameter {par_name} for process {self._name}")
 
         # Fetch array parameters.
         for data_index in sorted(params_data.keys()):
@@ -522,7 +529,7 @@ class AdwinProcess:
 
         return result
 
-    def set_par_multiple(self, params: Dict[str, Union[int, float]]) -> None:
+    def set_par_multiple(self, params: dict[str, int | float]) -> None:
         """Send multiple parameter values to the Adwin.
 
         Notes:
@@ -530,7 +537,7 @@ class AdwinProcess:
         """
 
         # Initialize an index of array elements to be uploaded.
-        params_data: Dict[int, Dict[int, Union[int, float]]] = {}
+        params_data: dict[int, dict[int, int | float]] = {}
 
         # Upload Par_nn and FPar_nn parameters.
         # Also fill the index of array elements to be uploaded.
@@ -538,7 +545,7 @@ class AdwinProcess:
             param_desc = self._get_par_desc(par_name)
             if isinstance(param_desc, ParDesc):
                 if not isinstance(par_value, int):
-                    raise TypeError("Expecting integer value for parameter {} but got {}".format(par_name, par_value))
+                    raise TypeError(f"Expecting integer value for parameter {par_name} but got {par_value}")
                 self._adwin.set_par(param_desc.par_index, par_value)
             elif isinstance(param_desc, FParDesc):
                 self._adwin.set_fpar(param_desc.fpar_index, par_value)
@@ -547,7 +554,7 @@ class AdwinProcess:
                     params_data[param_desc.data_index] = {}
                 params_data[param_desc.data_index][param_desc.elem_index] = par_value
             else:
-                raise ValueError("Unknown parameter {} for process {}".format(par_name, self._name))
+                raise ValueError(f"Unknown parameter {par_name} for process {self._name}")
 
         # Upload array parameters.
         for data_index in sorted(params_data.keys()):
@@ -604,7 +611,7 @@ class AdwinProcess:
         data_idx = self._get_data_idx(data_name)
         return self._adwin.get_full_data(data_idx)
 
-    def set_data(self, data_name: str, first_index: int, value: Union[np.ndarray, List[int], List[float]]) -> None:
+    def set_data(self, data_name: str, first_index: int, value: np.ndarray | list[int] | list[float]) -> None:
         """Write values to a global Data array.
 
         Notes:
@@ -664,7 +671,7 @@ class AdwinProcess:
         data_idx = self._get_data_idx(data_name)
         return self._adwin.read_fifo(data_idx, count)
 
-    def write_fifo(self, data_name: str, value: Union[np.ndarray, List[int], List[float]]) -> None:
+    def write_fifo(self, data_name: str, value: np.ndarray | list[int] | list[float]) -> None:
         """Write data to a global FIFO variable.
 
         Notes:
@@ -687,7 +694,7 @@ class AdwinManager:
     def __init__(self,
                  adwin: Adwin_Base,
                  program_library: AdwinProgramLibrary,
-                 auto_load_programs: List[str]
+                 auto_load_programs: list[str]
                  ) -> None:
         self._adwin = adwin
         self._program_library = program_library
@@ -696,15 +703,16 @@ class AdwinManager:
 
     def _check_auto_load_processnrs(self) -> None:
         """Sanity check for process number conflicts among automatically loaded programs."""
-        numbers_used: Set[int] = set()
+        numbers_used: set[int] = set()
         program_names = set(self._program_library.list_programs())
         for program_name in self._auto_load_programs:
             if program_name not in program_names:
-                raise ValueError("Unknown program {!r} in auto_load_programs".format(program_name))
+                raise ValueError(f"Unknown program {program_name!r} in auto_load_programs")
             program_info = self._program_library.get_program_info(program_name)
             if program_info.slot in numbers_used:
-                raise ValueError("Duplicate auto_load program in process slot number {} ({})"
-                                 .format(program_info.slot, program_name))
+                raise ValueError(
+                    f"Duplicate auto_load program in process slot number {program_info.slot} ({program_name})"
+                )
             numbers_used.add(program_info.slot)
 
     def get_adwin(self) -> Adwin_Base:
@@ -733,7 +741,7 @@ class AdwinManager:
             adwin_process = self.get_process(program_name)
             adwin_process.load()
 
-    def list_programs(self) -> List[str]:
+    def list_programs(self) -> list[str]:
         """Return a list of available programs."""
         return self._program_library.list_programs()
 

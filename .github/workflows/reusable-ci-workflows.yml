@@ -1,0 +1,82 @@
+name: Python CI Reusable Workflow
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        required: true
+        type: string
+      ref:
+        required: false
+        type: string
+
+env:
+  PYLINT_MIN_SCORE: "9.00"
+  COVERAGE_MIN_PERC: "90"
+  COMPLEXITY_MAX_SCORE: "30"
+  SOURCE_DIRS: "qmi/"
+  BADGES_DIR: ".github/badges"
+
+jobs:
+  ci-checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Python ${{ inputs.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qy
+          sudo apt-get install -y bc
+          pip install --upgrade pip
+          pip install '.[dev]'
+
+      - name: Run pylint
+        run: |
+          pylint --score=yes --load-plugins=pylint.extensions.mccabe --max-complexity=$COMPLEXITY_MAX_SCORE \
+            $SOURCE_DIRS | tee pylint-${{ inputs.python-version }}.log
+          PYLINT_SCORE=$(tail -n 2 pylint-${{ inputs.python-version }}.log \
+            | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1)
+          echo "Pylint score: $PYLINT_SCORE"
+          exit $(echo "$PYLINT_SCORE < $PYLINT_MIN_SCORE" | bc)
+      - name: Upload pylint results
+        uses: actions/upload-artifact@v4
+        with:
+          name: pylint-results-${{ inputs.python-version }}
+          path: pylint-${{ inputs.python-version }}.log
+
+      - name: Run mypy
+        run: |
+          mypy --namespace-packages $SOURCE_DIRS | tee mypy-${{ inputs.python-version }}.log
+          if [ -n "$(tail -n 1 mypy-${{ inputs.python-version }}.log | grep -e '^Succes')" ]; \
+            then RESULT="pass"; else RESULT="fail"; fi
+          echo "Mypy result: $RESULT"
+          exit $([[ "$RESULT" == "pass" ]] && echo 0 || echo 1)
+      - name: Upload mypy results
+        uses: actions/upload-artifact@v4
+        with:
+          name: mypy-results-${{ inputs.python-version }}
+          path: mypy-${{ inputs.python-version }}.log
+
+      - name: Run coverage
+        run: |
+          if [[ ${{ inputs.python-version }} == "3.13" ]]; \
+            then pip install py-xdrlib; fi
+          coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"
+          coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage-${{ inputs.python-version }}.log
+          COVERAGE_PERC=$(grep "TOTAL" coverage-${{ inputs.python-version }}.log | grep -Eo '[0-9.]+%' | sed 's/%//')
+          echo "Coverage: $COVERAGE_PERC%"
+          exit $(echo "$COVERAGE_PERC < $COVERAGE_MIN_PERC" | bc)
+      - name: Upload coverage results
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-results-${{ inputs.python-version }}
+          path: coverage-${{ inputs.python-version }}.log

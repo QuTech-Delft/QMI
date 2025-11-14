@@ -75,7 +75,6 @@ Wishlist for documentation
 --------------------------
 
 * Referencing to some items is quite hard to understand and get right.
-* The annotated types are not clickable, so we add them parenthesized if important, now.
 * Autosummary could help.
 * Standard exception "ValueError" is not clickable (intersphinx?)
 

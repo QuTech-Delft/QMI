@@ -4,6 +4,7 @@
 import enum
 import ctypes
 import logging
+from typing import ClassVar
 
 from qmi.core.exceptions import QMI_RuntimeException
 
@@ -18,18 +19,18 @@ class QMI_LittleEndianStructure(ctypes.LittleEndianStructure):
 
     def __repr__(self) -> str:
         fstr_list = []
-        for (fname, ftype) in self._fields_:
+        for (fname, ftype, *_) in self._fields_:
             value = getattr(self, fname)
             if isinstance(value, (QMI_LittleEndianStructure, int, float, bytes)):
                 vstr = repr(value)
             elif isinstance(value, ctypes.Array):
-                vstr = "[{}]".format(", ".join(repr(e) for e in value))
+                vstr = f"[{', '.join((repr(e) for e in value))}]"
             else:
                 _logger.error("Unhandled type: %s %s", type(value), value)
                 vstr = repr(value)
-            fstr = "{}={}".format(fname, vstr)
+            fstr = f"{fname}={vstr}"
             fstr_list.append(fstr)
-        return "{}({})".format(self.__class__.__name__, ", ".join(fstr_list))
+        return f"{self.__class__.__name__}({', '.join(fstr_list)})"
 
 
 @enum.unique
@@ -71,11 +72,12 @@ class QMI_UdpResponderContextInfoRequestPacket(QMI_UdpResponderPacketHeader):
     ]  # No extra fields.
 
     @staticmethod
-    def create(pkt_id: int,
-               pkt_timestamp: float,
-               workgroup_name_filter: bytes,
-               context_name_filter: bytes
-               ) -> 'QMI_UdpResponderContextInfoRequestPacket':
+    def create(
+        pkt_id: int,
+        pkt_timestamp: float,
+        workgroup_name_filter: bytes,
+        context_name_filter: bytes
+    ) -> 'QMI_UdpResponderContextInfoRequestPacket':
         return QMI_UdpResponderContextInfoRequestPacket(
             MAGIC,
             QMI_UdpResponderMessageTypeTag.CONTEXT_INFO_REQUEST.value,
@@ -95,15 +97,16 @@ class QMI_UdpResponderContextInfoResponsePacket(QMI_UdpResponderPacketHeader):
     ]
 
     @staticmethod
-    def create(pkt_id: int,
-               pkt_timestamp: float,
-               request_pkt_id: int,
-               request_pkt_timestamp: float,
-               context_pid: int,
-               context_name: bytes,
-               workgroup_name: bytes,
-               context_port: int
-               ) -> 'QMI_UdpResponderContextInfoResponsePacket':
+    def create(
+        pkt_id: int,
+        pkt_timestamp: float,
+        request_pkt_id: int,
+        request_pkt_timestamp: float,
+        context_pid: int,
+        context_name: bytes,
+        workgroup_name: bytes,
+        context_port: int
+    ) -> 'QMI_UdpResponderContextInfoResponsePacket':
         context_descriptor = QMI_UdpResponderContextDescriptor(context_pid, context_name, workgroup_name, context_port)
         return QMI_UdpResponderContextInfoResponsePacket(
             MAGIC, QMI_UdpResponderMessageTypeTag.CONTEXT_INFO_RESPONSE.value,
@@ -117,7 +120,7 @@ class QMI_UdpResponderContextInfoResponsePacket(QMI_UdpResponderPacketHeader):
 
 class QMI_UdpResponderKillRequestPacket(QMI_UdpResponderPacketHeader):
     _pack_ = 1
-    _fields_: list = []  # No extra fields.
+    _fields_: ClassVar[list] = []  # No extra fields.
 
     @staticmethod
     def create(pkt_id: int, pkt_timestamp: float) -> 'QMI_UdpResponderKillRequestPacket':
@@ -157,7 +160,10 @@ def unpack_qmi_udp_packet(packet: bytes) -> QMI_UdpResponderPacketHeader:
     expected_packet_size = ctypes.sizeof(packet_type)
 
     if packet_size != expected_packet_size:
-        raise QMI_RuntimeException("Bad UDP packet: unexpected size (tag = {}, actual = {}, expected = {})".format(
-                packet_type_tag, packet_size, expected_packet_size))
+        raise QMI_RuntimeException(
+            "Bad UDP packet: unexpected size (tag = {}, actual = {}, expected = {})".format(
+                packet_type_tag, packet_size, expected_packet_size
+            )
+        )
 
     return packet_type.from_buffer_copy(packet)
