@@ -229,7 +229,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self.daq_server.setDouble('/' + self._device_name + '/' + node_path, value)
 
     def _wait_compile(self, sequencer_program: str) -> CompilerStatus:
-        """Start a compilation of a sequencer program."""
+        """Start a compilation of a sequencer program.
+
+        Parameters:
+            sequencer_program: A sequencer program as a string.
+
+        Returns:
+            compilation_status: CompilerStatus enumeral instance.
+        """
 
         self._check_is_open()
 
@@ -257,7 +264,11 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return compilation_status
 
     def _wait_upload(self) -> UploadStatus:
-        """Poll ELF upload progress and check result."""
+        """Poll ELF upload progress and check result.
+
+        Returns:
+            upload_status: UploadStatus enumeral instance.
+        """
 
         self._check_is_open()
 
@@ -265,13 +276,11 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         upload_start_time = time.monotonic()
         _logger.debug("Polling ELF upload status ...")
         upload_progress = self.awg_module.getDouble("progress")
-        # upload_status = UploadStatus(self.daq_server.getInt(f"/{self._device_name:s}/awgs/0/ready"))
         upload_status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/0/ready")
         while upload_progress < 1.0 and upload_status == 0:
             time.sleep(0.1)
             upload_progress = self.awg_module.getDouble("progress")
             upload_status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/0/ready")
-            # upload_status = UploadStatus(self.awg_module.getInt("elf/status"))
             if time.monotonic() - upload_start_time > self.UPLOAD_TIMEOUT:
                 raise RuntimeError("Upload process timed out (timeout={})".format(self.UPLOAD_TIMEOUT))
 
@@ -285,7 +294,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return upload_status
 
     def _interpret_compilation_result_is_ok(self, compilation_result: CompilerStatus) -> bool:
-        """Interpret compilation result."""
+        """Interpret compilation result. Return result as OK (True) if compiler didn't return any errors."""
 
         self._check_is_open()
 
@@ -308,7 +317,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return ok_to_proceed
 
     def _interpret_upload_result_is_ok(self, upload_result: UploadStatus) -> bool:
-        """Interpret upload result."""
+        """Interpret upload result. Return result as OK (True) only if upload (has) finished correctly."""
 
         self._check_is_open()
 
@@ -505,34 +514,18 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if awg_index not in (0, 1, 2, 3):
             raise ValueError("AWG index must be in 0 .. 3")
 
+        # Get schema from the device
         schema_node = f"/{self._device_name:s}/awgs/0/commandtable/schema"
         schema = json.loads(
             self.daq_server.get(schema_node, flat=True)[schema_node][0]["vector"]
         )
-
         # Create the command table from the provided entries.
-        # command_table = {
-        #     "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
-        #     "header": {
-        #         "version": str(schema["version"])
-        #     },
-        #     "table": command_table_entries
-        # }
         command_table = {
             "header": {
                 "version": str(schema["version"])
             },
             "table": command_table_entries
         }
-        # Load the validation schema.
-        # validation_schema_file = _DEFAULT_CT_TABLE_SCHEMA_PATH
-        # try:
-        #     with open(validation_schema_file, 'r') as fhandle:
-        #         schema = json.load(fhandle)
-        # except json.JSONDecodeError as exc:
-        #     _logger.exception("Error in decoding validation schema", exc_info=exc)
-        #     raise ValueError("Invalid JSON") from exc
-
         # Validate the table against the schema.
         try:
             jsonschema.validate(instance=command_table, schema=schema, cls=jsonschema.Draft7Validator)
@@ -566,7 +559,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                 # Error in command table
                 raise RuntimeError(f"The upload of command table on core {awg_index} failed.")
 
-            # upload_status = UploadStatus(self.awg_module.getInt("elf/status"))
             if time.monotonic() - upload_start_time > self.UPLOAD_TIMEOUT:
                 raise RuntimeError("Upload process timed out (timeout={})".format(self.UPLOAD_TIMEOUT))
 
@@ -644,13 +636,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         Parameters:
             value:  Clock source to select.
-                    0 = internal reference clock;
-                    1 = external 10MHz or 100MHz reference clock;
-                    2 = a ZSync clock.
+                    0 - internal reference clock;
+                    1 - external 10MHz or 100MHz reference clock;
+                    2 - a ZSync clock.
         """
         if value not in (0, 1, 2):
             raise ValueError("Unsupported reference clock source")
 
+        self._check_is_open()
         _logger.info("[%s] Setting reference clock source to [%d]", self._name, value)
         self._set_int("system/clocks/referenceclock/source", value)
 
@@ -668,8 +661,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def set_sample_clock_frequency(self, frequency: float) -> None:
-        """
-        Set the base sample clock frequency.
+        """Set the base sample clock frequency.
+
         Changing the sample clock temporarily interrupts the AWG sequencers.
 
         Parameters:
@@ -681,13 +674,12 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def get_sample_clock_status(self) -> int:
-        """
-        Get the status of the sample clock.
+        """Get the status of the sample clock.
 
         Returns:
-            0 if the sample clock is valid and locked;
-            1 if there was an error adjusting the sample clock;
-            2 if the device is busy adjusting the sample clock.
+            0 - If the sample clock is valid and locked;
+            1 - If there was an error adjusting the sample clock;
+            2 - If the device is busy adjusting the sample clock.
         """
         self._check_is_open()
         _logger.info("[%s] Getting status of sample clock", self._name)
@@ -723,6 +715,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid trigger index")
         if value not in range(16) and value not in (17, 18):
             raise ValueError("Invalid marker source: {}".format(value))
+
         self._check_is_open()
         self._set_int("triggers/out/{}/source".format(trigger), value)
 
@@ -738,6 +731,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         if trigger < 0 or trigger >= self.NUM_CHANNELS:
             raise ValueError("Invalid trigger index")
+
         self._check_is_open()
         self._set_double("triggers/out/{}/delay".format(trigger), value)
 
@@ -753,6 +747,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid trigger index")
         if not -10.0 < value < 10.0:
             raise ValueError("Invalid trigger level")
+
         self._check_is_open()
         self._set_double("triggers/in/{}/level".format(trigger), value)
 
@@ -763,14 +758,13 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         Parameters:
             trigger: Trigger index in the range 0 to 7, corresponding to trigger inputs 1 to 8 on the front panel.
-            value:   Impedance setting.
-                     0 = 1 kOhm;
-                     1 = 50 Ohm.
+            value:   Impedance setting. 0 = 1 kOhm; 1 = 50 Ohm.
         """
         if trigger < 0 or trigger >= self.NUM_CHANNELS:
             raise ValueError("Invalid trigger index")
         if value not in (0, 1):
             raise ValueError("Invalid impedance setting")
+
         self._check_is_open()
         _logger.info(
             "[%s] Setting trigger impedance of channel [%d] to [%s]",
@@ -798,6 +792,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid digital trigger index")
         if value < 0 or value >= self.NUM_CHANNELS:
             raise ValueError("Invalid trigger source")
+
         self._check_is_open()
         self._set_int("awgs/{}/auxtriggers/{}/channel".format(awg, trigger), value)
 
@@ -812,10 +807,10 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             awg:     AWG module index (must be 0 in 1x8 channel mode).
             trigger: Digital trigger index in the range 0 to 1, corresponding to digital triggers 1 and 2.
             value:   Trigger slope.
-                     0 = level sensitive (trigger on high signal);
-                     1 = trigger on rising edge;
-                     2 = trigger on falling edge;
-                     3 = trigger on rising and falling edge.
+                     0 - level sensitive (trigger on high signal);
+                     1 - trigger on rising edge;
+                     2 - trigger on falling edge;
+                     3 - trigger on rising and falling edge.
         """
         if awg < 0 or awg >= self.NUM_AWGS:
             raise ValueError("Invalid AWG index")
@@ -823,6 +818,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid digital trigger index")
         if value < 0 or value > 3:
             raise ValueError("Invalid trigger slope")
+
         self._check_is_open()
         self._set_int("awgs/{}/auxtriggers/{}/slope".format(awg, trigger), value)
 
@@ -843,6 +839,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid AWG index")
         if channel < 0 or channel >= self.NUM_CHANNELS_PER_AWG:
             raise ValueError("Invalid channel index")
+
         self._check_is_open()
         return self._get_double(f"awgs/{awg}/outputs/{channel}/amplitude")
 
@@ -864,6 +861,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid AWG index")
         if channel < 0 or channel >= self.NUM_CHANNELS_PER_AWG:
             raise ValueError("Invalid channel index")
+
         self._check_is_open()
         self._set_double("awgs/{}/outputs/{}/amplitude".format(awg, channel), value)
 
@@ -878,13 +876,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             channel: Channel index in the range 0 to 1, selecting the first or second output channel
                      within the selected channel pair.
         Returns:
-            0 if not last sample is not held;
-            1 if last sample is held.
+            0 - If not last sample is not held;
+            1 - If last sample is held.
         """
         if awg < 0 or awg >= self.NUM_AWGS:
             raise ValueError("Invalid AWG index")
         if channel < 0 or channel >= self.NUM_CHANNELS_PER_AWG:
             raise ValueError("Invalid channel index")
+
         self._check_is_open()
         return self._get_int(f"awgs/{awg}/outputs/{channel}/hold")
 
@@ -906,18 +905,23 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid channel index")
         if value not in (0, 1):
             raise ValueError("Invalid hold state")
+
         self._check_is_open()
         self._set_int(f"awgs/{awg}/outputs/{channel}/hold", value)
 
     @rpc_method
     def get_output_channel_on(self, output_channel: int) -> int:
-        """Get the specified wave output channel state: 0 = output off, 1 = output on.
+        """Get the specified wave output channel state.
 
         Parameters:
             output_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
+
+        Returns:
+            channel_state: 0 = output off, 1 = output on.
         """
         if output_channel < 0 or output_channel >= self.NUM_CHANNELS:
             raise ValueError("Invalid channel index")
+
         self._check_is_open()
         return self._get_int("sigouts/{}/on".format(output_channel))
 
@@ -933,6 +937,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid channel index")
         if value not in (0, 1):
             raise ValueError("Invalid on/off state")
+
         self._check_is_open()
         self._set_int("sigouts/{}/on".format(output_channel), value)
 
@@ -948,6 +953,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid channel index")
         if value < 0 or value > 5.0:
             raise ValueError("Invalid output range")
+
         self._check_is_open()
         self._set_double("sigouts/{}/range".format(output_channel), value)
 
@@ -965,6 +971,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid channel index")
         if not -1.25 <= value <= 1.25:
             raise ValueError("Invalid offset value")
+
         self._check_is_open()
         self._set_double("sigouts/{}/offset".format(output_channel), value)
 
@@ -980,6 +987,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         if output_channel < 0 or output_channel >= self.NUM_CHANNELS:
             raise ValueError("Invalid channel index")
+
         self._check_is_open()
         return self._get_double("sigouts/{}/delay".format(output_channel))
 
@@ -997,6 +1005,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid channel index")
         if not 0 <= value < 26e-9:
             raise ValueError("Invalid delay setting")
+
         self._check_is_open()
         self._set_double("sigouts/{}/delay".format(output_channel), value)
 
@@ -1015,6 +1024,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid channel index")
         if value not in (0, 1):
             raise ValueError("Invalid value")
+
         self._check_is_open()
         self._set_int("sigouts/{}/direct".format(output_channel), value)
 
@@ -1030,6 +1040,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid channel index")
         if value not in (0, 1):
             raise ValueError("Invalid value")
+
         self._check_is_open()
         self._set_int("sigouts/{}/filter".format(output_channel), value)
 
@@ -1038,17 +1049,18 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Set the DIO control mode.
 
         Available mode are:
-            0: manual:                  control of DIO bits via LabOne user interface.
-            1: awg_sequencer_commands:  control of DIO bits from sequencer code and forward set values to sequencer
+            0 - manual:                  control of DIO bits via LabOne user interface.
+            1 - awg_sequencer_commands:  control of DIO bits from sequencer code and forward set values to sequencer
                                         (interface synced to 150 MHz).
-            2: dio_codeword             same as (1), but interface is synced to 50 MHz.
-            3: qccs                     map DIO onto ZSync interface and make it available to the sequencer.
+            2 - dio_codeword             same as (1), but interface is synced to 50 MHz.
+            3 - qccs                     map DIO onto ZSync interface and make it available to the sequencer.
 
         Parameters:
             mode:   mode to use (0, 1, 2 or 3).
         """
         if not 0 <= mode <= 3:
             raise ValueError("Invalid DIO mode")
+
         self._check_is_open()
         self._set_int("dios/0/mode", mode)
 
@@ -1064,6 +1076,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         if not 0 <= mask <= 15:
             raise ValueError("Invalid value for mask")
+
         self._check_is_open()
         self._set_int("dios/0/drive", mask)
 
@@ -1081,6 +1094,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid AWG index")
         if value < 0 or value > 31:
             raise ValueError("Invalid DIO bit index")
+
         self._check_is_open()
         self._set_int("awgs/{}/dio/strobe/index".format(awg), value)
 
@@ -1091,15 +1105,16 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Parameters:
             awg:    AWG module index (must be 0 in 1x8 channel mode).
             value:  Slope type.
-                    0 = off;
-                    1 = trigger on rising edge;
-                    2 = trigger on falling edge;
-                    3 = trigger on rising and falling edge.
+                    0 - off;
+                    1 - trigger on rising edge;
+                    2 - trigger on falling edge;
+                    3 - trigger on rising and falling edge.
         """
         if awg < 0 or awg >= self.NUM_AWGS:
             raise ValueError("Invalid AWG index")
         if value < 0 or value > 3:
             raise ValueError("Invalid slope")
+
         self._check_is_open()
         self._set_int("awgs/{}/dio/strobe/slope".format(awg), value)
 
@@ -1110,11 +1125,15 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Parameters:
             awg:    AWG module index (must be 0 in 1x8 channel mode).
             reg:    Register index in the range 0 to 15.
+
+        Returns:
+            User register value.
         """
         if awg < 0 or awg >= self.NUM_AWGS:
             raise ValueError("Invalid AWG index")
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index")
+
         self._check_is_open()
         return self._get_int("awgs/{}/userregs/{}".format(awg, reg))
 
@@ -1131,6 +1150,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid AWG index")
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index")
+
         self._check_is_open()
         self._set_int("awgs/{}/userregs/{}".format(awg, reg), value)
 
@@ -1142,11 +1162,12 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             awg:    AWG module index (must be 0 in 1x8 channel mode).
 
         Returns:
-            1 if the AWG sequencer is currently running;
-            0 if the AWG sequencer is not running.
+            1 - If the AWG sequencer is currently running.
+            0 - If the AWG sequencer is not running.
         """
         if awg < 0 or awg >= self.NUM_AWGS:
             raise ValueError("Invalid AWG index")
+
         self._check_is_open()
         return self._get_int("awgs/{}/enable".format(awg))
 
@@ -1162,5 +1183,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         if value not in (0, 1):
             raise ValueError("Invalid value")
+
         self._check_is_open()
         self.awg_module.set("awg/enable", value)
