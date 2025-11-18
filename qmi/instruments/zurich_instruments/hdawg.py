@@ -3,6 +3,7 @@
 import enum
 import logging
 import json
+import os.path
 import re
 import time
 import typing
@@ -19,8 +20,10 @@ import numpy as np
 if typing.TYPE_CHECKING:
     import zhinst.core
     import zhinst.utils
+    from zhinst.core import ziDAQServer, AwgModule
 else:
     zhinst = None
+    ziDAQServer, AwgModule = None, None
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
@@ -41,6 +44,7 @@ def _import_modules() -> None:
     if zhinst is None:
         import zhinst.core  # pylint: disable=W0621
         import zhinst.utils
+        from zhinst.core import ziDAQServer, AwgModule
 
 # Status enumerations.
 class CompilerStatus(enum.IntEnum):
@@ -105,12 +109,12 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._last_compilation_successful = False
 
     @property
-    def daq_server(self) -> zhinst.core.ziDAQServer:
+    def daq_server(self) -> ziDAQServer:
         assert self._daq_server is not None
         return self._daq_server
 
     @property
-    def awg_module(self) -> zhinst.core.AwgModule:
+    def awg_module(self) -> AwgModule:
         assert self._awg_module is not None
         return self._awg_module
 
@@ -335,7 +339,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         _logger.info("[%s] Opening connection to instrument", self._name)
 
         # This may fail!
-        self._daq_server = zhinst.core.ziDAQServer(self._server_host, self._server_port, api_level=6)
+        self._daq_server = ziDAQServer(self._server_host, self._server_port, api_level=6)
 
         # Connect to the device via Ethernet.
         # If the device is already connected, this is a no-op.
@@ -379,6 +383,56 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         super().close()
 
     @rpc_method
+    def set_node_value(self, node_path: str, value: int | float | str) -> None:
+        """Write an arbitrary value to the device node tree.
+
+        Requires LabOne version 21.08 or newer.
+
+        Parameters:
+            node_path:  Path in the device tree, relative to the "/devNNNN/" subtree.
+            value:      Value to write.
+        """
+        self._set_value(node_path, value)
+
+    @rpc_method
+    def get_node_int(self, node_path: str) -> int:
+        """Get an integer value in the device node tree.
+
+        Parameters:
+            node_path:  Path in the device tree, relative to the "/devNNNN/" subtree.
+        """
+        return self._get_int(node_path)
+
+    @rpc_method
+    def set_node_int(self, node_path: str, value: int) -> None:
+        """Set an integer value in the device node tree.
+
+        Parameters:
+            node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
+            value: Integer value to write.
+        """
+        self._set_int(node_path, value)
+
+    @rpc_method
+    def get_node_double(self, node_path: str) -> float:
+        """Get a floating point value in the device node tree.
+
+        Parameters:
+            node_path:  Path in the device tree, relative to the "/devNNNN/" subtree.
+        """
+        return self._get_double(node_path)
+
+    @rpc_method
+    def set_node_double(self, node_path: str, value: float) -> None:
+        """Set a floating point value in the device node tree.
+
+        Parameters:
+            node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
+            value: Floating point value to write.
+        """
+        self._set_double(node_path, value)
+
+    @rpc_method
     def set_channel_grouping(self, value: int) -> None:
         """Set the channel grouping of the device.
 
@@ -394,6 +448,47 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Unsupported channel grouping")
         self._check_is_open()
         self._set_int("system/awg/channelgrouping", value)
+
+    @rpc_method
+    def compile_and_upload(self,
+                           sequencer_program: str,
+                           replacements: None | dict[str, str | int | float] = None
+                           ) -> None:
+        """Compile and upload the sequencer_program, after performing textual replacements.
+
+        This function combines compilation followed by upload to the AWG if compilation was successful. This is forced
+        by the HDAWG API.
+
+        Notes on parameter replacements:
+         - Parameters must adhere to the following format: $[A-Za-z][A-Za-z0-9]+ (literal $, followed by at least one
+            letter followed by zero or more alphanumeric characters or underscores). Both the key in the replacements
+            dictionary and the parameter reference in the sequencer code must adhere to this format.
+         - Replacement respects word boundaries. The inclusion of the '$' allows to concatenate values in the sequencer
+            program code, e.g. "wave w = "$TYPE$LENGTH;" to achieve "wave w = "sin1024";", but be careful that you
+            don't accidentally create new parameters by concatenation.
+         - Replacement values must be of type str, int or float.
+
+        Parameters:
+            sequencer_program: Full text of the sequencer script.
+            replacements: Optional dictionary of (parameter, value) pairs. Every occurrence of the parameter in the
+                          sequencer program will be replaced  with the specified value.
+        """
+
+        self._check_is_open()
+        assert self._awg_module is not None
+
+        # Perform parameter replacements.
+        if replacements is None:
+            replacements = {}
+        sequencer_program = self._process_parameter_replacements(sequencer_program, replacements)
+        self._check_program_not_empty(sequencer_program)
+
+        # Compile.
+        compilation_result = self._wait_compile(sequencer_program)
+        result_ok = self._interpret_compilation_result_is_ok(compilation_result)
+
+        # Done; store result.
+        self._last_compilation_successful = result_ok
 
     @rpc_method
     def compilation_successful(self) -> bool:
@@ -533,7 +628,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             command_table_as_json = json.dumps(command_table, allow_nan=False, separators=(",", ":"))
         except (TypeError, ValueError) as exc:
             raise ValueError("Invalid value in command table") from exc
-        with open(f"/lhome/tud279275/hdawg_errors/cmd_table_{awg_index}.json", "w") as out:
+        with open(f"{os.path.dirname(__file__)}/cmd_table_{awg_index}.json", "w") as out:
             out.write(command_table_as_json)
         self.daq_server.setVector(
             "/{}/awgs/{}/commandtable/data".format(self._device_name, awg_index),
