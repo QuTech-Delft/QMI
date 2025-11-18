@@ -3,7 +3,6 @@
 import enum
 import logging
 import json
-from pathlib import Path
 import re
 import time
 import typing
@@ -26,6 +25,10 @@ else:
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
+# Sequencer code replacement variables must start with a literal $, followed by at least one letter followed by zero or
+# more alphanumeric characters or underscores.
+SEQC_PAR_PATTERN = re.compile(r"\$[A-Za-z][A-Za-z0-9_]*", re.ASCII)
+
 
 def _import_modules() -> None:
     """Import the zhinst library.
@@ -38,17 +41,6 @@ def _import_modules() -> None:
     if zhinst is None:
         import zhinst.core  # pylint: disable=W0621
         import zhinst.utils
-
-
-# Location of the default command table schema
-_THIS_MODULE_PATH = Path(__file__).resolve()
-_DEFAULT_CT_TABLE_SCHEMA_FILENAME = "hdawg_command_table.schema"
-_DEFAULT_CT_TABLE_SCHEMA_PATH = Path(_THIS_MODULE_PATH.parent, _DEFAULT_CT_TABLE_SCHEMA_FILENAME)
-
-# Sequencer code replacement variables must start with a literal $, followed by at least one letter followed by zero or
-# more alphanumeric characters or underscores.
-SEQC_PAR_PATTERN = re.compile(r"\$[A-Za-z][A-Za-z0-9_]*", re.ASCII)
-
 
 # Status enumerations.
 class CompilerStatus(enum.IntEnum):

@@ -98,7 +98,3 @@ qmi_wieserlabs_flexdds = "bin.instruments.qmi_wieserlabs_flexdds:run"
 
 [tool.setuptools]
 include-package-data = true
-
-[tool.setuptools.package-data]
-qmi = ["py.typed"]
-"qmi.instruments.zurich_instruments" = ["hdawg_command_table.schema"]
