@@ -245,35 +245,21 @@ class TestHDAWGInit(unittest.TestCase):
     def setUp(self):
         logging.getLogger("qmi.core.instrument").setLevel(logging.CRITICAL)
 
-        ctx = QMI_Context("test_hdawg_openclose")
-        self._awg_module = Mock()
-        self._awg_module.finished.side_effect = [True, False, False, True]
+        self.ctx = QMI_Context("test_hdawg_openclose")
+        self._awg_module = PropertyMock()
         # self._awg_module.finished = Mock(return_value=False)
+        self._awg_module.finished.side_effect = [True, False, False, True]
 
-        self._daq_server = Mock()
+        self._daq_server = PropertyMock()
         self._daq_server.awgModule = Mock(return_value=self._awg_module)
 
-        with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", self._daq_server
-            ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.AwgModule", self._awg_module
-        #     ), unittest.mock.patch(
-        #         "qmi.instruments.zurich_instruments.hdawg.zhinst"
-        #     ), unittest.mock.patch(
-        #         "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-        #     ) as core_patch, unittest.mock.patch(
-        #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
-        # ) as utils_patch:
-        ):
-            # core_patch.ziDAQServer = Mock(return_value=self._daq_server)
-            # core_patch.AwgModule = Mock(return_value=self._awg_module)
-            self.hdawg = ZurichInstruments_Hdawg(
-                ctx,
-                "HDAWG",
-                server_host=_DEVICE_HOST,
-                server_port=_DEVICE_PORT,
-                device_name=_DEVICE_NAME
-            )
+        # self.hdawg = ZurichInstruments_Hdawg(
+        #     ctx,
+        #     "HDAWG",
+        #     server_host=_DEVICE_HOST,
+        #     server_port=_DEVICE_PORT,
+        #     device_name=_DEVICE_NAME
+        # )
 
     def tearDown(self):
         with warnings.catch_warnings():
@@ -286,19 +272,25 @@ class TestHDAWGInit(unittest.TestCase):
         """Nominal open/close sequence."""
 
         with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", self._daq_server
+                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
             ), unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.AwgModule", self._awg_module
-            # ), unittest.mock.patch(
-            #     "qmi.instruments.zurich_instruments.hdawg.zhinst"
-            # ), unittest.mock.patch(
-            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-            # ) as core_patch, unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.AwgModule", return_value=self._awg_module
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
+            ) as core_patch:  #, unittest.mock.patch(
             #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
             # ) as utils_patch:
-            ):
-            # core_patch.ziDAQServer = Mock(return_value=self._daq_server)
-            # core_patch.AwgModule = Mock(return_value=self._awg_module)
+            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
+            core_patch.AwgModule = Mock(return_value=self._awg_module)
+            self.hdawg = ZurichInstruments_Hdawg(
+                self.ctx,
+                "HDAWG",
+                server_host=_DEVICE_HOST,
+                server_port=_DEVICE_PORT,
+                device_name=_DEVICE_NAME
+            )
             self.hdawg.open()
             self.hdawg.close()
 
@@ -329,8 +321,28 @@ class TestHDAWGInit(unittest.TestCase):
         """Failed open sequence."""
         self._awg_module.finished.side_effect = [False]
 
-        with self.assertRaises(AssertionError):
-            self.hdawg.open()
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.AwgModule", return_value=self._awg_module
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.zhinst"
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
+        ) as core_patch:  # , unittest.mock.patch(
+            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
+            # ) as utils_patch:
+            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
+            core_patch.AwgModule = Mock(return_value=self._awg_module)
+            self.hdawg = ZurichInstruments_Hdawg(
+                self.ctx,
+                "HDAWG",
+                server_host=_DEVICE_HOST,
+                server_port=_DEVICE_PORT,
+                device_name=_DEVICE_NAME
+            )
+            with self.assertRaises(AssertionError):
+                self.hdawg.open()
 
         expected_daq_server_calls = [
             call.connectDevice(_DEVICE_NAME, "1GbE"),
@@ -349,8 +361,28 @@ class TestHDAWGInit(unittest.TestCase):
         """Failed open sequence."""
         self._awg_module.finished.side_effect = [True, True]
 
-        with self.assertRaises(AssertionError):
-            self.hdawg.open()
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.AwgModule", return_value=self._awg_module
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.zhinst"
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
+        ) as core_patch:  # , unittest.mock.patch(
+            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
+            # ) as utils_patch:
+            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
+            core_patch.AwgModule = Mock(return_value=self._awg_module)
+            self.hdawg = ZurichInstruments_Hdawg(
+                self.ctx,
+                "HDAWG",
+                server_host=_DEVICE_HOST,
+                server_port=_DEVICE_PORT,
+                device_name=_DEVICE_NAME
+            )
+            with self.assertRaises(AssertionError):
+                self.hdawg.open()
 
         expected_daq_server_calls = [
             call.connectDevice(_DEVICE_NAME, "1GbE"),
@@ -371,9 +403,29 @@ class TestHDAWGInit(unittest.TestCase):
         """Failed close sequence."""
         self._awg_module.finished.side_effect = [True, False, True]
 
-        self.hdawg.open()
-        with self.assertRaises(AssertionError):
-            self.hdawg.close()
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.AwgModule", return_value=self._awg_module
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
+            ) as core_patch:  #, unittest.mock.patch(
+            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
+            # ) as utils_patch:
+            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
+            core_patch.AwgModule = Mock(return_value=self._awg_module)
+            self.hdawg = ZurichInstruments_Hdawg(
+                self.ctx,
+                "HDAWG",
+                server_host=_DEVICE_HOST,
+                server_port=_DEVICE_PORT,
+                device_name=_DEVICE_NAME
+            )
+            self.hdawg.open()
+            with self.assertRaises(AssertionError):
+                self.hdawg.close()
 
         expected_daq_server_calls = [
             # open()
@@ -398,9 +450,29 @@ class TestHDAWGInit(unittest.TestCase):
         """Failed close sequence."""
         self._awg_module.finished.side_effect = [True, False, False, False]
 
-        self.hdawg.open()
-        with self.assertRaises(AssertionError):
-            self.hdawg.close()
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.AwgModule", return_value=self._awg_module
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
+            ) as core_patch:  #, unittest.mock.patch(
+            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
+            # ) as utils_patch:
+            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
+            core_patch.AwgModule = Mock(return_value=self._awg_module)
+            self.hdawg = ZurichInstruments_Hdawg(
+                self.ctx,
+                "HDAWG",
+                server_host=_DEVICE_HOST,
+                server_port=_DEVICE_PORT,
+                device_name=_DEVICE_NAME
+            )
+            self.hdawg.open()
+            with self.assertRaises(AssertionError):
+                self.hdawg.close()
 
         expected_daq_server_calls = [
             # open()
@@ -426,11 +498,31 @@ class TestHDAWGInit(unittest.TestCase):
     def test_failed_open_notclosed(self):
         """Open device that is already open."""
         self._awg_module.finished.side_effect = [True, False, False, True]
-        self.hdawg.open()
-
-        with self.assertRaises(QMI_InvalidOperationException):
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.AwgModule", return_value=self._awg_module
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
+            ) as core_patch:  #, unittest.mock.patch(
+            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
+            # ) as utils_patch:
+            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
+            core_patch.AwgModule = Mock(return_value=self._awg_module)
+            self.hdawg = ZurichInstruments_Hdawg(
+                self.ctx,
+                "HDAWG",
+                server_host=_DEVICE_HOST,
+                server_port=_DEVICE_PORT,
+                device_name=_DEVICE_NAME
+            )
             self.hdawg.open()
-        self.hdawg.close()
+
+            with self.assertRaises(QMI_InvalidOperationException):
+                self.hdawg.open()
+            self.hdawg.close()
 
     def test_failed_close_notopen(self):
         """Close device that is not open."""
