@@ -9,7 +9,7 @@ import time
 import typing
 
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_RuntimeException, QMI_ApplicationException
+from qmi.core.exceptions import QMI_ApplicationException
 from qmi.core.instrument import QMI_Instrument
 from qmi.core.rpc import rpc_method
 
@@ -18,14 +18,6 @@ import numpy as np
 
 # Lazy import of the zhinst module. See the function _import_modules() below.
 if typing.TYPE_CHECKING:
-    import zhinst.toolkit
-    import zhinst.toolkit.driver
-    import zhinst.toolkit.driver.devices
-    import zhinst.toolkit.driver.modules
-    import zhinst.toolkit.driver.nodes
-    import zhinst.toolkit.driver.nodes.awg as awg
-    import zhinst.toolkit.nodetree
-    import zhinst.toolkit.session
     import zhinst.core
     import zhinst.utils
 else:
@@ -76,20 +68,23 @@ class UploadStatus(enum.IntEnum):
 
 
 class ZurichInstruments_HDAWG(QMI_Instrument):
-    """Instrument driver for the Zürich Instruments HDAWG."""
+    """Instrument driver for the Zürich Instruments HDAWG.
 
-    # TODO: Make as RPC constants. Compile and upload timeout in seconds.
-    _COMPILE_TIMEOUT = 30
-    _UPLOAD_TIMEOUT = 30
+    Attributes:
+        COMPILE_TIMEOUT:      The default timeout for a program compilation.
+        UPLOAD_TIMEOUT:       The default timeout for uploading a compiled program
+        NUM_AWGS:             The number of AWG cores.
+        NUM_CHANNELS:         The number of AWG channels.
+        NUM_CHANNELS_PER_AWG: The number of AWG channels per AWG core.
+    """
 
-    GENERATOR_WAIT_TIME_S = 30
-
+    _rpc_constants = ["COMPILE_TIMEOUT", "UPLOAD_TIMEOUT"]
+    COMPILE_TIMEOUT = 30
+    UPLOAD_TIMEOUT = 30
+    # Class constants
     NUM_AWGS = 4
     NUM_CHANNELS = 8
     NUM_CHANNELS_PER_AWG = 2
-
-    # Channel to core mapping. Each core maps to 2 channels.
-    CHANNEL_TO_CORE_MAPPING = {1: 0, 2: 0, 3: 1, 4: 1, 5: 2, 6: 2, 7: 3, 8: 3}
 
     def __init__(self, context: QMI_Context, name: str, server_host: str, server_port: int, device_name: str) -> None:
         """Initialize driver.
@@ -110,14 +105,10 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # ZI HDAWG server, module and device
         self._daq_server: None | zhinst.core.ziDAQServer = None
         self._awg_module: None | zhinst.core.AwgModule = None
-        self._device: None | zhinst.toolkit.driver.devices.HDAWG = None
 
         # Import the "zhinst" module.
         _import_modules()
 
-        # Connect to Zurich Instruments Data Server
-        self._session = zhinst.toolkit.Session(self._server_host, self._server_port)
-        #
         # Flags
         self._last_compilation_successful = False
 
@@ -130,11 +121,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     def awg_module(self) -> zhinst.core.AwgModule:
         assert self._awg_module is not None
         return self._awg_module
-
-    @property
-    def device(self) -> zhinst.toolkit.driver.devices.HDAWG:
-        assert self._device is not None
-        return self._device
 
     @staticmethod
     def _process_parameter_replacements(sequencer_program: str, replacements: dict[str, str | int | float]) -> str:
@@ -178,86 +164,51 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if len(seqc_statements) == 0:
             raise QMI_ApplicationException("Source string does not contain executable statements")
 
-    @staticmethod
-    def get_sequence_snippet(waveforms: zhinst.toolkit.Waveforms) -> str:
-        """
-        Get a sequencer code snippet that defines the given waveforms.
-
-        Parameters:
-            waveforms:  Waveforms to generate snippet for.
-
-        Returns:
-            Sequencer code snippet as a string.
-        """
-        _logger.info("[ZurichInstruments_HDAWG]: Generating sequencer code snippet for waveforms")
-        return waveforms.get_sequence_snippet()
-
-    def _get_int(self, node_path: str, awg_channel: None | int = None) -> int:
+    def _get_int(self, node_path: str) -> int:
         """
         Get an integer value from the nodetree.
 
         Parameters:
             node_path:      The path to the node to be queried.
-            awg_channel:    Optional, an AWG channel to get the node for. Default is None.
 
         Returns:
             integer value from node tree
         """
-        if awg_channel is not None:
-            awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-            return awg_node.root.connection.getInt(node_path)
-
         return self.daq_server.getInt('/' + self._device_name + '/' + node_path)
 
-    def _get_double(self, node_path: str, awg_channel: None | int = None) -> float:
+    def _get_double(self, node_path: str) -> float:
         """
         Get a double value from the nodetree.
 
         Parameters:
             node_path:      The path to the node to be queried.
-            awg_channel:    Optional, an AWG channel to get the node for. Default is None.
 
         Returns:
             double value from node tree.
         """
-        if awg_channel is not None:
-            awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-            return awg_node.root.connection.getDouble(node_path)
-
         return self.daq_server.getDouble('/' + self._device_name + '/' + node_path)
 
-    def _get_string(self, node_path: str, awg_channel: None | int = None) -> str:
+    def _get_string(self, node_path: str) -> str:
         """
         Get a string value from the nodetree.
 
         Parameters:
             node_path:      The path to the node to be queried.
-            awg_channel:    Optional, an AWG channel to get the node for. Default is None.
 
         Returns:
             string value from node tree.
         """
-        if awg_channel is not None:
-            awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-            return awg_node.root.connection.getString(node_path)
-
         return self.daq_server.getString('/' + self._device_name + '/' + node_path)
 
-    def _set_value(self, node_path: str, value: str | int | float, awg_channel: None | int = None) -> None:
+    def _set_value(self, node_path: str, value: str | int | float) -> None:
         """
         Set an integer value from the nodetree.
 
         Parameters:
             node_path:      The path to the node to be queried.
             value:          Value to set for the node.
-            awg_channel:    Optional, an AWG channel to get the node for. Default is None.
         """
-        if awg_channel is not None:
-            awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-            awg_node.root.connection.set(node_path, value)
-
-        else:
-            self.daq_server.set('/' + self._device_name + '/' + node_path, value)
+        self.daq_server.set('/' + self._device_name + '/' + node_path, value)
 
     def _set_int(self, node_path: str, value: int) -> None:
         """Set an integer value in the device node tree. Note: No 'awg_node' equivalent.
@@ -294,8 +245,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         while compilation_status == CompilerStatus.NOT_READY:
             time.sleep(0.1)
             compilation_status = CompilerStatus(self.awg_module.getInt("compiler/status"))
-            if time.monotonic() - compilation_start_time > self._COMPILE_TIMEOUT:
-                raise RuntimeError("Compilation process timed out (timeout={})".format(self._COMPILE_TIMEOUT))
+            if time.monotonic() - compilation_start_time > self.COMPILE_TIMEOUT:
+                raise RuntimeError("Compilation process timed out (timeout={})".format(self.COMPILE_TIMEOUT))
+
         compilation_end_time = time.monotonic()
         _logger.debug(
             "Compilation finished in %.1f seconds (status=%d)",
@@ -320,8 +272,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             upload_progress = self.awg_module.getDouble("progress")
             upload_status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/0/ready")
             # upload_status = UploadStatus(self.awg_module.getInt("elf/status"))
-            if time.monotonic() - upload_start_time > self._UPLOAD_TIMEOUT:
-                raise RuntimeError("Upload process timed out (timeout={})".format(self._UPLOAD_TIMEOUT))
+            if time.monotonic() - upload_start_time > self.UPLOAD_TIMEOUT:
+                raise RuntimeError("Upload process timed out (timeout={})".format(self.UPLOAD_TIMEOUT))
+
         upload_end_time = time.monotonic()
         _logger.debug(
             "ELF upload finished in %.1f seconds (status=%d)",
@@ -381,20 +334,13 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         _logger.info("[%s] Opening connection to instrument", self._name)
 
         # This may fail!
-        # self._daq_server = zhinst.core.ziDAQServer(self._server_host, self._server_port, api_level=6)
-        self._daq_server = self._session.daq_server
+        self._daq_server = zhinst.core.ziDAQServer(self._server_host, self._server_port, api_level=6)
 
-        # Connect to the device.
-        self._device = typing.cast(
-            zhinst.toolkit.driver.devices.HDAWG, self._session.connect_device(self._device_name)
-        )
         # Connect to the device via Ethernet.
         # If the device is already connected, this is a no-op.
         self.daq_server.connectDevice(self._device_name, "1GbE")
 
-        # self._awg_module = self.daq_server.awgModule()
-        # self._awg_module = typing.cast(zhinst.core.AwgModule, self._session.modules.create_awg_module()._raw_module)
-        self._awg_module = typing.cast(zhinst.core.AwgModule, self._session.modules.awg)
+        self._awg_module = self.daq_server.awgModule()
 
         self.awg_module.set("device", self._device_name)
         self.awg_module.set("index", 0)  # only support 1x8 mode, so only one AWG module
@@ -426,143 +372,27 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         self._awg_module = None
 
-        assert self._daq_server is not None
-        self._daq_server.disconnect()
+        self.daq_server.disconnect()
         self._daq_server = None
 
         super().close()
 
     @rpc_method
-    def wait_done(self, awg_channel: int) -> None:
-        """
-        Wait for AWG to finish.
+    def set_channel_grouping(self, value: int) -> None:
+        """Set the channel grouping of the device.
+
+        This QMI driver currently supports only channel grouping 2 (1x8 channels).
 
         Parameters:
-            awg_channel:   AWG channel to wait for.
+            value:  Channel grouping to set.
+                    0 = 4x2 channels;
+                    1 = 2x4 channels;
+                    2 = 1x8 channels.
         """
+        if value != 2:
+            raise ValueError("Unsupported channel grouping")
         self._check_is_open()
-        _logger.info("[%s] Waiting for sequencer to finish", self._name)
-        # Get the AWG node/core
-        awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-
-        awg_node.wait_done(timeout=self.GENERATOR_WAIT_TIME_S)
-
-    @rpc_method
-    def enable_sequencer(self, awg_channel: int, disable_when_finished: bool = True) -> None:
-        """
-        Enable the sequencer.
-
-        Parameters:
-            awg_channel:            AWG channel to enable.
-            disable_when_finished:  Flag to disable sequencer after it finishes execution. Default is True.
-        """
-        self._check_is_open()
-        _logger.info("[%s] Enabling sequencer", self._name)
-        # Get the AWG node/core
-        awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-
-        awg_node.enable_sequencer(single=disable_when_finished)
-
-    @rpc_method
-    def compile_sequencer_program(self, awg_channel: int, sequencer_program: str) -> bytes:
-        """
-        Compile the given sequencer program.
-
-        Parameters:
-            awg_channel:        The AWG channel to compile the program for.
-            sequencer_program:  The sequencer program as a string.
-
-        Returns:
-            compiled program as bytes.
-        """
-        self._check_is_open()
-        _logger.info("[%s] Compiling sequencer program", self._name)
-        # Get the AWG node/core
-        awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-
-        # Test compiling.
-        compilation_result = self._wait_compile(sequencer_program)
-        self._last_compilation_successful = self._interpret_compilation_result_is_ok(compilation_result)
-
-        compiled_program, compiler_output = awg_node.compile_sequencer_program(sequencer_program)
-        _logger.debug(f"Compilation Info:\n{compiler_output}")
-
-        return compiled_program
-
-    @rpc_method
-    def upload_program(self, awg_channel: int, compiled_program: bytes) -> None:
-        """
-        Upload the given compiler program.
-
-        Parameters:
-            awg_channel:        The AWG channel to upload the program to.
-            compiled_program:   The compiled program to upload.
-        """
-        self._check_is_open()
-        _logger.info("[%s] Uploading sequencer program", self._name)
-        # Get the AWG node/core
-        awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-
-        upload_info = awg_node.elf.data(compiled_program)
-        _logger.debug(f"Upload Info:\n{upload_info}")
-
-    @rpc_method
-    def compile_and_upload(
-            self,
-            awg_channel: int,
-            sequencer_program: str | zhinst.toolkit.Sequence,
-            replacements: None | dict[str, str| int | float] = None,
-    ) -> None:
-        """Compile and upload the sequencer program.
-
-        This function combines compilation followed by upload to the AWG if compilation was successful. This is forced
-        by the HDAWG API.
-
-        Notes on parameter replacements:
-         - Parameters must adhere to the following format: $[A-Za-z][A-Za-z0-9]+ (literal $, followed by at least one
-            letter followed by zero or more alphanumeric characters or underscores). Both the key in the replacements
-            dictionary and the parameter reference in the sequencer code must adhere to this format.
-         - Replacement respects word boundaries. The inclusion of the '$' allows to concatenate values in the sequencer
-            program code, e.g. "wave w = "$TYPE$LENGTH;" to achieve "wave w = "sin1024";", but be careful that you
-            don't accidentally create new parameters by concatenation.
-         - Replacement values must be of type str, int or float.
-
-        Warning:
-            After uploading the sequencer program one needs to wait for the awg core to become ready, before it can be
-            enabled. The awg core indicates the ready state through its `ready` node.
-            (device.awgs[0].ready() == True). Example:
-            > compile_info = self.device.awgs[0].load_sequencer_program(seqc)
-            > self.device.awgs[0].ready.wait_for_state_change(1)
-            > self.device.awgs[0].enable(True)
-
-        Parameters:
-            awg_channel:       The AWG channel to compile the program for.
-            sequencer_program: Sequencer program as a string or a Sequencer class.
-            replacements:      Optional dictionary of (parameter, value) pairs. Every occurrence of the parameter in
-                               the sequencer program will be replaced with the specified value.
-        """
-        self._check_is_open()
-        _logger.info("[%s] Loading sequencer program", self._name)
-
-        if replacements is not None:
-            # Perform parameter replacements.
-            sequencer_program = self._process_parameter_replacements(sequencer_program, replacements)
-
-        self._check_program_not_empty(sequencer_program)
-
-        # Get the AWG node/core
-        awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-
-        # Load sequencer program. Equivalent to compiling and uploading.
-        try:
-            info = awg_node.load_sequencer_program(sequencer_program)
-            _logger.debug(f"Loading sequencer program info:\n{info}")
-            awg_node.ready.wait_for_state_change(1, timeout=self._UPLOAD_TIMEOUT)
-            self._last_compilation_successful = True
-        except RuntimeError as err:
-            self._last_compilation_successful = False
-            _logger.exception(f"Loading sequencer program %s failed: %s", sequencer_program, str(err))
-            raise QMI_RuntimeException("Loading sequencer program failed.") from err
+        self._set_int("system/awg/channelgrouping", value)
 
     @rpc_method
     def compilation_successful(self) -> bool:
@@ -574,13 +404,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return self._last_compilation_successful
 
     @rpc_method
-    def upload_waveform(self,
-                        awg_index: int,
-                        waveform_index: int,
-                        wave1: np.ndarray,
-                        wave2: None | np.ndarray = None,
-                        markers: None | np.ndarray = None,
-                        ) -> None:
+    def upload_waveform(
+        self,
+        awg_index: int,
+        waveform_index: int,
+        wave1: np.ndarray,
+        wave2: None | np.ndarray = None,
+        markers: None | np.ndarray = None,
+    ) -> None:
         """Upload new waveform data to the AWG.
 
         The AWG must be explicitly disabled by calling `set_awg_module_enabled(0)`
@@ -614,9 +445,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def upload_waveforms(
-            self,
-            unpacked_waveforms: list[tuple[int, int, np.ndarray, None | np.ndarray, None | np.ndarray]],
-            batch_size: int = 50,
+        self,
+        unpacked_waveforms: list[tuple[int, int, np.ndarray, None | np.ndarray, None | np.ndarray]],
+        batch_size: int = 50,
     ) -> None:
         """Upload a set of new waveform data to the AWG. Works as singular waveform uploading, but creating a
         list of tuple sets of waveforms, and uploading all in one command, speeds up the upload significantly.
@@ -646,72 +477,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Send also any possible remains of the last batch
         if len(waves_set):
             self.daq_server.set(waves_set)
-
-    @rpc_method
-    def write_to_waveform_memory(
-        self, awg_channel: int, waveforms: zhinst.toolkit.Waveforms, indexes: None | list = None
-    ) -> None:
-        """
-        Write waveforms to the waveform memory. The waveforms must already be assigned in the sequencer program.
-
-        Parameters:
-            awg_channel:    The AWG channel to upload the waveforms to.
-            waveforms:      Waveforms to write.
-            indexes:        List of indexes to upload. Default is None, which uploads all waveforms.
-        """
-        self._check_is_open()
-        _logger.info("[%s] Writing waveforms to waveform memory", self._name)
-        # Get the AWG node/core
-        awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-
-        awg_node.write_to_waveform_memory(waveforms, indexes) if indexes else awg_node.write_to_waveform_memory(
-            waveforms
-        )
-
-    @rpc_method
-    def read_from_waveform_memory(
-        self, awg_channel: int, indexes: None | list[int] = None
-    ) -> zhinst.toolkit.Waveforms:
-        """
-        Read waveforms from the waveform memory.
-
-        Parameters:
-            awg_channel:    The AWG channel to upload the waveforms to.
-            indexes:        List of indexes to read. Default is None, which uploads all waveforms.
-
-        Returns:
-            Waveforms from waveform memory.
-        """
-        self._check_is_open()
-        _logger.info("[%s] Reading waveforms from waveform memory", self._name)
-        # Get the AWG node/core
-        awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-
-        return awg_node.read_from_waveform_memory(indexes) if indexes else awg_node.read_from_waveform_memory()
-
-    @rpc_method
-    def validate_waveforms(
-        self,
-        awg_channel: int,
-        waveforms: zhinst.toolkit.Waveforms,
-        compiled_sequencer_program: None | bytes = None,
-    ) -> None:
-        """
-        Validate if the waveforms match the sequencer program.
-
-        Parameters:
-            awg_channel:                AWG channel.
-            waveforms:                  Waveforms to validate.
-            compiled_sequencer_program: Optional sequencer program. If this is not provided then information from the device is used.
-        """
-        self._check_is_open()
-        _logger.info("[%s] Validating waveforms", self._name)
-        # Get the AWG node/core
-        awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-
-        waveforms.validate(
-            compiled_sequencer_program if compiled_sequencer_program else awg_node.waveform.descriptors()
-        )
 
     @rpc_method
     def upload_command_table(self, awg_index: int, command_table_entries: list[dict[str, typing.Any]]) -> None:
@@ -800,9 +565,11 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             if status & 0b1000:
                 # Error in command table
                 raise RuntimeError(f"The upload of command table on core {awg_index} failed.")
+
             # upload_status = UploadStatus(self.awg_module.getInt("elf/status"))
-            if time.monotonic() - upload_start_time > self._UPLOAD_TIMEOUT:
-                raise RuntimeError("Upload process timed out (timeout={})".format(self._UPLOAD_TIMEOUT))
+            if time.monotonic() - upload_start_time > self.UPLOAD_TIMEOUT:
+                raise RuntimeError("Upload process timed out (timeout={})".format(self.UPLOAD_TIMEOUT))
+
         upload_end_time = time.monotonic()
         _logger.debug(
             "Command Table upload finished in %.1f seconds (status=%d)",
@@ -811,31 +578,12 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         )
 
     @rpc_method
-    def get_command_table(self, awg_channel: int) -> zhinst.toolkit.CommandTable:
-        """
-        Get the command table from the device.
-
-        Parameters:
-            awg_channel:    The AWG channel to get the command table for.
-
-        Returns:
-            The command table.
-        """
-        self._check_is_open()
-        _logger.info("[%s] Getting command table for channel [%d]", self._name, awg_channel)
-        # Get the AWG node/core
-        awg_node: awg.AWG = self.device.awgs[self.CHANNEL_TO_CORE_MAPPING[awg_channel]]
-
-        return awg_node.commandtable.load_from_device()
-
-    @rpc_method
-    def get_node_int(self, node_path: str, awg_channel: None | int = None) -> int:
+    def get_node_int(self, node_path: str) -> int:
         """
         Get an integer value for the node.
 
         Parameters:
             node_path:      The node to query.
-            awg_channel:    The AWG channel to which the node belongs.
 
         Returns:
             integer value for the given node.
@@ -843,16 +591,15 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._check_is_open()
         _logger.info("[%s] Getting integer value for node [%s]", self._name, node_path)
 
-        return self._get_int(node_path, awg_channel)
+        return self._get_int(node_path)
 
     @rpc_method
-    def get_node_double(self, node_path: str, awg_channel: None | int = None) -> float:
+    def get_node_double(self, node_path: str) -> float:
         """
         Get a double value for the node.
 
         Parameters:
             node_path:      The node to query.
-            awg_channel:    The AWG channel to which the node belongs.
 
         Returns:
             double value for the given node.
@@ -860,16 +607,15 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._check_is_open()
         _logger.info("[%s] Getting double value for node [%s]", self._name, node_path)
 
-        return self._get_double(node_path, awg_channel)
+        return self._get_double(node_path)
 
     @rpc_method
-    def get_node_string(self, node_path: str, awg_channel: None | int = None) -> str:
+    def get_node_string(self, node_path: str) -> str:
         """
         Get a string value for the node.
 
         Parameters:
             node_path:      The node to query.
-            awg_channel:    The AWG channel to which the node belongs.
 
         Returns:
             string value for the given node.
@@ -877,7 +623,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._check_is_open()
         _logger.info("[%s] Getting string value for node [%s]", self._name, node_path)
 
-        return self._get_string(node_path, awg_channel)
+        return self._get_string(node_path)
 
     @rpc_method
     def sync(self) -> None:
@@ -889,25 +635,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         self._check_is_open()
         _logger.info("[%s] Synchronising state of AWG", self._name)
-        # self._session.sync()
         self.daq_server.sync()
-
-    @rpc_method
-    def set_channel_grouping(self, value: int) -> None:
-        """Set the channel grouping of the device.
-
-        This QMI driver currently supports only channel grouping 2 (1x8 channels).
-
-        Parameters:
-            value:  Channel grouping to set.
-                    0 = 4x2 channels;
-                    1 = 2x4 channels;
-                    2 = 1x8 channels.
-        """
-        if value != 2:
-            raise ValueError("Unsupported channel grouping")
-        self._check_is_open()
-        self._set_int("system/awg/channelgrouping", value)
 
     @rpc_method
     def set_reference_clock_source(self, value: int) -> None:
@@ -924,8 +652,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Unsupported reference clock source")
 
         _logger.info("[%s] Setting reference clock source to [%d]", self._name, value)
-        self.device.system.clocks.referenceclock.source(value)
-        # self._set_int("system/clocks/referenceclock/source", value)
+        self._set_int("system/clocks/referenceclock/source", value)
 
     @rpc_method
     def get_reference_clock_status(self) -> int:
@@ -937,8 +664,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         self._check_is_open()
         _logger.info("[%s] Getting status of reference clock", self._name)
-        return self.device.system.clocks.referenceclock.status()
-        # return self._get_int("system/clocks/referenceclock/status")
+        return self._get_int("system/clocks/referenceclock/status")
 
     @rpc_method
     def set_sample_clock_frequency(self, frequency: float) -> None:
@@ -951,8 +677,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         self._check_is_open()
         _logger.info("[%s] Setting sample clock frequency to [%d]", self._name, frequency)
-        self.device.system.clocks.sampleclock.freq(frequency)
-        # self._set_double("system/clocks/sampleclock/freq", frequency)
+        self._set_double("system/clocks/sampleclock/freq", frequency)
 
     @rpc_method
     def get_sample_clock_status(self) -> int:
@@ -966,8 +691,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         self._check_is_open()
         _logger.info("[%s] Getting status of sample clock", self._name)
-        return self.device.system.clocks.sampleclock.status
-        # return self._get_int("system/clocks/sampleclock/status")
+        return self._get_int("system/clocks/sampleclock/status")
 
     @rpc_method
     def set_marker_source(self, trigger: int, value: int) -> None:
@@ -1043,7 +767,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                      0 = 1 kOhm;
                      1 = 50 Ohm.
         """
-        if trigger < 0 or trigger >= len(self.CHANNEL_TO_CORE_MAPPING):
+        if trigger < 0 or trigger >= self.NUM_CHANNELS:
             raise ValueError("Invalid trigger index")
         if value not in (0, 1):
             raise ValueError("Invalid impedance setting")
@@ -1054,7 +778,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             trigger,
             "50 Ohm" if value else "1 kOhm",
         )
-        # self.device.triggers[trigger].imp50(value)
         self._set_int("triggers/in/{}/imp50".format(trigger), value)
 
     @rpc_method
@@ -1262,7 +985,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def set_output_channel_delay(self, output_channel: int, value: float) -> None:
-        """Set output delay for fine alignment of the the specified wave output channel.
+        """Set output delay for fine alignment of the specified wave output channel.
 
         Changing the delay setting may take several seconds.
 
