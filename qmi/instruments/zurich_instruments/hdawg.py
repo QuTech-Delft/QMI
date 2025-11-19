@@ -305,7 +305,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             upload_end_time - upload_start_time,
             upload_status
         )
-        upload_status = UploadStatus(self._awg_module.getInt("elf/status"))
+        upload_status = UploadStatus(self.awg_module.getInt("elf/status"))
         return upload_status
 
     def _interpret_upload_result_is_ok(self, upload_result: UploadStatus) -> bool:
