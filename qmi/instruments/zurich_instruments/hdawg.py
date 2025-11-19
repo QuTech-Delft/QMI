@@ -383,6 +383,22 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         super().close()
 
     @rpc_method
+    def get_node_string(self, node_path: str) -> str:
+        """
+        Get a string value for the node.
+
+        Parameters:
+            node_path:      The node to query.
+
+        Returns:
+            string value for the given node.
+        """
+        self._check_is_open()
+        _logger.info("[%s] Getting string value for node [%s]", self._name, node_path)
+
+        return self._get_string(node_path)
+
+    @rpc_method
     def set_node_value(self, node_path: str, value: int | float | str) -> None:
         """Write an arbitrary value to the device node tree.
 
@@ -655,54 +671,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             upload_end_time - upload_start_time,
             status
         )
-
-    @rpc_method
-    def get_node_int(self, node_path: str) -> int:
-        """
-        Get an integer value for the node.
-
-        Parameters:
-            node_path:      The node to query.
-
-        Returns:
-            integer value for the given node.
-        """
-        self._check_is_open()
-        _logger.info("[%s] Getting integer value for node [%s]", self._name, node_path)
-
-        return self._get_int(node_path)
-
-    @rpc_method
-    def get_node_double(self, node_path: str) -> float:
-        """
-        Get a double value for the node.
-
-        Parameters:
-            node_path:      The node to query.
-
-        Returns:
-            double value for the given node.
-        """
-        self._check_is_open()
-        _logger.info("[%s] Getting double value for node [%s]", self._name, node_path)
-
-        return self._get_double(node_path)
-
-    @rpc_method
-    def get_node_string(self, node_path: str) -> str:
-        """
-        Get a string value for the node.
-
-        Parameters:
-            node_path:      The node to query.
-
-        Returns:
-            string value for the given node.
-        """
-        self._check_is_open()
-        _logger.info("[%s] Getting string value for node [%s]", self._name, node_path)
-
-        return self._get_string(node_path)
 
     @rpc_method
     def sync(self) -> None:
