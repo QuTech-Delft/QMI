@@ -259,36 +259,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         )
         return compilation_status
 
-    def _wait_upload(self) -> UploadStatus:
-        """Poll ELF upload progress and check result.
-
-        Returns:
-            upload_status: UploadStatus enumeral instance.
-        """
-
-        self._check_is_open()
-
-        # Poll the AWG module to check ELF upload progress.
-        upload_start_time = time.monotonic()
-        _logger.debug("Polling ELF upload status ...")
-        upload_progress = self.awg_module.getDouble("progress")
-        upload_status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/0/ready")
-        while upload_progress < 1.0 and upload_status == 0:
-            time.sleep(0.1)
-            upload_progress = self.awg_module.getDouble("progress")
-            upload_status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/0/ready")
-            if time.monotonic() - upload_start_time > self.UPLOAD_TIMEOUT:
-                raise RuntimeError("Upload process timed out (timeout={})".format(self.UPLOAD_TIMEOUT))
-
-        upload_end_time = time.monotonic()
-        _logger.debug(
-            "ELF upload finished in %.1f seconds (status=%d)",
-            upload_end_time - upload_start_time,
-            upload_status
-        )
-        upload_status = UploadStatus(self.awg_module.getInt("awgModule/elf/status"))
-        return upload_status
-
     def _interpret_compilation_result_is_ok(self, compilation_result: CompilerStatus) -> bool:
         """Interpret compilation result. Return result as OK (True) if compiler didn't return any errors."""
 
@@ -309,27 +279,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ok_to_proceed = True
         else:
             raise ValueError("Unknown compiler status: {}".format(compilation_result))
-
-        return ok_to_proceed
-
-    def _interpret_upload_result_is_ok(self, upload_result: UploadStatus) -> bool:
-        """Interpret upload result. Return result as OK (True) only if upload (has) finished correctly."""
-
-        self._check_is_open()
-
-        if upload_result == UploadStatus.DONE:
-            # Successful upload; proceed.
-            ok_to_proceed = True
-        elif upload_result == UploadStatus.FAILED:
-            # Upload failed.
-            _logger.error("ELF upload failed")
-            ok_to_proceed = False
-        elif upload_result == UploadStatus.BUSY:
-            # Upload still in progress; we should never get here.
-            _logger.error("ELF upload in progress but aborted for unknown reason.")
-            ok_to_proceed = False
-        else:
-            raise ValueError("Unknown upload status: {}".format(upload_result))
 
         return ok_to_proceed
 

@@ -1,6 +1,7 @@
 """Test cases for Zurich Instruments HDAWG."""
 import enum
 import json
+import jsonschema
 import logging
 import unittest
 from unittest.mock import call, Mock, ANY, PropertyMock
@@ -247,19 +248,10 @@ class TestHDAWGInit(unittest.TestCase):
 
         self.ctx = QMI_Context("test_hdawg_openclose")
         self._awg_module = PropertyMock()
-        # self._awg_module.finished = Mock(return_value=False)
         self._awg_module.finished.side_effect = [True, False, False, True]
 
         self._daq_server = PropertyMock()
         self._daq_server.awgModule = Mock(return_value=self._awg_module)
-
-        # self.hdawg = ZurichInstruments_Hdawg(
-        #     ctx,
-        #     "HDAWG",
-        #     server_host=_DEVICE_HOST,
-        #     server_port=_DEVICE_PORT,
-        #     device_name=_DEVICE_NAME
-        # )
 
     def tearDown(self):
         with warnings.catch_warnings():
@@ -279,9 +271,7 @@ class TestHDAWGInit(unittest.TestCase):
                 "qmi.instruments.zurich_instruments.hdawg.zhinst"
             ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-            ) as core_patch:  #, unittest.mock.patch(
-            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
-            # ) as utils_patch:
+            ) as core_patch:
             core_patch.ziDAQServer = Mock(return_value=self._daq_server)
             core_patch.AwgModule = Mock(return_value=self._awg_module)
             self.hdawg = ZurichInstruments_Hdawg(
@@ -329,9 +319,7 @@ class TestHDAWGInit(unittest.TestCase):
             "qmi.instruments.zurich_instruments.hdawg.zhinst"
         ), unittest.mock.patch(
             "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-        ) as core_patch:  # , unittest.mock.patch(
-            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
-            # ) as utils_patch:
+        ) as core_patch:
             core_patch.ziDAQServer = Mock(return_value=self._daq_server)
             core_patch.AwgModule = Mock(return_value=self._awg_module)
             self.hdawg = ZurichInstruments_Hdawg(
@@ -411,9 +399,7 @@ class TestHDAWGInit(unittest.TestCase):
                 "qmi.instruments.zurich_instruments.hdawg.zhinst"
             ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-            ) as core_patch:  #, unittest.mock.patch(
-            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
-            # ) as utils_patch:
+            ) as core_patch:
             core_patch.ziDAQServer = Mock(return_value=self._daq_server)
             core_patch.AwgModule = Mock(return_value=self._awg_module)
             self.hdawg = ZurichInstruments_Hdawg(
@@ -458,9 +444,7 @@ class TestHDAWGInit(unittest.TestCase):
                 "qmi.instruments.zurich_instruments.hdawg.zhinst"
             ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-            ) as core_patch:  #, unittest.mock.patch(
-            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
-            # ) as utils_patch:
+            ) as core_patch:
             core_patch.ziDAQServer = Mock(return_value=self._daq_server)
             core_patch.AwgModule = Mock(return_value=self._awg_module)
             self.hdawg = ZurichInstruments_Hdawg(
@@ -506,9 +490,7 @@ class TestHDAWGInit(unittest.TestCase):
                 "qmi.instruments.zurich_instruments.hdawg.zhinst"
             ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-            ) as core_patch:  #, unittest.mock.patch(
-            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
-            # ) as utils_patch:
+            ) as core_patch:
             core_patch.ziDAQServer = Mock(return_value=self._daq_server)
             core_patch.AwgModule = Mock(return_value=self._awg_module)
             self.hdawg = ZurichInstruments_Hdawg(
@@ -526,8 +508,26 @@ class TestHDAWGInit(unittest.TestCase):
 
     def test_failed_close_notopen(self):
         """Close device that is not open."""
-        with self.assertRaises(QMI_InvalidOperationException):
-            self.hdawg.close()
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.AwgModule", return_value=self._awg_module
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
+            ) as core_patch:
+            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
+            core_patch.AwgModule = Mock(return_value=self._awg_module)
+            self.hdawg = ZurichInstruments_Hdawg(
+                self.ctx,
+                "HDAWG",
+                server_host=_DEVICE_HOST,
+                server_port=_DEVICE_PORT,
+                device_name=_DEVICE_NAME
+            )
+            with self.assertRaises(QMI_InvalidOperationException):
+                self.hdawg.close()
 
 
 class TestHDAWG(unittest.TestCase):
@@ -538,7 +538,6 @@ class TestHDAWG(unittest.TestCase):
 
         ctx = QMI_Context("TestHDAWGMethods")
         self._awg_module = PropertyMock()
-        # self._awg_module.finished = Mock(return_value=False)
         self._awg_module.finished.side_effect = [True, False, False, True]
         self._awg_module.getInt = Mock()
         self._awg_module.getDouble = Mock()
@@ -555,9 +554,7 @@ class TestHDAWG(unittest.TestCase):
                 "qmi.instruments.zurich_instruments.hdawg.zhinst"
             ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-            ) as core_patch:  #, unittest.mock.patch(
-            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
-            # ) as utils_patch:
+            ) as core_patch:
             core_patch.ziDAQServer = Mock(return_value=self._daq_server)
             core_patch.AwgModule = Mock(return_value=self._awg_module)
             self.hdawg = ZurichInstruments_Hdawg(
@@ -571,6 +568,12 @@ class TestHDAWG(unittest.TestCase):
 
         self._awg_module.reset_mock()
         self._daq_server.reset_mock()
+
+    def _check_get_value_string(self, node_path):
+        expected_calls = [
+            call.getString("/{}/{}".format(_DEVICE_NAME, node_path))
+        ]
+        self._daq_server.assert_has_calls(expected_calls)
 
     def _check_get_value_int(self, node_path):
         expected_calls = [
@@ -618,6 +621,15 @@ class TestHDAWG(unittest.TestCase):
         value = "value"
         self.hdawg.set_node_value(node, value)
         self._check_set_value(node, value)
+
+    def test_generic_get_string(self):
+        """Test getter."""
+        node = "my/test/node"
+        value = "value"
+        self._daq_server.getString.return_value = value
+        result = self.hdawg.get_node_string(node)
+        self._check_get_value_string(node)
+        self.assertEqual(result, value)
 
     def test_generic_get_int(self):
         """Test getter."""
@@ -1006,6 +1018,24 @@ class TestHDAWG(unittest.TestCase):
         uploaded_ct = json.loads(self._daq_server.setVector.call_args[0][1])
         self.assertListEqual(uploaded_ct["table"], command_table_entries)
 
+    def test_upload_command_table_invalid_schema(self):
+        """Test command table upload."""
+        command_table_entries = [
+            {
+                "index": 1,
+                "waveform": {
+                    "playZero": True,
+                    "length": 128
+                }
+            }
+        ]
+        with unittest.mock.patch("qmi.instruments.zurich_instruments.hdawg.json", spec=json) as json_patch:
+            json_patch.validate = Mock(side_effect=[ValueError("Invalid schema")])
+            with self.assertRaises(ValueError) as verr_2:
+                self.hdawg.upload_command_table(0, command_table_entries)
+
+        self.assertEqual("Invalid schema", str(verr_2.exception))
+
     def test_upload_empty_command_table(self):
         """Test command table upload."""
         table = []
@@ -1030,9 +1060,22 @@ class TestHDAWG(unittest.TestCase):
                 }
             }
         ]
-
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as verr:
             self.hdawg.upload_command_table(0, command_table_entries)
+
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.json", spec=json
+            ) as json_patch, unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.jsonschema", spec=jsonschema
+        ) as schema_patch:
+            json_patch.loads = Mock(return_value=json.loads(_SCHEMA["/DEV8888/awgs/0/commandtable/schema"][0]["vector"]))
+            json_patch.dumps = Mock(side_effect=[TypeError("Ugly value")])
+            schema_patch.validate = Mock()
+            with self.assertRaises(ValueError) as verr_2:
+                self.hdawg.upload_command_table(0, command_table_entries)
+
+        self.assertEqual("Invalid command table", str(verr.exception))
+        self.assertEqual("Invalid value in command table", str(verr_2.exception))
 
     def test_upload_command_table_wrong_awg(self):
         """Test invalid command table upload."""
@@ -1378,6 +1421,7 @@ class TestHDAWG(unittest.TestCase):
         self.hdawg.set_output_channel_on(7, 1)
         self._check_set_value_int("sigouts/7/on", 1)
 
+    def test_set_output_channel_on_valueerror(self):
         with self.assertRaises(ValueError):
             self.hdawg.set_output_channel_on(-1, 0)
 
@@ -1401,17 +1445,18 @@ class TestHDAWG(unittest.TestCase):
         self.hdawg.set_output_channel_range(7, 5.0)
         self._check_set_value_double("sigouts/7/range", 5.0)
 
+    def test_set_output_channel_range_out_of_range(self):
         with self.assertRaises(ValueError):
-            self.hdawg.set_output_channel_on(-1, 0.0)
+            self.hdawg.set_output_channel_range(-1, 0.0)
 
         with self.assertRaises(ValueError):
-            self.hdawg.set_output_channel_on(8, 0.0)
+            self.hdawg.set_output_channel_range(8, 0.0)
 
         with self.assertRaises(ValueError):
-            self.hdawg.set_output_channel_on(0, -1.0)
+            self.hdawg.set_output_channel_range(0, -1.0)
 
         with self.assertRaises(ValueError):
-            self.hdawg.set_output_channel_on(0, 6.0)
+            self.hdawg.set_output_channel_range(0, 6.0)
 
     def test_set_output_channel_offset(self):
         """Test output channel offset setting."""
@@ -1428,17 +1473,18 @@ class TestHDAWG(unittest.TestCase):
         self.hdawg.set_output_channel_offset(7, -1.25)
         self._check_set_value_double("sigouts/7/offset", -1.25)
 
+    def test_set_output_channel_offset_out_of_range(self):
         with self.assertRaises(ValueError):
-            self.hdawg.set_output_channel_on(-1, 0.0)
+            self.hdawg.set_output_channel_offset(-1, 0.0)
 
         with self.assertRaises(ValueError):
-            self.hdawg.set_output_channel_on(8, 0.0)
+            self.hdawg.set_output_channel_offset(8, 0.0)
 
         with self.assertRaises(ValueError):
-            self.hdawg.set_output_channel_on(0, -2.0)
+            self.hdawg.set_output_channel_offset(0, -2.0)
 
         with self.assertRaises(ValueError):
-            self.hdawg.set_output_channel_on(0, 2.0)
+            self.hdawg.set_output_channel_offset(0, 2.0)
 
     def test_get_output_channel_delay(self):
         """Test getting output channel delay."""
