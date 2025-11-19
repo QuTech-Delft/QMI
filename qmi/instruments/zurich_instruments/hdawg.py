@@ -239,9 +239,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Compile the sequencer program with replacements made.
         self.awg_module.set("compiler/sourcestring", sequencer_program)
 
-        # Poll the AWG module to check if compilation progress.
+        # Poll the AWG module to check compilation progress.
         # See https://docs.zhinst.com/labone_programming_manual/awg_module.html#_awg_module_parameters for how to query
-        # the progress.
+        # the progress. The program is uploaded automatically if the 'compiler/upload' parameter is set to 1
         compilation_start_time = time.monotonic()
         _logger.debug("Compilation started ... ")
         compilation_status = CompilerStatus(self.awg_module.getInt("compiler/status"))
@@ -279,6 +279,53 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ok_to_proceed = True
         else:
             raise ValueError("Unknown compiler status: {}".format(compilation_result))
+
+        return ok_to_proceed
+
+    def _wait_upload(self) -> UploadStatus:
+        """Poll ELF upload progress and check result."""
+
+        self._check_is_open()
+
+        # Poll the AWG module to check ELF upload progress.
+        upload_start_time = time.monotonic()
+        _logger.debug("Polling ELF upload status ...")
+        upload_progress = self.awg_module.getDouble("progress")
+        upload_status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/0/ready")
+        while upload_progress < 1.0 and upload_status == 0:
+            time.sleep(0.1)
+            upload_progress = self.awg_module.getDouble("progress")
+            upload_status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/0/ready")
+            if time.monotonic() - upload_start_time > self.UPLOAD_TIMEOUT:
+                raise RuntimeError("Upload process timed out (timeout={})".format(self.UPLOAD_TIMEOUT))
+
+        upload_end_time = time.monotonic()
+        _logger.debug(
+            "ELF upload finished in %.1f seconds (status=%d)",
+            upload_end_time - upload_start_time,
+            upload_status
+        )
+        upload_status = UploadStatus(self._awg_module.getInt("elf/status"))
+        return upload_status
+
+    def _interpret_upload_result_is_ok(self, upload_result: UploadStatus) -> bool:
+        """Interpret upload result."""
+
+        self._check_is_open()
+
+        if upload_result == UploadStatus.DONE:
+            # Successful upload; proceed.
+            ok_to_proceed = True
+        elif upload_result == UploadStatus.FAILED:
+            # Upload failed.
+            _logger.error("ELF upload failed")
+            ok_to_proceed = False
+        elif upload_result == UploadStatus.BUSY:
+            # Upload still in progress; we should never get here.
+            _logger.error("ELF upload in progress but aborted for unknown reason.")
+            ok_to_proceed = False
+        else:
+            raise ValueError("Unknown upload status: {}".format(upload_result))
 
         return ok_to_proceed
 
@@ -422,7 +469,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Compile and upload the sequencer_program, after performing textual replacements.
 
         This function combines compilation followed by upload to the AWG if compilation was successful. This is forced
-        by the HDAWG API.
+        by the HDAWG API if the compiler/upload parameter is set to 1.
 
         Notes on parameter replacements:
          - Parameters must adhere to the following format: $[A-Za-z][A-Za-z0-9]+ (literal $, followed by at least one
@@ -451,6 +498,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Compile.
         compilation_result = self._wait_compile(sequencer_program)
         result_ok = self._interpret_compilation_result_is_ok(compilation_result)
+        # Wait for the upload
+        if result_ok:
+            # Allow some time for upload to start.
+            time.sleep(0.2)
+
+            # Wait for upload to finish.
+            upload_result = self._wait_upload()
+            result_ok = self._interpret_upload_result_is_ok(upload_result)
 
         # Done; store result.
         self._last_compilation_successful = result_ok

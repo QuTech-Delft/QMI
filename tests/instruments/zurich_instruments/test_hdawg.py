@@ -233,11 +233,12 @@ class CompilerStatusNotReady(enum.IntEnum):
     READY = -1
 
 
-class CompilerStatusReadyWithErrors(enum.IntEnum):
+class UploadStatusReadyWithErrors(enum.IntEnum):
     """Enumeration of compiler process status."""
-    NOT_READY = 0
-    READY_WITH_ERRORS = -1
-    READY = 1
+    WAITING = 2
+    DONE = 1
+    FAILED = 0
+    BUSY = -1
 
 
 class TestHDAWGInit(unittest.TestCase):
@@ -693,8 +694,8 @@ class TestHDAWG(unittest.TestCase):
         expected_calls = [
             call.set("compiler/sourcestring", expected_source),
             call.getInt("compiler/status"),
-            # call.getDouble("progress"),
-            # call.getInt("elf/status"),
+            call.getDouble("progress"),
+            call.getInt("elf/status"),
         ]
 
         self.hdawg.compile_and_upload(source, replacements)
@@ -821,14 +822,10 @@ class TestHDAWG(unittest.TestCase):
             call.getInt("compiler/status"),
             call.getInt("compiler/status"),
         ]
-
-        with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ZurichInstruments_HDAWG.COMPILE_TIMEOUT", 0.1
-            ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ZurichInstruments_HDAWG.UPLOAD_TIMEOUT", 0.1
-        ):
-            with self.assertRaises(RuntimeError):
-                self.hdawg.compile_and_upload(source)
+        self.hdawg.COMPILE_TIMEOUT = 0.1
+        self.hdawg.UPLOAD_TIMEOUT = 0.1
+        with self.assertRaises(RuntimeError):
+            self.hdawg.compile_and_upload(source)
 
         self.assertEqual(self._awg_module.mock_calls, expected_calls)
 
@@ -836,21 +833,17 @@ class TestHDAWG(unittest.TestCase):
         """Test failed ELF upload sequence."""
         source = "while(true) {}"
 
-        self._awg_module.getInt.side_effect = [0, 1]  # successful compilation; failed upload
+        self._awg_module.getInt.side_effect = [0, 1]  # successful compilation; upload timed out
         self._awg_module.getDouble.side_effect = [0.3]  # upload progress
 
         expected_calls = [
             call.set("compiler/sourcestring", source),
             call.getInt("compiler/status"),
-            call.getString("compiler/statusstring"),
-            # call.getDouble("progress"),
-            # call.getInt("elf/status"),
+            call.getDouble("progress"),
+            call.getInt("elf/status"),
         ]
 
-        with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.CompilerStatus", CompilerStatusNotReady
-            ):
-            self.hdawg.compile_and_upload(source)
+        self.hdawg.compile_and_upload(source)
 
         self.assertEqual(expected_calls, self._awg_module.mock_calls)
         self.assertFalse(self.hdawg.compilation_successful())
@@ -859,27 +852,25 @@ class TestHDAWG(unittest.TestCase):
         """Test timed-out ELF upload sequence."""
         source = "while(true) {}"
 
-        self._awg_module.getInt.side_effect = [0, -1, -1]  # successful compilation; upload timed out
-        self._awg_module.getDouble.side_effect = [0.0, 0.0]  # upload progress
+        self._daq_server.getInt.side_effect = [0, -1, -1]  # successful compilation; failed upload
+        self._awg_module.getInt.return_value = 0  # = [0, -1, -1]  # successful compilation; upload timed out
+        self._awg_module.getDouble.side_effect = [0.0, 0.5]  # upload progress
 
         expected_calls = [
             call.set("compiler/sourcestring", source),
             call.getInt("compiler/status"),
-            call.getInt("compiler/status"),
-            # call.getDouble("progress"),
+            # call.getInt("compiler/status"),
+            call.getDouble("progress"),
             # call.getInt("elf/status"),
-            # call.getDouble("progress"),
+            call.getDouble("progress"),
             # call.getInt("elf/status"),
         ]
+        self.hdawg.UPLOAD_TIMEOUT = 0.1
 
-        with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ZurichInstruments_HDAWG.COMPILE_TIMEOUT", 0.0
-            ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.CompilerStatus", CompilerStatusReadyWithErrors
-        ):
-            with self.assertRaises(RuntimeError):
-                self.hdawg.compile_and_upload(source)
+        with self.assertRaises(RuntimeError) as err:
+            self.hdawg.compile_and_upload(source)
 
+        self.assertEqual(f"Upload process timed out (timeout={self.hdawg.UPLOAD_TIMEOUT})", str(err.exception))
         self.assertEqual(expected_calls, self._awg_module.mock_calls)
 
     def test_upload_waveform(self):
