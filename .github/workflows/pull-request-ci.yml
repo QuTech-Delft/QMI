@@ -36,6 +36,12 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - name: Get log files from Python 3.11 build
+        uses: actions/download-artifact@v4
+        with:
+          name: pylint-3.11.log
+          path: .
+
       - name: Generate and push badges
         run: |
           pip install anybadge
