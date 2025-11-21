@@ -37,7 +37,6 @@ jobs:
           ref: ${{ inputs.ref }}
 
       - name: Generate and push badges
-        if: ${{ matrix.python-version == '3.11' }}
         run: |
           pip install anybadge
           anybadge -o -l pylint -v $(tail -n 2 pylint.log | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1) -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
