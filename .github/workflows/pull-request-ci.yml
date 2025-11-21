@@ -39,7 +39,7 @@ jobs:
       - name: Get pylint log file from Python 3.11 build
         uses: actions/download-artifact@v4
         with:
-          name: pylint-results-3.11.zip
+          name: pylint-results-3.11
           path: .
 
       - name: Generate and push badges
