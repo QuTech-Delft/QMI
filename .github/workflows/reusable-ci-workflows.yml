@@ -12,7 +12,6 @@ on:
     outputs:
       python-version:
         description: "The python-version that was passed to this reusable workflow"
-        # Simple mapping of the workflow input -> workflow output
         value: ${{ inputs.python-version }}
 
 env:
