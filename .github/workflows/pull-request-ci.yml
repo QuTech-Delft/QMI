@@ -34,18 +34,38 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ github.head_ref }}
+          fetch_depth: 0
+
+      - name: Get pylint log file from Python 3.11 build
+        uses: actions/download-artifact@v4
+        with:
+          name: pylint-results-3.11
+          path: .
+
+      - name: Get mypy log file from Python 3.11 build
+        uses: actions/download-artifact@v4
+        with:
+          name: mypy-results-3.11
+          path: .
+
+      - name: Get coverage log file from Python 3.11 build
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-results-3.11
+          path: .
 
       - name: Generate and push badges
-        if: ${{ matrix.python-version == '3.11' }}
         run: |
+          git fetch origin "${{ github.head_ref }}" || true
+          git checkout "${{ github.head_ref }}"
           pip install anybadge
-          anybadge -o -l pylint -v $(tail -n 2 pylint.log | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1) -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
-          anybadge -o -l mypy -v $([ -n "$(tail -n 1 mypy.log | grep -e '^Succes')" ] && echo pass || echo fail) -f $BADGES_DIR/mypy.svg fail=red pass=green
-          COVERAGE_PERC=$(grep "TOTAL" coverage.log | grep -Eo '[0-9.]+%' | sed 's/%//')
-          anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green
+          anybadge -o -l pylint -v $(tail -n 2 pylint-3.11.log | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1) -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
+          anybadge -o -l mypy -v $([ -n "$(tail -n 1 mypy-3.11.log | grep -e '^Succes')" ] && echo pass || echo fail) -f $BADGES_DIR/mypy.svg fail=red pass=green
+          COVERAGE_PERC=$(grep "TOTAL" coverage-3.11.log | grep -Eo '[0-9.]+%' | sed 's/%//')
+          anybadge -o -l coverage -v "$COVERAGE_PERC%" -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green
           git config user.name "Badge Bot"
           git config user.email "<>"
           git add $BADGES_DIR/*.svg
           git commit -m "Update badges" || true
-          git push || true
+          git push origin HEAD:${{ github.head_ref }} || true
