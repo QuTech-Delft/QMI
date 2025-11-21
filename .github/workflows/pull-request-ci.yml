@@ -42,6 +42,18 @@ jobs:
           name: pylint-results-3.11
           path: .
 
+      - name: Get mypy log file from Python 3.11 build
+        uses: actions/download-artifact@v4
+        with:
+          name: mypy-results-3.11
+          path: .
+
+      - name: Get coverage log file from Python 3.11 build
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-results-3.11
+          path: .
+
       - name: Generate and push badges
         run: |
           echo `ls`
