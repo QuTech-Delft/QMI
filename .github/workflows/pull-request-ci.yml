@@ -63,7 +63,7 @@ jobs:
           anybadge -o -l pylint -v $(tail -n 2 pylint-3.11.log | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1) -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
           anybadge -o -l mypy -v $([ -n "$(tail -n 1 mypy-3.11.log | grep -e '^Succes')" ] && echo pass || echo fail) -f $BADGES_DIR/mypy.svg fail=red pass=green
           COVERAGE_PERC=$(grep "TOTAL" coverage-3.11.log | grep -Eo '[0-9.]+%' | sed 's/%//')
-          anybadge -o -l coverage -v $COVERAGE_PERC -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green
+          anybadge -o -l coverage -v "$COVERAGE_PERC%" -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green
           git config user.name "Badge Bot"
           git config user.email "<>"
           git add $BADGES_DIR/*.svg
