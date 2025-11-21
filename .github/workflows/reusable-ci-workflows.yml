@@ -9,6 +9,11 @@ on:
       ref:
         required: false
         type: string
+    outputs:
+      python-version:
+        description: "The python-version that was passed to this reusable workflow"
+        # Simple mapping of the workflow input -> workflow output
+        value: ${{ inputs.python-version }}
 
 env:
   PYLINT_MIN_SCORE: "9.00"
