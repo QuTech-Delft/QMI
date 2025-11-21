@@ -36,16 +36,17 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Get log files from Python 3.11 build
+      - name: Get pylint log file from Python 3.11 build
         uses: actions/download-artifact@v4
         with:
-          name: pylint-3.11.log
+          name: pylint-results-3.11.zip
           path: .
 
       - name: Generate and push badges
         run: |
-          pip install anybadge
+          unzip pylint-results-3.11.zip
           echo `ls`
+          pip install anybadge
           anybadge -o -l pylint -v $(tail -n 2 pylint-3.11.log | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1) -f $BADGES_DIR/pylint.svg 2=red 4=orange 8=yellow 10=green
           anybadge -o -l mypy -v $([ -n "$(tail -n 1 mypy-3.11.log | grep -e '^Succes')" ] && echo pass || echo fail) -f $BADGES_DIR/mypy.svg fail=red pass=green
           COVERAGE_PERC=$(grep "TOTAL" coverage-3.11.log | grep -Eo '[0-9.]+%' | sed 's/%//')
