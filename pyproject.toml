@@ -79,26 +79,24 @@ dev = [
 qmi_proc = "qmi.tools.proc:run"
 qmi_adbasic_parser = "qmi.utils.adbasic_parser:run"
 qmi_adbasic_compiler = "qmi.utils.adbasic_compiler:run"
-# tool and instrument scripts
-qmi_tool = "bin.qmi_tool:run"
-qmi_hdf5_to_mat = "bin.qmi_hdf5_to_mat:run"
-qmi_anapico_apsin = "bin.instruments.qmi_anapico_apsin:run"
-qmi_highfinesse_ws = "bin.instruments.qmi_highfinesse_ws:run"
-qmi_mcc_usb1808x = "bin.instruments.qmi_mcc_usb1808x:run"
-qmi_newport_ag_uc8 = "bin.instruments.qmi_newport_ag_uc8:run"
-qmi_quantum_composer_9530 = "bin.instruments.qmi_quantum_composer_9530:run"
-qmi_siglent_ssa3000x = "bin.instruments.qmi_siglent_ssa3000x:run"
-qmi_srs_dc205 = "bin.instruments.qmi_srs_dc205:run"
-qmi_tenma_72psu = "bin.instruments.qmi_tenma_72psu:run"
-qmi_teraxion_tfn = "bin.instruments.qmi_teraxion_tfn:run"
-qmi_thorlabs_k10cr1 = "bin.instruments.qmi_thorlabs_k10cr1:run"
-qmi_timebase_dim3000 = "bin.instruments.qmi_timebase_dim3000:run"
-qmi_wavelength_tclab = "bin.instruments.qmi_wavelength_tclab:run"
-qmi_wieserlabs_flexdds = "bin.instruments.qmi_wieserlabs_flexdds:run"
+qmi_tool = "qmi.tools.qmi_tool:run"
 
 [tool.setuptools]
-packages = ["qmi", "bin"]
-
-[tool.setuptools.package-dir]
-qmi = "qmi/"
-bin = "bin/"
+include-package-data = true
+# tool and instrument scripts
+script-files = [
+    "bin/qmi_hdf5_to_mat",
+    "bin/instruments/qmi_anapico_apsin",
+    "bin/instruments/qmi_highfinesse_ws",
+    "bin/instruments/qmi_mcc_usb1808x",
+    "bin/instruments/qmi_newport_ag_uc8",
+    "bin/instruments/qmi_quantum_composer_9530",
+    "bin/instruments/qmi_siglent_ssa3000x",
+    "bin/instruments/qmi_srs_dc205",
+    "bin/instruments/qmi_tenma_72psu",
+    "bin/instruments/qmi_teraxion_tfn",
+    "bin/instruments/qmi_thorlabs_k10cr1",
+    "bin/instruments/qmi_timebase_dim3000",
+    "bin/instruments/qmi_wavelength_tclab",
+    "bin/instruments/qmi_wieserlabs_flexdds",
+]

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """Swiss army knife for QMI command line monitoring and control."""
 
 import random
