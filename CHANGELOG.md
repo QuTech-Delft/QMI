@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - In `usbtmc.py` now doing `.strip()` on `dev.serial_number` string to avoid SNs with whitespace character(s).
+- `pyproject.toml` with "bin" as package and added `.py` filename extensions to all the "bin" folder scripts to avoid a `ModuleNotFoundError` when running certain scripts.
 
 ### Removed
 - Zurich Instruments HDAWG instrument driver `hdawg_command_table.schema` file.
