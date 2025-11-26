@@ -97,4 +97,8 @@ qmi_wavelength_tclab = "bin.instruments.qmi_wavelength_tclab:run"
 qmi_wieserlabs_flexdds = "bin.instruments.qmi_wieserlabs_flexdds:run"
 
 [tool.setuptools]
-include-package-data = true
+packages = ["qmi", "bin"]
+
+[tool.setuptools.package-dir]
+qmi = "qmi/"
+bin = "bin/"
