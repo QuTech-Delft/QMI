@@ -1,4 +1,15 @@
-"""Swiss army knife for QMI command line monitoring and control."""
+"""Swiss army knife for QMI command line monitoring and control.
+
+Run with `qmi_tool ls` or `qmi_tool lsqmi` to list all QMI contexts present on the network with the default
+workgroup name ("default"). To see other contexts in other workgroups, use:
+`qmi_tool ls <workgorup-name>`.
+You can also give timeout:
+`qmi_tool ls <workgroup-name> 10`.
+
+You can also use this tool to kill all visible QMI contexts with the default workgroup name with:
+`qmi_tool hard-kill`. Use with care and never use without first checking which contexts will be killed,
+with `qmi_tool ls`.
+"""
 
 import random
 import sys
