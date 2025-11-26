@@ -1,7 +1,7 @@
 """
 PicoQuant, time tagger instruments and event handling.
 
-The qmi.instruments.pi package provides support for:
+The qmi.instruments.picoquant package provides support for:
 - MultiHarp 150
 - HydraHarp 400
 - PicoHarp 300.

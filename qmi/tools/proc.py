@@ -1,8 +1,14 @@
 """
 # QMI Process Manager
 
-This tool starts or stops background QMI processes.
+This tool can start, stop and query background QMI processes. Processes are identified by their context name,
+as specified in the QMI configuration file. Processes can run either on the local computer or on a remote,
+network-connected computer.
+
+When installing QMI with `pip`, also an executable `qmi_proc[.exe]` is created and can be used from command line.
+Run on command line `qmi_proc --help` to see usage options for `qmi_proc`.
 """
+
 import builtins
 import sys
 import argparse

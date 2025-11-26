@@ -20,8 +20,8 @@ def lsqmi(workgroup_name: str = CfgQmi.workgroup, timeout: float = 0.1) -> None:
     """List all QMI contexts on the network.
 
     Parameters:
-        workgroup_name:    The name of the workgroup to be searched for. Default is the CfgQmi.workgroup default.
-        timeout:                time to wait for answers (default: 0.1).
+        workgroup_name: The name of the workgroup to be searched for. Default is the CfgQmi.workgroup default.
+        timeout:        Timeout to wait for answers (default: 0.1).
     """
     # Ping and collect responses.
     timestamped_packets = ping_qmi_contexts(workgroup_name_filter=workgroup_name, timeout=timeout)
@@ -74,10 +74,10 @@ def hard_kill() -> None:
 
 def run() -> None | str:
     for e, arg in enumerate(sys.argv[1:]):
-        if arg not in ["ls", "hard-kill", "hard-kill-yes-really-i-am-sure"]:
+        if arg not in ["ls", "lsqmi", "hard-kill", "hard-kill-yes-really-i-am-sure"]:
             return f"Invalid argument {arg}."
 
-        if arg == "ls":
+        if arg == "ls" or arg == "lsqmi":
             if len(sys.argv) == (e + 3):
                 # we have one input and need to check if it is timeout or workgroup name
                 if len(re.findall(r"[a-zA-z]+", sys.argv[e+2])) == 0:
@@ -104,6 +104,8 @@ def run() -> None | str:
 
         if arg == "hard-kill-yes-really-i-am-sure":
             hard_kill()
+
+    return None
 
 
 if __name__ == "__main__":

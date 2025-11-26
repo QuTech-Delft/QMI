@@ -42,7 +42,7 @@ Modifications by Joris van Rantwijk:
  - Always call set_configuration() to synchronize data toggle.
  - Clear Bulk-IN endpoint during initialization to synchronize data toggle.
 
- Modification by HK Ervasti:
+Modifications by HK Ervasti:
  - .strip() `dev.serial_number` string to avoid SNs with whitespace character(s).
  - Logging import and a `_logger` instance with some 'debug' logging lines.
 """
