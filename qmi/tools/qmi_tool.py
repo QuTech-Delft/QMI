@@ -2,7 +2,7 @@
 
 Run with `qmi_tool ls` or `qmi_tool lsqmi` to list all QMI contexts present on the network with the default
 workgroup name ("default"). To see other contexts in other workgroups, use:
-`qmi_tool ls <workgorup-name>`.
+`qmi_tool ls <workgroup-name>`.
 You can also give timeout:
 `qmi_tool ls <workgroup-name> 10`.
 
