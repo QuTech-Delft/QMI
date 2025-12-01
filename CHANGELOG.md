@@ -15,9 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Agiltron FF optical switch QMI drivers have now common base class in `qmi.instruments.agiltron._ff_optical_switch`
 - Refactored also unit-tests for Agiltron FF optical switches.
 - Zurich Instruments HDAWG instrument driver now uses `zhinst.core` instead of `zhinst.ziPython`. Also the 'schema' is obtained now from the instrument itself, and not from a separate file.
+- Changed `qmi_tool` to be also an executable script like `qmi_proc`.
 
 ### Fixed
 - In `usbtmc.py` now doing `.strip()` on `dev.serial_number` string to avoid SNs with whitespace character(s).
+- Fixed in `pyproject.toml` the executable `qmi_proc` and "adwin" scripts in "bin" to be in separate section w.r.t. the other scripts which should not be executable.
 
 ### Removed
 - Zurich Instruments HDAWG instrument driver `hdawg_command_table.schema` file.
