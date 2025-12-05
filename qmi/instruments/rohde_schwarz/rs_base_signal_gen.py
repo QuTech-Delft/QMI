@@ -43,7 +43,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         self._timeout = self.DEFAULT_RESPONSE_TIMEOUT
         self._calibrating = False
         self._calibration_result: int | None = None
-        self._calibration_error: int | None = None
+        self._calibration_error: str | None = None
         self._max_continuous_power = max_continuous_power
         self._transport = create_transport(transport, default_attributes={"port": 5025})
         self._scpi_protocol = ScpiProtocol(
@@ -120,7 +120,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """Check for ongoing calibration.
 
         Attributes:
-            self._calibrating: Set to `False` if response is received from instrument.
+            self._calibrating:        Set to `False` if response is received from instrument.
             self._calibration_result: Integer result from the response or `None`.
             self._calibration_error:  String describing the erroneous response or `None`.
 
