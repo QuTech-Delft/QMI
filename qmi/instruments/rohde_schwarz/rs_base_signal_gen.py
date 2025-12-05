@@ -5,7 +5,6 @@ Base class for the instrument drivers for the Rohde&Schwarz Signal Generators
 import logging
 import re
 import time
-from typing import List, Optional
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
@@ -20,16 +19,17 @@ _logger = logging.getLogger(__name__)
 
 class RohdeSchwarz_Base(QMI_Instrument):
     """Base class for the instrument driver for the Rohde&Schwarz Signal Generators."""
-
+    _rpc_constants = ["DEFAULT_RESPONSE_TIMEOUT"]
     # Default response timeout in seconds.
     DEFAULT_RESPONSE_TIMEOUT = 5.0
 
-    def __init__(self,
-                 context: QMI_Context,
-                 name: str,
-                 transport: str,
-                 max_continuous_power: Optional[float] = None
-                 ) -> None:
+    def __init__(
+        self,
+        context: QMI_Context,
+        name: str,
+        transport: str,
+        max_continuous_power: float | None = None
+    ) -> None:
         """Initialize the instrument driver.
 
         Parameters:
@@ -42,16 +42,18 @@ class RohdeSchwarz_Base(QMI_Instrument):
         super().__init__(context, name)
         self._timeout = self.DEFAULT_RESPONSE_TIMEOUT
         self._calibrating = False
-        self._calibration_result = None  # type: Optional[int]
-        self._calibration_error = None  # type: Optional[str]
+        self._calibration_result: int | None = None
+        self._calibration_error: int | None = None
         self._max_continuous_power = max_continuous_power
         self._transport = create_transport(transport, default_attributes={"port": 5025})
-        self._scpi_protocol = ScpiProtocol(self._transport,
-                                           command_terminator="\r\n",
-                                           response_terminator="\n",
-                                           default_timeout=self._timeout)
+        self._scpi_protocol = ScpiProtocol(
+            self._transport,
+            command_terminator="\r\n",
+            response_terminator="\n",
+            default_timeout=self._timeout
+        )
 
-    def _is_valid_param(self, inp: str, params: List[str]) -> str:
+    def _is_valid_param(self, inp: str, params: list[str]) -> str:
         """ Checks if input string is a valid parameter string.
 
         Parameters:
@@ -61,8 +63,8 @@ class RohdeSchwarz_Base(QMI_Instrument):
         Raises:
             ValueError: If the input value is not in the allowed parameters list.
 
-        Return:
-            The input string in upper case.
+        Returns:
+            inp: The input string in upper case.
         """
         if inp.upper() in params:
             return inp.upper()
@@ -184,12 +186,12 @@ class RohdeSchwarz_Base(QMI_Instrument):
         self._check_calibrating()
         return self._scpi_protocol.ask(":ROSC:EXT:FREQ?").strip()
 
-    def _set_external_reference_frequency(self, frequency: str, options: List[str]) -> None:
+    def _set_external_reference_frequency(self, frequency: str, options: list[str]) -> None:
         """Configure the external reference input frequency.
 
         Parameters:
-            frequency:  desired frequency.
-            options:    allowed frequencies.
+            frequency:  Desired frequency.
+            options:    Allowed frequencies.
         """
         frequency = self._is_valid_param(frequency, options)
         self._check_calibrating()
@@ -211,10 +213,13 @@ class RohdeSchwarz_Base(QMI_Instrument):
         words = resp.rstrip().split(",")
         if len(words) != 4:
             raise QMI_InstrumentException(f"Unexpected response to *IDN?, got {resp!r}")
-        return QMI_InstrumentIdentification(vendor=words[0].strip(),
-                                            model=words[1].strip(),
-                                            serial=words[2].strip(),
-                                            version=words[3].strip())
+
+        return QMI_InstrumentIdentification(
+            vendor=words[0].strip(),
+            model=words[1].strip(),
+            serial=words[2].strip(),
+            version=words[3].strip()
+        )
 
     @rpc_method
     def start_calibration(self) -> None:
@@ -229,7 +234,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         The instrument must be at stable temperature (30 minutes to warm up)
         before starting internal adjustments.
 
-        Attributes:
+        Parameters:
             self._calibrating: Set to `True` if starting the calibration succeeded.
 
         Raises:
@@ -243,23 +248,24 @@ class RohdeSchwarz_Base(QMI_Instrument):
         self._calibrating = True
 
     @rpc_method
-    def poll_calibration(self) -> Optional[int]:
-        """Check whether an ongoing calibration is finished.
+    def poll_calibration(self) -> None | int:
+        """Check whether an ongoing calibration is finished. If calibration is finished, this function returns a
+        status code.
 
         Raises:
-            QMI_InstrumentException on calibration error.
+            QMI_InstrumentException: On calibration error or no calibration active.
 
         Returns:
-            If calibration is not yet finished, this function returns None.
-            If calibration is finished, this function returns a status code:
-                0 if calibration was successful;
-                1 if calibration failed.
+            status_code: 0 - If calibration was successful.
+                         1 - If calibration failed.
+            None:        If calibration is not yet finished.
         """
         self._check_is_open()
         if self._calibrating:
             if not self._internal_poll_calibration_finished():
                 # Still calibrating.
                 return None
+
         assert not self._calibrating
 
         if self._calibration_error is not None:
@@ -618,6 +624,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """
         if not -8.0 <= phase <= 8.0:
             raise ValueError("Phase offset should be in [-8, 8].")
+
         self._check_calibrating()
         self._scpi_protocol.write(f":IQ:IMP:QUAD {phase:.2f}")
         self._check_error()
@@ -662,6 +669,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """
         if not -5.0 <= leakage <= 5.0:
             raise ValueError("Leakage offset should be in [-5, 5].")
+
         self._check_calibrating()
         self._scpi_protocol.write(f":IQ:IMP:LEAK:Q {leakage:.2f}")
         self._check_error()
@@ -684,6 +692,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """
         if not -1.0 <= gain <= 1.0:
             raise ValueError("Gain imbalance should be in [-1, 1].")
+
         self._check_calibrating()
         self._scpi_protocol.write(f":IQ:IMP:IQR:MAGN {gain:.3f}")
         self._check_error()
@@ -707,15 +716,10 @@ class RohdeSchwarz_Base(QMI_Instrument):
 
     @rpc_method
     def get_errors(self) -> None:
-        """
-        Queries the error/event queue for all unread items and
-        removes them from the queue.
-        """
+        """Queries the error/event queue for all unread items and removes them from the queue."""
         return self._check_error()
 
     @rpc_method
     def get_error_queue_length(self) -> int:
-        """
-        Queries the number of entries in the error queue.
-        """
+        """Queries the number of entries in the error queue."""
         return int(self._scpi_protocol.ask('SYST:ERR:COUN?'))

@@ -1,5 +1,5 @@
 """
-Instrument driver for the Rohde&Schwarz SGS100A RF Signal Generator
+Instrument driver for the Rohde&Schwarz SGS100A RF Signal Generator.
 """
 
 import logging

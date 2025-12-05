@@ -1,18 +1,18 @@
 """Unit-tests for Rohde&Schwarz SMBV100a."""
-from typing import cast
 import unittest
 from unittest.mock import Mock, call, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.rohde_schwarz import RohdeSchwarz_Smbv100a
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class TestSMBV100A(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("TestSMBV100AContext")
+        ctx = QMI_Context("TestSMBV100AContext")
         # Add patches
         patcher = patch('qmi.instruments.rohde_schwarz.rs_base_signal_gen.create_transport', spec=QMI_TcpTransport)
         self._transport_mock: Mock = patcher.start().return_value
@@ -21,13 +21,11 @@ class TestSMBV100A(unittest.TestCase):
         self._scpi_mock: Mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
         # Make DUT
-        self.instr: RohdeSchwarz_Smbv100a = qmi.make_instrument("SMBV100a", RohdeSchwarz_Smbv100a, "")
-        self.instr = cast(RohdeSchwarz_Smbv100a, self.instr)
+        self.instr: RohdeSchwarz_Smbv100a = RohdeSchwarz_Smbv100a(ctx, "SMBV100a", "")
         self.instr.open()
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
 
     def test_start_calibration_for_all(self):
         """Test start calibration for all."""
