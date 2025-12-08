@@ -49,8 +49,8 @@ class RohdeSchwarz_SGS100A(RohdeSchwarz_Base):
         """Set the external reference synchronization bandwidth.
 
         Parameters:
-            bandwidth:  desired bandwidth (accepted values: "NARR", "WIDE"); see also
-                        get_external_reference_bandwidth().
+            bandwidth: Desired bandwidth (accepted values: "NARR", "WIDE");
+                       see also get_external_reference_bandwidth().
         """
         options = ["NARR", "WIDE"]
         bandwidth = self._is_valid_param(bandwidth, options)
@@ -75,7 +75,7 @@ class RohdeSchwarz_SGS100A(RohdeSchwarz_Base):
         """Set the input impedance of the TRIG port.
 
         Parameters:
-            impedance:  desired input impedance (accepted values: "G50", "G10K"); see also get_trigger_impedance().
+            impedance: Desired input impedance (accepted values: "G50", "G10K"); see also get_trigger_impedance().
         """
         options = ["G50", "G10K"]
         impedance = self._is_valid_param(impedance, options)
@@ -91,7 +91,7 @@ class RohdeSchwarz_SGS100A(RohdeSchwarz_Base):
 
     @rpc_method
     def get_iq_correction_enabled(self) -> bool:
-        """Return True if IQ modulation corrections are enabled, False if disabled."""
+        """Return True if IQ modulation corrections (impairment) are enabled, False if disabled."""
         self._check_calibrating()
         return self._ask_bool(":IQ:IMP:STAT?")
 
@@ -100,7 +100,7 @@ class RohdeSchwarz_SGS100A(RohdeSchwarz_Base):
         """Activate/deactivate the three correction values for the I/Q modulator.
 
         Parameters:
-            enable: target enabled state.
+            enable: Target IQ corrections (impairment) state. True for enabled, False for disabled.
         """
         self._check_calibrating()
         self._scpi_protocol.write(f":IQ:IMP:STAT {1 if enable else 0}")

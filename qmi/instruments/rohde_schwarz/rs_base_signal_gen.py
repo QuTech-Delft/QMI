@@ -234,7 +234,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         The instrument must be at stable temperature (30 minutes to warm up)
         before starting internal adjustments.
 
-        Parameters:
+        Attributes:
             self._calibrating: Set to `True` if starting the calibration succeeded.
 
         Raises:
@@ -286,8 +286,10 @@ class RohdeSchwarz_Base(QMI_Instrument):
 
     @rpc_method
     def reset(self) -> None:
-        """Reset the instrument, returning (most) settings to their defaults."""
-        # Unfortunately RST does not cancel ongoing calibration.
+        """Reset the instrument, returning (most) settings to their defaults.
+
+        Note that RST does not cancel an ongoing calibration.
+        """
         self._check_calibrating()
         self._scpi_protocol.write("*CLS")  # clear error queue
         self._scpi_protocol.write("*RST")
@@ -327,7 +329,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """Set the reference source.
 
         Parameters:
-            source: desired reference source (accepted values: "INT", "EXT"); see also get_reference_source().
+            source: Desired reference source (accepted values: "INT", "EXT"); see also get_reference_source().
         """
         options = ["INT", "EXT"]
         source = self._is_valid_param(source, options)
@@ -346,7 +348,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """Set the RF frequency.
 
         Parameters:
-            frequency:  target frequency in Hertz.
+            frequency: Target frequency in Hertz.
         """
         self._check_calibrating()
         self._scpi_protocol.write(f":FREQ {frequency}")
@@ -356,8 +358,8 @@ class RohdeSchwarz_Base(QMI_Instrument):
     def get_pulsemod_ext_source(self) -> bool:
         """Check pulse modulation source.
 
-        Return:
-            True if pulse modulation uses an external source, else False.
+        Returns:
+            boolean: True if pulse modulation uses an external source, else False.
 
         Raises:
             QMI_InstrumentException: On unexpected response.
@@ -480,7 +482,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """Set the RF output power in dBm.
 
         Parameters:
-            power:  target output power in dBm.
+            power: Target output power in dBm.
 
         Raises:
             QMI_InstrumentException: On power exceeding the power limit.
@@ -515,10 +517,11 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """Enable or disable RF output.
 
         Parameters:
-            enable: target enabled state.
+            enable: Target output state. True for enabled, False for disabled.
 
         Raises:
-            QMI_InstrumentException: On power exceeding the power limit.
+            QMI_InstrumentException: On power exceeding the power limit due to disable pulse modulation, using internal
+                                     pulse modulation source or inverted external pulse source polarity.
         """
         self._check_calibrating()
 
@@ -527,19 +530,20 @@ class RohdeSchwarz_Base(QMI_Instrument):
             if self.get_power() > self._max_continuous_power:
                 if not self.get_pulsemod_enabled():
                     raise QMI_InstrumentException(
-                        "Power limited to {} dBm unless pulse modulation is enabled".format(
-                            self._max_continuous_power
-                        ))
+                        "Power limited to {} dBm unless pulse modulation is enabled".format(self._max_continuous_power)
+                    )
                 if not self.get_pulsemod_ext_source():
                     raise QMI_InstrumentException(
                         "Power limited to {} dBm unless external pulse modulation source is selected".format(
                             self._max_continuous_power
-                        ))
+                        )
+                    )
                 if self.get_pulsemod_polarity():
                     raise QMI_InstrumentException(
                         "Power limited to {} dBm unless external pulse source polarity is non-inverted".format(
                             self._max_continuous_power
-                        ))
+                        )
+                    )
 
         self._scpi_protocol.write(f":OUTP {1 if enable else 0}")
         self._check_error()
@@ -555,7 +559,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """Enable or disable pulse modulation.
 
         Parameters:
-            enable: target enabled state.
+            enable: Target pulse modulation state. True for enabled, False for disabled.
 
         Raises:
             QMI_InstrumentException: On power exceeding the power limit.
@@ -583,7 +587,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """Enable or disable IQ modulation.
 
         Parameters:
-            enable: target enabled state.
+            enable: Target IQ modulation state. True for enabled, False for disabled.
         """
         self._check_calibrating()
         self._scpi_protocol.write(f":IQ:STAT {1 if enable else 0}")
@@ -600,7 +604,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """Enable or disable wideband IQ modulation.
 
         Parameters:
-            enable: target enabled state.
+            enable: Target wideband IQ modulation state. True for enabled, False for disabled.
         """
         self._check_calibrating()
         self._scpi_protocol.write(f":IQ:WBST {1 if enable else 0}")
@@ -617,7 +621,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """Set the IQ quadrature offset between -8 and 8 degrees in increments of 0.01.
 
         Parameters:
-            phase:  desired phase offset in degrees.
+            phase: Desired phase offset in degrees.
 
         Raises:
             ValueError: If phase offset not within -8 - 8 degrees.
@@ -662,7 +666,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """Set the Q leakage amplitude between -5 and 5 (percent), in increments of 0.01.
 
         Parameters:
-            leakage:    leakage amplitude in percent.
+            leakage: Leakage amplitude in percent.
 
         Raises:
             ValueError: If leakage amplitude not within -5 - 5 percent.
@@ -685,7 +689,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """Set the IQ gain imbalance in dB in range -1 to 1, increments of 0.001.
 
         Parameters:
-            gain:   desired gain in dB.
+            gain: Desired gain in dB.
 
         Raises:
             ValueError: If gain imbalance not within -1 - 1 dB.
@@ -708,7 +712,7 @@ class RohdeSchwarz_Base(QMI_Instrument):
         """Set the IQ crest factor compensation in dB.
 
         Parameters:
-            factor: crest factor in dB.
+            factor: Crest factor in dB.
         """
         self._check_calibrating()
         self._scpi_protocol.write(f":IQ:CRES {factor}")

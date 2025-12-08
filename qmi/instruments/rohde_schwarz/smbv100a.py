@@ -68,8 +68,8 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
         """Configure the external reference input frequency.
 
         Parameters:
-            frequency: desired frequency (accepted values: "5MHZ", "10MHZ"); see also
-                       get_external_reference_frequency().
+            frequency: Desired frequency (accepted values: "5MHZ", "10MHZ");
+                       see also get_external_reference_frequency().
         """
         freq_options = ["5MHZ", "10MHZ"]
         self._set_external_reference_frequency(frequency, freq_options)
@@ -81,7 +81,7 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
         since it is used by the calibration method.
 
         Parameters:
-            toggle: boolean flag to turn IQ modulation on/off.
+            toggle: Boolean flag to turn IQ modulation on/off.
         """
         iq = "ON" if toggle else "OFF"
         _logger.info(__name__ + " : setting external IQ modulation to '%s'" % iq)
@@ -116,7 +116,7 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
         """Set start frequency of sweep.
 
         Parameters:
-            frequency: frequency in Hz.
+            frequency: Frequency in Hz.
         """
         self._check_calibrating()
         _logger.info(__name__ + " : setting sweep frequency start to %s Hz" % frequency)
@@ -128,7 +128,7 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
         """Set stop frequency of sweep.
 
         Parameters:
-            frequency: frequency in Hz.
+            frequency: Frequency in Hz.
         """
         self._check_calibrating()
         _logger.info(__name__ + " : setting sweep frequency stop to %s Hz" % frequency)
@@ -140,7 +140,7 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
         """Set step frequency of sweep.
 
         Parameters:
-            frequency: frequency in Hz.
+            frequency: Frequency in Hz.
         """
         self._check_calibrating()
         _logger.info(__name__ + " : setting sweep frequency step to %s Hz" % frequency)
