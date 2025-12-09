@@ -5,7 +5,7 @@ requires = ["setuptools>=75", "wheel", "setuptools_scm>=8"]
 [project.urls]
 Homepage = "https://github.com/QuTech-Delft/QMI"
 Repository = "https://github.com/QuTech-Delft/QMI.git"
-Changelog = "https://github.com/QuTech-Delft/QMI/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/QuTech-Delft/QMI/blob/stable-0-51/CHANGELOG.md"
 Issues = "https://github.com/QuTech-Delft/QMI/issues"
 
 [project]
@@ -75,7 +75,7 @@ dev = [
 ]
 
 [project.scripts]
-# main scripts
+# stable-0-51 scripts
 qmi_proc = "qmi.tools.proc:run"
 qmi_adbasic_parser = "qmi.utils.adbasic_parser:run"
 qmi_adbasic_compiler = "qmi.utils.adbasic_compiler:run"
