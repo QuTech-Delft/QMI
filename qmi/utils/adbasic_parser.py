@@ -33,7 +33,7 @@ class ParDesc(NamedTuple):
     par_index: int
 
     def __str__(self) -> str:
-        return "Par_{}".format(self.par_index)
+        return f"Par_{self.par_index}"
 
 
 class FParDesc(NamedTuple):
@@ -41,7 +41,7 @@ class FParDesc(NamedTuple):
     fpar_index: int
 
     def __str__(self) -> str:
-        return "FPar_{}".format(self.fpar_index)
+        return f"FPar_{self.fpar_index}"
 
 
 class ArrayElemDesc(NamedTuple):
@@ -50,7 +50,7 @@ class ArrayElemDesc(NamedTuple):
     elem_index: int
 
     def __str__(self) -> str:
-        return "Data_{}[{}]".format(self.data_index, self.elem_index)
+        return f"Data_{self.data_index}[{self.elem_index}]"
 
 
 ParameterDesc = ParDesc | FParDesc | ArrayElemDesc
@@ -77,7 +77,7 @@ class ParseException(QMI_Exception):
         self.message = message
 
     def __str__(self) -> str:
-        return "{}, line {}: {}".format(self.filename, self.line_nr, self.message)
+        return f"{self.filename}, line {self.line_nr}: {self.message}"
 
 
 def _resolve_include_path(include_path: str, source_file: str, include_dir: str) -> str | None:
@@ -236,7 +236,7 @@ def _extract_data_defines(symbols: list[SymbolInfo]) -> dict[str, int]:
             raise ParseException(
                 filename=symbol.filename,
                 line_nr=symbol.line_nr,
-                message="Duplicate definition of symbol {} with different case".format(symbol.label))
+                message=f"Duplicate definition of symbol {symbol.label} with different case")
 
         # Check for duplicate definition of this symbol with different data index.
         prev_index = data_info.get(data_name)
@@ -244,7 +244,7 @@ def _extract_data_defines(symbols: list[SymbolInfo]) -> dict[str, int]:
             raise ParseException(
                 filename=symbol.filename,
                 line_nr=symbol.line_nr,
-                message="Duplicate definition of symbol {} for different data array".format(symbol.label)
+                message=f"Duplicate definition of symbol {symbol.label} for different data array"
             )
 
         # Check for duplicate use of the same Data_nnn array under different names.
@@ -253,7 +253,7 @@ def _extract_data_defines(symbols: list[SymbolInfo]) -> dict[str, int]:
             raise ParseException(
                 filename=symbol.filename,
                 line_nr=symbol.line_nr,
-                message="Symbol {} is a duplicate reference to {}".format(symbol.label, symbol.value)
+                message=f"Symbol {symbol.label} is a duplicate reference to {symbol.value}"
             )
 
         # Store new symbol definition.
@@ -321,7 +321,7 @@ def _extract_par_defines(symbols: list[SymbolInfo], data_info: dict[str, int]) -
                     raise ParseException(
                         filename=symbol.filename,
                         line_nr=symbol.line_nr,
-                        message="Symbol {} refers to unknown array {}".format(symbol.label, data_name)
+                        message=f"Symbol {symbol.label} refers to unknown array {data_name}"
                     )
                 data_index = data_info_upper[data_name.upper()]
                 param_desc = ArrayElemDesc(data_index, elem_index)
@@ -336,7 +336,7 @@ def _extract_par_defines(symbols: list[SymbolInfo], data_info: dict[str, int]) -
             raise ParseException(
                 filename=symbol.filename,
                 line_nr=symbol.line_nr,
-                message="Duplicate definition of symbol {} with different case".format(symbol.label)
+                message=f"Duplicate definition of symbol {symbol.label} with different case"
             )
 
         # Check for duplicate definition of this symbol with different data index.
@@ -345,7 +345,7 @@ def _extract_par_defines(symbols: list[SymbolInfo], data_info: dict[str, int]) -
             raise ParseException(
                 filename=symbol.filename,
                 line_nr=symbol.line_nr,
-                message="Duplicate definition of symbol {} for different parameter".format(symbol.label)
+                message=f"Duplicate definition of symbol {symbol.label} for different parameter"
             )
 
         # Check for duplicate use of the same parameter under different names.
@@ -354,7 +354,7 @@ def _extract_par_defines(symbols: list[SymbolInfo], data_info: dict[str, int]) -
             raise ParseException(
                 filename=symbol.filename,
                 line_nr=symbol.line_nr,
-                message="Symbol {} is a duplicate reference to {}".format(symbol.label, symbol.value)
+                message=f"Symbol {symbol.label} is a duplicate reference to {symbol.value}"
             )
 
         # Store new symbol definition.
@@ -390,7 +390,7 @@ def print_symbol_info(symbols: list[SymbolInfo]) -> None:
     """Print the result of parse_adbasic_program()."""
 
     for symbol in symbols:
-        print("{}, {}: #Define {} {}".format(symbol.filename, symbol.line_nr, symbol.label, symbol.value))
+        print(f"{symbol.filename}, {symbol.line_nr}: #Define {symbol.label} {symbol.value}")
 
 
 def print_parameter_info(param_info: ParameterInfo) -> None:
@@ -404,12 +404,12 @@ def print_parameter_info(param_info: ParameterInfo) -> None:
     par_items = list(param_info.param.items())
     par_items.sort(key=lambda kv: (sort_order.get(type(kv[1])), tuple(kv[1])))
     for (name, desc) in par_items:
-        print("PAR_{:32} = {}".format(name, str(desc)))
+        print(f"PAR_{name:32} = {desc!s}")
 
     data_items = list(param_info.data.items())
     data_items.sort(key=lambda kv: kv[1])
     for (name, index) in data_items:
-        print("DATA_{:32} = Data_{}".format(name, index))
+        print(f"DATA_{name:32} = Data_{index}")
 
 
 def run():

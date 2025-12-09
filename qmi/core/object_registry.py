@@ -4,7 +4,7 @@ import logging
 import threading
 import time
 from collections import namedtuple
-from typing import Any, Dict, Optional
+from typing import Any
 
 _logger = logging.getLogger(__name__)
 
@@ -16,9 +16,9 @@ class ObjectRegistry:
     def __init__(self) -> None:
         self._mutex = threading.Lock()
         self._counter = 0
-        self._registry: Dict[int, ObjectRegistration] = {}
+        self._registry: dict[int, ObjectRegistration] = {}
 
-    def register(self, obj: Any, comment: Optional[str] = None) -> int:
+    def register(self, obj: Any, comment: str | None = None) -> int:
         timestamp = time.time()
         with self._mutex:
             oid = self._counter
@@ -36,7 +36,7 @@ class ObjectRegistry:
                 err_flag = True
 
         if err_flag:
-            _logger.error("Attempt to unregister object that is not registered: {}".format(oid))
+            _logger.error(f"Attempt to unregister object id %i that is not registered.", oid)
 
     def report(self, force_summary_flag: bool = True) -> None:
 
@@ -47,7 +47,10 @@ class ObjectRegistry:
 
         if force_summary_flag or len(registry) > 0:
             num_past_objects = counter - len(registry)
-            _logger.info("Number of objects currently in registry: {} (properly registered/unregistered: {}).".format(len(registry), num_past_objects))
+            _logger.info(
+                f"Number of objects currently in registry: %i (properly registered/unregistered: %i).",
+                len(registry), num_past_objects
+            )
 
         for registration in registry.values():
-            _logger.info("registered object: {}".format(registration))
+            _logger.info(f"registered object: {registration}")

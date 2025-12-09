@@ -9,7 +9,6 @@ https://www.picoquant.com/products/category/tcspc-and-time-tagging-modules/hydra
 import ctypes
 import enum
 import logging
-from typing import List, Tuple
 
 from qmi.core.exceptions import QMI_InvalidOperationException
 from qmi.core.rpc import rpc_method
@@ -195,7 +194,7 @@ class PicoQuant_HydraHarp400(_PicoquantHarp):
         _logger.info("[%s] Initialized device with mode %s and source %s", self._name, mode.value, refsource.value)
 
     @rpc_method
-    def get_module_info(self) -> List[Tuple[int, int]]:
+    def get_module_info(self) -> list[tuple[int, int]]:
         self._check_is_open()
         info = []
         with self._device_lock:
@@ -224,7 +223,7 @@ class PicoQuant_HydraHarp400(_PicoquantHarp):
             self._lib.SetMeasControl(self._devidx, meascontrol.value, startedge.value, stopedge.value)
 
     @rpc_method
-    def get_flags(self) -> List[str]:
+    def get_flags(self) -> list[str]:
         self._check_is_open()
         with self._device_lock:
             bitset = ctypes.c_int()
@@ -233,7 +232,7 @@ class PicoQuant_HydraHarp400(_PicoquantHarp):
             return [flag.name for flag in _FLAG if flag in flags and flag.name is not None]
 
     @rpc_method
-    def get_warnings(self) -> List[str]:
+    def get_warnings(self) -> list[str]:
         self._check_is_open()
         with self._device_lock:
             bitset = ctypes.c_int()

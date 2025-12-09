@@ -1,6 +1,6 @@
 """Context managers for QMI RPC protocol contexts."""
 from contextlib import contextmanager
-from typing import Iterator, Optional, Protocol, TypeVar
+from typing import Iterator, Protocol, TypeVar
 import warnings
 
 from qmi.core.pubsub import QMI_SignalReceiver, QMI_SignalSubscriber
@@ -88,7 +88,7 @@ def lock_unlock(thing: _LU, *args, **kwargs) -> Iterator[_LU]:
 
 @contextmanager
 def subscribe_unsubscribe(
-        signal: QMI_SignalSubscriber, receiver: Optional[QMI_SignalReceiver]
+        signal: QMI_SignalSubscriber, receiver: QMI_SignalReceiver | None
     ) -> Iterator[QMI_SignalReceiver]:
     receiver = receiver if receiver is not None else QMI_SignalReceiver()
     signal.subscribe(receiver)

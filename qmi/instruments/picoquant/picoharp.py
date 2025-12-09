@@ -9,7 +9,6 @@ https://www.picoquant.com/products/category/tcspc-and-time-tagging-modules/picoh
 import ctypes
 import enum
 import logging
-from typing import List
 
 from qmi.core.exceptions import QMI_InvalidOperationException
 from qmi.core.rpc import rpc_method
@@ -140,7 +139,7 @@ class PicoQuant_PicoHarp300(_PicoquantHarp):
             self._lib.SetSyncOffset(self._devidx, sync_offset)
 
     @rpc_method
-    def get_flags(self) -> List[str]:
+    def get_flags(self) -> list[str]:
         self._check_is_open()
         with self._device_lock:
             bitset = ctypes.c_int()
@@ -149,7 +148,7 @@ class PicoQuant_PicoHarp300(_PicoquantHarp):
             return [flag.name for flag in _FLAG if flag in flags and flag.name is not None]
 
     @rpc_method
-    def get_warnings(self) -> List[str]:
+    def get_warnings(self) -> list[str]:
         self._check_is_open()
         with self._device_lock:
             bitset = ctypes.c_int()

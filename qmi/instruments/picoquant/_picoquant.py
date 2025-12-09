@@ -6,7 +6,7 @@ import logging
 import time
 from enum import Enum
 from threading import Lock
-from typing import Optional, Dict, List, Tuple, TypeVar, Type
+from typing import TypeVar, Type
 
 import numpy as np
 
@@ -16,7 +16,7 @@ from qmi.core.instrument import QMI_Instrument
 from qmi.core.messaging import _PeerTcpConnection
 from qmi.core.pubsub import QMI_Signal
 from qmi.core.rpc import rpc_method
-from qmi.instruments.picoquant import EventFilterMode, SYNC_TYPE
+from qmi.instruments.picoquant.support._decoders import EventFilterMode, SYNC_TYPE
 from qmi.instruments.picoquant.support._realtime import RealTimeHistogram, RealTimeCountRate, NUM_CHANNELS
 from qmi.instruments.picoquant.support._events import _FetchEventsThread, _MODE
 from qmi.instruments.picoquant.support._library_wrapper import _LibWrapper
@@ -99,14 +99,14 @@ class _PicoquantHarp(QMI_Instrument):
         super().__init__(context, name)
         self._serial_number = serial_number
         self._max_pending_events = max_pending_events
-        self._lazy_lib: Optional[_LibWrapper] = None
+        self._lazy_lib: _LibWrapper | None = None
         self._devidx = -1
         self._lib_version: str = ""
-        self._fetch_events_thread: Optional[_FetchEventsThread] = None
-        self._mode: Optional[_MODE] = None
+        self._fetch_events_thread: _FetchEventsThread | None = None
+        self._mode: _MODE | None = None
         self._measurement_running = False
         self._measurement_start_time = 0.0
-        self._event_filter_channels: Dict[int, EventFilterMode] = {}
+        self._event_filter_channels: dict[int, EventFilterMode] = {}
         self._event_filter_aperture = (0, 0)
         self._actuallen = 65536  # Actual histogram length value
 
@@ -260,7 +260,7 @@ class _PicoquantHarp(QMI_Instrument):
         return error_string.value.decode()
 
     @rpc_method
-    def get_hardware_info(self) -> Tuple[str, str, str]:
+    def get_hardware_info(self) -> tuple[str, str, str]:
         """Get model, part nr, and version of the device.
 
         Note:
@@ -303,7 +303,7 @@ class _PicoquantHarp(QMI_Instrument):
             return serial.value.decode()
 
     @rpc_method
-    def get_features(self) -> List[str]:
+    def get_features(self) -> list[str]:
         """Get device features.
 
         This function is usually not needed by the user. It is mainly for integration in PicoQuant system software
@@ -326,7 +326,7 @@ class _PicoquantHarp(QMI_Instrument):
             return [feature.name for feature in _FEATURE if feature in features and feature.name is not None]
 
     @rpc_method
-    def get_base_resolution(self) -> Tuple[float, int]:
+    def get_base_resolution(self) -> tuple[float, int]:
         """Get the resolution and binsteps of the device.
 
         Returns:
@@ -581,7 +581,7 @@ class _PicoquantHarp(QMI_Instrument):
         return events
 
     @rpc_method
-    def get_timestamped_events(self) -> Tuple[float, np.ndarray]:
+    def get_timestamped_events(self) -> tuple[float, np.ndarray]:
         """Return events recorded by the instrument in T2 or T3 mode.
 
         While a measurement is active, a background thread continuously reads
@@ -729,8 +729,8 @@ class _PicoquantHarp(QMI_Instrument):
     @rpc_method
     def set_event_filter(self,
                          reset_filter: bool = False,
-                         channel_filter: Optional[Dict[int, EventFilterMode]] = None,
-                         sync_aperture: Optional[Tuple[int, int]] = None,
+                         channel_filter: dict[int, EventFilterMode] | None = None,
+                         sync_aperture: tuple[int, int] | None = None,
                          ) -> None:
         """Configure the event filter.
 
@@ -780,7 +780,7 @@ class _PicoquantHarp(QMI_Instrument):
         self._fetch_events_thread.set_event_filter_config(self._event_filter_channels, self._event_filter_aperture)
 
     @rpc_method
-    def set_realtime_histogram(self, channels: List[int], bin_resolution: int, num_bins: int, num_sync: int) -> None:
+    def set_realtime_histogram(self, channels: list[int], bin_resolution: int, num_bins: int, num_sync: int) -> None:
         """Configure real-time histograms.
 
         When measuring in T2 mode, the driver can optionally report real-time histograms.
@@ -807,7 +807,7 @@ class _PicoquantHarp(QMI_Instrument):
         )
 
     @rpc_method
-    def set_realtime_countrate(self, sync_aperture: Tuple[int, int], num_sync: int) -> None:
+    def set_realtime_countrate(self, sync_aperture: tuple[int, int], num_sync: int) -> None:
         """Configure real-time count rate reporting.
 
         When measuring in T2 mode, the driver can optionally report real-time count rates.
@@ -1065,7 +1065,7 @@ class _PicoquantHarp(QMI_Instrument):
             self._lib.SetInputChannelEnable(self._devidx, channel, enable_int)
 
     @rpc_method
-    def get_flags(self) -> List[str]:
+    def get_flags(self) -> list[str]:
         """Get flags.
 
         Returns:
@@ -1080,7 +1080,7 @@ class _PicoquantHarp(QMI_Instrument):
         raise NotImplementedError()
 
     @rpc_method
-    def get_histogram(self, channel: int, clear: Optional[int] = None) -> np.ndarray:
+    def get_histogram(self, channel: int, clear: int | None = None) -> np.ndarray:
         """Get histogram data array from a specific channel. Note that MH_GetHistogram cannot be used with the
         shortest two histogram lengths of 1024 and 2048 bins. You need to use MH_GetAllHistograms in this case.
 
@@ -1121,7 +1121,7 @@ class _PicoquantHarp(QMI_Instrument):
         raise NotImplementedError()
 
     @rpc_method
-    def get_warnings(self) -> List[str]:
+    def get_warnings(self) -> list[str]:
         """Get a list of warnings.
 
         Returns:
@@ -1167,7 +1167,7 @@ class _PicoquantHarp(QMI_Instrument):
         raise NotImplementedError()
 
     @rpc_method
-    def get_module_info(self) -> List[Tuple[int, int]]:
+    def get_module_info(self) -> list[tuple[int, int]]:
         """Get the model and version codes of all modules of the device.
 
         Note:

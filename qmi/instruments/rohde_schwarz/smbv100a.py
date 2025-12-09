@@ -1,5 +1,5 @@
 """
-Instrument driver for the Rohde&Schwarz SMBV100A RF Signal Generator
+Instrument driver for the Rohde&Schwarz SMBV100A RF Signal Generator.
 """
 
 import logging
@@ -14,8 +14,7 @@ _logger = logging.getLogger(__name__)
 
 
 def _create_list(start: Union[float, int], stop: Union[float, int], unit: str, number_of_steps: int) -> str:
-    """
-    Create a list of values given the start, stop and step values.
+    """Create a list of values given the start, stop and step values.
     Append the unit to the values in the list.
 
     Parameters:
@@ -32,14 +31,13 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
     """Instrument driver for the Rohde&Schwarz SMBV100A RF Signal Generator."""
 
     def _set_sig_for_iq_mod(self, sig: str) -> None:
-        """
-        Sets the input signal for I/Q modulation.
-        This private version of the method does not perform any
-        calibration or error checks, since it is used by the
-        calibration method.
+        """Sets the input signal for I/Q modulation.
+
+        This private version of the method does not perform any calibration or error checks,
+        since it is used by the calibration method.
 
         Parameters:
-            sig: "bas", "anal" or "diff"
+            sig: "bas", "anal" or "diff".
         """
         options = ["BAS", "ANAL", "DIFF"]
         sig = self._is_valid_param(sig, options)
@@ -48,11 +46,10 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def set_sig_for_iq_mod(self, sig: str) -> None:
-        """
-        Sets the input signal for I/Q modulation.
+        """Sets the input signal for I/Q modulation.
 
         Parameters:
-            sig: "bas", "anal" or "diff"
+            sig: "bas", "anal" or "diff".
         """
         self._check_calibrating()
         self._set_sig_for_iq_mod(sig)
@@ -71,21 +68,20 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
         """Configure the external reference input frequency.
 
         Parameters:
-            frequency: desired frequency (accepted values: "5MHZ", "10MHZ"); see also
-                       get_external_reference_frequency().
+            frequency: Desired frequency (accepted values: "5MHZ", "10MHZ");
+                       see also get_external_reference_frequency().
         """
         freq_options = ["5MHZ", "10MHZ"]
         self._set_external_reference_frequency(frequency, freq_options)
 
     def _set_iq(self, toggle: bool) -> None:
-        """
-        Activates external I/Q modulation with analog signal.
-        This private version of the method does not perform any
-        calibration or error checks, since it is used by the
-        calibration method.
+        """Activates external I/Q modulation with analog signal.
+
+        This private version of the method does not perform any calibration or error checks,
+        since it is used by the calibration method.
 
         Parameters:
-            toggle: boolean flag to turn IQ modulation on/off
+            toggle: Boolean flag to turn IQ modulation on/off.
         """
         iq = "ON" if toggle else "OFF"
         _logger.info(__name__ + " : setting external IQ modulation to '%s'" % iq)
@@ -94,19 +90,16 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def set_iq(self, toggle: bool) -> None:
-        """
-        Activates external I/Q modulation with analog signal.
+        """Activates external I/Q modulation with analog signal.
 
         Parameters:
-            toggle: boolean flag to turn IQ modulation on/off
+            toggle: boolean flag to turn IQ modulation on/off.
         """
         self._set_iq(toggle)
 
     @rpc_method
     def set_freq_mode(self, mode: str) -> None:
-        """
-        Sets RF frequency mode to list, sweep or fixed.
-        CW and FIX are the same
+        """Sets RF frequency mode to list, sweep or fixed. CW and FIX are the same.
 
         Parameters:
             mode: "fix", "list", "swe" or "cw"
@@ -120,11 +113,10 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def set_sweep_frequency_start(self, frequency: float) -> None:
-        """
-        Set start frequency of sweep.
+        """Set start frequency of sweep.
 
         Parameters:
-            frequency: frequency in Hz
+            frequency: Frequency in Hz.
         """
         self._check_calibrating()
         _logger.info(__name__ + " : setting sweep frequency start to %s Hz" % frequency)
@@ -133,11 +125,10 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def set_sweep_frequency_stop(self, frequency: float) -> None:
-        """
-        Set stop frequency of sweep.
+        """Set stop frequency of sweep.
 
         Parameters:
-            frequency: frequency in Hz
+            frequency: Frequency in Hz.
         """
         self._check_calibrating()
         _logger.info(__name__ + " : setting sweep frequency stop to %s Hz" % frequency)
@@ -146,11 +137,10 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def set_sweep_frequency_step(self, frequency: float) -> None:
-        """
-        Set step frequency of sweep.
+        """Set step frequency of sweep.
 
         Parameters:
-            frequency: frequency in Hz
+            frequency: Frequency in Hz.
         """
         self._check_calibrating()
         _logger.info(__name__ + " : setting sweep frequency step to %s Hz" % frequency)
@@ -159,7 +149,9 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def start_calibration(self, all: bool = False, cal_iqm: bool = True) -> None:
-        """
+        """Start a calibration of the device. This method can be used to calibrate all internal adjustments,
+        or to select a partial device calibration. This method does not use external measurement equipment.
+
         Parameters:
             all:     Boolean to select if to calibrate everything.
             cal_iqm: Boolean to select if to calibrate IQ modulator. Has effect only if 'all' is False.
@@ -180,18 +172,15 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def enable_list_mode(self) -> None:
-        """
-        Convenience function to set RF frequency to list mode.
-        """
+        """Convenience function to set RF frequency to list mode."""
         self.set_freq_mode("LIST")
 
     @rpc_method
     def set_list_processing_mode(self, mode: str) -> None:
-        """
-        Selects how the list is to be processed.
+        """Selects how the list is to be processed.
 
         Parameters:
-            mode: "auto" or "step"
+            mode: "auto" or "step".
         """
         options = ["AUTO", "STEP"]
         mode = self._is_valid_param(mode, options)
@@ -202,18 +191,15 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def enable_list_step_mode(self):
-        """
-        Convenience function to select step-by-step processing of the list.
-        """
+        """Convenience function to select step-by-step processing of the list."""
         self.set_list_processing_mode("STEP")
 
     @rpc_method
     def set_trigger_source_processing_lists(self, mode: str) -> None:
-        """
-        Sets the trigger source processing lists.
+        """Sets the trigger source processing lists.
 
         Parameters:
-            mode: "auto", "imm", "sing" or "ext"
+            mode: "auto", "imm", "sing" or "ext".
         """
         options = ["AUTO", "IMM", "SING", "EXT"]
         mode = self._is_valid_param(mode, options)
@@ -224,18 +210,15 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def set_list_ext_trigger_source(self):
-        """
-        Selects triggering by means of the external trigger.
-        """
+        """Selects triggering by means of the external trigger."""
         self.set_trigger_source_processing_lists("EXT")
 
     @rpc_method
     def set_freq_sweep_mode(self, mode: str):
-        """
-        Selects the frequency sweep mode.
+        """Selects the frequency sweep mode.
 
         Parameters:
-            mode: "auto" or "step"
+            mode: "auto" or "step".
         """
         options = ["STEP", "AUTO"]
         mode = self._is_valid_param(mode, options)
@@ -246,11 +229,10 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def set_freq_sweep_spacing_mode(self, mode: str):
-        """
-        Selects the frequency sweep spacing mode.
+        """Selects the frequency sweep spacing mode.
 
         Parameters:
-            mode: "log" or "lin"
+            mode: "log" or "lin".
         """
         options = ["LIN", "LOG"]
         mode = self._is_valid_param(mode, options)
@@ -261,11 +243,10 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def set_trig_source_freq_sweep(self, mode: str):
-        """
-        Sets the trigger source for the RF frequency sweep.
+        """Sets the trigger source for the RF frequency sweep.
 
         Parameters:
-            mode: "auto", "sing", "ext" or "eaut"
+            mode: "auto", "sing", "ext" or "eaut".
         """
         options = ["AUTO", "SING", "EXT", "EAUT"]
         mode = self._is_valid_param(mode, options)
@@ -276,10 +257,9 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def enable_ext_freq_sweep_mode(self):
-        """
-        Convenience function to generate sweep signal step-by-step, manually triggered.
-        To trigger a sweep step, apply an external trigger signal. The step
-        width corresponds to the step width set for the rotary knob.
+        """Convenience function to generate sweep signal step-by-step, manually triggered.
+        To trigger a sweep step, apply an external trigger signal. The step width corresponds
+        to the step width set for the rotary knob.
         """
         self.set_freq_sweep_mode("STEP")
         self.set_freq_sweep_spacing_mode("LIN")
@@ -288,9 +268,7 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def reset_sweep(self):
-        """
-        Resets all active sweeps to the starting points.
-        """
+        """Resets all active sweeps to the starting points."""
         self._check_calibrating()
         _logger.info(__name__ + " : resetting all active sweeps to the starting points.")
         self._scpi_protocol.write("SOUR:SWE:RES:ALL")
@@ -298,9 +276,7 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def reset_list_mode(self):
-        """
-        Resets the list to the starting point.
-        """
+        """Resets the list to the starting point."""
         self._check_calibrating()
         _logger.info(__name__ + " : resetting the list to the starting point")
         self._scpi_protocol.write("SOUR:LIST:RES")
@@ -308,11 +284,9 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def learn_list(self):
-        """
-        Learns the selected list to determine the hardware setting for
-        all list entries. The results are saved with the list. When
-        the list is activated the first time, these settings are
-        calculated automatically.
+        """Learns the selected list to determine the hardware setting for all list entries.
+        The results are saved with the list. When the list is activated the first time,
+        these settings are calculated automatically.
         """
         self._check_calibrating()
         _logger.info(__name__ + " : learning the list")
@@ -328,17 +302,16 @@ class RohdeSchwarz_SMBV100A(RohdeSchwarz_Base):
 
     @rpc_method
     def load_fplist(
-            self,
-            fstart: float,
-            fstop: float,
-            funit: str,
-            number_of_steps: int,
-            pstart: float,
-            pstop: float,
-            punit: str
+        self,
+        fstart: float,
+        fstop: float,
+        funit: str,
+        number_of_steps: int,
+        pstart: float,
+        pstop: float,
+        punit: str
     ):
-        """
-        Loads a frequency and power list.
+        """Loads a frequency and power list.
 
         Parameters:
             fstart:             The starting frequency of the list.

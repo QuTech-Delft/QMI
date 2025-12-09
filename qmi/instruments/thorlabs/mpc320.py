@@ -71,6 +71,13 @@ class Thorlabs_Mpc320(QMI_Instrument):
     """
     Driver for a Thorlabs MPC320 motorised fibre polarisation controller.
     """
+    _rpc_constants = [
+        "DEFAULT_RESPONSE_TIMEOUT",
+        "MIN_POSITION_DEGREES",
+        "MAX_POSITION_DEGREES",
+        "MIN_VELOCITY_PERC",
+        "MAX_VELOCITY_PERC",
+    ]
 
     DEFAULT_RESPONSE_TIMEOUT = 0.5
 
@@ -84,8 +91,7 @@ class Thorlabs_Mpc320(QMI_Instrument):
     MIN_VELOCITY_PERC = 10
     MAX_VELOCITY_PERC = 100
 
-    MIN_CHANNEL_NUMBER = 1
-    MAX_CHANNEL_NUMBER = 3
+    NUMBER_OF_CHANNELS = 3
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize the instrument driver.
@@ -141,13 +147,13 @@ class Thorlabs_Mpc320(QMI_Instrument):
             channel_number: Channel number to validate.
 
         Raises:
-            QMI_InstrumentException: if the channel is not 1, 2 or 3
+            QMI_InstrumentException: If the channel is not 1, 2 or 3
         """
 
-        if channel_number not in range(self.MIN_CHANNEL_NUMBER, self.MAX_CHANNEL_NUMBER + 1):
+        if channel_number not in range(1, self.NUMBER_OF_CHANNELS + 1):
             raise QMI_InstrumentException(
                 f"Given channel {channel_number} is not in the valid range \
-                    [{self.MIN_CHANNEL_NUMBER}, {self.MAX_CHANNEL_NUMBER}]"
+                    [1, {self.NUMBER_OF_CHANNELS}]"
             )
 
     def _is_move_complete(self, channel: int, timeout: float) -> bool:

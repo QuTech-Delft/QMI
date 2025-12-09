@@ -3,17 +3,18 @@ import logging
 import unittest
 from unittest.mock import call, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.rohde_schwarz.rs_base_signal_gen import RohdeSchwarz_Base
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class TestRohdeSchwarzBase(unittest.TestCase):
 
     def setUp(self):
         logging.getLogger("qmi.instruments.rohde_schwarz.rs_base_signal_gen").setLevel(logging.CRITICAL)
-        qmi.start("TestRohdeSchwarzBaseContext")
+        ctx = QMI_Context("TestRohdeSchwarzBaseContext")
         # Add patches
         patcher = patch('qmi.instruments.rohde_schwarz.rs_base_signal_gen.create_transport', spec=QMI_TcpTransport)
         self._transport_mock = patcher.start().return_value
@@ -22,12 +23,11 @@ class TestRohdeSchwarzBase(unittest.TestCase):
         self._scpi_mock = patcher2.start().return_value
         self.addCleanup(patcher2.stop)
         # Make DUT
-        self.instr: RohdeSchwarz_Base = RohdeSchwarz_Base(qmi.context(), "RSB100a", "")
+        self.instr: RohdeSchwarz_Base = RohdeSchwarz_Base(ctx, "RSB100a", "")
         self.instr.open()
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
         logging.getLogger("qmi.instruments.rohde_schwarz.rs_base_signal_gen").setLevel(logging.NOTSET)
 
     def test_get_idn(self):
@@ -570,7 +570,7 @@ class TestRohdeSchwarzBase(unittest.TestCase):
 class TestRohdeSchwarzBasePowerLimited(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("TestRohdeSchwarzBasePLContext")
+        ctx = QMI_Context("TestRohdeSchwarzBasePLContext")
         # Add patches
         patcher = patch('qmi.instruments.rohde_schwarz.rs_base_signal_gen.create_transport', spec=QMI_TcpTransport)
         self._transport_mock = patcher.start().return_value
@@ -580,12 +580,11 @@ class TestRohdeSchwarzBasePowerLimited(unittest.TestCase):
         self.addCleanup(patcher.stop)
         # Make DUT
         self.maxpower = 10  # max_continuous_power
-        self.instr: RohdeSchwarz_Base = RohdeSchwarz_Base(qmi.context(), "RSB100a", "", self.maxpower)
+        self.instr: RohdeSchwarz_Base = RohdeSchwarz_Base(ctx, "RSB100a", "", self.maxpower)
         self.instr.open()
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
 
     def test_set_power_below_max(self):
         """Test set power with maximum power set."""

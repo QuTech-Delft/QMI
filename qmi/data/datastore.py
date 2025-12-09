@@ -57,10 +57,10 @@ class DataFolder:
         self.time_str = time_str
 
         if not os.path.isdir(self.folder_path):
-            raise FileNotFoundError("DataFolder directory {!r} not found".format(self.folder_path))
+            raise FileNotFoundError(f"DataFolder directory {self.folder_path!r} not found")
 
     def __repr__(self) -> str:
-        return "DataFolder({!r})".format(self.folder_path)
+        return f"DataFolder({self.folder_path!r})"
 
     def write_config(self, config: Any) -> None:
         """Write QMI configuration to a file in the data folder.
@@ -114,7 +114,7 @@ class DataFolder:
         """
 
         if not re.match(r"^[-_a-zA-Z0-9(),]+$", ds.name):
-            raise ValueError("Invalid DataSet name {!r}".format(ds.name))
+            raise ValueError(f"Invalid DataSet name {ds.name!r}")
 
         if file_format == "hdf5":
             filename = ds.name + ".h5"
@@ -129,7 +129,7 @@ class DataFolder:
                 qmi.data.dataset.write_dataset_to_text(ds, f)
 
         else:
-            raise QMI_UsageException("Unknown file format {!r}".format(file_format))
+            raise QMI_UsageException(f"Unknown file format {file_format!r}")
 
     def read_dataset(self, name: str) -> DataSet:
         """Read a DataSet from the data folder.
@@ -149,14 +149,14 @@ class DataFolder:
 
         # Check that the name is safe (no path names).
         if os.path.split(name)[0]:
-            raise ValueError("Invalid dataset name {!r}".format(name))
+            raise ValueError(f"Invalid dataset name {name!r}")
 
         # Look for a HDF5 file with matching name.
         file_path = os.path.join(self.folder_path, name + ".h5")
         if os.path.isfile(file_path):
             with h5py.File(file_path, "r") as f:
                 if name not in f:
-                    raise FileNotFoundError("No dataset {!r} found in {}".format(name, file_path))
+                    raise FileNotFoundError(f"No dataset {name!r} found in {file_path}")
                 return qmi.data.dataset.read_dataset_from_hdf5(f[name])
 
         # Look for a text file with matching name.
@@ -166,7 +166,7 @@ class DataFolder:
                 return qmi.data.dataset.read_dataset_from_text(f)
 
         # File not found.
-        raise FileNotFoundError("No dataset {!r} found in {}".format(name, self.folder_path))
+        raise FileNotFoundError(f"No dataset {name!r} found in {self.folder_path}")
 
     def make_hdf5file(self, name: str) -> h5py.File:
         """Create a new HDF5 file in the data folder.
@@ -184,7 +184,7 @@ class DataFolder:
             ValueError: If the `name` has non-latin character(s).
         """
         if not re.match(r"^[-_a-zA-Z0-9(),]+$", name):
-            raise ValueError("Invalid name {!r}".format(name))
+            raise ValueError(f"Invalid name {name!r}")
 
         filename = name + ".h5"
         file_path = os.path.join(self.folder_path, filename)
@@ -206,7 +206,7 @@ class DataFolder:
             ValueError: If the `name` has non-latin character(s).
         """
         if not re.match(r"^[-_a-zA-Z0-9(),]+$", name):
-            raise ValueError("Invalid name {!r}".format(name))
+            raise ValueError(f"Invalid name {name!r}")
 
         filename = name + ".h5"
         file_path = os.path.join(self.folder_path, filename)
@@ -251,10 +251,10 @@ class DataStore:
         """
         self.basedir = basedir
         if not os.path.isdir(basedir):
-            raise FileNotFoundError("DataStore base directory {!r} not found".format(basedir))
+            raise FileNotFoundError(f"DataStore base directory {basedir!r} not found")
 
     def __repr__(self) -> str:
-        return "DataStore({!r})".format(self.basedir)
+        return f"DataStore({self.basedir!r})"
 
     def make_folder(self,
                     label: str,
@@ -326,7 +326,7 @@ class DataStore:
         rel_path = _relative_folder_path(date_str, time_str, label)
         full_path = os.path.join(self.basedir, rel_path)
         if os.path.exists(full_path):
-            raise FileExistsError("Directory {!r} already exists".format(full_path))
+            raise FileExistsError(f"Directory {full_path!r} already exists")
         os.mkdir(full_path)
 
         return DataFolder(full_path, label, date_str, time_str)
@@ -371,7 +371,7 @@ class DataStore:
             path = os.path.join(self.basedir, path)
 
         if not os.path.isdir(path):
-            raise FileNotFoundError("Data folder {!r} not found".format(path))
+            raise FileNotFoundError(f"Data folder {path!r} not found")
 
         return DataFolder(path, label=None, date_str=None, time_str=None)
 

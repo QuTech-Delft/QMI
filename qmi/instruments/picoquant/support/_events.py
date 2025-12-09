@@ -1,14 +1,15 @@
 import enum
 import time
 from threading import Condition, Lock
-from typing import Callable, Dict, List, Tuple
+from collections.abc import Callable
 
 import numpy as np
 
 from qmi.core.exceptions import QMI_InvalidOperationException, QMI_RuntimeException, QMI_UsageException
 from qmi.core.thread import QMI_Thread
-from qmi.instruments.picoquant import EventDataType, EventFilterMode, SYNC_TYPE
-from qmi.instruments.picoquant.support._decoders import EventDecoder, _T2EventDecoder, _T3EventDecoder
+from qmi.instruments.picoquant.support._decoders import (
+    EventDataType, EventDecoder, EventFilterMode, SYNC_TYPE, _T2EventDecoder, _T3EventDecoder
+)
 from qmi.instruments.picoquant.support._realtime import _RealTimeHistogramProcessor, _get_sync_deltas
 
 
@@ -59,9 +60,9 @@ class _FetchEventsThread(QMI_Thread):
         self._decoder = EventDecoder()
         self._event_filter = _EventFilter()
         self._histogram_processor = _RealTimeHistogramProcessor(publish_histogram_func, publish_countrate_func)
-        self._event_filter_channels: Dict[int, EventFilterMode] = {}
+        self._event_filter_channels: dict[int, EventFilterMode] = {}
         self._event_filter_aperture = (0, 0)
-        self._histogram_channels: List[int] = []
+        self._histogram_channels: list[int] = []
         self._histogram_resolution = 1
         self._histogram_num_bins = 0
         self._histogram_num_sync = 0
@@ -70,7 +71,7 @@ class _FetchEventsThread(QMI_Thread):
         self._active = False
         self._count_read_fifo = 0
         self._block_events = False
-        self._data: List[np.ndarray] = []
+        self._data: list[np.ndarray] = []
         self._data_timestamp = 0.0
         self._num_pending_events = 0
         self._pending_events_overflow = False
@@ -191,8 +192,8 @@ class _FetchEventsThread(QMI_Thread):
             self._block_events = blocked
 
     def set_event_filter_config(self,
-                                channel_filter: Dict[int, EventFilterMode],
-                                sync_aperture: Tuple[int, int]
+                                channel_filter: dict[int, EventFilterMode],
+                                sync_aperture: tuple[int, int]
                                 ) -> None:
         """Update event filter parameters.
 
@@ -208,7 +209,7 @@ class _FetchEventsThread(QMI_Thread):
             self._event_filter_aperture = sync_aperture
             self._event_filter.set_event_filter_config(channel_filter, sync_aperture)
 
-    def set_histogram_config(self, channels: List[int], bin_resolution_ps: int, num_bins: int, num_sync: int) -> None:
+    def set_histogram_config(self, channels: list[int], bin_resolution_ps: int, num_bins: int, num_sync: int) -> None:
         """Configure real-time histograms.
 
         This method is thread-safe.
@@ -227,7 +228,7 @@ class _FetchEventsThread(QMI_Thread):
             self._histogram_num_sync = num_sync
             self._histogram_processor.set_histogram_config(channels, bin_resolution_ps, num_bins, num_sync)
 
-    def set_countrate_config(self, sync_aperture: Tuple[int, int], num_sync: int) -> None:
+    def set_countrate_config(self, sync_aperture: tuple[int, int], num_sync: int) -> None:
         """Configure real-time count rate reporting.
 
         This method is thread-safe.
@@ -246,7 +247,7 @@ class _FetchEventsThread(QMI_Thread):
         with self._condition:
             self._condition.notify_all()
 
-    def get_events(self, max_events: int) -> Tuple[float, np.ndarray]:
+    def get_events(self, max_events: int) -> tuple[float, np.ndarray]:
         """Return events fetched by the background thread.
 
         Parameters:
@@ -318,8 +319,8 @@ class _EventFilter:
         self._aperture_filter_enabled = False
 
     def set_event_filter_config(self,
-                                channel_filter: Dict[int, EventFilterMode],
-                                sync_aperture: Tuple[int, int]
+                                channel_filter: dict[int, EventFilterMode],
+                                sync_aperture: tuple[int, int]
                                 ) -> None:
         """Set event filter parameters.
 
