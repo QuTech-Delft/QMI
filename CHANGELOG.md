@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.52.0-beta.0] - Unreleased
 
 ### Added
+- Addition of new methods in Zurich Instruments HDAWG QMI driver.
 
 ### Changed
+- Zurich Instruments HDAWG QMI driver refactoring to be based mainly on the zhinst.toolkit package to allow easier 4x2 and 2x4 grouping modes and use.
 
 ### Fixed
 
