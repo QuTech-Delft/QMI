@@ -9,7 +9,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_ApplicationException
+from qmi.core.exceptions import QMI_ApplicationException, QMI_TimeoutException
 from qmi.core.instrument import QMI_Instrument
 from qmi.core.rpc import rpc_method
 
@@ -74,35 +74,41 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         NUM_CHANNELS_PER_AWG: The number of AWG channels per AWG core.
     """
 
-    _rpc_constants = ["COMPILE_TIMEOUT", "UPLOAD_TIMEOUT"]
+    _rpc_constants = ["COMPILE_TIMEOUT", "UPLOAD_TIMEOUT", "NUM_AWGS", "NUM_CHANNELS"]
     COMPILE_TIMEOUT = 30
     UPLOAD_TIMEOUT = 30
-    # Class constants
     NUM_AWGS = 4
     NUM_CHANNELS = 8
+    # Class constants
     NUM_CHANNELS_PER_AWG = 2
 
-    def __init__(self, context: QMI_Context, name: str, server_host: str, server_port: int, device_name: str) -> None:
+    def __init__(
+        self, context: QMI_Context, name: str, server_host: str, server_port: int, device_name: str, grouping: int = 2
+    ) -> None:
         """Initialize driver.
 
-        We connect to a specific HDAWG via a Data Server, which is a process running on some computer.
-
         Parameters:
-            name:           Name for this instrument instance.
-            server_host:    Host where the ziDataServer process is running.
-            server_port:    TCP port there the ziDataServer process can be reached.
-            device_name:    Name of the HDAWG device (typically "devNNNN").
+            name:        Name for this instrument instance.
+            server_host: Host where the ziDataServer process is running.
+            server_port: TCP port there the ziDataServer process can be reached.
+            device_name: Name of the HDAWG device (typically "devNNNN").
+            grouping:    The grouping to use. Options are 0 (4x2), 1 (2x4) and 2 (1x8, default).
         """
+        if grouping not in range(3):
+            raise ValueError(f"Invalid grouping number: {grouping}")
+
         super().__init__(context, name)
         # Class attributes
         self._server_host = server_host
         self._server_port = server_port
         self._device_name = device_name
+        self._grouping = grouping
         # ZI HDAWG server, module and device
         self._daq_server: None | ziDAQServer = None
         self._awg_module: None | AwgModule = None
+        self._awg_channel_map: list[int] = []
 
-        # Import the "zhinst" module.
+        # Import the "zhinst" modules.
         _import_modules()
 
         # Flags
@@ -117,6 +123,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     def awg_module(self) -> AwgModule:
         assert self._awg_module is not None
         return self._awg_module
+
+    @property
+    def awg_channel_map(self) -> list[int]:
+        """Channel map for AWG channels to correct core index, based on current grouping and channel range."""
+        return [
+            (awg_channel // (2 ** (self._grouping + 1))) *
+            (self._grouping % 2 + 1) for awg_channel in range(self.NUM_CHANNELS)
+        ]
 
     @staticmethod
     def _process_parameter_replacements(sequencer_program: str, replacements: dict[str, str | int | float]) -> str:
@@ -253,7 +267,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             time.sleep(0.1)
             compilation_status = CompilerStatus(self.awg_module.getInt("compiler/status"))
             if time.monotonic() - compilation_start_time > self.COMPILE_TIMEOUT:
-                raise RuntimeError("Compilation process timed out (timeout={})".format(self.COMPILE_TIMEOUT))
+                raise QMI_TimeoutException(f"Compilation process timed out (timeout={self.COMPILE_TIMEOUT})")
 
         compilation_end_time = time.monotonic()
         _logger.debug(
@@ -305,14 +319,15 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Poll the AWG module to check ELF upload progress.
         upload_start_time = time.monotonic()
         _logger.debug("Polling ELF upload status ...")
+        awg_core = self.awg_module.getInt("index") * (self._grouping % 2 + 1)
         upload_progress = self.awg_module.getDouble("progress")
-        upload_status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/0/ready")
+        upload_status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/{awg_core}/ready")
         while upload_progress < 1.0 and upload_status == 0:
             time.sleep(0.1)
             upload_progress = self.awg_module.getDouble("progress")
-            upload_status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/0/ready")
+            upload_status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/{awg_core}/ready")
             if time.monotonic() - upload_start_time > self.UPLOAD_TIMEOUT:
-                raise RuntimeError("Upload process timed out (timeout={})".format(self.UPLOAD_TIMEOUT))
+                raise QMI_TimeoutException(f"Upload process timed out (timeout={self.UPLOAD_TIMEOUT})")
 
         upload_end_time = time.monotonic()
         _logger.debug(
@@ -348,12 +363,23 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             _logger.error("ELF upload in progress but aborted for unknown reason.")
             ok_to_proceed = False
         else:
-            raise ValueError("Unknown upload status: {}".format(upload_result))
+            raise ValueError(f"Unknown upload status: {upload_result}")
 
         return ok_to_proceed
 
+    def _verify_awg_module_state(self):
+        # TODO: In other than 1x8 mode all AWG cores should be checked, not just the currently selected one?
+        # Verify that the AWG thread is not running.
+        assert self.awg_module.finished()
+        # Start the AWG thread.
+        self.awg_module.execute()
+        # Verify that the AWG thread is running.
+        assert not self.awg_module.finished()
+
     @rpc_method
     def open(self) -> None:
+        """We connect to a specific HDAWG via a DAQ Server, which is a process running on some computer."""
+
         self._check_is_closed()
         _logger.info("[%s] Opening connection to instrument", self._name)
 
@@ -367,24 +393,16 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._awg_module = self.daq_server.awgModule()
 
         self.awg_module.set("device", self._device_name)
-        self.awg_module.set("index", 0)  # only support 1x8 mode, so only one AWG module
-
-        # Verify that the AWG thread is not running.
-        assert self.awg_module.finished()
-
-        # Start the AWG thread.
-        self.awg_module.execute()
-
-        # Verify that the AWG thread is running.
-        assert not self.awg_module.finished()
-
         super().open()
+        self.set_channel_grouping(self._grouping)
+        self.set_awg_module_index(0)  # Set initially as 0, 0 is valid for all grouping modes.
 
     @rpc_method
     def close(self) -> None:
         self._check_is_open()
 
         _logger.info("[%s] Closing connection to instrument", self._name)
+        # TODO: In other than 1x8 mode all AWG cores should be checked, not just the currently selected one?
         # Verify that the AWG thread is running.
         assert not self.awg_module.finished()
 
@@ -468,27 +486,88 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._set_double(node_path, value)
 
     @rpc_method
-    def set_channel_grouping(self, value: int) -> None:
+    def set_channel_grouping(self, grouping: int) -> None:
         """Set the channel grouping of the device.
 
-        This QMI driver currently supports only channel grouping 2 (1x8 channels).
-
         Parameters:
-            value:  Channel grouping to set.
-                    0 = 4x2 channels;
-                    1 = 2x4 channels;
-                    2 = 1x8 channels.
+            grouping: Channel grouping to set. Possible values are:
+                      0 = 4x2 channels;
+                      1 = 2x4 channels;
+                      2 = 1x8 channels.
         """
-        if value != 2:
-            raise ValueError("Unsupported channel grouping")
+        if grouping not in range(3):
+            raise ValueError(f"Unsupported channel grouping: {grouping}.")
+
         self._check_is_open()
-        self._set_int("system/awg/channelgrouping", value)
+        self._set_int("system/awg/channelgrouping", grouping)
+        self._grouping = grouping
 
     @rpc_method
-    def compile_and_upload(self,
-                           sequencer_program: str,
-                           replacements: None | dict[str, str | int | float] = None
-                           ) -> None:
+    def set_awg_module_index(self, index: int):
+        """Set the AWG module index. Possible values are dependent on grouping.
+
+        Parameters:
+            index: AWG module index number. Possible values are:
+                      0 for 1x8 group mode;
+                      0,1 for 2x4 group mode;
+                      0,1,2,3 for 4x2 group mode.
+        """
+        if index != 0:
+            # Then we need to check
+            if (
+                    (self._grouping == 0 and index not in range(1, 4)) or
+                    (self._grouping == 1 and index > 1) or
+                    self._grouping == 2
+            ):
+                raise ValueError(f"Invalid index, {index}, for group mode {self._grouping}.")
+
+        self.awg_module.set("index", index)
+        self._verify_awg_module_state()
+
+    @rpc_method
+    def get_awg_module_enabled(self, awg_core: int) -> int:
+        """Return the current enable status of the AWG module.
+
+        Parameters:
+            awg_core: AWG core number.
+
+        Raises:
+            ValueError: AWG core number is invalid.
+
+        Returns:
+            1 - If the AWG sequencer is currently running.
+            0 - If the AWG sequencer is not running.
+        """
+        if awg_core not in self.awg_channel_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
+
+        self._check_is_open()
+        return self._get_int(f"awgs/{awg_core}/enable")
+
+    @rpc_method
+    def set_awg_module_enabled(self, value: int) -> None:
+        """Enable or disable the AWG module.
+
+        Enabling the AWG starts execution of the currently loaded sequencer program. This is equal to calling
+        'awg_module.execute()'. Disabling is equal to 'awg_module.finish()'.
+        Uploading a sequencer program or waveform is only possible while the AWG module is disabled.
+
+        Parameters:
+            value: 1 to enable the AWG module, 0 to disable.
+
+        Raises:
+            ValueError: AWG module enable value is invalid.
+        """
+        if value not in (0, 1):
+            raise ValueError("Invalid value")
+
+        self._check_is_open()
+        self.awg_module.set("awg/enable", value)
+
+    @rpc_method
+    def compile_and_upload(
+        self, sequencer_program: str, replacements: None | dict[str, str | int | float] = None
+    ) -> None:
         """Compile and upload the sequencer_program, after performing textual replacements.
 
         This function combines compilation followed by upload to the AWG if compilation was successful. This is forced
@@ -544,7 +623,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     @rpc_method
     def upload_waveform(
         self,
-        awg_index: int,
+        awg_core: int,
         waveform_index: int,
         wave1: np.ndarray,
         wave2: None | np.ndarray = None,
@@ -562,7 +641,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         This can be inspected in the "Waveform Viewer" in the LabOne user interface.
 
         Parameters:
-            awg_index:       0-based index of the AWG (group of 2 channels).
+            awg_core:        0-based AWG core number.
             waveform_index:  0-based index of the waveform array.
             wave1:           Array containing floating point samples
                              in range -1.0 .. +1.0 for the first waveform.
@@ -573,8 +652,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                              represent the 4 marker channels.
         """
         self._check_is_open()
+        assert awg_core in self.awg_channel_map, f"Invalid AWG core ({awg_core}) for group mode {self._grouping}."
         waveform_data = zhinst.utils.convert_awg_waveform(wave1, wave2, markers)
-        waveform_address = f"/{self._device_name}/awgs/{awg_index}/waveform/waves/{waveform_index}"
+        waveform_address = f"/{self._device_name}/awgs/{awg_core}/waveform/waves/{waveform_index}"
         self.daq_server.setVector(waveform_address, waveform_data)
 
     @rpc_method
@@ -588,8 +668,12 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         Large sets of waveforms need to be batched to avoid running out of memory.
 
+        The loop that creates the unpacked waveforms loops such that:
+        - outer loop: for waveform_index, sequence in enumerate(waveforms)
+          - inner loop: for awg_core in range(4)
+
         Parameters:
-            unpacked_waveforms: List of tuples, each tuple is a collection of awg_index, waveform sequence index,
+            unpacked_waveforms: List of tuples, each tuple is a collection of AWG core number, waveform sequence index,
                                 wave1, wave2 and markers.
             batch_size:         Large sets of waveforms take plenty of memory. This makes the waveforms to be sent with
                                 maximum sized batches. Default size is 50 waveform entries.
@@ -598,9 +682,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         waves_set = []
         for wf_count, sequence in enumerate(unpacked_waveforms):
-            awg_index, waveform_index, wave1, wave2, markers = sequence
+            awg_core, waveform_index, wave1, wave2, markers = sequence
             wave_raw = zhinst.utils.convert_awg_waveform(wave1, wave2, markers)
-            waveform_address = f'/{self._device_name}/awgs/{awg_index}/waveform/waves/{waveform_index}'
+            waveform_address = f"/{self._device_name}/awgs/{awg_core}/waveform/waves/{waveform_index}"
             waves_set.append((waveform_address, wave_raw))
             # Check set size against batch size
             if wf_count % batch_size == batch_size - 1:
@@ -614,7 +698,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def upload_command_table(
-            self, awg_index: int, command_table_entries: list[dict[str, Any]], save_as_file: bool = False
+        self, awg_core: int, command_table_entries: list[dict[str, Any]], save_as_file: bool = False
     ) -> None:
         """Upload a new command table to the AWG.
 
@@ -630,28 +714,27 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         https://json-schema.org/draft-07.
 
         Parameters:
-            awg_index:              0-based index of the AWG core to apply the table to (0 .. 3).
-            command_table_entries:  Actual command table as a list of entries (dicts).
-            save_as_file:           Set to True to save the validated JSON command table in a file. Default is False.
+            awg_core:              0-based AWG core number to apply the table to (0 .. 3).
+            command_table_entries: Actual command table as a list of entries (dicts).
+            save_as_file:          Set to True to save the validated JSON command table in a file. Default is False.
 
         Raises:
-            ValueError:   Invalid schema used (should not happen as it is obtained from the device).
-            ValueError:   Validation of the command table failed.
-            ValueError:   Invalid value in the command table despite successful validation.
-            RuntimeError: If the upload of command table on core {awg_index} failed.
-            RuntimeError: If the upload process timed out.
+            ValueError:           Invalid AWG core number.
+            ValueError:           Provided schema is not valid.
+            ValueError:           Validation of the command table failed.
+            ValueError:           Invalid value in the command table despite successful validation.
+            RuntimeError:         If the upload of command table on core {awg_index} failed.
+            QMI_TimeoutException: If the upload process timed out.
         """
         self._check_is_open()
 
-        # Check AWG core index.
-        if awg_index not in (0, 1, 2, 3):
-            raise ValueError("AWG index must be in 0 .. 3")
+        # Check AWG core number.
+        if awg_core not in self.awg_channel_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
 
         # Get schema from the device
-        schema_node = f"/{self._device_name:s}/awgs/0/commandtable/schema"
-        schema = json.loads(
-            self.daq_server.get(schema_node, flat=True)[schema_node][0]["vector"]
-        )
+        schema_node = f"/{self._device_name:s}/awgs/{awg_core}/commandtable/schema"
+        schema = json.loads(self.daq_server.get(schema_node, flat=True)[schema_node][0]["vector"])
         # Create the command table from the provided entries.
         command_table = {
             "header": {
@@ -664,38 +747,38 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             jsonschema.validate(instance=command_table, schema=schema, cls=jsonschema.Draft7Validator)
         except jsonschema.exceptions.SchemaError as exc:
             _logger.exception("The provided schema is invalid", exc_info=exc)
-            raise ValueError("Invalid schema") from exc
+            raise ValueError("Invalid schema.") from exc
         except jsonschema.exceptions.ValidationError as exc:
             _logger.exception("The provided command table is not valid", exc_info=exc)
-            raise ValueError("Invalid command table") from exc
+            raise ValueError("Invalid command table.") from exc
 
         # Convert the command table to JSON and upload.
         try:
             command_table_as_json = json.dumps(command_table, allow_nan=False, separators=(",", ":"))
         except (TypeError, ValueError) as exc:
-            raise ValueError("Invalid value in command table") from exc
+            raise ValueError("Invalid value in command table.") from exc
 
         if save_as_file:
-            with open(f"{os.path.dirname(__file__)}/cmd_table_{awg_index}.json", "w") as out:
+            # Save as a file
+            with open(os.path.join(os.path.dirname(__file__), f"cmd_table_{awg_core}.json"), "w") as out:
                 out.write(command_table_as_json)
 
         self.daq_server.setVector(
-            "/{}/awgs/{}/commandtable/data".format(self._device_name, awg_index),
-            command_table_as_json
+            f"/{self._device_name:s}/awgs/{awg_core}/commandtable/data", command_table_as_json
         )
         upload_start_time = time.monotonic()
         while True:
             time.sleep(0.01)
-            status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/{awg_index}/commandtable/status")
+            status = self.daq_server.getInt(f"/{self._device_name:s}/awgs/{awg_core}/commandtable/status")
             if status & 0b1:
                 # Upload successful, move on the next core
                 break
             if status & 0b1000:
                 # Error in command table
-                raise RuntimeError(f"The upload of command table on core {awg_index} failed.")
+                raise RuntimeError(f"The upload of command table on core {awg_core} failed.")
 
             if time.monotonic() - upload_start_time > self.UPLOAD_TIMEOUT:
-                raise RuntimeError("Upload process timed out (timeout={})".format(self.UPLOAD_TIMEOUT))
+                raise QMI_TimeoutException(f"Upload process timed out (timeout={self.UPLOAD_TIMEOUT})")
 
         upload_end_time = time.monotonic()
         _logger.debug(
@@ -729,7 +812,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: By invalid reference clock source input parameter.
         """
         if value not in (0, 1, 2):
-            raise ValueError("Unsupported reference clock source")
+            raise ValueError("Unsupported reference clock source.")
 
         self._check_is_open()
         _logger.info("[%s] Setting reference clock source to [%d]", self._name, value)
@@ -805,12 +888,12 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: By invalid marker source value.
         """
         if trigger < 0 or trigger >= self.NUM_CHANNELS:
-            raise ValueError("Invalid trigger index")
+            raise ValueError("Invalid trigger index.")
         if value not in range(16) and value not in (17, 18):
-            raise ValueError("Invalid marker source: {}".format(value))
+            raise ValueError(f"Invalid marker source: {value}.")
 
         self._check_is_open()
-        self._set_int("triggers/out/{}/source".format(trigger), value)
+        self._set_int(f"triggers/out/{trigger}/source", value)
 
     @rpc_method
     def set_marker_delay(self, trigger: int, value: float) -> None:
@@ -825,11 +908,11 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Raises:
             ValueError: By invalid trigger index value.
         """
-        if trigger < 0 or trigger >= self.NUM_CHANNELS:
-            raise ValueError("Invalid trigger index")
+        if trigger not in range(self.NUM_CHANNELS):
+            raise ValueError("Invalid trigger index.")
 
         self._check_is_open()
-        self._set_double("triggers/out/{}/delay".format(trigger), value)
+        self._set_double(f"triggers/out/{trigger}/delay", value)
 
     @rpc_method
     def set_trigger_level(self, trigger: int, value: float) -> None:
@@ -843,13 +926,13 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: By invalid trigger index value.
             ValueError: By invalid trigger level value.
         """
-        if trigger < 0 or trigger >= self.NUM_CHANNELS:
-            raise ValueError("Invalid trigger index")
+        if trigger not in range(self.NUM_CHANNELS):
+            raise ValueError("Invalid trigger index.")
         if not -10.0 < value < 10.0:
-            raise ValueError("Invalid trigger level")
+            raise ValueError("Invalid trigger level.")
 
         self._check_is_open()
-        self._set_double("triggers/in/{}/level".format(trigger), value)
+        self._set_double(f"triggers/in/{trigger}/level", value)
 
     @rpc_method
     def set_trigger_impedance(self, trigger: int, value: int) -> None:
@@ -863,10 +946,10 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: By invalid trigger index value.
             ValueError: By invalid trigger impedance setting.
         """
-        if trigger < 0 or trigger >= self.NUM_CHANNELS:
-            raise ValueError("Invalid trigger index")
+        if trigger not in range(self.NUM_CHANNELS):
+            raise ValueError("Invalid trigger index.")
         if value not in (0, 1):
-            raise ValueError("Invalid impedance setting")
+            raise ValueError("Invalid impedance setting.")
 
         self._check_is_open()
         _logger.info(
@@ -875,175 +958,175 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             trigger,
             "50 Ohm" if value else "1 kOhm",
         )
-        self._set_int("triggers/in/{}/imp50".format(trigger), value)
+        self._set_int(f"triggers/in/{trigger}/imp50", value)
 
     @rpc_method
-    def set_dig_trigger_source(self, awg: int, trigger: int, value: int) -> None:
+    def set_dig_trigger_source(self, awg_core: int, trigger: int, value: int) -> None:
         """Select the source of a specific digital trigger channel.
 
         There are two digital trigger channels which can be accessed in the
         sequencer program via calls to "waitDigTrigger()" and "playWaveDigTrigger()".
 
         Parameters:
-            awg:     AWG module index (must be 0 in 1x8 channel mode).
-            trigger: Digital trigger index in the range 0 to 1, corresponding to digital triggers 1 and 2.
-            value:   Trigger source in the range 0 to 7, corresponding to trigger inputs 1 to 8 on the front panel.
+            awg_core: AWG core number.
+            trigger:  Digital trigger index in the range 0 to 1, corresponding to digital triggers 1 and 2.
+            value:    Trigger source in the range 0 to 7,
+                      corresponding to trigger inputs 1 to 8 on the front panel.
 
         Raises:
-            ValueError: AWG index number is invalid.
+            ValueError: AWG core number is invalid.
             ValueError: Digital trigger index is invalid.
             ValueError: Trigger source value is invalid.
         """
-        if awg < 0 or awg >= self.NUM_AWGS:
-            raise ValueError("Invalid AWG index")
+        if awg_core not in self.awg_channel_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
         if trigger < 0 or trigger > 1:
-            raise ValueError("Invalid digital trigger index")
-        if value < 0 or value >= self.NUM_CHANNELS:
-            raise ValueError("Invalid trigger source")
+            raise ValueError("Invalid digital trigger index.")
+        if value not in range(self.NUM_CHANNELS):
+            raise ValueError("Invalid trigger source.")
 
         self._check_is_open()
-        self._set_int("awgs/{}/auxtriggers/{}/channel".format(awg, trigger), value)
+        self._set_int(f"awgs/{awg_core}/auxtriggers/{trigger}/channel", value)
 
     @rpc_method
-    def set_dig_trigger_slope(self, awg: int, trigger: int, value: int) -> None:
+    def set_dig_trigger_slope(self, awg_core: int, trigger: int, value: int) -> None:
         """Set the trigger slope of a specific digital trigger channel.
 
         There are two digital trigger channels which can be accessed in the
         sequencer program vi calls to "waitDigTrigger()" and "playWaveDigTrigger()".
 
         Parameters:
-            awg:     AWG module index (must be 0 in 1x8 channel mode).
-            trigger: Digital trigger index in the range 0 to 1, corresponding to digital triggers 1 and 2.
-            value:   Trigger slope.
-                     0 - level sensitive (trigger on high signal);
-                     1 - trigger on rising edge;
-                     2 - trigger on falling edge;
-                     3 - trigger on rising and falling edge.
+            awg_core: AWG core number.
+            trigger:  Digital trigger index in the range 0 to 1, corresponding to digital triggers 1 and 2.
+            value:    Trigger slope.
+                        0 - level sensitive (trigger on high signal);
+                        1 - trigger on rising edge;
+                        2 - trigger on falling edge;
+                        3 - trigger on rising and falling edge.
 
         Raises:
-            ValueError: AWG index number is invalid.
+            ValueError: AWG core number is invalid.
             ValueError: Digital trigger index is invalid.
             ValueError: Trigger slope value is invalid.
         """
-        if awg < 0 or awg >= self.NUM_AWGS:
-            raise ValueError("Invalid AWG index")
+        if awg_core not in self.awg_channel_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
         if trigger < 0 or trigger > 1:
-            raise ValueError("Invalid digital trigger index")
+            raise ValueError("Invalid digital trigger index.")
         if value < 0 or value > 3:
-            raise ValueError("Invalid trigger slope")
+            raise ValueError("Invalid trigger slope.")
 
         self._check_is_open()
-        self._set_int("awgs/{}/auxtriggers/{}/slope".format(awg, trigger), value)
+        self._set_int(f"awgs/{awg_core}/auxtriggers/{trigger}/slope", value)
 
     @rpc_method
-    def get_output_amplitude(self, awg: int, channel: int) -> float:
+    def get_output_amplitude(self, awg_core: int, channel: int) -> float:
         """Get the output amplitude scaling factor of the specified channel.
 
         Parameters:
-            awg:     AWG module index in the range 0 to 3. The AWG index selects a pair of output channels.
-                     Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
-            channel: Channel index in the range 0 to 1, selecting the first or second output channel
-                     within the selected channel pair.
+            awg_core: AWG core number in the range 0 to 3. The AWG index selects a pair of output channels.
+                      Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
+            channel:  Channel index in the range 0 to 1, selecting the first or second output channel
+                      within the selected channel pair.
 
         Raises:
-            ValueError: AWG index number is invalid.
-            ValueError: AWG channel number is invalid.
+            ValueError: AWG core number is invalid.
+            ValueError: AWG channel pair index is invalid.
 
         Returns:
             amplitude: A dimensionless scaling factor applied to the digital signal.
         """
-        if awg < 0 or awg >= self.NUM_AWGS:
-            raise ValueError("Invalid AWG index")
-        if channel < 0 or channel >= self.NUM_CHANNELS_PER_AWG:
-            raise ValueError("Invalid channel index")
+        if awg_core not in self.awg_channel_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
+        if channel not in range(self.NUM_CHANNELS_PER_AWG):
+            raise ValueError("Invalid channel pair index.")
 
         self._check_is_open()
-        return self._get_double(f"awgs/{awg}/outputs/{channel}/amplitude")
+        return self._get_double(f"awgs/{awg_core}/outputs/{channel}/amplitude")
 
     @rpc_method
-    def set_output_amplitude(self, awg: int, channel: int, value: float) -> None:
+    def set_output_amplitude(self, awg_core: int, channel: int, value: float) -> None:
         """Set the output scaling factor of the specified channel.
 
         The amplitude is a dimensionless scaling factor applied to the digital signal.
 
         Parameters:
-            awg:     AWG module index in the range 0 to 3. The AWG index selects a pair of output channels.
-                     Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
-            channel: Channel index in the range 0 to 1, selecting the first or second output channel
-                     within the selected channel pair.
-            value:   Amplitude scale factor.
+            awg_core: AWG core number in the range 0 to 3. The AWG index selects a pair of output channels.
+                      Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
+            channel:  Channel index in the range 0 to 1, selecting the first or second output channel
+                      within the selected channel pair.
+            value:    Amplitude scale factor.
 
         Raises:
-            ValueError: AWG index number is invalid.
-            ValueError: AWG channel number is invalid.
+            ValueError: AWG core number is invalid.
+            ValueError: AWG channel pair index is invalid.
         """
-        if awg < 0 or awg >= self.NUM_AWGS:
-            raise ValueError("Invalid AWG index")
-        if channel < 0 or channel >= self.NUM_CHANNELS_PER_AWG:
-            raise ValueError("Invalid channel index")
+        if awg_core not in self.awg_channel_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
+        if channel not in range(self.NUM_CHANNELS_PER_AWG):
+            raise ValueError("Invalid channel pair index.")
 
         self._check_is_open()
-        self._set_double("awgs/{}/outputs/{}/amplitude".format(awg, channel), value)
+        self._set_double(f"awgs/{awg_core}/outputs/{channel}/amplitude", value)
 
     @rpc_method
-    def get_output_channel_hold(self, awg: int, channel: int) -> int:
+    def get_output_channel_hold(self, awg_core: int, channel: int) -> int:
         """Get whether the last sample is held for the specified channel.
 
         Parameters:
-            awg:     AWG module index in the range 0 to 3. The AWG index selects a pair of output channels.
-                     Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
-            channel: Channel index in the range 0 to 1, selecting the first or second output channel
-                     within the selected channel pair.
+            awg_core: AWG core number in the range 0 to 3. The AWG index selects a pair of output channels.
+                      Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
+            channel:  Channel index in the range 0 to 1, selecting the first or second output channel
+                      within the selected channel pair.
 
         Raises:
             ValueError: AWG index number is invalid.
-            ValueError: AWG channel number is invalid.
+            ValueError: AWG channel pair index is invalid.
 
         Returns:
             0: If last sample is not held.
             1: If last sample is held.
         """
-        if awg < 0 or awg >= self.NUM_AWGS:
-            raise ValueError("Invalid AWG index")
-        if channel < 0 or channel >= self.NUM_CHANNELS_PER_AWG:
-            raise ValueError("Invalid channel index")
+        if awg_core not in self.awg_channel_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
+        if channel not in range(self.NUM_CHANNELS_PER_AWG):
+            raise ValueError("Invalid channel pair index.")
 
         self._check_is_open()
-        return self._get_int(f"awgs/{awg}/outputs/{channel}/hold")
+        return self._get_int(f"awgs/{awg_core}/outputs/{channel}/hold")
 
     @rpc_method
-    def set_output_channel_hold(self, awg: int, channel: int, value: int) -> None:
+    def set_output_channel_hold(self, awg_core: int, channel: int, value: int) -> None:
         """Set whether the last sample should be held for the specified channel.
 
         Parameters:
-            awg:     AWG module index in the range 0 to 3.
-                     The AWG index selects a pair of output channels.
-                     Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
-            channel: Channel index in the range 0 to 1, selecting the first or second output channel
-                     within the selected channel pair.
-            value:   Hold state; 0 = False, 1 = True.
+            awg_core: AWG core number in the range 0 to 3. The AWG index selects a pair of output channels.
+                      Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
+            channel:  Channel index in the range 0 to 1, selecting the first or second output channel
+                      within the selected channel pair.
+            value:    Hold state; 0 = False, 1 = True.
 
         Raises:
             ValueError: AWG index number is invalid.
-            ValueError: AWG channel number is invalid.
+            ValueError: AWG channel pair index is invalid.
             ValueError: Invalid hold state value.
         """
-        if awg < 0 or awg >= self.NUM_AWGS:
-            raise ValueError("Invalid AWG index")
-        if channel < 0 or channel >= self.NUM_CHANNELS_PER_AWG:
-            raise ValueError("Invalid channel index")
+        if awg_core not in self.awg_channel_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
+        if channel not in range(self.NUM_CHANNELS_PER_AWG):
+            raise ValueError("Invalid channel pair index.")
         if value not in (0, 1):
-            raise ValueError("Invalid hold state")
+            raise ValueError("Invalid hold state.")
 
         self._check_is_open()
-        self._set_int(f"awgs/{awg}/outputs/{channel}/hold", value)
+        self._set_int(f"awgs/{awg_core}/outputs/{channel}/hold", value)
 
     @rpc_method
-    def get_output_channel_on(self, output_channel: int) -> int:
+    def get_output_channel_on(self, awg_channel: int) -> int:
         """Get the specified wave output channel state.
 
         Parameters:
-            output_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
+            awg_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
 
         Returns:
             channel_state: 0 = output off, 1 = output on.
@@ -1051,80 +1134,80 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Raises:
             ValueError: Output channel number is invalid.
         """
-        if output_channel < 0 or output_channel >= self.NUM_CHANNELS:
-            raise ValueError("Invalid channel index")
+        if awg_channel not in range(self.NUM_CHANNELS):
+            raise ValueError("Invalid channel index.")
 
         self._check_is_open()
-        return self._get_int("sigouts/{}/on".format(output_channel))
+        return self._get_int(f"sigouts/{awg_channel}/on")
 
     @rpc_method
-    def set_output_channel_on(self, output_channel: int, value: int) -> None:
+    def set_output_channel_on(self, awg_channel: int, value: int) -> None:
         """Set the specified wave output channel on or off.
 
         Parameters:
-            output_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
-            value:          Output state; 0 = output off, 1 = output on.
+            awg_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
+            value:       Output state; 0 = output off, 1 = output on.
 
         Raises:
             ValueError: Output channel number is invalid.
             ValueError: Invalid output channel state value.
         """
-        if output_channel < 0 or output_channel >= self.NUM_CHANNELS:
-            raise ValueError("Invalid channel index")
+        if awg_channel not in range(self.NUM_CHANNELS):
+            raise ValueError("Invalid channel index.")
         if value not in (0, 1):
-            raise ValueError("Invalid on/off state")
+            raise ValueError("Invalid on/off state.")
 
         self._check_is_open()
-        self._set_int("sigouts/{}/on".format(output_channel), value)
+        self._set_int(f"sigouts/{awg_channel}/on", value)
 
     @rpc_method
-    def set_output_channel_range(self, output_channel: int, value: float) -> None:
+    def set_output_channel_range(self, awg_channel: int, value: float) -> None:
         """Set voltage range of the specified wave output channel.
 
         Parameters:
-            output_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
-            value:          Output range in Volt. The instrument selects the next higher available range.
+            awg_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
+            value:       Output range in Volt. The instrument selects the next higher available range.
 
         Raises:
             ValueError: Output channel number is invalid.
             ValueError: Voltage range is invalid.
         """
-        if output_channel < 0 or output_channel >= self.NUM_CHANNELS:
-            raise ValueError("Invalid channel index")
+        if awg_channel not in range(self.NUM_CHANNELS):
+            raise ValueError("Invalid channel index.")
         if value < 0 or value > 5.0:
-            raise ValueError("Invalid output range")
+            raise ValueError("Invalid output range.")
 
         self._check_is_open()
-        self._set_double("sigouts/{}/range".format(output_channel), value)
+        self._set_double(f"sigouts/{awg_channel}/range", value)
 
     @rpc_method
-    def set_output_channel_offset(self, output_channel: int, value: float) -> None:
+    def set_output_channel_offset(self, awg_channel: int, value: float) -> None:
         """Set the DC offset voltage for the specified wave output channel.
 
         The DC offset is only active in amplified mode, not in direct mode.
 
         Parameters:
-            output_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
-            value:          Offset in Volt, in range -1.25 to +1.25 V.
+            awg_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
+            value:       Offset in Volt, in range -1.25 to +1.25 V.
 
         Raises:
             ValueError: Output channel number is invalid.
             ValueError: Voltage offset is invalid.
         """
-        if output_channel < 0 or output_channel >= self.NUM_CHANNELS:
-            raise ValueError("Invalid channel index")
+        if awg_channel not in range(self.NUM_CHANNELS):
+            raise ValueError("Invalid channel index.")
         if not -1.25 <= value <= 1.25:
-            raise ValueError("Invalid offset value")
+            raise ValueError("Invalid offset value.")
 
         self._check_is_open()
-        self._set_double("sigouts/{}/offset".format(output_channel), value)
+        self._set_double(f"sigouts/{awg_channel}/offset", value)
 
     @rpc_method
-    def get_output_channel_delay(self, output_channel: int) -> float:
+    def get_output_channel_delay(self, awg_channel: int) -> float:
         """Return output delay for fine alignment of the specified wave output channel.
 
         Parameters:
-            output_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
+            awg_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
 
         Raises:
             ValueError: Output channel number is invalid.
@@ -1132,76 +1215,76 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
             Delay in seconds.
         """
-        if output_channel < 0 or output_channel >= self.NUM_CHANNELS:
-            raise ValueError("Invalid channel index")
+        if awg_channel not in range(self.NUM_CHANNELS):
+            raise ValueError("Invalid channel index.")
 
         self._check_is_open()
-        return self._get_double("sigouts/{}/delay".format(output_channel))
+        return self._get_double(f"sigouts/{awg_channel}/delay")
 
     @rpc_method
-    def set_output_channel_delay(self, output_channel: int, value: float) -> None:
+    def set_output_channel_delay(self, awg_channel: int, value: float) -> None:
         """Set output delay for fine alignment of the specified wave output channel.
 
         Changing the delay setting may take several seconds.
 
         Parameters:
-            output_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
-            value:          Delay in seconds, range 0 to 26e-9.
+            awg_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
+            value:       Delay in seconds, range 0 to 26e-9.
 
         Raises:
             ValueError: Output channel number is invalid.
             ValueError: Delay value is invalid.
         """
-        if output_channel < 0 or output_channel >= self.NUM_CHANNELS:
-            raise ValueError("Invalid channel index")
+        if awg_channel not in range(self.NUM_CHANNELS):
+            raise ValueError("Invalid channel index.")
         if not 0 <= value < 26e-9:
-            raise ValueError("Invalid delay setting")
+            raise ValueError("Invalid delay setting.")
 
         self._check_is_open()
-        self._set_double("sigouts/{}/delay".format(output_channel), value)
+        self._set_double(f"sigouts/{awg_channel}/delay", value)
 
     @rpc_method
-    def set_output_channel_direct(self, output_channel: int, value: int) -> None:
+    def set_output_channel_direct(self, awg_channel: int, value: int) -> None:
         """Enable or disable the direct output path for the specified wave output channel.
 
         The direct output path bypasses the output amplifier and offset circuits,
         and fixes the output range to 800 mV.
 
         Parameters:
-            output_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
-            value:          1 to enable the direct output path, 0 to disable.
+            awg_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
+            value:       1 to enable the direct output path, 0 to disable.
 
         Raises:
             ValueError: Output channel number is invalid.
             ValueError: Direct value is invalid.
         """
-        if output_channel < 0 or output_channel >= self.NUM_CHANNELS:
-            raise ValueError("Invalid channel index")
+        if awg_channel not in range(self.NUM_CHANNELS):
+            raise ValueError("Invalid channel index.")
         if value not in (0, 1):
-            raise ValueError("Invalid value")
+            raise ValueError("Invalid value.")
 
         self._check_is_open()
-        self._set_int("sigouts/{}/direct".format(output_channel), value)
+        self._set_int(f"sigouts/{awg_channel}/direct", value)
 
     @rpc_method
-    def set_output_channel_filter(self, output_channel: int, value: int) -> None:
+    def set_output_channel_filter(self, awg_channel: int, value: int) -> None:
         """Enable or disable the analog output filter for the specified wave output channel.
 
         Parameters:
-            output_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
-            value:          1 to enable the output filter, 0 to disable.
+            awg_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
+            value:       1 to enable the output filter, 0 to disable.
 
         Raises:
             ValueError: Output channel number is invalid.
             ValueError: Filter value is invalid.
         """
-        if output_channel < 0 or output_channel >= self.NUM_CHANNELS:
-            raise ValueError("Invalid channel index")
+        if awg_channel not in range(self.NUM_CHANNELS):
+            raise ValueError(f"Invalid output channel: {awg_channel}.")
         if value not in (0, 1):
-            raise ValueError("Invalid value")
+            raise ValueError("Invalid value.")
 
         self._check_is_open()
-        self._set_int("sigouts/{}/filter".format(output_channel), value)
+        self._set_int(f"sigouts/{awg_channel}/filter", value)
 
     @rpc_method
     def set_dio_mode(self, mode: int) -> None:
@@ -1221,7 +1304,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: If mode is not valid.
         """
         if not 0 <= mode <= 3:
-            raise ValueError("Invalid DIO mode")
+            raise ValueError("Invalid DIO mode.")
 
         self._check_is_open()
         self._set_int("dios/0/mode", mode)
@@ -1240,64 +1323,64 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: If DIO signals direction mask is not valid.
         """
         if not 0 <= mask <= 15:
-            raise ValueError("Invalid value for mask")
+            raise ValueError("Invalid value for mask.")
 
         self._check_is_open()
         self._set_int("dios/0/drive", mask)
 
     @rpc_method
-    def set_dio_strobe_index(self, awg: int, value: int) -> None:
+    def set_dio_strobe_index(self, awg_core: int, value: int) -> None:
         """Select the DIO index to be used as a trigger for playback.
 
         The sequencer program uses this trigger by calling "playWaveDIO()".
 
         Parameters:
-            awg:    AWG module index (must be 0 in 1x8 channel mode).
-            value:  DIO bit index in the range 0 to 31.
+            awg_core: AWG core number.
+            value:    DIO bit index in the range 0 to 31.
 
         Raises:
             ValueError: AWG index number is invalid.
             ValueError: DIO bit index is invalid.
         """
-        if awg < 0 or awg >= self.NUM_AWGS:
-            raise ValueError("Invalid AWG index")
+        if awg_core not in self.awg_channel_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
         if value < 0 or value > 31:
-            raise ValueError("Invalid DIO bit index")
+            raise ValueError("Invalid DIO bit index.")
 
         self._check_is_open()
-        self._set_int("awgs/{}/dio/strobe/index".format(awg), value)
+        self._set_int(f"awgs/{awg_core}/dio/strobe/index", value)
 
     @rpc_method
-    def set_dio_strobe_slope(self, awg: int, value: int) -> None:
+    def set_dio_strobe_slope(self, awg_core: int, value: int) -> None:
         """Select the signal edge that should activate the strobe trigger.
 
         Parameters:
-            awg:    AWG module index (must be 0 in 1x8 channel mode).
-            value:  Slope type.
-                    0 - off;
-                    1 - trigger on rising edge;
-                    2 - trigger on falling edge;
-                    3 - trigger on rising and falling edge.
+            awg_core: AWG core number.
+            value:    Slope type.
+                        0 - off;
+                        1 - trigger on rising edge;
+                        2 - trigger on falling edge;
+                        3 - trigger on rising and falling edge.
 
         Raises:
             ValueError: AWG index number is invalid.
             ValueError: DIO strobe slope value is invalid.
         """
-        if awg < 0 or awg >= self.NUM_AWGS:
-            raise ValueError("Invalid AWG index")
+        if awg_core not in self.awg_channel_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
         if value < 0 or value > 3:
-            raise ValueError("Invalid slope")
+            raise ValueError("Invalid slope.")
 
         self._check_is_open()
-        self._set_int("awgs/{}/dio/strobe/slope".format(awg), value)
+        self._set_int(f"awgs/{awg_core}/dio/strobe/slope", value)
 
     @rpc_method
-    def get_user_register(self, awg: int, reg: int) -> int:
+    def get_user_register(self, awg_core: int, reg: int) -> int:
         """Return the value of the specified user register.
 
         Parameters:
-            awg:    AWG module index (must be 0 in 1x8 channel mode).
-            reg:    Register index in the range 0 to 15.
+            awg_core: AWG core number.
+            reg:      Register index in the range 0 to 15.
 
         Raises:
             ValueError: AWG index number is invalid.
@@ -1306,70 +1389,31 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
             value: User register value.
         """
-        if awg < 0 or awg >= self.NUM_AWGS:
-            raise ValueError("Invalid AWG index")
+        if awg_core not in self.awg_channel_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
         if not 0 <= reg <= 15:
-            raise ValueError("Invalid register index")
+            raise ValueError("Invalid register index.")
 
         self._check_is_open()
-        return self._get_int("awgs/{}/userregs/{}".format(awg, reg))
+        return self._get_int(f"awgs/{awg_core}/userregs/{reg}")
 
     @rpc_method
-    def set_user_register(self, awg: int, reg: int, value: int) -> None:
+    def set_user_register(self, awg_core: int, reg: int, value: int) -> None:
         """Change the value of the specified user register.
 
         Parameters:
-            awg:    AWG module index (must be 0 in 1x8 channel mode).
-            reg:    Register index in the range 0 to 15.
-            value:  Integer value to write to the register.
+            awg_core: AWG core number.
+            reg:      Register index in the range 0 to 15.
+            value:    Integer value to write to the register.
 
         Raises:
             ValueError: AWG index number is invalid.
             ValueError: Register index is invalid.
         """
-        if awg < 0 or awg >= self.NUM_AWGS:
-            raise ValueError("Invalid AWG index")
+        if awg_core not in self.awg_channel_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index")
 
         self._check_is_open()
-        self._set_int("awgs/{}/userregs/{}".format(awg, reg), value)
-
-    @rpc_method
-    def get_awg_module_enabled(self, awg: int) -> int:
-        """Return the current enable status of the AWG module.
-
-        Parameters:
-            awg:    AWG module index (must be 0 in 1x8 channel mode).
-
-        Raises:
-            ValueError: AWG index number is invalid.
-
-        Returns:
-            1 - If the AWG sequencer is currently running.
-            0 - If the AWG sequencer is not running.
-        """
-        if awg < 0 or awg >= self.NUM_AWGS:
-            raise ValueError("Invalid AWG index")
-
-        self._check_is_open()
-        return self._get_int("awgs/{}/enable".format(awg))
-
-    @rpc_method
-    def set_awg_module_enabled(self, value: int) -> None:
-        """Enable or disable the AWG module.
-
-        Enabling the AWG starts execution of the currently loaded sequencer program.
-        Uploading a sequencer program or waveform is only possible while the AWG module is disabled.
-
-        Parameters:
-            value: 1 to enable the AWG module, 0 to disable.
-
-        Raises:
-            ValueError: AWG module enable value is invalid.
-        """
-        if value not in (0, 1):
-            raise ValueError("Invalid value")
-
-        self._check_is_open()
-        self.awg_module.set("awg/enable", value)
+        self._set_int(f"awgs/{awg_core}/userregs/{reg}", value)

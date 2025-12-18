@@ -10,7 +10,7 @@ import warnings
 import numpy as np
 
 from qmi.instruments.zurich_instruments import ZurichInstruments_Hdawg
-from qmi.core.exceptions import QMI_InvalidOperationException, QMI_ApplicationException
+from qmi.core.exceptions import QMI_InvalidOperationException, QMI_ApplicationException, QMI_TimeoutException
 from tests.patcher import PatcherQmiContext as QMI_Context
 
 _DEVICE_HOST = "localhost"
@@ -249,7 +249,7 @@ class TestHDAWGInit(unittest.TestCase):
 
         self.ctx = QMI_Context("test_hdawg_openclose")
         self._awg_module = PropertyMock()
-        self._awg_module.finished.side_effect = [True, False, False, True]
+        self._awg_module.finished.side_effect = [True, False, False, True] * 2
 
         self._daq_server = PropertyMock()
         self._daq_server.awgModule = Mock(return_value=self._awg_module)
@@ -285,10 +285,13 @@ class TestHDAWGInit(unittest.TestCase):
             self.hdawg.open()
             self.hdawg.close()
 
+        self.assertListEqual([0 for _ in range(ZurichInstruments_Hdawg.NUM_CHANNELS)], self.hdawg.awg_channel_map)
+
         expected_daq_server_calls = [
             # open()
             call.connectDevice(_DEVICE_NAME, "1GbE"),
             call.awgModule(),
+            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2),  # 2 is the default group
             # close()
             call.disconnect()
         ]
@@ -307,6 +310,63 @@ class TestHDAWGInit(unittest.TestCase):
             call.finished()
         ]
         self.assertEqual(self._awg_module.mock_calls, expected_awg_module_calls)
+
+    def test_openclose_grouping_modes_0_1(self):
+        """open/close sequence with 4x2 and 2x4 grouping modes."""
+
+        for grouping in (0, 1):
+            with unittest.mock.patch(
+                    "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
+                ), unittest.mock.patch(
+                    "qmi.instruments.zurich_instruments.hdawg.AwgModule", return_value=self._awg_module
+                ), unittest.mock.patch(
+                    "qmi.instruments.zurich_instruments.hdawg.zhinst"
+                ), unittest.mock.patch(
+                    "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
+                ) as core_patch:
+                core_patch.ziDAQServer = Mock(return_value=self._daq_server)
+                core_patch.AwgModule = Mock(return_value=self._awg_module)
+                self.hdawg = ZurichInstruments_Hdawg(
+                    self.ctx,
+                    "HDAWG",
+                    server_host=_DEVICE_HOST,
+                    server_port=_DEVICE_PORT,
+                    device_name=_DEVICE_NAME,
+                    grouping=grouping
+                )
+                self.hdawg.open()
+                self.hdawg.close()
+
+            awg_cores_map = [
+                n // (2 ** (grouping + 1)) * (grouping % 2 + 1) for n in range(ZurichInstruments_Hdawg.NUM_CHANNELS)
+            ]
+            self.assertListEqual(awg_cores_map, self.hdawg.awg_channel_map)
+
+            expected_daq_server_calls = [
+                # open()
+                call.connectDevice(_DEVICE_NAME, "1GbE"),
+                call.awgModule(),
+                call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", grouping),
+                # close()
+                call.disconnect()
+            ]
+            self.assertEqual(expected_daq_server_calls, self._daq_server.mock_calls)
+
+            expected_awg_module_calls = [
+                # open()
+                call.set("device", _DEVICE_NAME),
+                call.set("index", 0),
+                call.finished(),
+                call.execute(),
+                call.finished(),
+                # close()
+                call.finished(),
+                call.finish(),
+                call.finished()
+            ]
+            self.assertEqual(expected_awg_module_calls, self._awg_module.mock_calls)
+            self._daq_server.reset_mock()
+            self._awg_module.reset_mock()
 
     def test_failed_open1(self):
         """Failed open sequence."""
@@ -335,7 +395,8 @@ class TestHDAWGInit(unittest.TestCase):
 
         expected_daq_server_calls = [
             call.connectDevice(_DEVICE_NAME, "1GbE"),
-            call.awgModule()
+            call.awgModule(),
+            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2)  # 2 is the default group
         ]
         self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
 
@@ -351,7 +412,7 @@ class TestHDAWGInit(unittest.TestCase):
         self._awg_module.finished.side_effect = [True, True]
 
         with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
+            "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
         ), unittest.mock.patch(
             "qmi.instruments.zurich_instruments.hdawg.AwgModule", return_value=self._awg_module
         ), unittest.mock.patch(
@@ -375,7 +436,8 @@ class TestHDAWGInit(unittest.TestCase):
 
         expected_daq_server_calls = [
             call.connectDevice(_DEVICE_NAME, "1GbE"),
-            call.awgModule()
+            call.awgModule(),
+            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2)  # 2 is the default group
         ]
         self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
 
@@ -417,7 +479,8 @@ class TestHDAWGInit(unittest.TestCase):
         expected_daq_server_calls = [
             # open()
             call.connectDevice(_DEVICE_NAME, "1GbE"),
-            call.awgModule()
+            call.awgModule(),
+            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2)  # 2 is the default group
         ]
         self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
 
@@ -462,7 +525,8 @@ class TestHDAWGInit(unittest.TestCase):
         expected_daq_server_calls = [
             # open()
             call.connectDevice(_DEVICE_NAME, "1GbE"),
-            call.awgModule()
+            call.awgModule(),
+            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2)  # 2 is the default group
         ]
         self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
 
@@ -563,7 +627,8 @@ class TestHDAWG(unittest.TestCase):
                 "HDAWG",
                 server_host=_DEVICE_HOST,
                 server_port=_DEVICE_PORT,
-                device_name=_DEVICE_NAME
+                device_name=_DEVICE_NAME,
+                grouping=0
             )
             self.hdawg.open()
 
@@ -688,12 +753,13 @@ class TestHDAWG(unittest.TestCase):
         }
         """
 
-        self._awg_module.getInt.side_effect = [0, 0]  # successful compilation; upload completed
+        self._awg_module.getInt.side_effect = [0, 0, 0]  # compiler status; get index; elf status
         self._awg_module.getDouble.side_effect = [1.0]  # upload progress
 
         expected_calls = [
             call.set("compiler/sourcestring", expected_source),
             call.getInt("compiler/status"),
+            call.getInt("index"),
             call.getDouble("progress"),
             call.getInt("elf/status"),
         ]
@@ -741,7 +807,7 @@ class TestHDAWG(unittest.TestCase):
 
         for source, replacements, expected_source in cases:
             with self.subTest(source=source):
-                self._awg_module.getInt.side_effect = [0, 0]  # successful compilation; upload completed
+                self._awg_module.getInt.side_effect = [0, 0, 0]  # successful compilation; get index; upload completed
                 self._awg_module.getDouble.side_effect = [1.0]  # upload progress
 
                 self.hdawg.compile_and_upload(source, replacements)
@@ -777,7 +843,7 @@ class TestHDAWG(unittest.TestCase):
 
         for value, expected_source in cases:
             with self.subTest(value=value):
-                self._awg_module.getInt.side_effect = [0, 0]  # successful compilation; upload completed
+                self._awg_module.getInt.side_effect = [0, 0, 0]  # successful compilation; get index; upload completed
                 self._awg_module.getDouble.side_effect = [1.0]  # upload progress
 
                 self.hdawg.compile_and_upload(source, {"$PAR": value})
@@ -824,7 +890,7 @@ class TestHDAWG(unittest.TestCase):
         ]
         self.hdawg.COMPILE_TIMEOUT = 0.1
         self.hdawg.UPLOAD_TIMEOUT = 0.1
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(QMI_TimeoutException):
             self.hdawg.compile_and_upload(source)
 
         self.assertEqual(self._awg_module.mock_calls, expected_calls)
@@ -833,12 +899,13 @@ class TestHDAWG(unittest.TestCase):
         """Test failed ELF upload sequence."""
         source = "while(true) {}"
 
-        self._awg_module.getInt.side_effect = [0, 1]  # successful compilation; upload timed out
+        self._awg_module.getInt.side_effect = [0, 0, 1]  # successful compilation; get index; upload timed out
         self._awg_module.getDouble.side_effect = [0.3]  # upload progress
 
         expected_calls = [
             call.set("compiler/sourcestring", source),
             call.getInt("compiler/status"),
+            call.getInt("index"),
             call.getDouble("progress"),
             call.getInt("elf/status"),
         ]
@@ -859,7 +926,7 @@ class TestHDAWG(unittest.TestCase):
         expected_calls = [
             call.set("compiler/sourcestring", source),
             call.getInt("compiler/status"),
-            # call.getInt("compiler/status"),
+            call.getInt("index"),
             call.getDouble("progress"),
             # call.getInt("elf/status"),
             call.getDouble("progress"),
@@ -867,7 +934,7 @@ class TestHDAWG(unittest.TestCase):
         ]
         self.hdawg.UPLOAD_TIMEOUT = 0.1
 
-        with self.assertRaises(RuntimeError) as err:
+        with self.assertRaises(QMI_TimeoutException) as err:
             self.hdawg.compile_and_upload(source)
 
         self.assertEqual(f"Upload process timed out (timeout={self.hdawg.UPLOAD_TIMEOUT})", str(err.exception))
@@ -1025,9 +1092,22 @@ class TestHDAWG(unittest.TestCase):
             with self.assertRaises(ValueError) as verr_2:
                 self.hdawg.upload_command_table(0, command_table_entries)
 
-        self.assertEqual("Invalid schema", str(verr_2.exception))
+        self.assertEqual("Invalid schema.", str(verr_2.exception))
 
     def test_upload_empty_command_table(self):
+        """Test command table upload."""
+        table = []
+        awg_index = 0
+        # Create the command table from the provided entries.
+        command_table = {
+            "header": {"version":"0.4"}, "table": table
+        }
+        set_vector = "/{}/awgs/{}/commandtable/data".format(_DEVICE_NAME, awg_index)
+
+        self.hdawg.upload_command_table(awg_index, table)
+        self._daq_server.setVector.assert_called_once_with(set_vector, json.dumps(command_table, allow_nan=False).replace(" ", ""))
+
+    def test_upload_empty_command_table_invalid_index_error(self):
         """Test command table upload."""
         table = []
         awg_index = 1
@@ -1037,8 +1117,8 @@ class TestHDAWG(unittest.TestCase):
         }
         set_vector = "/{}/awgs/{}/commandtable/data".format(_DEVICE_NAME, awg_index)
 
-        self.hdawg.upload_command_table(awg_index, table)
-        self._daq_server.setVector.assert_called_once_with(set_vector, json.dumps(command_table, allow_nan=False).replace(" ", ""))
+        with self.assertRaises(KeyError):
+            self.hdawg.upload_command_table(awg_index, table)
 
     def test_upload_invalid_command_table(self):
         """Test invalid command table upload."""
@@ -1065,8 +1145,8 @@ class TestHDAWG(unittest.TestCase):
             with self.assertRaises(ValueError) as verr_2:
                 self.hdawg.upload_command_table(0, command_table_entries)
 
-        self.assertEqual("Invalid command table", str(verr.exception))
-        self.assertEqual("Invalid value in command table", str(verr_2.exception))
+        self.assertEqual("Invalid command table.", str(verr.exception))
+        self.assertEqual("Invalid value in command table.", str(verr_2.exception))
 
     def test_upload_command_table_wrong_awg(self):
         """Test invalid command table upload."""
@@ -1085,13 +1165,65 @@ class TestHDAWG(unittest.TestCase):
         ]
         self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
 
-    def test_set_channel_grouping(self):
-        """Test channel grouping setting."""
-        self.hdawg.set_channel_grouping(2)
-        self._check_set_value_int("system/awg/channelgrouping", 2)
+    def test_set_awg_module_index(self):
+        """Test setting AWG module index with good values."""
+        side_effect = [True, False] * 7  # group 0 = 4x, group 1 = 2x, group 2 = 1x
+        self._awg_module.finished.side_effect = side_effect + [False, True]  # For close
+        groupings = list(range(3))
+        for grouping in groupings:
+            self.hdawg._grouping = grouping
+            ok_indexes = list(range((2 - grouping) * 2))
+            ok_indexes = [0] if not ok_indexes else ok_indexes
+            for index in ok_indexes:
+                self.hdawg.set_awg_module_index(index)
+
+    def test_set_awg_module_index_exceptions(self):
+        """Test setting AWG module index with wrong values w.r.t. grouping."""
+        self._awg_module.finished.side_effect = [False, True]  # For close
+        groupings = list(range(3))
+        for grouping in groupings:
+            self.hdawg._grouping = grouping
+            nok_indexes = list(range((3 - grouping), grouping * 2 + 2))
+            nok_indexes = [-1, 4] if not nok_indexes else nok_indexes
+            for index in nok_indexes:
+                with self.assertRaises(ValueError):
+                    self.hdawg.set_awg_module_index(index)
+
+    def test_awg_module_enabled(self):
+        """Test AWG enable on/off."""
+        self.hdawg.get_awg_module_enabled(0)
+        self._check_get_value_int("awgs/0/enable")
+        self.hdawg.get_awg_module_enabled(3)
+        self._check_get_value_int("awgs/3/enable")
 
         with self.assertRaises(ValueError):
-            self.hdawg.set_channel_grouping(1)
+            self.hdawg.get_awg_module_enabled(-1)
+
+        with self.assertRaises(ValueError):
+            self.hdawg.get_awg_module_enabled(4)
+
+        self.hdawg.set_awg_module_enabled(0)
+        self.hdawg.set_awg_module_enabled(1)
+
+        expected_awg_module_calls = [
+            call.set("awg/enable", 0),
+            call.set("awg/enable", 1)
+        ]
+        self.assertEqual(expected_awg_module_calls, self._awg_module.mock_calls)
+
+        with self.assertRaises(ValueError):
+            self.hdawg.set_awg_module_enabled(-1)
+
+        with self.assertRaises(ValueError):
+            self.hdawg.set_awg_module_enabled(2)
+
+    def test_set_channel_grouping(self):
+        """Test setting channel grouping."""
+        self.hdawg.set_channel_grouping(0)
+        self._check_set_value_int("system/awg/channelgrouping", 0)
+
+        with self.assertRaises(ValueError):
+            self.hdawg.set_channel_grouping(3)
 
     def test_set_reference_clock_source(self):
         """Test reference clock source setting."""
@@ -1674,34 +1806,6 @@ class TestHDAWG(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             self.hdawg.set_user_register(0, 16, 789)
-
-    def test_awg_module_enabled(self):
-        """Test AWG enable on/off."""
-        self.hdawg.get_awg_module_enabled(0)
-        self._check_get_value_int("awgs/0/enable")
-        self.hdawg.get_awg_module_enabled(3)
-        self._check_get_value_int("awgs/3/enable")
-
-        with self.assertRaises(ValueError):
-            self.hdawg.get_awg_module_enabled(-1)
-
-        with self.assertRaises(ValueError):
-            self.hdawg.get_awg_module_enabled(4)
-
-        self.hdawg.set_awg_module_enabled(0)
-        self.hdawg.set_awg_module_enabled(1)
-
-        expected_awg_module_calls = [
-            call.set("awg/enable", 0),
-            call.set("awg/enable", 1)
-        ]
-        self.assertEqual(expected_awg_module_calls, self._awg_module.mock_calls)
-
-        with self.assertRaises(ValueError):
-            self.hdawg.set_awg_module_enabled(-1)
-
-        with self.assertRaises(ValueError):
-            self.hdawg.set_awg_module_enabled(2)
 
 
 if __name__ == '__main__':
