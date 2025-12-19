@@ -164,9 +164,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         leftover_parameters = SEQC_PAR_PATTERN.findall(sequencer_program)
         if leftover_parameters:
             raise KeyError(
-                f"Variables left in sequencer program that were not in replacement dictionary: {
-                ', '.join(leftover_parameters)
-                }."
+                "Variables left in sequencer program that were not in replacement dictionary: " +
+                f"{', '.join(leftover_parameters)}."
             )
 
         return sequencer_program
