@@ -130,6 +130,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._awg_module: None | AwgModule = None
         self._device: None | HDAWG = None
         self._awg_channel_map: list[awg.AWG] = []
+        self._awg_core_map: list[int] = []
 
         # Import the "zhinst" modules.
         _import_modules()
@@ -157,19 +158,19 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @property
     def awg_channel_map(self) -> list[awg.AWG]:
-        """Channel map for AWG channels to correct core index, based on channel range 0-7."""
+        """Channel map for AWG channels to correct AWG node, based on channel range 0-7."""
         return [
             self.device.awgs[awg_channel % (2 ** (2 - self._grouping))] for awg_channel in range(self.NUM_CHANNELS)
         ]
 
-    # @property
-    # def awg_channel_map(self) -> list[int]:
-    #     """Channel map for AWG channels to correct core index, based on current grouping and channel range."""
-    #     return [
-    #         (awg_channel // (2 ** (self._grouping + 1))) *
-    #         (self._grouping % 2 + 1) for awg_channel in range(self.NUM_CHANNELS)
-    #     ]
-    #
+    @property
+    def awg_core_map(self) -> list[int]:
+        """Channel map for AWG channels to correct AWG core, based on current grouping and channel range."""
+        return [
+            (awg_channel // (2 ** (self._grouping + 1))) *
+            (self._grouping % 2 + 1) for awg_channel in range(self.NUM_CHANNELS)
+        ]
+
     @staticmethod
     def _process_parameter_replacements(sequencer_program: str, replacements: dict[str, str | int | float]) -> str:
         """Process parameter replacements for sequencer code.
@@ -231,7 +232,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             integer: Value from node tree.
         """
         if awg_channel is not None:
-            awg_node = self.awg_channel_map[awg_channel - 1]
+            awg_node = self.awg_channel_map[awg_channel]
             return awg_node.root.connection.getInt(node_path)
 
         return self.daq_server.getInt('/' + self._device_name + '/' + node_path)
@@ -247,7 +248,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             double: Value from node tree.
         """
         if awg_channel is not None:
-            awg_node = self.awg_channel_map[awg_channel - 1]
+            awg_node = self.awg_channel_map[awg_channel]
             return awg_node.root.connection.getDouble(node_path)
 
         return self.daq_server.getDouble('/' + self._device_name + '/' + node_path)
@@ -263,7 +264,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             string: Value from node tree.
         """
         if awg_channel is not None:
-            awg_node = self.awg_channel_map[awg_channel - 1]
+            awg_node = self.awg_channel_map[awg_channel]
             return awg_node.root.connection.getString(node_path)
 
         return self.daq_server.getString('/' + self._device_name + '/' + node_path)
@@ -277,7 +278,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             awg_channel: Optional, an AWG channel to get the node for. Default is None.
         """
         if awg_channel is not None:
-            awg_node = self.awg_channel_map[awg_channel - 1]
+            awg_node = self.awg_channel_map[awg_channel]
             awg_node.root.connection.set(node_path, value)
             return
 
@@ -292,7 +293,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             awg_channel: Optional, an AWG channel to get the node for. Default is None.
         """
         if awg_channel is not None:
-            awg_node = self.awg_channel_map[awg_channel - 1]
+            awg_node = self.awg_channel_map[awg_channel]
             awg_node.root.connection.set(node_path, value)
             return
 
@@ -307,7 +308,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             awg_channel: Optional, an AWG channel to get the node for. Default is None.
         """
         if awg_channel is not None:
-            awg_node = self.awg_channel_map[awg_channel - 1]
+            awg_node = self.awg_channel_map[awg_channel]
             awg_node.root.connection.set(node_path, value)
             return
 
@@ -615,7 +616,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             1 - If the AWG sequencer is currently running.
             0 - If the AWG sequencer is not running.
         """
-        if awg_core not in self.awg_channel_map:
+        if awg_core not in self.awg_core_map:
             raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
 
         self._check_is_open()
@@ -654,7 +655,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._check_is_open()
         _logger.info("[%s] Compiling sequencer program", self._name)
         # Get the AWG node/core
-        awg_node = self.awg_channel_map[awg_channel - 1]
+        awg_node = self.awg_channel_map[awg_channel]
 
         compiled_program, compiler_output = awg_node.compile_sequencer_program(sequencer_program)
         _logger.debug(f"Compilation Info:\n{compiler_output}")
@@ -720,7 +721,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             return
 
         # Get the AWG node for the AWG channel
-        awg_node = self.awg_channel_map[awg_channel - 1]
+        awg_node = self.awg_channel_map[awg_channel]
         # Load sequencer program. Equivalent to compiling and uploading.
         try:
             self._last_compilation_successful = False
@@ -775,7 +776,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                              represent the 4 marker channels.
         """
         self._check_is_open()
-        # assert awg_core in self.awg_channel_map, f"Invalid AWG core ({awg_core}) for group mode {self._grouping}."
+        # assert awg_core in self.awg_core_map, f"Invalid AWG core ({awg_core}) for group mode {self._grouping}."
         # waveform_data = zhinst.utils.convert_awg_waveform(wave1, wave2, markers)
         # waveform_address = f"/{self._device_name}/awgs/{awg_core}/waveform/waves/{waveform_index}"
         # self.daq_server.setVector(waveform_address, waveform_data)
@@ -831,9 +832,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         The loop that creates the unpacked waveforms loops such that:
         - outer loop: for waveform_index, sequence in enumerate(waveforms)
-          - inner loop: for awg_core_index in range(4), where channels are paired per core index:
-              channel_a = 2 * awg_core_index + 1  # 1, 3, 5, 7
-              channel_b = 2 * awg_core_index + 2  # 2, 4, 6, 8
+          - inner loop: for awg_core in range(4), where channels are paired per core:
+              channel_a = 2 * awg_core + 1  # 1, 3, 5, 7
+              channel_b = 2 * awg_core + 2  # 2, 4, 6, 8
 
         Parameters:
             unpacked_waveforms: List of tuples, each tuple is a collection of AWG core index, waveform sequence index,
@@ -843,8 +844,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         waveforms = {}
         for wf_count, sequence in enumerate(unpacked_waveforms):
-            awg_core_index, waveform_index, wave1, wave2, markers = sequence
-            awg_channel = 2 * awg_core_index  # 0, 2, 4, 6
+            awg_core, waveform_index, wave1, wave2, markers = sequence
+            awg_channel = 2 * awg_core  # 0, 2, 4, 6
             if awg_channel not in waveforms:
                 waveforms[awg_channel] = Waveforms()
 
@@ -884,7 +885,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._check_is_open()
 
         # # Check AWG core number.
-        # if awg_core not in self.awg_channel_map:
+        # if awg_core not in self.awg_core_map:
         #     raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
         # Check AWG core index.
         if awg_core_index not in range(4):
@@ -1214,7 +1215,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         if awg_core_index not in range(self.NUM_AWGS):
             raise ValueError("Invalid AWG index")
-        # if awg_core not in self.awg_channel_map:
+        # if awg_core not in self.awg_core_map:
         #     raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
@@ -1241,7 +1242,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         if awg_core_index not in range(self.NUM_AWGS):
             raise ValueError("Invalid AWG index")
-        # if awg_core not in self.awg_channel_map:
+        # if awg_core not in self.awg_core_map:
         #     raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
@@ -1269,7 +1270,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         if awg_core_index not in range(self.NUM_AWGS):
             raise ValueError("Invalid AWG index")
-        # if awg_core not in self.awg_channel_map:
+        # if awg_core not in self.awg_core_map:
         #     raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
@@ -1295,7 +1296,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """
         if awg_core_index not in range(self.NUM_AWGS):
             raise ValueError("Invalid AWG index")
-        # if awg_core not in self.awg_channel_map:
+        # if awg_core not in self.awg_core_map:
         #     raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
@@ -1349,8 +1350,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Set voltage range of the specified wave output channel.
 
         Parameters:
-            output_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
-            value:          Output range in Volt. The instrument selects the next higher available range.
+            awg_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
+            value:       Output range in Volt. The instrument selects the next higher available range.
 
         Raises:
             ValueError: Output channel number is invalid.
@@ -1482,7 +1483,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             3: qccs - map DIO onto ZSync interface and make it available to the sequencer.
 
         Parameters:
-            mode:   mode to use (0, 1, 2 or 3).
+            mode: Mode to use (0, 1, 2 or 3).
 
         Raises:
             ValueError: If mode is not valid.
@@ -1526,7 +1527,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: AWG index number is invalid.
             ValueError: DIO bit index is invalid.
         """
-        if awg_core not in self.awg_channel_map:
+        if awg_core not in self.awg_core_map:
             raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
         if value < 0 or value > 31:
             raise ValueError("Invalid DIO bit index.")
@@ -1550,7 +1551,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: AWG index number is invalid.
             ValueError: DIO strobe slope value is invalid.
         """
-        if awg_core not in self.awg_channel_map:
+        if awg_core not in self.awg_core_map:
             raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
         if value < 0 or value > 3:
             raise ValueError("Invalid slope.")
@@ -1573,7 +1574,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
             value: User register value.
         """
-        if awg_core not in self.awg_channel_map:
+        if awg_core not in self.awg_core_map:
             raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index.")
@@ -1594,7 +1595,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: AWG index number is invalid.
             ValueError: Register index is invalid.
         """
-        if awg_core not in self.awg_channel_map:
+        if awg_core not in self.awg_core_map:
             raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index")
@@ -1603,11 +1604,11 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._set_int(f"awgs/{awg_core}/userregs/{reg}", value)
 
     @rpc_method
-    def get_awg_module_enabled(self, awg_core_index: int) -> int:
+    def get_awg_module_enabled(self, awg_core: int) -> int:
         """Return the current enable status of the AWG module.
 
         Parameters:
-            awg_core_index:  AWG core index.
+            awg_core:  AWG core number.
 
         Raises:
             ValueError: AWG index number is invalid.
@@ -1616,11 +1617,11 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             1 - If the AWG sequencer is currently running.
             0 - If the AWG sequencer is not running.
         """
-        if awg_core_index not in range(self.NUM_AWGS):
-            raise ValueError(f"Invalid AWG core index: {awg_core_index}")
+        if awg_core not in self.awg_core_map:
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
 
         self._check_is_open()
-        return self._get_int(f"awgs/{awg_core_index}/enable")
+        return self._get_int(f"awgs/{awg_core}/enable")
 
     @rpc_method
     def set_awg_module_enabled(self, value: int) -> None:
@@ -1660,13 +1661,13 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Wait for AWG sequencer to finish.
 
         Parameters:
-            awg_channel: AWG channel number [1-8].
+            awg_channel: AWG channel number [0-7].
             timeout:     Optional timeout in seconds. Default is 10s.
         """
         self._check_is_open()
         _logger.info("[%s] Waiting for sequencer to finish", self._name)
         # Get the AWG node/core
-        awg_node = self.awg_channel_map[awg_channel - 1]
+        awg_node = self.awg_channel_map[awg_channel]
         awg_node.wait_done(timeout=timeout)
 
     @rpc_method
@@ -1674,13 +1675,13 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Enable the sequencer.
 
         Parameters:
-            awg_channel:           AWG channel number [1-8].
+            awg_channel:           AWG channel number [0-7].
             disable_when_finished: Flag to disable sequencer after it finishes execution. Default is True.
         """
         self._check_is_open()
         _logger.info("[%s] Enabling sequencer", self._name)
         # Get the AWG node/core
-        awg_node = self.awg_channel_map[awg_channel - 1]
+        awg_node = self.awg_channel_map[awg_channel]
 
         awg_node.enable_sequencer(single=disable_when_finished)
 
@@ -1695,7 +1696,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._check_is_open()
         _logger.info("[%s] Uploading sequencer program", self._name)
         # Get the AWG node/core
-        awg_node = self.awg_channel_map[awg_channel - 1]
+        awg_node = self.awg_channel_map[awg_channel]
 
         upload_info = awg_node.elf.data(compiled_program)
         _logger.debug(f"Upload Info:\n{upload_info}")
@@ -1705,7 +1706,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Get the command table from the device.
 
         Parameters:
-            awg_channel: AWG channel number [1-8].
+            awg_channel: AWG channel number [0-7].
 
         Returns:
             The command table.
@@ -1713,7 +1714,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._check_is_open()
         _logger.info("[%s] Getting command table for channel [%d]", self._name, awg_channel)
         # Get the AWG node/core
-        awg_node = self.awg_channel_map[awg_channel - 1]
+        awg_node = self.awg_channel_map[awg_channel]
 
         return awg_node.commandtable.load_from_device()
 
@@ -1722,14 +1723,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Write waveforms to the waveform memory. The waveforms must already be assigned in the sequencer program.
 
         Parameters:
-            awg_channel: AWG channel number [1-8].
+            awg_channel: AWG channel number [0-7].
             waveforms:   Waveforms to write.
             indexes:     List of indexes to upload. Default is None, which uploads all waveforms.
         """
         self._check_is_open()
         _logger.info("[%s] Writing waveforms to waveform memory", self._name)
         # Get the AWG node/core
-        awg_node = self.awg_channel_map[awg_channel - 1]
+        awg_node = self.awg_channel_map[awg_channel]
 
         awg_node.write_to_waveform_memory(waveforms, indexes) if indexes else awg_node.write_to_waveform_memory(
             waveforms
@@ -1740,7 +1741,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Read waveforms from the waveform memory for an AWG channel.
 
         Parameters:
-            awg_channel:    AWG channel number [1-8].
+            awg_channel:    AWG channel number [0-7].
             indexes:        List of indexes to read. Default is None, which uploads all waveforms.
 
         Returns:
@@ -1749,7 +1750,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._check_is_open()
         _logger.info("[%s] Reading waveforms from waveform memory", self._name)
         # Get the AWG node/core
-        awg_node = self.awg_channel_map[awg_channel - 1]
+        awg_node = self.awg_channel_map[awg_channel]
 
         return awg_node.read_from_waveform_memory(indexes) if indexes else awg_node.read_from_waveform_memory()
 
@@ -1763,14 +1764,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Validate if the waveforms match the sequencer program.
 
         Parameters:
-            awg_channel:                AWG channel number [1-8].
+            awg_channel:                AWG channel number [0-7].
             waveforms:                  Waveforms to validate.
             compiled_sequencer_program: Optional sequencer program. If this is not provided then information from the device is used.
         """
         self._check_is_open()
         _logger.info("[%s] Validating waveforms", self._name)
         # Get the AWG node/core
-        awg_node = self.awg_channel_map[awg_channel - 1]
+        awg_node = self.awg_channel_map[awg_channel]
 
         waveforms.validate(
             compiled_sequencer_program if compiled_sequencer_program else awg_node.waveform.descriptors()

@@ -285,7 +285,7 @@ class TestHDAWGInit(unittest.TestCase):
             self.hdawg.open()
             self.hdawg.close()
 
-        self.assertListEqual([0 for _ in range(ZurichInstruments_Hdawg.NUM_CHANNELS)], self.hdawg.awg_channel_map)
+        self.assertListEqual([0 for _ in range(ZurichInstruments_Hdawg.NUM_CHANNELS)], self.hdawg.awg_core_map)
 
         expected_daq_server_calls = [
             # open()
@@ -340,7 +340,7 @@ class TestHDAWGInit(unittest.TestCase):
             awg_cores_map = [
                 n // (2 ** (grouping + 1)) * (grouping % 2 + 1) for n in range(ZurichInstruments_Hdawg.NUM_CHANNELS)
             ]
-            self.assertListEqual(awg_cores_map, self.hdawg.awg_channel_map)
+            self.assertListEqual(awg_cores_map, self.hdawg.awg_core_map)
 
             expected_daq_server_calls = [
                 # open()
