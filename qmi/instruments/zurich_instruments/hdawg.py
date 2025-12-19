@@ -1389,7 +1389,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value: User register value.
         """
         if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index.")
 
@@ -1410,9 +1410,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: Register index is invalid.
         """
         if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
+            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
         if not 0 <= reg <= 15:
-            raise ValueError("Invalid register index")
+            raise ValueError("Invalid register index.")
 
         self._check_is_open()
         self._set_int(f"awgs/{awg_core}/userregs/{reg}", value)
