@@ -150,7 +150,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
             # At this point, the replacement value should be a string.
             if not isinstance(replacement, str):
-                raise ValueError("Cannot handle replacement value of type {!r}".format(type(replacement)))
+                raise ValueError(f"Cannot handle replacement value of type {type(replacement)!r}.")
 
             # Perform the replacement.
             if SEQC_PAR_PATTERN.fullmatch(parameter):
@@ -158,14 +158,16 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                 parameter_pattern = f"\\{parameter}\\b"  # escape the '$' and add word boundary match
                 sequencer_program = re.sub(parameter_pattern, replacement, sequencer_program)
             else:
-                raise NameError("Replacement parameter has an invalid name: {}".format(parameter))
+                raise NameError(f"Replacement parameter has an invalid name: {parameter}.")
 
         # Check if there are any unreplaced parameters left in the source code; this will not compile.
         leftover_parameters = SEQC_PAR_PATTERN.findall(sequencer_program)
         if leftover_parameters:
-            raise KeyError("Variables left in sequencer program that were not in replacement dictionary: {}".format(
+            raise KeyError(
+                f"Variables left in sequencer program that were not in replacement dictionary: {
                 ', '.join(leftover_parameters)
-            ))
+                }."
+            )
 
         return sequencer_program
 
@@ -180,13 +182,13 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         # Check if there are any lines left (we do not check if that is executable code; the compiler will do that).
         if len(seqc_statements) == 0:
-            raise QMI_ApplicationException("Source string does not contain executable statements")
+            raise QMI_ApplicationException("Source string does not contain executable statements.")
 
     def _get_int(self, node_path: str) -> int:
         """Get an integer value from the nodetree.
 
         Parameters:
-            node_path:      The path to the node to be queried.
+            node_path: The path to the node to be queried.
 
         Returns:
             integer value from node tree.
@@ -197,7 +199,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Get a double value from the nodetree.
 
         Parameters:
-            node_path:      The path to the node to be queried.
+            node_path: The path to the node to be queried.
 
         Returns:
             double value from node tree.
@@ -208,7 +210,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Get a string value from the nodetree.
 
         Parameters:
-            node_path:      The path to the node to be queried.
+            node_path: The path to the node to be queried.
 
         Returns:
             string value from node tree.
@@ -219,8 +221,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Set a value in the nodetree. Can be a string, integer, or a floating point number.
 
         Parameters:
-            node_path:      The path to the node to be queried.
-            value:          Value to set for the node.
+            node_path: The path to the node to be queried.
+            value:     Value to set for the node.
         """
         self.daq_server.set('/' + self._device_name + '/' + node_path, value)
 
@@ -246,13 +248,13 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Start a compilation of a sequencer program and wait until the compilation is done or timeout.
 
         Parameters:
-            sequencer_program:  A sequencer program as a string.
+            sequencer_program: A sequencer program as a string.
 
         Raises:
-            RuntimeError:       If the compilation does now within the 'self.COMPILE_TIMEOUT period.
+            RuntimeError: If the compilation does now within the 'self.COMPILE_TIMEOUT' period.
 
         Returns:
-            compilation_status: the obtained compiler status after compiler was finished.
+            compilation_status: The obtained compiler status after compiler was finished.
         """
         # Compile the sequencer program with replacements made.
         self.awg_module.set("compiler/sourcestring", sequencer_program)
@@ -348,7 +350,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
              ok_to_proceed: Result as True (OK) if upload was successful, else False.
         """
-
         self._check_is_open()
 
         if upload_result == UploadStatus.DONE:
@@ -379,7 +380,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     @rpc_method
     def open(self) -> None:
         """We connect to a specific HDAWG via a DAQ Server, which is a process running on some computer."""
-
         self._check_is_closed()
         _logger.info("[%s] Opening connection to instrument", self._name)
 
@@ -421,11 +421,10 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def get_node_string(self, node_path: str) -> str:
-        """
-        Get a string value for the node.
+        """Get a string value for the node.
 
         Parameters:
-            node_path:      The node to query.
+            node_path: The node to query.
 
         Returns:
             string value for the given node.
@@ -491,9 +490,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         Parameters:
             grouping: Channel grouping to set. Possible values are:
-                      0 = 4x2 channels;
-                      1 = 2x4 channels;
-                      2 = 1x8 channels.
+                        0 = 4x2 channels;
+                        1 = 2x4 channels;
+                        2 = 1x8 channels.
         """
         if grouping not in range(3):
             raise ValueError(f"Unsupported channel grouping: {grouping}.")
@@ -1024,8 +1023,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Get the output amplitude scaling factor of the specified channel.
 
         Parameters:
-            awg_core: AWG core number in the range 0 to 3. The AWG index selects a pair of output channels.
-                      Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
+            awg_core: AWG core number in the range 0 to 3. The core number selects a pair of output channels.
+                      Core 0 selects output channels 1 and 2, core 1 selects channels 3 and 4 etc.
             channel:  Channel index in the range 0 to 1, selecting the first or second output channel
                       within the selected channel pair.
 
@@ -1051,8 +1050,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         The amplitude is a dimensionless scaling factor applied to the digital signal.
 
         Parameters:
-            awg_core: AWG core number in the range 0 to 3. The AWG index selects a pair of output channels.
-                      Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
+            awg_core: AWG core number in the range 0 to 3. The core number selects a pair of output channels.
+                      Core 0 selects output channels 1 and 2, core 1 selects channels 3 and 4 etc.
             channel:  Channel index in the range 0 to 1, selecting the first or second output channel
                       within the selected channel pair.
             value:    Amplitude scale factor.
@@ -1074,13 +1073,13 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Get whether the last sample is held for the specified channel.
 
         Parameters:
-            awg_core: AWG core number in the range 0 to 3. The AWG index selects a pair of output channels.
-                      Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
+            awg_core: AWG core number in the range 0 to 3. The core number selects a pair of output channels.
+                      Core 0 selects output channels 1 and 2, core 1 selects channels 3 and 4 etc.
             channel:  Channel index in the range 0 to 1, selecting the first or second output channel
                       within the selected channel pair.
 
         Raises:
-            ValueError: AWG index number is invalid.
+            ValueError: AWG core number is invalid.
             ValueError: AWG channel pair index is invalid.
 
         Returns:
@@ -1100,14 +1099,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         """Set whether the last sample should be held for the specified channel.
 
         Parameters:
-            awg_core: AWG core number in the range 0 to 3. The AWG index selects a pair of output channels.
-                      Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
+            awg_core: AWG core number in the range 0 to 3. The core number selects a pair of output channels.
+                      Core 0 selects output channels 1 and 2, core 1 selects channels 3 and 4 etc.
             channel:  Channel index in the range 0 to 1, selecting the first or second output channel
                       within the selected channel pair.
             value:    Hold state; 0 = False, 1 = True.
 
         Raises:
-            ValueError: AWG index number is invalid.
+            ValueError: AWG core number is invalid.
             ValueError: AWG channel pair index is invalid.
             ValueError: Invalid hold state value.
         """
@@ -1135,7 +1134,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: Output channel number is invalid.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
-            raise ValueError("Invalid channel index.")
+            raise ValueError(f"Invalid output channel: {awg_channel}.")
 
         self._check_is_open()
         return self._get_int(f"sigouts/{awg_channel}/on")
@@ -1153,7 +1152,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: Invalid output channel state value.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
-            raise ValueError("Invalid channel index.")
+            raise ValueError(f"Invalid output channel: {awg_channel}.")
         if value not in (0, 1):
             raise ValueError("Invalid on/off state.")
 
@@ -1173,7 +1172,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: Voltage range is invalid.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
-            raise ValueError("Invalid channel index.")
+            raise ValueError(f"Invalid output channel: {awg_channel}.")
         if value < 0 or value > 5.0:
             raise ValueError("Invalid output range.")
 
@@ -1195,7 +1194,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: Voltage offset is invalid.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
-            raise ValueError("Invalid channel index.")
+            raise ValueError(f"Invalid output channel: {awg_channel}.")
         if not -1.25 <= value <= 1.25:
             raise ValueError("Invalid offset value.")
 
@@ -1216,7 +1215,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             Delay in seconds.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
-            raise ValueError("Invalid channel index.")
+            raise ValueError(f"Invalid output channel: {awg_channel}.")
 
         self._check_is_open()
         return self._get_double(f"sigouts/{awg_channel}/delay")
@@ -1236,7 +1235,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: Delay value is invalid.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
-            raise ValueError("Invalid channel index.")
+            raise ValueError(f"Invalid output channel: {awg_channel}.")
         if not 0 <= value < 26e-9:
             raise ValueError("Invalid delay setting.")
 
@@ -1259,7 +1258,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: Direct value is invalid.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
-            raise ValueError("Invalid channel index.")
+            raise ValueError(f"Invalid output channel: {awg_channel}.")
         if value not in (0, 1):
             raise ValueError("Invalid value.")
 
