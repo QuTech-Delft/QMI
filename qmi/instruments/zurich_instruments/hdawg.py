@@ -641,13 +641,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._check_is_open()
         self.awg_module.set("awg/enable", value)
 
-    @rpc_method
-    def compile_and_upload(
-        self, sequencer_program: str, replacements: None | dict[str, str | int | float] = None
-    ) -> None:
     def compile_sequencer_program(self, awg_channel: int, sequencer_program: str) -> bytes:
-        """
-        Compile the given sequencer program.
+        """Compile the given sequencer program.
 
         Parameters:
             awg_channel:        The AWG channel to compile the program for.
