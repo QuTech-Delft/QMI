@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.52.0-beta.0] - Unreleased
 
 ### Added
+- `grouping=2` input parameter in the `ZurichInstruments_Hdawg` to enable initialization directly in wanted grouping mode.
+- Addition of `set_awg_module_index` method to set the AWG module index number.
 
 ### Changed
+- All ZI grouping modes are now allowed in methods.
+- For all calls using the "/awgs/n/" the AWG core number (n) is checked based on current grouping mode.
 
 ### Fixed
+- Now referring to "AWG core", and using `awg_core` in methods where erroneously was referred to "AWG index" and `awg_index`.
 
 ### Removed
 
