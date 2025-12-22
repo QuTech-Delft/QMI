@@ -6,7 +6,6 @@ from qmi.core.transport import QMI_SerialTransport
 from qmi.core.exceptions import QMI_InstrumentException
 
 with patch("qmi.instruments.pololu.maestro.TYPE_CHECKING", True):
-    import qmi.instruments.pololu.qmi_uart  # We need this import, do not remove
     from qmi.instruments.pololu import Pololu_Maestro
 
 from tests.patcher import PatcherQmiContext as QMI_Context
@@ -17,15 +16,19 @@ class PololuMaestroUartOpenCloseTestCase(unittest.TestCase):
     board_mock.TX = 2
     board_mock.RX = 3
     busio_mock = Mock()
+    uart_mock = Mock()
     uart_ports_mock = Mock()
 
-    def setUp(self) -> None:  #, imp) -> None:
+    def setUp(self) -> None:
+        self.busio_mock.UART = Mock(return_value=None)
         self.baudrate = 115200
         self._cmd_lead = chr(0xAA) + chr(0x0C)
         ctx = QMI_Context("pololu_unit_test")
         transport = f"uart:COM1:baudrate={self.baudrate}"
         with patch.dict("sys.modules", {
-            "board": self.board_mock, "busio": self.busio_mock, "machine": Mock(), "microcontroller.pin": self.uart_ports_mock
+            "qmi.instruments.pololu.qmi_uart": self.uart_mock,
+            "board": self.board_mock, "busio": self.busio_mock,
+            "machine": Mock(), "microcontroller.pin": self.uart_ports_mock
         }) as self.sys_patch:
             self.uart_ports_mock.uartPorts = ([[10, 2, 3]])
             self.instr = Pololu_Maestro(ctx, "Pololu", transport)
@@ -45,18 +48,19 @@ class PololuMaestroUartOpenCloseTestCase(unittest.TestCase):
         msb = (target >> 7) & 0x7F  # shift 7 and take next 7 bits for msb
         cmd = chr(0x04) + chr(channel) + chr(lsb) + chr(msb)
         expected_command = bytes(self._cmd_lead + cmd, "latin-1")
-        self.instr._transport._uart.readinto.return_value = b'\x00\x00'
-        expected_calls = [
+        self.instr._transport.read_until_timeout.side_effect = [b'\x00\x00'] * 2
+        expected_write_calls = [
             call(expected_command), call(bytes(self._cmd_lead + '!', "latin-1"))
         ]
+        expected_read_call = [call(nbytes=2, timeout=Pololu_Maestro.RESPONSE_TIMEOUT)]
 
         # Act
         self.instr.open()
         self.instr.set_target(channel, target)
 
         # Assert
-        self.instr._transport._uart.write.assert_has_calls(expected_calls)
-        self.instr._transport._uart.readline.assert_has_calls([call()])
+        self.instr._transport.write.assert_has_calls(expected_write_calls)
+        self.instr._transport.read_until_timeout.assert_has_calls(expected_read_call)
 
     def test_read_with_get_position(self):
         """Test get position returns expected value."""
@@ -65,7 +69,7 @@ class PololuMaestroUartOpenCloseTestCase(unittest.TestCase):
         cmd = chr(0x10) + chr(channel)
         expected_command = bytes(self._cmd_lead + cmd, "latin-1")
         low_bit, high_bit = expected - (expected // 256 * 256), expected // 256
-        self.instr._transport._uart.readinto.side_effect = [
+        self.instr._transport.read_until_timeout.side_effect = [
             chr(low_bit),
             chr(high_bit),
             b'\x00\x00',
@@ -74,9 +78,9 @@ class PololuMaestroUartOpenCloseTestCase(unittest.TestCase):
             call(expected_command), call(bytes(self._cmd_lead + '!', "latin-1"))
         ]
         expected_read_calls = [
-            call(bytearray(b''), 1),
-            call(bytearray(b''), 1),
-            call(bytearray(b''), 2),
+            call(nbytes=1, timeout=Pololu_Maestro.RESPONSE_TIMEOUT),
+            call(nbytes=1, timeout=Pololu_Maestro.RESPONSE_TIMEOUT),
+            call(nbytes=2, timeout=Pololu_Maestro.RESPONSE_TIMEOUT),
         ]
 
         # Act
@@ -84,8 +88,8 @@ class PololuMaestroUartOpenCloseTestCase(unittest.TestCase):
         result = self.instr.get_position(channel)
 
         # Assert
-        self.instr._transport._uart.write.assert_has_calls(expected_write_calls)
-        self.instr._transport._uart.readinto.assert_has_calls(expected_read_calls)
+        self.instr._transport.write.assert_has_calls(expected_write_calls)
+        self.instr._transport.read_until_timeout.assert_has_calls(expected_read_calls)
         self.assertEqual(expected, result)
 
 
