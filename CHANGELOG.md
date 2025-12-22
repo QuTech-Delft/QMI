@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.52.0-beta.0] - Unreleased
 
 ### Added
+- Pololu QMI driver can now be used also in UART mode. For this, use of special transport line "uart:<address>[:baudrate=...]" is needed.
 
 ### Changed
 

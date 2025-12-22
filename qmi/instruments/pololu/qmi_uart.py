@@ -1,6 +1,6 @@
 import time
 
-import busio
+import busio  # mypy: ignore
 
 from qmi.core.exceptions import QMI_InvalidOperationException
 
