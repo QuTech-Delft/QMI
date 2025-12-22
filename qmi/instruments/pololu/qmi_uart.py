@@ -14,7 +14,7 @@ class QMI_Uart(busio.UART):
     READ_BYTE_BATCH_SIZE = 2
 
     def __init__(self, *args, **kwargs):
-        super().__init__(args, kwargs)
+        super().__init__(*args, **kwargs)
         self._is_open = True
 
     def _check_is_open(self) -> None:
@@ -76,22 +76,25 @@ class QMI_Uart(busio.UART):
         """
         self._check_is_open()
         buffer = bytearray()
-        batch = self.READ_BYTE_BATCH_SIZE
+        batch = self.READ_BYTE_BATCH_SIZE if nbytes > self.READ_BYTE_BATCH_SIZE else nbytes
         bytes_read = 0
         start_time = time.time()
         while bytes_read < nbytes:
-            # Extend buffer, for now try in batches of 4 bytes.
-            self.readinto(buffer, nbytes=batch)
+            # Extend buffer, for now try in batches (of 1 or more bytes).
+            buffer = self.readinto(buffer, nbytes=batch)
             bytes_read += batch
+            if bytes_read == nbytes:
+                break
+
             # Check on remaining buffer and adjust read batch size if necessary.
             if bytes_read + batch > nbytes:
-                self.readinto(buffer, nbytes=nbytes - bytes_read)
+                buffer = self.readinto(buffer, nbytes=nbytes - bytes_read)
                 break
 
             if time.time() - start_time > timeout:
                 break
 
-        return bytes(buffer)
+        return buffer
 
     def discard_read(self) -> None:
         """Discard all bytes that are immediately available for reading."""

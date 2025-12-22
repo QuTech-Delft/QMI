@@ -2,33 +2,33 @@ import unittest
 from unittest.mock import Mock, patch, call
 import logging
 
-board_mock = Mock()
-board_mock.TX = Mock()
-board_mock.RX = Mock()
-
 from qmi.core.transport import QMI_SerialTransport
 from qmi.core.exceptions import QMI_InstrumentException
 
-with patch("typing.TYPE_CHECKING", True):
-    import qmi.instruments
-    import qmi.instruments.pololu
-    with patch("qmi.instruments.pololu"):
-        with patch("qmi.instruments.pololu.maestro.board", board_mock), patch(
-                "pkg_resources._typeshed"):
-            from qmi.instruments.pololu import Pololu_Maestro
+with patch("qmi.instruments.pololu.maestro.TYPE_CHECKING", True):
+    import qmi.instruments.pololu.qmi_uart  # We need this import, do not remove
+    from qmi.instruments.pololu import Pololu_Maestro
 
 from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class PololuMaestroUartOpenCloseTestCase(unittest.TestCase):
+    board_mock = Mock()
+    board_mock.TX = 2
+    board_mock.RX = 3
+    busio_mock = Mock()
+    uart_ports_mock = Mock()
 
     def setUp(self) -> None:  #, imp) -> None:
         self.baudrate = 115200
+        self._cmd_lead = chr(0xAA) + chr(0x0C)
         ctx = QMI_Context("pololu_unit_test")
         transport = f"uart:COM1:baudrate={self.baudrate}"
-        self.instr = Pololu_Maestro(ctx, "Pololu", transport)
-
-        self.addCleanup(self.board)
+        with patch.dict("sys.modules", {
+            "board": self.board_mock, "busio": self.busio_mock, "machine": Mock(), "microcontroller.pin": self.uart_ports_mock
+        }) as self.sys_patch:
+            self.uart_ports_mock.uartPorts = ([[10, 2, 3]])
+            self.instr = Pololu_Maestro(ctx, "Pololu", transport)
 
     def test_open_close(self):
         """Test opening and closing the instrument"""
@@ -36,15 +36,57 @@ class PololuMaestroUartOpenCloseTestCase(unittest.TestCase):
         self.assertTrue(self.instr.is_open())
         self.instr.close()
         self.assertFalse(self.instr.is_open())
-        self.board.assert_called_once_with(
-            "COM1",
-            baudrate=self.baudrate,  # The rest are defaults
-            bytesize=8,
-            parity='N',
-            rtscts=False,
-            stopbits=1.0,
-            timeout=0.04
-        )
+
+    def test_write_with_set_target_value(self):
+        """Test writing by setting a target value."""
+        # Arrange
+        target, channel = 5000, 1
+        lsb = target & 0x7F  # 7 bits for least significant byte
+        msb = (target >> 7) & 0x7F  # shift 7 and take next 7 bits for msb
+        cmd = chr(0x04) + chr(channel) + chr(lsb) + chr(msb)
+        expected_command = bytes(self._cmd_lead + cmd, "latin-1")
+        self.instr._transport._uart.readinto.return_value = b'\x00\x00'
+        expected_calls = [
+            call(expected_command), call(bytes(self._cmd_lead + '!', "latin-1"))
+        ]
+
+        # Act
+        self.instr.open()
+        self.instr.set_target(channel, target)
+
+        # Assert
+        self.instr._transport._uart.write.assert_has_calls(expected_calls)
+        self.instr._transport._uart.readline.assert_has_calls([call()])
+
+    def test_read_with_get_position(self):
+        """Test get position returns expected value."""
+        # Arrange
+        expected, channel = 5000, 0
+        cmd = chr(0x10) + chr(channel)
+        expected_command = bytes(self._cmd_lead + cmd, "latin-1")
+        low_bit, high_bit = expected - (expected // 256 * 256), expected // 256
+        self.instr._transport._uart.readinto.side_effect = [
+            chr(low_bit),
+            chr(high_bit),
+            b'\x00\x00',
+        ]
+        expected_write_calls = [
+            call(expected_command), call(bytes(self._cmd_lead + '!', "latin-1"))
+        ]
+        expected_read_calls = [
+            call(bytearray(b''), 1),
+            call(bytearray(b''), 1),
+            call(bytearray(b''), 2),
+        ]
+
+        # Act
+        self.instr.open()
+        result = self.instr.get_position(channel)
+
+        # Assert
+        self.instr._transport._uart.write.assert_has_calls(expected_write_calls)
+        self.instr._transport._uart.readinto.assert_has_calls(expected_read_calls)
+        self.assertEqual(expected, result)
 
 
 class PololuMaestroSerialOpenCloseTestCase(unittest.TestCase):
@@ -309,9 +351,12 @@ class PololuMaestroCommandsTestCase(unittest.TestCase):
         cmd = chr(0x10) + chr(channel)
         expected_command = bytes(self._cmd_lead + cmd, "latin-1")
         low_bit, high_bit = expected - (expected // 256 * 256), expected // 256
-        self._transport_mock.read_until_timeout.side_effect = [chr(low_bit),
-                                                 chr(high_bit), b'\x00\x00']
-        expected_calls = [
+        self._transport_mock.read_until_timeout.side_effect = [
+            chr(low_bit),
+            chr(high_bit),
+            b'\x00\x00'
+        ]
+        expected_write_calls = [
             call(expected_command),
             call(self._error_check_cmd)
         ]
@@ -320,7 +365,7 @@ class PololuMaestroCommandsTestCase(unittest.TestCase):
         result = self.instr.get_position(channel)
 
         # Assert
-        self._transport_mock.write.assert_has_calls(expected_calls)
+        self._transport_mock.write.assert_has_calls(expected_write_calls)
         self.assertEqual(result, expected)
 
     def test_set_speed(self):
