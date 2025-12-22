@@ -13,7 +13,7 @@ import warnings
 
 # Lazy import of the adafruit-blinka module 'board' and 'QMI_Uart'. See the function _import_modules() below.
 if TYPE_CHECKING:
-    import board  # mypy: ignore
+    import board  # type: ignore
     from qmi.instruments.pololu.qmi_uart import QMI_Uart
 else:
     board = None
