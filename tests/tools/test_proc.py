@@ -389,7 +389,11 @@ class QmiProcMethodsTestCase(unittest.TestCase):
             "some_if": ["foute_addr"]
         })
         psutil_patch.net_if_addrs = net_if_addrs
-        psutil_patch._common.snicaddr = psutil._common.snicaddr
+        v, r, _ = map(int, psutil.__version__.split("."))
+        if (v == 7 and r >= 2) or v > 7:
+            psutil_patch._ntuples.snicaddr = psutil._ntuples.snicaddr
+        else:
+            psutil_patch._common.snicaddr = psutil._common.snicaddr
         # Except first the second assertion
         with self.assertRaises(AssertionError) as ass_err_2:
             proc.is_local_host("123.45.67.89")
