@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- `psutil._common` does not contain `snicaddr` namedtuple since version 7.2.0. It has been moved to `psutil._ntuples`. Fixed this in `proc.py`.
 
 ### Removed
 

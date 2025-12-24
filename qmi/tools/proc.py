@@ -253,7 +253,12 @@ def is_local_host(host: str) -> bool:
     # Return True if a local IP address matches the specified host.
     for addrs in if_addrs.values():
         for addr in addrs:
-            assert isinstance(addr, psutil._common.snicaddr)
+            v, r, _ = map(int, psutil.__version__.split("."))
+            if (v == 7 and r >= 2) or v > 7:
+                assert isinstance(addr, psutil._ntuples.snicaddr)
+            else:
+                assert isinstance(addr, psutil._common.snicaddr)
+
             if addr.address in host_ips:
                 return True
 
