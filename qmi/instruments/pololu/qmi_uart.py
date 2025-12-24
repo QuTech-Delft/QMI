@@ -1,4 +1,5 @@
 import time
+from queue import Empty
 
 import busio  # type: ignore
 
@@ -7,6 +8,14 @@ from qmi.core.exceptions import QMI_InvalidOperationException
 
 class QMI_Uart(busio.UART):
     """Extension of the class to make compatible with QMI_Transport calls.
+
+    The UART class opens a serial connection behind the scenes, see class binhoHostAdapter in binhoHostAdapter.py.
+    The default read and write timeouts are: timeout=0.025, write_timeout=0.05. These are not changeable through the
+    API, but would need a workaround through the 'serial' module interface.
+
+    The docstring of busio.readline says a 'line' is read until a _newline_ character, but in `uart.py` we can see that
+    ```        while out != "\r":``` is used. Thus, the correct docstring should be that a line is read until a
+    _carriage return_ character.
 
     Attributes:
         READ_BYTE_BATCH_SIZE: The default size of the read buffer, based on <LSB><MSB>.
@@ -24,7 +33,9 @@ class QMI_Uart(busio.UART):
                 f"Operation not allowed on closed transport {type(self).__name__}")
 
     def open(self) -> None:
-        """The instrument is opened already at the __init__."""
+        """The instrument is opened already at the __init__. Note that if close() -> self.deinit() was called,
+        we cannot simply 're-open', but need to make a new instance to open the connection again.
+        """
         pass
 
     def close(self) -> None:
@@ -39,10 +50,8 @@ class QMI_Uart(busio.UART):
         When this method returns, all bytes are written to the transport
         or queued to be written to the transport.
 
-        An exception is raised if the transport is closed from the remote
-        side before all bytes could be written.
-
-        Subclasses must override this method, if applicable.
+        Parameters:
+            data: Bytes to write.
         """
         self._check_is_open()
         super().write(data)
@@ -59,20 +68,13 @@ class QMI_Uart(busio.UART):
 
         If the transport has been closed on the remote side, any remaining
         input bytes are returned (up to the maximum number of bytes requested).
-        If there are no more bytes to read, QMI_EndOfInputException is raised.
-
-        Subclasses must override this method, if applicable.
 
         Parameters:
             nbytes:  Maximum number of bytes to read.
             timeout: Maximum time to wait (in seconds).
 
         Returns:
-            Received bytes.
-
-        Raises:
-            ~qmi.core.exceptions.QMI_EndOfInputException: If the transport has been closed on
-                the remote side and there are no more bytes to read.
+            data: Received bytes.
         """
         self._check_is_open()
         buffer = bytearray()
@@ -83,6 +85,9 @@ class QMI_Uart(busio.UART):
             # Extend buffer, for now try in batches (of 1 or more bytes).
             buffer = self.readinto(buffer, nbytes=batch)
             bytes_read += batch
+            if time.time() - start_time > timeout:
+                break
+
             if bytes_read == nbytes:
                 break
 
@@ -91,11 +96,15 @@ class QMI_Uart(busio.UART):
                 buffer = self.readinto(buffer, nbytes=nbytes - bytes_read)
                 break
 
-            if time.time() - start_time > timeout:
-                break
-
         return buffer
 
     def discard_read(self) -> None:
-        """Discard all bytes that are immediately available for reading."""
-        self.readline()  # Warning! This might block if there is nothing to read.
+        """Discard all bytes that are immediately available for reading. As using the read methods from uart.py use
+        `Queue.get()`, which means blocking until something is received, we work around this by calling the queue
+        without blocking.
+        """
+        while True:
+            try:
+                self._uart._nova._rxdQueue.get(block=False)
+            except Empty:
+                break
