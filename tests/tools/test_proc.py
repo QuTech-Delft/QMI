@@ -389,6 +389,7 @@ class QmiProcMethodsTestCase(unittest.TestCase):
             "some_if": ["foute_addr"]
         })
         psutil_patch.net_if_addrs = net_if_addrs
+        psutil_patch.__version__ = psutil.__version__
         v, r, _ = map(int, psutil.__version__.split("."))
         if (v == 7 and r >= 2) or v > 7:
             psutil_patch._ntuples.snicaddr = psutil._ntuples.snicaddr
