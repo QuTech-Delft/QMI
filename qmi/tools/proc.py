@@ -53,6 +53,8 @@ if __name__ == "__main__":
 else:
     _logger = logging.getLogger(__name__)
 
+# psutil version info
+V, R, _ = map(int, psutil.__version__.split("."))
 
 # Result from shutdown_context().
 ShutdownResult = NamedTuple("ShutdownResult", [
@@ -253,7 +255,11 @@ def is_local_host(host: str) -> bool:
     # Return True if a local IP address matches the specified host.
     for addrs in if_addrs.values():
         for addr in addrs:
-            assert isinstance(addr, psutil._common.snicaddr)
+            if (V == 7 and R >= 2) or V > 7:
+                assert isinstance(addr, psutil._ntuples.snicaddr)
+            else:
+                assert isinstance(addr, psutil._common.snicaddr)
+
             if addr.address in host_ips:
                 return True
 

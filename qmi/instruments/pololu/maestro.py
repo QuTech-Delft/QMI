@@ -1,38 +1,72 @@
 """Instrument driver for the Pololu maestro servo controller"""
 
 import logging
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import TYPE_CHECKING, Generator
 from time import sleep
 
 from qmi.core.context import QMI_Context
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
-from qmi.core.transport import create_transport
+from qmi.core.transport import create_transport, SerialTransportDescriptorParser, QMI_Transport
 from qmi.core.exceptions import QMI_InstrumentException
 import warnings
+
+# Lazy import of the adafruit-blinka module 'board' and 'QMI_Uart'. See the function _import_modules() below.
+if TYPE_CHECKING:
+    import board  # type: ignore
+    from qmi.instruments.pololu.qmi_uart import QMI_Uart
+else:
+    board = None
+    QMI_Uart = None
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
 
+def _import_modules() -> None:
+    """Import the adafruit-blinka modules 'board', and 'busio' in qmi_uart.py.
+
+    This import is done in a function, instead of at the top-level, to avoid an unnecessary dependency for programs
+    that do not access the instrument directly.
+    """
+    global board, QMI_Uart
+    if board is None or QMI_Uart is None:
+        import board
+        from qmi.instruments.pololu.qmi_uart import QMI_Uart
+
+
 class Pololu_Maestro(QMI_Instrument):
-    """Instrument driver for the Pololu Maestro servo controller."""
+    """Instrument driver for the Pololu Maestro servo controller.
 
-    # Baudrate of instrument.
+    Note that new devices are delivered standard in UART mode. The UART mode can be used by this driver by providing a
+    special transport string, f.ex. "uart:COMx:baudrate=115200". The device address (COM port number in this example)
+    is ignored by the driver in UART mode, but needed for parsing the string. If the user wishes to use the device
+    in USB Dual Port or USB Chained serial mode, the mode has to be changed with the Pololu's
+    Maestro Control Center program.
+
+    Attributes:
+        BAUDRATE:                 Default Baudrate of instrument with serial connection.
+        RESPONSE_TIMEOUT:         Default response timeout for I/O actions.
+        DEFAULT_NUM_CHANNELS:     Default number of channels.
+        DEFAULT_MIN_VALUE:        Default minimum settable target and speed values.
+        DEFAULT_MAX_VALUE:        Default maximum settable target and speed values.
+        DEFAULT_MIN_ACCELERATION: Default minimum acceleration.
+        DEFAULT_MAX_ACCELERATION: Default maximum acceleration.
+    """
+    _rpc_constants = [
+        "BAUDRATE",
+        "RESPONSE_TIMEOUT",
+        "DEFAULT_NUM_CHANNELS",
+        "DEFAULT_MIN_VALUE",
+        "DEFAULT_MAX_VALUE",
+        "DEFAULT_MIN_ACCELERATION",
+        "DEFAULT_MAX_ACCELERATION",
+    ]
     BAUDRATE = 9600
-
-    # Instrument should respond within 2 seconds.
     RESPONSE_TIMEOUT = 2.0
-
-    # Default number of channels.
     DEFAULT_NUM_CHANNELS = 6
-
-    # Default minimum and maximum settable values.
-    # These are determined by the bit lengths for the values (16 bits)
     DEFAULT_MIN_VALUE = 0
     DEFAULT_MAX_VALUE = 16383
-
-    # Default minimum and maximum accleration.
     DEFAULT_MIN_ACCELERATION = 0
     DEFAULT_MAX_ACCELERATION = 255
 
@@ -72,11 +106,12 @@ class Pololu_Maestro(QMI_Instrument):
     }
 
     def __init__(
-            self, context: QMI_Context, name: str, transport: str, num_channels: int = DEFAULT_NUM_CHANNELS,
-            channels_min_max_targets: Optional[Dict[int, Tuple[int, int]]] = None,
-            channels_min_max_speeds: Optional[Dict[int, Tuple[int, int]]] = None,
-            channels_min_max_accelerations: Optional[Dict[int, Tuple[int, int]]] = None) -> None:
-        """Initialize driver.
+        self, context: QMI_Context, name: str, transport: str, num_channels: int = DEFAULT_NUM_CHANNELS,
+        channels_min_max_targets: None | dict[int, tuple[int, int]] = None,
+        channels_min_max_speeds: None | dict[int, tuple[int, int]] = None,
+        channels_min_max_accelerations: None | dict[int, tuple[int, int]] = None
+    ) -> None:
+        """Initialize driver. This driver can be used for Pololu Micro Maestro in UART or Dual Port USB modes.
 
         Parameters:
             context:                        The QMI context
@@ -91,41 +126,48 @@ class Pololu_Maestro(QMI_Instrument):
                                             of the min and max.
         """
         super().__init__(context, name)
-        self._transport = create_transport(transport, default_attributes={
-                                           "baudrate": self.BAUDRATE})
+        self._transport: QMI_Transport | QMI_Uart
+        if transport.lower().startswith("uart"):
+            # import modules
+            _import_modules()
+            # Do a manual parsing of the transport string
+            transport = transport.lower().replace("uart", "serial")
+            parsed_transport_dict = SerialTransportDescriptorParser.parse_parameter_strings(transport)
+            baudrate = parsed_transport_dict["baudrate"] if "baudrate" in parsed_transport_dict else self.BAUDRATE
+            self._transport = QMI_Uart(board.TX, board.RX, baudrate)
+
+        else:
+            self._transport = create_transport(transport, default_attributes={"baudrate": self.BAUDRATE})
+
         # This device number defaults to 0x0C (or 12 in decimal).
         device_nr = 0x0C
         # Command lead-in and device number are sent for each Pololu serial command.
         self._cmd_lead_in = chr(0xAA) + chr(device_nr)
         # Track the target value of each channel
-        self._targets: List[int] = [0] * num_channels
+        self._targets: list[int] = [0] * num_channels
         # Store the minimum and maximum target values of each channel
-        self._min_target_values: List[int] = [
-            self.DEFAULT_MIN_VALUE] * num_channels
-        self._max_target_values: List[int] = [
-            self.DEFAULT_MAX_VALUE] * num_channels
+        self._min_target_values: list[int] = [self.DEFAULT_MIN_VALUE] * num_channels
+        self._max_target_values: list[int] = [self.DEFAULT_MAX_VALUE] * num_channels
 
-        channels_min_max_targets = channels_min_max_targets if channels_min_max_targets else {}
-        channels_min_max_speeds = channels_min_max_speeds if channels_min_max_speeds else {}
-        channels_min_max_accelerations = channels_min_max_accelerations if channels_min_max_accelerations else {}
+        channels_min_max_targets = channels_min_max_targets or {}
+        channels_min_max_speeds = channels_min_max_speeds or {}
+        channels_min_max_accelerations = channels_min_max_accelerations or {}
         # Overwrite channels that have a provided min/max target value
         for c in channels_min_max_targets.keys():
             self._min_target_values[c] = channels_min_max_targets[c][0]
             self._max_target_values[c] = channels_min_max_targets[c][1]
+
         # Store the minimum and maximum speeds of each channel
-        self._min_speeds: List[int] = [
-            self.DEFAULT_MIN_VALUE] * num_channels
-        self._max_speeds: List[int] = [
-            self.DEFAULT_MAX_VALUE] * num_channels
+        self._min_speeds: list[int] = [self.DEFAULT_MIN_VALUE] * num_channels
+        self._max_speeds: list[int] = [self.DEFAULT_MAX_VALUE] * num_channels
         # Overwrite channels that have a provided min/max speed
         for c in channels_min_max_speeds.keys():
             self._min_speeds[c] = channels_min_max_speeds[c][0]
             self._max_speeds[c] = channels_min_max_speeds[c][1]
+
         # Store the minimum and maximum accelerations of each channel
-        self._min_accelerations: List[int] = [
-            self.DEFAULT_MIN_ACCELERATION] * num_channels
-        self._max_accelerations: List[int] = [
-            self.DEFAULT_MAX_ACCELERATION] * num_channels
+        self._min_accelerations: list[int] = [self.DEFAULT_MIN_ACCELERATION] * num_channels
+        self._max_accelerations: list[int] = [self.DEFAULT_MAX_ACCELERATION] * num_channels
         # Overwrite channels that have a provided min/max acceleration
         for c in channels_min_max_accelerations.keys():
             self._min_accelerations[c] = channels_min_max_accelerations[c][0]
@@ -141,6 +183,9 @@ class Pololu_Maestro(QMI_Instrument):
         Parameters:
             channel:    Channel number.
             value:      Value for the command.
+
+        Returns:
+            command: Four-character compiled command string "<cmd><channel><LSB><MSB>".
         """
         lsb = value & 0x7F
         msb = (value >> 7) & 0x7F
@@ -157,17 +202,16 @@ class Pololu_Maestro(QMI_Instrument):
             yield bit
             num ^= bit
 
-    def _get_errors(self) -> List[str]:
+    def _get_errors(self) -> list[str]:
         """Get errors.
 
         Returns:
-            List of errors.
+            list of errors.
         """
         self._transport.discard_read()  # Discard possible read buffer
         cmd = self._cmd_lead_in + chr(0x21)
         self._transport.write(bytes(cmd, "latin-1"))
-        bin_err = self._transport.read(
-            nbytes=2, timeout=self.RESPONSE_TIMEOUT)
+        bin_err = self._transport.read_until_timeout(nbytes=2, timeout=self.RESPONSE_TIMEOUT)
         int_err = int.from_bytes(bin_err, "big")
         errors = []
         # loop over bits and log the errors
@@ -191,7 +235,8 @@ class Pololu_Maestro(QMI_Instrument):
         if errs:
             formatted_errs = '\n'.join(map(str, errs))
             raise QMI_InstrumentException(
-                f"Pololu Maestro servo command {cmd} resulted in the following error(s).\n{formatted_errs}")
+                f"Pololu Maestro servo command {cmd} resulted in the following error(s).\n{formatted_errs}"
+            )
 
     def _ask(self, cmd: str) -> int:
         """Send ask command to instrument.
@@ -200,26 +245,25 @@ class Pololu_Maestro(QMI_Instrument):
             cmd: The command string to be written.
 
         Raises:
-            QMI_InstrumentException if the servo command returns an error.
+            QMI_InstrumentException: If the servo command returns an error.
 
         Returns:
-            The queried value.
+            sum_msb_lsb: The queried value.
         """
         cmd = self._cmd_lead_in + cmd
         self._transport.write(bytes(cmd, "latin-1"))
         # Sleep over the bits to be sent
         sleep(len(cmd) / self.BAUDRATE * 100)
         # Read back the response bits
-        lsb = ord(self._transport.read(
-            nbytes=1, timeout=self.RESPONSE_TIMEOUT))
-        msb = ord(self._transport.read(
-            nbytes=1, timeout=self.RESPONSE_TIMEOUT))
+        lsb = ord(self._transport.read_until_timeout(nbytes=1, timeout=self.RESPONSE_TIMEOUT))
+        msb = ord(self._transport.read_until_timeout(nbytes=1, timeout=self.RESPONSE_TIMEOUT))
 
         errs = self._get_errors()
         if errs:
             formatted_errs = '\n'.join(map(str, errs))
             raise QMI_InstrumentException(
-                f"Pololu Maestro servo command {cmd} resulted in the following error(s).\n{formatted_errs}")
+                f"Pololu Maestro servo command {cmd} resulted in the following error(s).\n{formatted_errs}"
+            )
 
         return (msb << 8) + lsb
 
@@ -260,7 +304,7 @@ class Pololu_Maestro(QMI_Instrument):
     def set_target(self, channel: int, value: int) -> None:
         """Set channel to a specified target value. The target value is of units 0.25us. For example, if you want to
         set the target to 1500 us, you need to give as input 6000:
-        (1500×4 = 6000 = 01011101110000 in binary)
+        (1500×4 = 6000 = 01011101110000 in binary).
         Servo will begin moving based on speed and acceleration parameters previously set.
         This method will check against the maximum and minimum target value of the channel. If the value to be set is
         out of the min/max range, the method will set the target value to the min/max.
@@ -287,11 +331,11 @@ class Pololu_Maestro(QMI_Instrument):
         self._targets[channel] = target
 
     @rpc_method
-    def get_targets(self) -> List[int]:
+    def get_targets(self) -> list[int]:
         """Get the current targets for each channel.
 
         Returns:
-            The target values for each channel.
+            self_targets: The target values for each channel.
         """
         return self._targets
 
@@ -303,7 +347,7 @@ class Pololu_Maestro(QMI_Instrument):
             channel: The channel number.
 
         Returns:
-            The position in quarter-microsecond units.
+            position: The position in quarter-microsecond units.
         """
         self._check_is_open()
         self._check_channel(channel)
@@ -321,7 +365,7 @@ class Pololu_Maestro(QMI_Instrument):
             speed:      The target speed.
 
         Raises:
-            ValueError if speed is out of allowable range.
+            ValueError: If speed is out of allowable range.
         """
         self._check_is_open()
         self._check_channel(channel)
@@ -344,7 +388,7 @@ class Pololu_Maestro(QMI_Instrument):
             acceleration:   The target acceleration.
 
         Raises:
-            ValueError if acceleration not within 0 to 255
+            ValueError: If acceleration not within 0 to 255.
         """
         self._check_is_open()
         self._check_channel(channel)
@@ -358,7 +402,7 @@ class Pololu_Maestro(QMI_Instrument):
         self._write(cmd)
 
     @rpc_method
-    def go_home(self):
+    def go_home(self) -> None:
         """Send all servos and outputs to their home values."""
         self._check_is_open()
         self._write(chr(0x22))
@@ -370,11 +414,15 @@ class Pololu_Maestro(QMI_Instrument):
         Parameters:
             channel:    The channel number.
             value:      The new minimum target value.
+
+        Raises:
+            ValueError: If minimum target value is not in valid range.
         """
         if value < self.DEFAULT_MIN_VALUE or value > self._max_target_values[channel]:
             raise ValueError(
-                f"Minimum value invalid, should be in range [{self.DEFAULT_MIN_VALUE},\
-                    {self._max_target_values[channel]}")
+                f"Minimum value invalid, should be in range [{self.DEFAULT_MIN_VALUE}," +
+                    f"{self._max_target_values[channel]}]"
+            )
 
         self._min_target_values[channel] = value
 
@@ -384,6 +432,9 @@ class Pololu_Maestro(QMI_Instrument):
 
         Parameters:
             channel:    The channel number.
+
+        Returns:
+            min_target_value: The queried value.
         """
         return self._min_target_values[channel]
 
@@ -394,11 +445,15 @@ class Pololu_Maestro(QMI_Instrument):
         Parameters:
             channel:    The channel number.
             value:      The new maximum target value.
+
+        Raises:
+            ValueError: If given maximum target value is not in valid range.
         """
         if value <= self._min_target_values[channel] or value > self.DEFAULT_MAX_VALUE:
             raise ValueError(
-                f"Maximum value invalid, should be in range [{self._min_target_values[channel] + 1},\
-                    {self.DEFAULT_MAX_VALUE}]")
+                f"Maximum value invalid, should be in range [{self._min_target_values[channel] + 1}," +
+                    f"{self.DEFAULT_MAX_VALUE}]"
+            )
 
         self._max_target_values[channel] = value
 
@@ -408,6 +463,9 @@ class Pololu_Maestro(QMI_Instrument):
 
         Parameters:
             channel:    The channel number.
+
+        Returns:
+            max_target_value: The queried maximum target value.
         """
         return self._max_target_values[channel]
 
@@ -421,7 +479,8 @@ class Pololu_Maestro(QMI_Instrument):
         """
         warnings.warn(
             f"{self.set_max.__name__} has been deprecated. Please use {self.set_max_target.__name__}.",
-            DeprecationWarning)
+            DeprecationWarning
+        )
         self.set_max_target(channel, value)
 
     @rpc_method
@@ -434,14 +493,15 @@ class Pololu_Maestro(QMI_Instrument):
         """
         warnings.warn(
             f"{self.set_min.__name__} has been deprecated. Please use {self.set_min_target.__name__}.",
-            DeprecationWarning)
+            DeprecationWarning
+        )
         self.set_min_target(channel, value)
 
     @rpc_method
     def set_target_value(self, channel: int, value: int) -> None:
         """Set channel to a specified target value. The target value is of units 0.25us. For example, if you want to
         set the target to 1500 us, you need to give as input 6000:
-        (1500×4 = 6000 = 01011101110000 in binary)
+        (1500×4 = 6000 = 01011101110000 in binary).
         Servo will begin moving based on speed and acceleration parameters previously set.
         This method will check against the maximum and minimum target value of the channel. If the value to be set is
         out of the min/max range, the method will set the target value to the min/max.
@@ -479,7 +539,8 @@ class Pololu_Maestro(QMI_Instrument):
         """
         warnings.warn(
             f"{self.move_up.__name__} has been deprecated. There is no replacement for this.",
-            DeprecationWarning)
+            DeprecationWarning
+        )
 
     @rpc_method
     def move_down(self, channel: int) -> None:
@@ -490,4 +551,5 @@ class Pololu_Maestro(QMI_Instrument):
         """
         warnings.warn(
             f"{self.move_down.__name__} has been deprecated. There is no replacement for this.",
-            DeprecationWarning)
+            DeprecationWarning
+        )
