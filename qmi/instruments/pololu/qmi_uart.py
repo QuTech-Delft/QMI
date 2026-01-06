@@ -74,7 +74,7 @@ class QMI_Uart(busio.UART):
             timeout: Maximum time to wait (in seconds).
 
         Returns:
-            data: Received bytes.
+            buffer: Received bytes.
         """
         self._check_is_open()
         buffer = bytearray()

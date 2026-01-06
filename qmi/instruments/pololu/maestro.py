@@ -24,11 +24,10 @@ _logger = logging.getLogger(__name__)
 
 
 def _import_modules() -> None:
-    """Import the adafruit-blinka module and busio extension.
+    """Import the adafruit-blinka modules 'board', and 'busio' in qmi_uart.py.
 
-    This import is done in a function, instead of at the top-level,
-    to avoid an unnecessary dependency for programs that do not access
-    the instrument directly.
+    This import is done in a function, instead of at the top-level, to avoid an unnecessary dependency for programs
+    that do not access the instrument directly.
     """
     global board, QMI_Uart
     if board is None or QMI_Uart is None:
@@ -39,7 +38,9 @@ def _import_modules() -> None:
 class Pololu_Maestro(QMI_Instrument):
     """Instrument driver for the Pololu Maestro servo controller.
 
-    Note that new devices are delivered standard in UART mode. If the user wishes to use the device
+    Note that new devices are delivered standard in UART mode. The UART mode can be used by this driver by providing a
+    special transport string, f.ex. "uart:COMx:baudrate=115200". The device address (COM port number in this example)
+    is ignored by the driver in UART mode, but needed for parsing the string. If the user wishes to use the device
     in USB Dual Port or USB Chained serial mode, the mode has to be changed with the Pololu's
     Maestro Control Center program.
 
@@ -134,6 +135,7 @@ class Pololu_Maestro(QMI_Instrument):
             parsed_transport_dict = SerialTransportDescriptorParser.parse_parameter_strings(transport)
             baudrate = parsed_transport_dict["baudrate"] if "baudrate" in parsed_transport_dict else self.BAUDRATE
             self._transport = QMI_Uart(board.TX, board.RX, baudrate)
+
         else:
             self._transport = create_transport(transport, default_attributes={"baudrate": self.BAUDRATE})
 
