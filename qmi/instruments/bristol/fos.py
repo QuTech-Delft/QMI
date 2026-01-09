@@ -4,18 +4,17 @@ Instrument driver for the four-channel Bristol Fiber-Optic Switch (FOS)
 
 import logging
 import sys
-import typing
-from typing import Optional
+from typing import TYPE_CHECKING
 
-import qmi.core.exceptions
 from qmi.core.context import QMI_Context
+from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.instrument import QMI_Instrument
 from qmi.core.rpc import rpc_method
 
 # Lazy import of the "uldaq" or "ul" and "enums" modules. See the function _import_modules() below.
 uldaq = None
 ul, enums = None, None
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     if sys.platform.startswith("linux") or sys.platform == "darwin":
         import uldaq  # type: ignore
 
@@ -63,7 +62,7 @@ class _Bristol_FosUnix:
         return self._dio_device
 
     @staticmethod
-    def _find_device_descriptor(unique_id: str) -> "Optional[uldaq.DaqDeviceDescriptor]":  # type: ignore
+    def _find_device_descriptor(unique_id: str) -> "uldaq.DaqDeviceDescriptor | None":  # type: ignore
         """A method to retrieve a specific instrument's 'device descriptor' object based on unique ID of the instrument.
 
         Parameters:
@@ -89,6 +88,7 @@ class _Bristol_FosUnix:
 
         assert uldaq is not None
         device = uldaq.DaqDevice(device_descriptor)
+        dio_device = None
         try:
             device.connect()
             try:
@@ -102,10 +102,11 @@ class _Bristol_FosUnix:
         except Exception as exc:
             device.release()
             _logger.error("Bristol FOS device connection failed with: %s", str(exc))
-            raise qmi.core.exceptions.QMI_InstrumentException("Bristol FOS device connection failed.") from exc
+            raise QMI_InstrumentException("Bristol FOS device connection failed.") from exc
 
-        self._device = device
-        self._dio_device = dio_device
+        finally:
+            self._device = device
+            self._dio_device = dio_device
 
     @rpc_method
     def close(self) -> None:
@@ -178,7 +179,7 @@ class _Bristol_FosWindows:
         except Exception as exc:
             _logger.error("Bristol FOS device configuration failed with: %s", str(exc))
             ul.release_daq_device(self.board_id)
-            raise qmi.core.exceptions.QMI_InstrumentException("Bristol FOS device port configuration failed.") from exc
+            raise QMI_InstrumentException("Bristol FOS device port configuration failed.") from exc
 
     @rpc_method
     def close(self) -> None:
