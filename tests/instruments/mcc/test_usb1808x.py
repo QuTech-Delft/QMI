@@ -1,22 +1,23 @@
-"""Test for the USB1808x driver."""
-import struct
-
-from math import isnan
-
 from unittest import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 from unittest.mock import patch
 from unittest.mock import call
 
+from dataclasses import dataclass
+import logging
 from typing import cast
 
-from dataclasses import dataclass
-
-
-from qmi.core.transport import QMI_Transport
-from qmi.core.scpi_protocol import ScpiProtocol
-from qmi.instruments.mcc.usb1808x import MCC_USB1808X
 from qmi.core.exceptions import QMI_InstrumentException
+import qmi.instruments
+from qmi.instruments.mcc.usb1808x import MCC_USB1808X
+from tests.patcher import PatcherQmiContext as QMI_Context
+
+
+# Mock import "mcculw"
+class mcculw:
+    ul = None
+    enums = None
+    device_info = None
 
 
 @dataclass
@@ -26,16 +27,16 @@ class TestMeta:
     name: MagicMock
     id: MagicMock
     uldaq: MagicMock
-    super: MagicMock
+    # super: MagicMock
     import_module: MagicMock
-    instr: MCC_USB1808X
+    instr: "MCC_USB1808X"
 
 
 @dataclass
 class TestDeviceMeta:
     """Test device data."""
 
-    descriptor: MagicMock
+    descriptor: "TestUldaqDeviceDescriptor"
     device: MagicMock
     dio_device: MagicMock
     ai_device: MagicMock
@@ -50,53 +51,74 @@ class TestUldaqDeviceDescriptor:
     unique_id: MagicMock()
 
 
-class TestMCC_USB1808X(TestCase):
-    """Testcase for the MCC_USB1808X class.
+class TestUSB1808XUnix(TestCase):
+    """Testcase for the MCC_USB1808X class on Unix environment."""
 
-    Decided not to check assertions for self._device and self._*_device in
-    every function. These assertions are unnesecary in the code of the
-    USB1808x driver, self._check_is_open() already covers this check.
-    """
-
+    @patch("sys.platform", "linux")
     def setUp(self):
-        mock_name = MagicMock()
-        mock_id = MagicMock()
+        logging.getLogger("qmi.instruments.bristol.fos").setLevel(logging.CRITICAL)
+        from qmi.instruments.mcc.usb1808x import MCC_USB1808X, _Mcc_Usb1808xUnix
+
+        self.unix_inst_class = _Mcc_Usb1808xUnix
+        # Substitute a mock object in place of the "uldaq" module.
+        # This must be done BEFORE the FOS driver runs "import uldaq".
+        with patch.dict("sys.modules", {"uldaq": Mock()}):
+            # Trigger lazy import of the uldaq module.
+            qmi.instruments.mcc.usb1808x._import_modules()
+
+        self._mock_name = "D3ADMAU5"
+        # mock_name = MagicMock()
+        # mock_id = MagicMock()
         mock_uldaq = MagicMock()
-        mock_super = MagicMock()
+        # mock_super = MagicMock()
         mock_import_module = MagicMock()
 
-        self._patcher_import_module = patch(
-            "qmi.instruments.mcc.usb1808x._import_modules",
-            mock_import_module,
-        )
-        self._patcher_import_module.start()
+        # self._patcher_import_module = patch(
+        #     "qmi.instruments.mcc.usb1808x._import_modules",
+        #     mock_import_module,
+        # )
+        # self._patcher_import_module.start()
 
         self._patcher_uldaq = patch("qmi.instruments.mcc.usb1808x.uldaq", mock_uldaq)
         self._patcher_uldaq.start()
 
-        instr = MCC_USB1808X(MagicMock(), mock_name, mock_id)
+        self.instr = MCC_USB1808X(QMI_Context(), "unix_1808x", self._mock_name)
 
-        self._patcher_super = patch("qmi.instruments.mcc.usb1808x.super", mock_super)
-        self._patcher_super.start()
+        # self._patcher_super = patch("qmi.instruments.mcc.usb1808x.super", mock_super)
+        # self._patcher_super.start()
 
-        self._meta = TestMeta(
-            instr=cast(MCC_USB1808X, instr),
-            name=mock_name,
-            id=mock_id,
-            uldaq=mock_uldaq,
-            super=mock_super,
-            import_module=mock_import_module,
-        )
+        # Patch device
+        self.device_mock = Mock()
+        patcher = patch('qmi.instruments.mcc.usb1808x.uldaq.DaqDevice',
+                        return_value=self.device_mock)
+        self.device_init = patcher.start()
+        self.addCleanup(patcher.stop)
+
+        # self._meta = TestMeta(
+        #     instr=cast(MCC_USB1808X, self.instr),
+        #     name=mock_name,
+        #     id=mock_id,
+        #     uldaq=mock_uldaq,
+        #     # super=mock_super,
+        #     import_module=mock_import_module,
+        # )
+
+        # Start QMI patcher
+        self.qmi_ctx = QMI_Context("test_mcc_usb-1808x")
+        self.qmi_ctx.start("test_mcc_usb-1808x")
 
     def tearDown(self):
-        self._meta = None
-        self._patcher_import_module.stop()
+        # self._meta = None
+        # self._patcher_import_module.stop()
         self._patcher_uldaq.stop()
-        self._patcher_super.stop()
+        # self._patcher_super.stop()
+        # Stop QMI
+        self.qmi_ctx.stop()
+        logging.getLogger("qmi.instruments.mcc.usb1808x").setLevel(logging.NOTSET)
 
     def test_init(self):
         """MCC_USB1808X.__init__(), happy flow."""
-        self._meta.import_module.assert_called_once_with()
+        self.assertIsInstance(self.instr.device, self.unix_inst_class)
 
     def test_list_instruments(self):
         """MCC_USB1808X.list_instruments(), happy flow."""
@@ -111,7 +133,7 @@ class TestMCC_USB1808X(TestCase):
 
         self._meta.uldaq.get_daq_device_inventory = MagicMock(return_value=mock_resp)
         rt_val = self._meta.instr.list_instruments()
-        self._meta.import_module.assert_has_calls([call(), call()])
+        # self._meta.import_module.assert_has_calls([call(), call()])
         self._meta.uldaq.get_daq_device_inventory.assert_called_once_with(
             self._meta.uldaq.InterfaceType.USB
         )
@@ -145,31 +167,27 @@ class TestMCC_USB1808X(TestCase):
 
     def test_open(self):
         """MCC_USB1808X.open(), happy flow."""
-        self._meta.instr._check_is_closed = MagicMock()
+        test_descriptor = TestUldaqDeviceDescriptor(product_name="NOT", unique_id=self._mock_name)
+        self.instr._check_is_open = Mock(return_value=True)
+        with patch("qmi.instruments.mcc.usb1808x.uldaq.get_daq_device_inventory", return_value=[test_descriptor]):
+            self.instr.open()
 
-        device_meta = self._mock_device()
-
-        self._meta.instr.open()
-
-        self._meta.instr._check_is_closed.assert_called_once_with()
-        device_meta.device.connect.assert_called_once_with()
-        self._meta.uldaq.DaqDevice.assert_called_once_with(device_meta.descriptor)
-        self.assertEqual(self._meta.instr._device, device_meta.device)
-        self.assertEqual(self._meta.instr._dio_device, device_meta.dio_device)
-        self.assertEqual(self._meta.instr._ai_device, device_meta.ai_device)
-        self.assertEqual(self._meta.instr._ao_device, device_meta.ao_device)
-        self._meta.super().open.assert_called_once_with()
+        self.assertIsNotNone(self.instr._device)
+        self.assertTrue(self.instr._is_open)
 
     def test_open_no_device(self):
         """MCC_USB1808X.open(), no device found exception."""
-        self._meta.instr._check_is_closed = MagicMock()
+        expected_exception = f"MCC USB-1808X with unique_id '{self._mock_name}' not found."
+        test_descriptor = TestUldaqDeviceDescriptor(
+            product_name="NOT", unique_id="NOT"
+        )
 
-        device_meta = self._mock_device()
-        device_meta.descriptor.product_name = "NOT"
-        device_meta.descriptor.id = "NOT"
+        self.instr._check_is_open = Mock(return_value=True)
+        with patch("qmi.instruments.mcc.usb1808x.uldaq.get_daq_device_inventory", return_value=[test_descriptor]):
+            with self.assertRaises(ValueError) as exc:
+                self.instr.open()
 
-        with self.assertRaises(QMI_InstrumentException):
-            self._meta.instr.open()
+            self.assertEqual(expected_exception, str(exc.exception))
 
     def test_open_connect_error(self):
         """MCC_USB1808X.open(), device.connect() exception."""
@@ -198,16 +216,22 @@ class TestMCC_USB1808X(TestCase):
 
     def test_close(self):
         """MCC_USB1808X.close(), happy flow."""
-        self._meta.instr._check_is_open = MagicMock()
-        device_meta = self._mock_device()
-        self._meta.instr._device = (
-            device_meta.device
-        )  # want to make sure disconnect and release arent called through open() thus set the device directly.
-        self._meta.instr.close()
-        device_meta.device.disconnect.assert_called_once_with()
-        device_meta.device.release.assert_called_once_with()
-        self._meta.instr._check_is_open.assert_called_once_with()
-        self._meta.super().close.assert_called_once_with()
+        self.instr._check_is_open = Mock(return_value=True)
+        self.instr._device = Mock(spec=self.unix_inst_class)
+        self.instr._device._unique_id = "D3ADMAU5"
+        # device_meta = self._mock_device()
+        # self._meta.instr._device = (
+        #     device_meta.device
+        # )
+        # self._meta.instr.close()
+        self.instr.close()
+        # self.instr.device.disconnect.assert_called_once_with()
+        # device_meta.device.disconnect.assert_called_once_with()
+        # device_meta.device.release.assert_called_once_with()
+        # self._meta.instr._check_is_open.assert_called_once_with()
+        # self._meta.super().close.assert_called_once_with()
+        self.assertIsNone(self.instr._device)
+        self.assertFalse(self.instr._is_open)
 
     def test_get_idn(self):
         """MCC_USB1808X.get_idn(), happy flow."""

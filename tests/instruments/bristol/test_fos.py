@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, Mock, call, patch
 import logging
 
 import qmi.core.exceptions
-
 import qmi.instruments
 from tests.patcher import PatcherQmiContext as QMI_Context
 
@@ -12,11 +11,10 @@ from tests.patcher import PatcherQmiContext as QMI_Context
 class mcculw:
     ul = None
     enums = None
-    structs = None
 
 
 class TestFosUnix(unittest.TestCase):
-    """ Unit tests for Bristol FOS. """
+    """Testcase for Bristol FOS class on Unix environment."""
 
     UNIQUE_ID = 'DEADBEAF'
 

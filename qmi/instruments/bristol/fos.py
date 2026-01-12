@@ -11,7 +11,7 @@ from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.instrument import QMI_Instrument
 from qmi.core.rpc import rpc_method
 
-# Lazy import of the "uldaq" or "ul" and "enums" modules. See the function _import_modules() below.
+# Lazy import of the "uldaq" or "mcculw" modules. See the function _import_modules() below.
 uldaq = None
 ul, enums = None, None
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ _logger = logging.getLogger(__name__)
 
 
 def _import_modules() -> None:
-    """Import the "uldaq" library or "mcculw" modules.
+    """Import the "uldaq" or "mcculw" modules.
 
     This import is done in a function, instead of at the top-level, to avoid unnecessary
     dependencies for programs that do not access the instrument directly.
@@ -79,7 +79,6 @@ class _Bristol_FosUnix:
 
         return None  # Device not found.
 
-    @rpc_method
     def open(self) -> None:
         device_descriptor = self._find_device_descriptor(self._unique_id)
         if device_descriptor is None:
@@ -108,14 +107,12 @@ class _Bristol_FosUnix:
             self._device = device
             self._dio_device = dio_device
 
-    @rpc_method
     def close(self) -> None:
         self.device.disconnect()
         self.device.release()
         self._device = None
         self._dio_device = None
 
-    @rpc_method
     def select_channel(self, channel: int) -> None:
         assert uldaq is not None
         # Note that the 'channel parameter has values 1..4 ; these are mapped to value 0..3 here.
@@ -160,7 +157,6 @@ class _Bristol_FosWindows:
 
         return None  # Device not found.
 
-    @rpc_method
     def open(self) -> None:
         assert ul is not None and enums is not None
         ul.ignore_instacal()  # With this we ignore 'cg.cfg' file and enable runtime configuring.
@@ -181,12 +177,10 @@ class _Bristol_FosWindows:
             ul.release_daq_device(self.board_id)
             raise QMI_InstrumentException("Bristol FOS device port configuration failed.") from exc
 
-    @rpc_method
     def close(self) -> None:
         assert ul is not None
         ul.release_daq_device(self.board_id)
 
-    @rpc_method
     def select_channel(self, channel: int) -> None:
         assert ul is not None
         # Note that the 'channel parameter has values 1..4 ; these are mapped to value 0..3 here.
