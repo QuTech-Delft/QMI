@@ -153,8 +153,8 @@ class _Mcc_Usb1808xUnix:
         self._device = None
 
     def get_idn(self) -> QMI_InstrumentIdentification:
-        desc = self._device.get_descriptor()
-        cfg = self._device.get_config()
+        desc = self.device.get_descriptor()
+        cfg = self.device.get_config()
         version = cfg.get_version(uldaq.DevVersionType.FW_MAIN)
         return QMI_InstrumentIdentification(
             vendor="Measurement Computing",
@@ -176,10 +176,10 @@ class _Mcc_Usb1808xUnix:
         d = uldaq.DigitalDirection.OUTPUT if output else uldaq.DigitalDirection.INPUT
         self.dio_device.d_config_bit(uldaq.DigitalPortType.AUXPORT, channel, d)
 
-    def get_dio_input_bit(self, channel: int) -> bool:
-        return bool(self.dio_device.d_bit_in(uldaq.DigitalPortType.AUXPORT, channel))
+    def get_dio_input_bit(self, channel: int) -> int:
+        return self.dio_device.d_bit_in(uldaq.DigitalPortType.AUXPORT, channel)
 
-    def set_dio_output_bit(self, channel: int, value: bool) -> None:
+    def set_dio_output_bit(self, channel: int, value: int) -> None:
         return self.dio_device.d_bit_out(uldaq.DigitalPortType.AUXPORT, channel, value)
 
     def get_ai_num_channels(self) -> int:
@@ -270,13 +270,13 @@ class _Mcc_Usb1808xWindows:
         device_descriptor = self._find_device_descriptor(self._unique_id)
         if device_descriptor is None:
             _logger.error("MCC USB-1808X with unique_id '%s' not found.", self._unique_id)
-            raise ValueError(f"MCC USB-1808X with unique_id '{self._unique_id!r}' not found.")
+            raise ValueError(f"MCC USB-1808X with unique_id {self._unique_id!r} not found.")
 
         try:
             ul.create_daq_device(self.board_id, device_descriptor)
             assert self.board_id == ul.get_board_number(
                 device_descriptor
-            ), f"{self.board_id} != {ul.get_board_number(device_descriptor)}"
+            ), f"Board ID {self.board_id} != {ul.get_board_number(device_descriptor)}"
             self._device_info = device_info.DaqDeviceInfo(self.board_id)
 
         except Exception as exc:
@@ -320,9 +320,9 @@ class _Mcc_Usb1808xWindows:
         port = self.device_info.get_dio_info().port_info[enums.DigitalPortType.AUXPORT]
         return ul.d_bit_in(self._board_id, port.type, channel)
 
-    def set_dio_output_bit(self, channel: int, value: bool) -> None:
+    def set_dio_output_bit(self, channel: int, value: int) -> None:
         port = self.device_info.get_dio_info().port_info[enums.DigitalPortType.AUXPORT]
-        return ul.d_bit_out(self.board_id, port.type, channel, int(value))
+        return ul.d_bit_out(self.board_id, port.type, channel, value)
 
     def get_ai_num_channels(self) -> int:
         return self.device_info.get_ai_info().num_chans
@@ -490,7 +490,7 @@ class MCC_USB1808X(QMI_Instrument):
                              f"Possible values are {list(range(DIGITAL_CHANNELS))}")
 
         self._check_is_open()
-        self.device.set_dio_output_bit(channel, value)
+        self.device.set_dio_output_bit(channel, int(value))
 
     @rpc_method
     def get_ai_num_channels(self) -> int:
