@@ -153,6 +153,7 @@ class _Mcc_Usb1808xUnix:
         self._device = None
 
     def get_idn(self) -> QMI_InstrumentIdentification:
+        assert uldaq is not None
         desc = self.device.get_descriptor()
         cfg = self.device.get_config()
         version = cfg.get_version(uldaq.DevVersionType.FW_MAIN)
@@ -164,32 +165,39 @@ class _Mcc_Usb1808xUnix:
         )
 
     def get_dio_num_channels(self) -> int:
+        assert uldaq is not None
         info = self.dio_device.get_info()
         return info.get_port_info(uldaq.DigitalPortType.AUXPORT).number_of_bits
 
     def get_dio_direction(self) -> list[bool]:
+        assert uldaq is not None
         cfg = self.dio_device.get_config()
         directions = cfg.get_port_direction(uldaq.DigitalPortType.AUXPORT)
         return [(d == uldaq.DigitalDirection.OUTPUT) for d in directions]
 
     def set_dio_direction(self, channel: int, output: bool) -> None:
+        assert uldaq is not None
         d = uldaq.DigitalDirection.OUTPUT if output else uldaq.DigitalDirection.INPUT
         self.dio_device.d_config_bit(uldaq.DigitalPortType.AUXPORT, channel, d)
 
     def get_dio_input_bit(self, channel: int) -> int:
+        assert uldaq is not None
         return self.dio_device.d_bit_in(uldaq.DigitalPortType.AUXPORT, channel)
 
     def set_dio_output_bit(self, channel: int, value: int) -> None:
+        assert uldaq is not None
         return self.dio_device.d_bit_out(uldaq.DigitalPortType.AUXPORT, channel, value)
 
     def get_ai_num_channels(self) -> int:
         return self.ai_device.get_info().get_num_chans()
 
     def get_ai_ranges(self) -> list[str]:
+        assert uldaq is not None
         ranges = self.ai_device.get_info().get_ranges(uldaq.AiChanType.VOLTAGE)
         return [urange.name for urange in ranges]
 
     def get_ai_value(self, channel: int, input_mode: str, analog_range: str) -> float:
+        assert uldaq is not None
         mod = uldaq.AiInputMode[input_mode]
         urange = uldaq.Range[analog_range]
         return self.ai_device.a_in(channel, mod, urange, uldaq.AInFlag.DEFAULT)
@@ -202,6 +210,7 @@ class _Mcc_Usb1808xUnix:
         return [urange.name for urange in ranges]
 
     def set_ao_value(self, channel: int, analog_range: str, value: float) -> None:
+        assert uldaq is not None
         urange = uldaq.Range[analog_range]
         self.ao_device.a_out(channel, urange, uldaq.AOutFlag.DEFAULT, value)
 
@@ -290,6 +299,8 @@ class _Mcc_Usb1808xWindows:
         ul.release_daq_device(self.board_id)
 
     def get_idn(self) -> QMI_InstrumentIdentification:
+        assert ul is not None
+        assert enums is not None
         version = ul.get_config_string(
             enums.InfoType.BOARDINFO, self._board_id, enums.FirmwareVersionType.MAIN, enums.BoardInfo.DEVVERSION, 16
         )
@@ -305,6 +316,8 @@ class _Mcc_Usb1808xWindows:
         return port_info.num_bits
 
     def get_dio_direction(self) -> list[bool]:
+        assert ul is not None
+        assert enums is not None
         dio_info = self.device_info.get_dio_info()
         # Get config returns in this case an integer, representing a num_bits (= 4) sized channel 0|1 bits
         directions = [ul.get_config(
@@ -314,15 +327,21 @@ class _Mcc_Usb1808xWindows:
         return [(int(b) == enums.DigitalIODirection.OUT) for d in directions for b in f"{d:04b}"[::-1]]
 
     def set_dio_direction(self, channel: int, output: bool) -> None:
+        assert ul is not None
+        assert enums is not None
         d = enums.DigitalIODirection.OUT if output else enums.DigitalIODirection.IN
         port = self.device_info.get_dio_info().port_info[enums.DigitalPortType.AUXPORT]
         ul.d_config_bit(self._board_id, port.type, channel, d)
 
     def get_dio_input_bit(self, channel: int) -> int:
+        assert ul is not None
+        assert enums is not None
         port = self.device_info.get_dio_info().port_info[enums.DigitalPortType.AUXPORT]
         return ul.d_bit_in(self._board_id, port.type, channel)
 
     def set_dio_output_bit(self, channel: int, value: int) -> None:
+        assert ul is not None
+        assert enums is not None
         port = self.device_info.get_dio_info().port_info[enums.DigitalPortType.AUXPORT]
         return ul.d_bit_out(self.board_id, port.type, channel, value)
 
@@ -335,6 +354,7 @@ class _Mcc_Usb1808xWindows:
 
     def get_ai_value(self, channel: int, input_mode: str, analog_range: str) -> float:
         # input_mode is not used with mcculw at this call.
+        assert ul is not None
         urange = enums.ULRange[analog_range]
         return ul.a_in(self.board_id, channel, urange)
 
@@ -346,6 +366,8 @@ class _Mcc_Usb1808xWindows:
         return [urange.name for urange in ranges]
 
     def set_ao_value(self, channel: int, analog_range: str, value: float) -> None:
+        assert ul is not None
+        assert enums is not None
         urange = enums.ULRange[analog_range]
         # For mcculw we need to scale the value into range 0..1.
         scaled_value = (value - urange.range_min) / (urange.range_max - urange.range_min)
@@ -381,6 +403,7 @@ class MCC_USB1808X(QMI_Instrument):
             device:     The Windows|Linux object for MCC USB-1808X device on the driver.
         """
         super().__init__(context, name)
+        self._device: _Mcc_Usb1808xUnix | _Mcc_Usb1808xWindows | None
         if sys.platform.startswith("win"):
             self._device = _Mcc_Usb1808xWindows(unique_id, board_id)
 
