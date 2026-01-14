@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import logging
 
 import qmi.instruments
-from qmi.instruments.mcc.usb1808x import MCC_USB1808X  # Needed for the tests, do not remove
+from qmi.instruments.mcc.usb1808x import MCC_USB1808X
 from tests.patcher import PatcherQmiContext as QMI_Context
 
 

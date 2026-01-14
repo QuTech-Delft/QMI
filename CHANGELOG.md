@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.52.0-beta.0] - Unreleased
 
 ### Added
-- Windows compatibility for MCC_USB1808X QMI driver in `qmi.instruments.mcc.usb1808x`
+- Windows compatibility for MCC_USB1808X QMI driver in `qmi.instruments.mcc.usb1808x`.
 
 ### Changed
 
