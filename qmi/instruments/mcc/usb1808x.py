@@ -301,15 +301,17 @@ class _Mcc_Usb1808xWindows:
         )
 
     def get_dio_num_channels(self) -> int:
-        dio_info = self.device_info.get_dio_info().port_info[0].num_bits
-        return dio_info.num_ports
+        port_info = self.device_info.get_dio_info().port_info[0]
+        return port_info.num_bits
 
     def get_dio_direction(self) -> list[bool]:
         dio_info = self.device_info.get_dio_info()
+        # Get config returns in this case an integer, representing a num_bits (= 4) sized channel 0|1 bits
         directions = [ul.get_config(
             enums.InfoType.DIGITALINFO, self._board_id, i, enums.DigitalInfo.CONFIG,
-        ) for i in range(dio_info.num_ports)]
-        return [(d == enums.DigitalIODirection.OUT) for d in directions]
+        ) for i in range(dio_info.num_ports)]  # No real need to do a range for this model, but it is 'future proof'.
+        # We need to parse the integer(s) into bits, and compare those (in reverse order).
+        return [(int(b) == enums.DigitalIODirection.OUT) for d in directions for b in f"{d:04b}"[::-1]]
 
     def set_dio_direction(self, channel: int, output: bool) -> None:
         d = enums.DigitalIODirection.OUT if output else enums.DigitalIODirection.IN
