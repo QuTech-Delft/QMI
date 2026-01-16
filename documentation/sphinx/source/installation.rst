@@ -33,7 +33,7 @@ The following Python packages provide support for specific hardware. They are no
 * Package `ADwin <https://pypi.org/project/ADwin/>`_ for Adwin instruments.
 * Package `pydwf <https://pypi.org/project/pydwf/>`_ for Analog Discovery 2 instrument.
 * Package `PyVISA <https://pypi.org/project/PyVISA/>`_ for certain Windows(-only) instruments.
-* Package `uldaq <https://pypi.org/project/uldaq/>`_ for supporting MCC and MCC-based instruments (Bristol FOS);
+* Packages `uldaq <https://pypi.org/project/uldaq/>`_ and `mcculw <https://pypi.org/project/mcculw/>`_ for supporting MCC and MCC-based instruments;
 * Package `zhinst <https://pypi.org/project/zhinst/>`_ for the Zürich Instruments AWG.
 * Package `RPi.GPIO <https://pypi.org/project/RPi.GPIO/>`_ for controlling the digital pins of the Raspberry Pi.
 Note that this list might not be complete, as by introduction of new hardware drivers, new packages could be added.
@@ -43,15 +43,12 @@ The QMI project uses Mypy and Pylint in checking the code quality. For local che
 * Packages `pylint <https://pypi.org/project/pylint/>`_ and `mypy <https://pypi.org/project/mypy/>`_ for static code checks;
 
 
-.. rubric:: Dependencies on closed-source drivers
+.. rubric:: Dependencies on closed-source drivers and SDKs
 
+* `Aravis <https://aravisproject.github.io/aravis/aravis-stable/>`_ for GigE cameras; Aravis is Linux only.
 * `Digilent <https://store.digilentinc.com/>`_ `Analog Discovery 2 <https://store.digilentinc.com/analog-discovery-2-100msps-usb-oscilloscope-logic-analyzer-and-variable-power-supply/>`_ and `Digital Discovery <https://store.digilentinc.com/digital-discovery-portable-usb-logic-analyzer-and-digital-pattern-generator/>`_;
 * `PicoQuant <https://www.picoquant.com/>`_ `Multiharp 150 <https://www.picoquant.com/products/category/tcspc-and-time-tagging-modules/multiharp-150-high-throughput-multichannel-event-timer-tcspc-unit>`_;
+* `PicoTech <https://www.picotech.com/>`_ `PicoSDK <https://www.picotech.com/oscilloscope/3000/usb3-oscilloscope-logic-analyzer>`_ for Picoscope 3000 and 4000 series.
 * `Jäger Computergesteuerte Messtechnik <https://www.adwin.de/index-us.html>`_: `ADwin-Pro II <https://www.adwin.de/us/produkte/proII.html>`_;
 * `Imagine Optic <https://www.imagine-optic.com/>`_ `mirao 52e <https://www.imagine-optic.com/product/mirao-52e/>`_.
 Note that this list might not be complete, as by introduction of new hardware drivers, new dependencies could be added.
-
-.. To be added:
-..
-.. import usb    "python3-usb"
-.. from gi.repository import Aravis ; Aravis is Linux only. "gi.repository" ?? "gobject introspection" only used in Linux.
