@@ -135,7 +135,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._grouping = grouping
         # ZI HDAWG server, module and device
         self._daq_server: None | ziDAQServer = None
-        self._awg_module_zi: None | ZIModule = None
+        self._awg_module: None | ZIModule = None
         self._device: None | HDAWG = None
 
         # Import the "zhinst" modules.
@@ -156,9 +156,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return self._daq_server
 
     @property
-    def awg_module_zi(self) -> "ZIModule":
-        assert self._awg_module_zi is not None
-        return self._awg_module_zi
+    def awg_module(self) -> "ZIModule":
+        assert self._awg_module is not None
+        return self._awg_module
 
     @property
     def device(self) -> "HDAWG":
@@ -370,10 +370,10 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Poll the AWG module to check compilation progress.
         compilation_start_time = time.monotonic()
         _logger.debug("Compilation started ... ")
-        compilation_status = CompilerStatus(self.awg_module_zi.getInt("compiler/status"))
+        compilation_status = CompilerStatus(self.awg_module.getInt("compiler/status"))
         while compilation_status == CompilerStatus.NOT_READY:
             time.sleep(self.POLL_PERIOD)
-            compilation_status = CompilerStatus(self.awg_module_zi.getInt("compiler/status"))
+            compilation_status = CompilerStatus(self.awg_module.getInt("compiler/status"))
             if time.monotonic() - compilation_start_time > self.COMPILE_TIMEOUT:
                 raise QMI_TimeoutException(f"Compilation process timed out (timeout={self.COMPILE_TIMEOUT})")
 
@@ -402,12 +402,12 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ok_to_proceed = True
         elif compilation_result == CompilerStatus.READY_WITH_ERRORS:
             # Compilation finished with errors.
-            error_message = self.awg_module_zi.getString("compiler/statusstring")
+            error_message = self.awg_module.getString("compiler/statusstring")
             _logger.error("Compilation finished with errors: %s", error_message)
             ok_to_proceed = False
         elif compilation_result == CompilerStatus.READY_WITH_WARNINGS:
             # Compilation finished with warnings.
-            warning_message = self.awg_module_zi.getString("compiler/statusstring")
+            warning_message = self.awg_module.getString("compiler/statusstring")
             _logger.warning("Compilation finished with warnings: %s", warning_message)
             ok_to_proceed = True
         else:
@@ -427,11 +427,11 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Poll the AWG module to check ELF upload progress.
         upload_start_time = time.monotonic()
         _logger.debug("Polling ELF upload status ...")
-        upload_status = UploadStatus(self.awg_module_zi.getInt("elf/status"))
+        upload_status = UploadStatus(self.awg_module.getInt("elf/status"))
         while upload_status == 2:
             time.sleep(self.POLL_PERIOD)
-            upload_status = UploadStatus(self.awg_module_zi.getInt("elf/status"))
-            upload_progress = self.awg_module_zi.getDouble("progress")
+            upload_status = UploadStatus(self.awg_module.getInt("elf/status"))
+            upload_progress = self.awg_module.getDouble("progress")
             if time.monotonic() - upload_start_time > self.UPLOAD_TIMEOUT:
                 raise QMI_TimeoutException(
                     f"Upload process timed out (timeout={self.UPLOAD_TIMEOUT}) at {upload_progress * 100}%"
@@ -488,14 +488,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         # Connect to the device.
         self._device = cast(HDAWG, self._session.connect_device(self._device_name))
-        self._awg_module_zi = self._session.modules.awg.raw_module
+        self._awg_module = self._session.modules.awg.raw_module
 
-        self.awg_module_zi.set("device", self._device_name)
+        self.awg_module.set("device", self._device_name)
         super().open()
         # Set the core YxZ channels grouping
         self.set_channel_grouping(self._grouping)
-        self.awg_module_zi.set("index", 0)  # Set initially as 0, 0 is valid for all grouping modes.
-        self.awg_module_zi.execute()
+        self.awg_module.set("index", 0)  # Set initially as 0, 0 is valid for all grouping modes.
+        self.awg_module.execute()
 
     @rpc_method
     def close(self) -> None:
@@ -503,13 +503,13 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         _logger.info("[%s] Closing connection to instrument", self._name)
         # Check if the AWG thread is running.
-        if not self.awg_module_zi.finished():
+        if not self.awg_module.finished():
             # Stop the AWG module thread.
-            self.awg_module_zi.finish()
+            self.awg_module.finish()
 
         # Verify that the AWG thread is no longer running.
-        assert self.awg_module_zi.finished()
-        self._awg_module_zi = None
+        assert self.awg_module.finished()
+        self._awg_module = None
 
         self._session.disconnect_device(self._device_name)
         self._daq_server = None
@@ -643,7 +643,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Raises:
             ValueError: If the given index value is invalid for the current grouping mode.
         """
-        self.awg_module_zi.set("index", index)
+        self.awg_module.set("index", index)
 
     @rpc_method
     def get_awg_module_index(self) -> int:
@@ -652,7 +652,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
             index: AWG module index number.
         """
-        return self.awg_module_zi.getInt("index")
+        return self.awg_module.getInt("index")
 
     @rpc_method
     def get_awg_module_enabled(self) -> int:
@@ -666,7 +666,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: AWG index number is invalid.
         """
         self._check_is_open()
-        return self.awg_module_zi.getInt("awg/enable")
+        return self.awg_module.getInt("awg/enable")
 
     @rpc_method
     def set_awg_module_enabled(self, value: int) -> None:
@@ -686,7 +686,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             raise ValueError("Invalid value")
 
         self._check_is_open()
-        self.awg_module_zi.set("awg/enable", value)
+        self.awg_module.set("awg/enable", value)
 
     @rpc_method
     def compile_sequencer_program(self, awg_channel: int, sequencer_program: str) -> tuple[bytes, Any]:
@@ -786,8 +786,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             return
 
         # Compile and upload for current AWG module index.
-        self.awg_module_zi.set("compiler/upload", 1)
-        self.awg_module_zi.set("compiler/sourcestring", sequencer_program)
+        self.awg_module.set("compiler/upload", 1)
+        self.awg_module.set("compiler/sourcestring", sequencer_program)
         # Check for compiling timeout
         compilation_status = self._wait_compile()
         result_ok = self._interpret_compilation_result_is_ok(compilation_status)
