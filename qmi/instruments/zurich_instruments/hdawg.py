@@ -16,14 +16,13 @@ from qmi.core.rpc import rpc_method
 import jsonschema  # type: ignore
 import numpy as np
 
+zhinst = None
+ziDAQServer, AwgModule = None, None
 # Lazy import of the zhinst module. See the function _import_modules() below.
 if TYPE_CHECKING:
     import zhinst.core
     import zhinst.utils
     from zhinst.core import ziDAQServer, AwgModule
-else:
-    zhinst = None
-    ziDAQServer, AwgModule = None, None
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
