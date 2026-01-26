@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `psutil._common` does not contain `snicaddr` namedtuple since version 7.2.0. It has been moved to `psutil._ntuples`. Fixed this in `proc.py`.
-- Not setting `ziDAQServer` and `AwgModule` as global variables in `qmi.instruments.zurich_instruments.hdawg` caused them not to be available in the driver after importing them in the `_import_modules`. This is not fixed.
+- Not setting `ziDAQServer` and `AwgModule` as global variables in `qmi.instruments.zurich_instruments.hdawg` caused them not to be available in the driver after importing them in the `_import_modules`. This is now fixed.
 
 ## [0.51.0] - 2025-12-09
 
