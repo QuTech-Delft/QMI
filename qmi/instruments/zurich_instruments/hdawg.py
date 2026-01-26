@@ -40,8 +40,9 @@ def _import_modules() -> None:
     to avoid an unnecessary dependency for programs that do not access
     the instrument directly.
     """
-    global zhinst
+    global zhinst, ziDAQServer, AwgModule
     if zhinst is None:
+        import zhinst
         import zhinst.core  # pylint: disable=W0621
         import zhinst.utils
         from zhinst.core import ziDAQServer, AwgModule
