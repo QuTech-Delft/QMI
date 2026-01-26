@@ -18,6 +18,7 @@ import numpy as np
 
 # Lazy import of the zhinst module. See the function _import_modules() below.
 if TYPE_CHECKING:
+    import zhinst
     import zhinst.core
     import zhinst.toolkit
     import zhinst.toolkit.driver
@@ -60,6 +61,7 @@ def _import_modules() -> None:
     """
     global zhinst, awg, ziDAQServer, Waveforms, HDAWG, ZIModule
     if zhinst is None:
+        import zhinst
         import zhinst.core
         import zhinst.toolkit
         import zhinst.toolkit.driver

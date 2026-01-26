@@ -10,13 +10,14 @@ import warnings
 import numpy as np
 
 from qmi.instruments.zurich_instruments import ZurichInstruments_Hdawg
-from qmi.core.exceptions import QMI_InvalidOperationException, QMI_ApplicationException, QMI_TimeoutException
+from qmi.core.exceptions import QMI_InvalidOperationException, QMI_ApplicationException, QMI_TimeoutException, \
+    QMI_RuntimeException
 from tests.patcher import PatcherQmiContext as QMI_Context
 
 _DEVICE_HOST = "localhost"
 _DEVICE_PORT = 12345
 _DEVICE_NAME = "DEV8888"
-_SCHEMA = {"/DEV8888/awgs/0/commandtable/schema": [{"vector": """{
+_schema_dict = {"vector": """{
   "$schema": "http://json-schema.org/draft-07/schema",
   "title": "AWG Command Table Schema",
   "version": "0.4",
@@ -223,7 +224,19 @@ _SCHEMA = {"/DEV8888/awgs/0/commandtable/schema": [{"vector": """{
   "required": [
     "header"
   ]
-}"""}]}
+}"""}
+_SCHEMA = {"/DEV8888/awgs/0/commandtable/schema": [_schema_dict]}
+
+
+class WaveformMock:
+    def __init__(self):
+        self.length = 0
+        self.playZero = False
+
+
+class ParameterMock:
+    def __init__(self):
+        self.waveform = WaveformMock()
 
 
 class CompilerStatusNotReady(enum.IntEnum):
@@ -249,10 +262,8 @@ class TestHDAWGInit(unittest.TestCase):
 
         self.ctx = QMI_Context("test_hdawg_openclose")
         self._awg_module = PropertyMock()
-        self._awg_module.finished.side_effect = [True, False, False, True] * 2
-
-        self._daq_server = PropertyMock()
-        self._daq_server.awgModule = Mock(return_value=self._awg_module)
+        self._awg_module.awg = Mock()
+        self._awg_module.awg.raw_module = Mock()
 
     def tearDown(self):
         with warnings.catch_warnings():
@@ -265,18 +276,10 @@ class TestHDAWGInit(unittest.TestCase):
         """Nominal open/close sequence."""
 
         with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
-            ), unittest.mock.patch(
-               "qmi.instruments.zurich_instruments.hdawg.ZIModule", return_value=self._awg_module
-            ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst"
             ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
-            ) as session_patch, unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-            ) as core_patch:
-            session_patch.daq_server = self._daq_server
-            session_patch.module.awg.raw_module = self._awg_module
+            ) as session_patch:
             self.hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
@@ -287,47 +290,27 @@ class TestHDAWGInit(unittest.TestCase):
             self.hdawg.open()
             self.hdawg.close()
 
-        # self.assertListEqual([0 for _ in range(ZurichInstruments_Hdawg.NUM_CHANNELS)], self.hdawg.awg_channel_map)
-
-        # expected_daq_server_calls = [
-        #     # open()
-        #     call.connectDevice(_DEVICE_NAME, "1GbE"),
-        #     call.awgModule(),
-        #     call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2),  # 2 is the default group
-        #     # close()
-        #     call.disconnect()
-        # ]
-        # self.assertEqual(expected_daq_server_calls, self._daq_server.mock_calls)
-
-        expected_awg_module_calls = [
-            # open()
-            call.set("device", _DEVICE_NAME),
-            call.set("index", 0),
-            call.finished(),
-            call.execute(),
-            call.finished(),
-            # close()
-            call.finished(),
-            call.finish(),
-            call.finished()
+        expected_session_calls = [
+            call(_DEVICE_HOST, _DEVICE_PORT),
+            call().connect_device(_DEVICE_NAME),
+            call().modules.awg.raw_module.set("device", _DEVICE_NAME),
+            call().daq_server.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2),
+            call().modules.awg.raw_module.set("index", 0),
+            call().modules.awg.raw_module.execute(),
+            call().modules.awg.raw_module.finished(),
+            call().disconnect_device(_DEVICE_NAME),
         ]
-        self.assertEqual(self._awg_module.mock_calls, expected_awg_module_calls)
+        session_patch.assert_has_calls(expected_session_calls, any_order=True)
 
     def test_openclose_grouping_modes_0_1(self):
         """open/close sequence with 4x2 and 2x4 grouping modes."""
 
         for grouping in (0, 1):
             with unittest.mock.patch(
-                    "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
                 ), unittest.mock.patch(
-                    "qmi.instruments.zurich_instruments.hdawg.ZIModule", return_value=self._awg_module
-                ), unittest.mock.patch(
-                    "qmi.instruments.zurich_instruments.hdawg.zhinst"
-                ), unittest.mock.patch(
-                    "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-                ) as core_patch:
-                core_patch.ziDAQServer = Mock(return_value=self._daq_server)
-                core_patch.AwgModule = Mock(return_value=self._awg_module)
+                "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
+            ) as session_patch:
                 self.hdawg = ZurichInstruments_Hdawg(
                     self.ctx,
                     "HDAWG",
@@ -339,52 +322,27 @@ class TestHDAWGInit(unittest.TestCase):
                 self.hdawg.open()
                 self.hdawg.close()
 
-            # awg_cores_map = [
-            #     n // (2 ** (grouping + 1)) * (grouping % 2 + 1) for n in range(ZurichInstruments_Hdawg.NUM_CHANNELS)
-            # ]
-            # self.assertListEqual(awg_cores_map, self.hdawg.awg_channel_map)
-
-            expected_daq_server_calls = [
-                # open()
-                call.connectDevice(_DEVICE_NAME, "1GbE"),
-                call.awgModule(),
-                call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", grouping),
-                # close()
-                call.disconnect()
+            expected_session_calls = [
+                call(_DEVICE_HOST, _DEVICE_PORT),
+                call().connect_device(_DEVICE_NAME),
+                call().modules.awg.raw_module.set("device", _DEVICE_NAME),
+                call().daq_server.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", grouping),
+                call().modules.awg.raw_module.set("index", 0),
+                call().modules.awg.raw_module.execute(),
+                call().modules.awg.raw_module.finished(),
+                call().disconnect_device(_DEVICE_NAME),
             ]
-            self.assertEqual(expected_daq_server_calls, self._daq_server.mock_calls)
-
-            expected_awg_module_calls = [
-                # open()
-                call.set("device", _DEVICE_NAME),
-                call.set("index", 0),
-                call.finished(),
-                call.execute(),
-                call.finished(),
-                # close()
-                call.finished(),
-                call.finish(),
-                call.finished()
-            ]
-            self.assertEqual(expected_awg_module_calls, self._awg_module.mock_calls)
-            self._daq_server.reset_mock()
-            self._awg_module.reset_mock()
+            session_patch.assert_has_calls(expected_session_calls, any_order=True)
 
     def test_failed_open1(self):
-        """Failed open sequence."""
-        self._awg_module.finished.side_effect = [False]
-
+        """Failed open sequence due to self._awg_module being None."""
         with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
         ), unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.ZIModule", return_value=self._awg_module
-        ), unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.zhinst"
-        ), unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-        ) as core_patch:
-            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
-            core_patch.AwgModule = Mock(return_value=self._awg_module)
+            "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
+        ) as session_patch:
+            self._awg_module.awg.raw_module = None
+            session_patch().modules = self._awg_module
             self.hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
@@ -395,37 +353,20 @@ class TestHDAWGInit(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 self.hdawg.open()
 
-        expected_daq_server_calls = [
-            call.connectDevice(_DEVICE_NAME, "1GbE"),
-            call.awgModule(),
-            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2)  # 2 is the default group
+        expected_session_calls = [
+            call(_DEVICE_HOST, _DEVICE_PORT),
+            call().connect_device(_DEVICE_NAME),
         ]
-        self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
-
-        expected_awg_module_calls = [
-            call.set("device", _DEVICE_NAME),
-            call.set("index", 0),
-            call.finished()
-        ]
-        self.assertEqual(self._awg_module.mock_calls, expected_awg_module_calls)
+        session_patch.assert_has_calls(expected_session_calls)
 
     def test_failed_open2(self):
-        """Failed open sequence."""
-        self._awg_module.finished.side_effect = [True, True]
-
+        """Failed open sequence due to self._daq_server being None."""
         with unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
         ), unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.ZIModule", return_value=self._awg_module
-        ), unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.zhinst"
-        ), unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-        ) as core_patch:  # , unittest.mock.patch(
-            #     "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
-            # ) as utils_patch:
-            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
-            core_patch.AwgModule = Mock(return_value=self._awg_module)
+            "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
+        ) as session_patch:
+            session_patch().daq_server = None
             self.hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
@@ -436,37 +377,56 @@ class TestHDAWGInit(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 self.hdawg.open()
 
-        expected_daq_server_calls = [
-            call.connectDevice(_DEVICE_NAME, "1GbE"),
-            call.awgModule(),
-            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2)  # 2 is the default group
+        expected_session_calls = [
+            call(_DEVICE_HOST, _DEVICE_PORT),
+            call().connect_device(_DEVICE_NAME),
         ]
-        self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
+        session_patch.assert_has_calls(expected_session_calls)
 
-        expected_awg_module_calls = [
-            call.set("device", _DEVICE_NAME),
-            call.set("index", 0),
-            call.finished(),
-            call.execute(),
-            call.finished()
-        ]
-        self.assertEqual(self._awg_module.mock_calls, expected_awg_module_calls)
-
-    def test_failed_close1(self):
-        """Failed close sequence."""
-        self._awg_module.finished.side_effect = [True, False, True]
+    def test_close_awg_module_not_finished(self):
+        """Test close sequence such that the self.awg_module is not finished and finish() call has to be made."""
+        self._awg_module.awg.raw_module.finished = Mock(side_effect=[False, True])
 
         with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
-            ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ZIModule", return_value=self._awg_module
-            ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst"
             ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-            ) as core_patch:
-            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
-            core_patch.AwgModule = Mock(return_value=self._awg_module)
+                "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
+            ) as session_patch:
+            session_patch().modules = self._awg_module
+            self.hdawg = ZurichInstruments_Hdawg(
+                self.ctx,
+                "HDAWG",
+                server_host=_DEVICE_HOST,
+                server_port=_DEVICE_PORT,
+                device_name=_DEVICE_NAME
+            )
+            self.hdawg.open()
+            self.hdawg.close()
+
+        expected_session_calls = [
+            call(_DEVICE_HOST, _DEVICE_PORT),
+            call().connect_device(_DEVICE_NAME),
+            call().modules.awg.raw_module.set("device", _DEVICE_NAME),
+            call().daq_server.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2),
+            call().modules.awg.raw_module.set("index", 0),
+            call().modules.awg.raw_module.execute(),
+            call().modules.awg.raw_module.finished(),
+            call().modules.awg.raw_module.finish(),
+            call().modules.awg.raw_module.finished(),
+            call().disconnect_device(_DEVICE_NAME),
+        ]
+        session_patch.assert_has_calls(expected_session_calls, any_order=True)
+
+    def test_close_assertion_error(self):
+        """Failed close sequence due to assertion error AWG module 'finished'."""
+        self._awg_module.awg.raw_module.finished = Mock(return_value=False)
+
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
+            ) as session_patch:
+            session_patch().modules = self._awg_module
             self.hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
@@ -478,88 +438,26 @@ class TestHDAWGInit(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 self.hdawg.close()
 
-        expected_daq_server_calls = [
-            # open()
-            call.connectDevice(_DEVICE_NAME, "1GbE"),
-            call.awgModule(),
-            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2)  # 2 is the default group
+        expected_session_calls = [
+            call(_DEVICE_HOST, _DEVICE_PORT),
+            call().connect_device(_DEVICE_NAME),
+            call().modules.awg.raw_module.set("device", _DEVICE_NAME),
+            call().daq_server.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2),
+            call().modules.awg.raw_module.set("index", 0),
+            call().modules.awg.raw_module.execute(),
+            call().modules.awg.raw_module.finished(),
+            call().modules.awg.raw_module.finish(),
+            call().modules.awg.raw_module.finished(),
         ]
-        self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
-
-        expected_awg_module_calls = [
-            # open()
-            call.set("device", _DEVICE_NAME),
-            call.set("index", 0),
-            call.finished(),
-            call.execute(),
-            call.finished(),
-            # close()
-            call.finished()
-        ]
-        self.assertEqual(self._awg_module.mock_calls, expected_awg_module_calls)
-
-    def test_failed_close2(self):
-        """Failed close sequence."""
-        self._awg_module.finished.side_effect = [True, False, False, False]
-
-        with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
-            ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ZIModule", return_value=self._awg_module
-            ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.zhinst"
-            ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-            ) as core_patch:
-            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
-            core_patch.AwgModule = Mock(return_value=self._awg_module)
-            self.hdawg = ZurichInstruments_Hdawg(
-                self.ctx,
-                "HDAWG",
-                server_host=_DEVICE_HOST,
-                server_port=_DEVICE_PORT,
-                device_name=_DEVICE_NAME
-            )
-            self.hdawg.open()
-            with self.assertRaises(AssertionError):
-                self.hdawg.close()
-
-        expected_daq_server_calls = [
-            # open()
-            call.connectDevice(_DEVICE_NAME, "1GbE"),
-            call.awgModule(),
-            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2)  # 2 is the default group
-        ]
-        self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
-
-        expected_awg_module_calls = [
-            # open()
-            call.set("device", _DEVICE_NAME),
-            call.set("index", 0),
-            call.finished(),
-            call.execute(),
-            call.finished(),
-            # close()
-            call.finished(),
-            call.finish(),
-            call.finished()
-        ]
-        self.assertEqual(self._awg_module.mock_calls, expected_awg_module_calls)
+        session_patch.assert_has_calls(expected_session_calls, any_order=True)
 
     def test_failed_open_notclosed(self):
         """Open device that is already open."""
-        self._awg_module.finished.side_effect = [True, False, False, True]
         with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
-            ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ZIModule", return_value=self._awg_module
-            ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst"
             ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-            ) as core_patch:
-            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
-            core_patch.AwgModule = Mock(return_value=self._awg_module)
+                "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
+            ):
             self.hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
@@ -568,24 +466,18 @@ class TestHDAWGInit(unittest.TestCase):
                 device_name=_DEVICE_NAME
             )
             self.hdawg.open()
-
             with self.assertRaises(QMI_InvalidOperationException):
                 self.hdawg.open()
+
             self.hdawg.close()
 
     def test_failed_close_notopen(self):
         """Close device that is not open."""
         with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
-            ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ZIModule", return_value=self._awg_module
-            ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst"
             ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-            ) as core_patch:
-            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
-            core_patch.AwgModule = Mock(return_value=self._awg_module)
+                "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
+            ):
             self.hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
@@ -601,41 +493,44 @@ class TestHDAWG(unittest.TestCase):
     """Testcase for HDAWG functions."""
 
     def setUp(self):
+
+        class CommandTableMock:
+            table = [ParameterMock() for _ in range(1024)]
+
         logging.getLogger("qmi.instruments.zurich_instruments.hdawg").setLevel(logging.CRITICAL)
 
         ctx = QMI_Context("TestHDAWGMethods")
         self._awg_module = PropertyMock()
-        self._awg_module.finished.side_effect = [True, False, False, True]
-        self._awg_module.getInt = Mock()
-        self._awg_module.getDouble = Mock()
+        self._awg_module.awg = Mock()
+        self._awg_module.awg.raw_module = Mock()
 
         self._daq_server = PropertyMock()
-        self._daq_server.awgModule = Mock(return_value=self._awg_module)
         self._daq_server.get = Mock(return_value=_SCHEMA)
 
+        self._device = PropertyMock()
+
+        self.CommandTableMock = CommandTableMock
+
         with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ziDAQServer", return_value=self._daq_server
-            ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.ZIModule", return_value=self._awg_module
-            ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst"
             ), unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.zhinst.core"
-            ) as core_patch:
-            core_patch.ziDAQServer = Mock(return_value=self._daq_server)
-            core_patch.AwgModule = Mock(return_value=self._awg_module)
+                "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
+            ) as self.session_patch:
+            self.session_patch().modules = self._awg_module
+            self.session_patch().daq_server = self._daq_server
+            self.session_patch().connect_device = Mock(return_value=self._device)
             self.hdawg = ZurichInstruments_Hdawg(
                 ctx,
                 "HDAWG",
                 server_host=_DEVICE_HOST,
                 server_port=_DEVICE_PORT,
-                device_name=_DEVICE_NAME,
-                grouping=0
+                device_name=_DEVICE_NAME
             )
             self.hdawg.open()
 
-        self._awg_module.reset_mock()
-        self._daq_server.reset_mock()
+    def tearDown(self):
+        self.hdawg.close()
+        logging.getLogger("qmi.instruments.zurich_instruments.hdawg").setLevel(logging.NOTSET)
 
     def _check_get_value_string(self, node_path):
         expected_calls = [
@@ -678,10 +573,6 @@ class TestHDAWG(unittest.TestCase):
             call.setDouble("/{}/{}".format(_DEVICE_NAME, node_path), value)
         ]
         self._daq_server.assert_has_calls(expected_calls)
-
-    def tearDown(self):
-        self.hdawg.close()
-        logging.getLogger("qmi.instruments.zurich_instruments.hdawg").setLevel(logging.NOTSET)
 
     def test_generic_set(self):
         """Test setter."""
@@ -755,19 +646,19 @@ class TestHDAWG(unittest.TestCase):
         }
         """
 
-        self._awg_module.getInt.side_effect = [0, 0, 0]  # compiler status; get index; elf status
-        self._awg_module.getDouble.side_effect = [1.0]  # upload progress
+        self._awg_module.awg.raw_module.getInt = Mock(side_effect=[0, 0, 0])  # compiler status; get index; elf status
+        self._awg_module.awg.raw_module.getDouble = Mock(side_effect=[1.0])  # upload progress
 
         expected_calls = [
-            call.set("compiler/sourcestring", expected_source),
-            call.getInt("compiler/status"),
-            call.getInt("index"),
-            call.getDouble("progress"),
-            call.getInt("elf/status"),
+            call().modules.awg.raw_module.set("compiler/upload", 1),
+            call().modules.awg.raw_module.set("compiler/sourcestring", expected_source),
+            call().modules.awg.raw_module.getInt("compiler/status"),
+            call().modules.awg.raw_module.getInt("elf/status"),
         ]
 
         self.hdawg.compile_and_upload(source, replacements)
-        self.assertEqual(expected_calls, self._awg_module.mock_calls)
+        # Assert
+        self.session_patch.assert_has_calls(expected_calls, any_order=True)
         self.assertTrue(self.hdawg.compilation_successful())
 
     def test_compile_empty_fails(self):
@@ -809,14 +700,18 @@ class TestHDAWG(unittest.TestCase):
 
         for source, replacements, expected_source in cases:
             with self.subTest(source=source):
-                self._awg_module.getInt.side_effect = [0, 0, 0]  # successful compilation; get index; upload completed
-                self._awg_module.getDouble.side_effect = [1.0]  # upload progress
+                self._awg_module.awg.raw_module.getInt.side_effect = [0, 0, 0]  # successful compilation; get index; upload completed
+                self._awg_module.awg.raw_module.getDouble.side_effect = [1.0]  # upload progress
 
                 self.hdawg.compile_and_upload(source, replacements)
 
-                self._awg_module.set.assert_called_once_with("compiler/sourcestring", expected_source)
+                expected_calls = [
+                    call("compiler/upload", 1),
+                    call("compiler/sourcestring", expected_source)
+                ]
+                self._awg_module.awg.raw_module.set.assert_has_calls(expected_calls)
                 self.assertTrue(self.hdawg.compilation_successful())
-                self._awg_module.set.reset_mock()
+                self._awg_module.awg.raw_module.set.reset_mock()
 
     def test_invalid_replacements(self):
         """Test replacement patterns."""
@@ -845,14 +740,18 @@ class TestHDAWG(unittest.TestCase):
 
         for value, expected_source in cases:
             with self.subTest(value=value):
-                self._awg_module.getInt.side_effect = [0, 0, 0]  # successful compilation; get index; upload completed
-                self._awg_module.getDouble.side_effect = [1.0]  # upload progress
+                self._awg_module.awg.raw_module.getInt.side_effect = [0, 0, 0]  # successful compilation; get index; upload completed
+                self._awg_module.awg.raw_module.getDouble.side_effect = [1.0]  # upload progress
 
                 self.hdawg.compile_and_upload(source, {"$PAR": value})
 
-                self._awg_module.set.assert_called_once_with("compiler/sourcestring", expected_source)
+                expected_calls = [
+                    call("compiler/upload", 1),
+                    call("compiler/sourcestring", expected_source)
+                ]
                 self.assertTrue(self.hdawg.compilation_successful())
-                self._awg_module.set.reset_mock()
+                self._awg_module.awg.raw_module.set.assert_has_calls(expected_calls)
+                self._awg_module.awg.raw_module.set.reset_mock()
 
     def test_replacement_value_bad_types(self):
         """Test replacement type."""
@@ -865,106 +764,127 @@ class TestHDAWG(unittest.TestCase):
     def test_compile_error(self):
         """Test failed compile sequence."""
         source = "while(true) {}"
-
-        self._awg_module.getInt.side_effect = [1]  # failed compilation
+        expected_error = "Compilation did not succeed."
+        self._awg_module.awg.raw_module.getInt.side_effect = [1]  # failed compilation
 
         expected_calls = [
-            call.set("compiler/sourcestring", source),
-            call.getInt("compiler/status"),
-            call.getString("compiler/statusstring")
+            call("device", _DEVICE_NAME),
+            call("index", 0),
+            call("compiler/upload", 1),
+            call("compiler/sourcestring", source),
         ]
+        with self.assertRaises(QMI_RuntimeException) as exc:
+            self.hdawg.compile_and_upload(source)
 
-        self.hdawg.compile_and_upload(source)
-
-        self.assertEqual(expected_calls, self._awg_module.mock_calls)
+        self._awg_module.awg.raw_module.set.assert_has_calls(expected_calls)
         self.assertFalse(self.hdawg.compilation_successful())
+        self.assertEqual(expected_error, str(exc.exception))
 
     def test_compile_timeout(self):
         """Test timed-out compile sequence."""
         source = "while(true) {}"
 
-        self._awg_module.getInt.return_value = -1  # idle
+        self._awg_module.awg.raw_module.getInt.return_value = -1  # idle
 
-        expected_calls = [
-            call.set("compiler/sourcestring", source),
-            call.getInt("compiler/status"),
-            call.getInt("compiler/status"),
+        expected_calls_set = [
+            call.awg.raw_module.set("device", _DEVICE_NAME),
+            call.awg.raw_module.set("index", 0),
+            call.awg.raw_module.set("compiler/upload", 1),
+            call.awg.raw_module.set("compiler/sourcestring", source),
+        ]
+        expected_calls_getint = [
+            call.awg.raw_module.getInt("compiler/status"),
+            call.awg.raw_module.getInt("compiler/status"),
         ]
         self.hdawg.COMPILE_TIMEOUT = 0.1
         self.hdawg.UPLOAD_TIMEOUT = 0.1
         with self.assertRaises(QMI_TimeoutException):
             self.hdawg.compile_and_upload(source)
 
-        self.assertEqual(self._awg_module.mock_calls, expected_calls)
+        self._awg_module.awg.raw_module.set.assert_has_calls(expected_calls_set)
+        self._awg_module.awg.raw_module.getInt.assert_has_calls(expected_calls_getint)
+        self._awg_module.awg.raw_module.execute.assert_called_once_with()
 
     def test_elf_upload_error(self):
         """Test failed ELF upload sequence."""
         source = "while(true) {}"
+        expected_exception = "ELF upload did not succeed."
+        self._awg_module.awg.raw_module.getInt.side_effect = [2, 2, 1]  # successful compilation; get index; upload timed out
+        self._awg_module.awg.raw_module.getDouble.side_effect = [0.3]  # upload progress
 
-        self._awg_module.getInt.side_effect = [0, 0, 1]  # successful compilation; get index; upload timed out
-        self._awg_module.getDouble.side_effect = [0.3]  # upload progress
-
-        expected_calls = [
-            call.set("compiler/sourcestring", source),
-            call.getInt("compiler/status"),
-            call.getInt("index"),
-            call.getDouble("progress"),
-            call.getInt("elf/status"),
+        expected_calls_set = [
+            call.awg.raw_module.set("device", _DEVICE_NAME),
+            call.awg.raw_module.set("index", 0),
+            call.awg.raw_module.set("compiler/upload", 1),
+            call.awg.raw_module.set("compiler/sourcestring", source),
+        ]
+        expected_calls_getint = [
+            call("compiler/status"),
+            call("elf/status"),
         ]
 
-        self.hdawg.compile_and_upload(source)
+        with self.assertRaises(QMI_RuntimeException) as exc:
+            self.hdawg.compile_and_upload(source)
 
-        self.assertEqual(expected_calls, self._awg_module.mock_calls)
+        self.assertEqual(expected_exception, str(exc.exception))
+        self._awg_module.awg.raw_module.set.assert_has_calls(expected_calls_set)
+        self._awg_module.awg.raw_module.getInt.assert_has_calls(expected_calls_getint)
+        self._awg_module.awg.raw_module.getDouble.assert_called_once_with("progress")
         self.assertFalse(self.hdawg.compilation_successful())
 
     def test_elf_upload_timeout(self):
         """Test timed-out ELF upload sequence."""
-        source = "while(true) {}"
-
-        self._daq_server.getInt.side_effect = [0, -1, -1]  # successful compilation; failed upload
-        self._awg_module.getInt.return_value = 0  # = [0, -1, -1]  # successful compilation; upload timed out
-        self._awg_module.getDouble.side_effect = [0.0, 0.5]  # upload progress
-
-        expected_calls = [
-            call.set("compiler/sourcestring", source),
-            call.getInt("compiler/status"),
-            call.getInt("index"),
-            call.getDouble("progress"),
-            # call.getInt("elf/status"),
-            call.getDouble("progress"),
-            # call.getInt("elf/status"),
-        ]
+        upload_progress = [0.0, 0.5]
         self.hdawg.UPLOAD_TIMEOUT = 0.1
+        self.hdawg.POLL_PERIOD = 0.05
+        source = "while(true) {}"
+        expected_exception = f"Upload process timed out (timeout={self.hdawg.UPLOAD_TIMEOUT}) at {upload_progress[1] * 100}%"
+        # self._daq_server.getInt.side_effect = [0, -1, -1]  # successful compilation; failed upload
+        self._awg_module.awg.raw_module.getInt.return_value = 2  # = [0, -1, -1]  # successful compilation; upload timed out
+        self._awg_module.awg.raw_module.getDouble.side_effect = upload_progress
 
-        with self.assertRaises(QMI_TimeoutException) as err:
+        expected_calls_set = [
+            call.awg.raw_module.set("device", _DEVICE_NAME),
+            call.awg.raw_module.set("index", 0),
+            call.awg.raw_module.set("compiler/upload", 1),
+            call.awg.raw_module.set("compiler/sourcestring", source),
+        ]
+        expected_calls_getint = [
+            call("compiler/status"),
+            call("elf/status"),
+        ]
+        expected_calls_getdouble = [call("progress"), call("progress")]
+
+        with self.assertRaises(QMI_TimeoutException) as exc:
             self.hdawg.compile_and_upload(source)
 
-        self.assertEqual(f"Upload process timed out (timeout={self.hdawg.UPLOAD_TIMEOUT})", str(err.exception))
-        self.assertEqual(expected_calls, self._awg_module.mock_calls)
+        self.assertEqual(expected_exception, str(exc.exception))
+        self._awg_module.awg.raw_module.set.assert_has_calls(expected_calls_set)
+        self._awg_module.awg.raw_module.getInt.assert_has_calls(expected_calls_getint)
+        self._awg_module.awg.raw_module.getDouble.assert_has_calls(expected_calls_getdouble)
+        self.assertFalse(self.hdawg.compilation_successful())
 
     def test_upload_waveform(self):
         """Test waveform upload."""
+        index = 0
         wave1 = [1, 2, 3]
         wave2 = [4, 5, 6]
         markers = [7, 8, 9]
 
-        with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.zhinst"
-            ), unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
-            ) as utils_patch:
-            utils_patch.convert_awg_waveform = Mock(return_value="WAVEFORM")
-            self.hdawg.upload_waveform(0, 0, wave1, wave2, markers)
+        expected_call = call().__setitem__(index, (wave1, wave2, markers))
 
-        expected_utils_calls = [
-            call.convert_awg_waveform(wave1, wave2, markers)
-        ]
+        with unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.Waveforms"
+        ) as waveforms_patch:
+            waveforms_patch.validate = Mock()
+            self.hdawg.upload_waveform(0, index, wave1, wave2, markers)
 
         expected_daq_server_calls = [
-            call.setVector(f"/{_DEVICE_NAME}/awgs/0/waveform/waves/0", "WAVEFORM")
+            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2)
         ]
         self._daq_server.assert_has_calls(expected_daq_server_calls)
-        utils_patch.assert_has_calls(expected_utils_calls)
+        waveforms_patch.assert_has_calls([expected_call], any_order=True)
+        waveforms_patch().validate.assert_called_once()  # When creating the 'waveform'.
 
     def test_upload_waveforms_small_batch(self):
         """Test uploading a small batch of waveforms (less than batch size limit)."""
@@ -1068,59 +988,60 @@ class TestHDAWG(unittest.TestCase):
             }
         ]
 
-        self.hdawg.upload_command_table(0, command_table_entries)
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit"
+        ) as zhinst_patch:
+            zhinst_patch.CommandTable = Mock(return_value=self.CommandTableMock)
+            self.hdawg.upload_command_table(0, command_table_entries)
 
-        expected_daq_server_calls = [
-            call.setVector(f"/{_DEVICE_NAME}/awgs/0/commandtable/data", ANY)
-        ]
-        self._daq_server.assert_has_calls(expected_daq_server_calls)
+        zhinst_patch.CommandTable.assert_called_once()
+        # Assert that only index 1 was changed, as intended
+        for n, entry in enumerate(self.CommandTableMock.table):
+            if n != command_table_entries[0]["index"]:
+                self.assertEqual(0, entry.waveform.length)
+                self.assertFalse(entry.waveform.playZero)
+            else:
+                self.assertEqual(command_table_entries[0]["waveform"]["length"], entry.waveform.length)
+                self.assertTrue(entry.waveform.playZero)
 
-        uploaded_ct = json.loads(self._daq_server.setVector.call_args[0][1])
-        self.assertListEqual(uploaded_ct["table"], command_table_entries)
-
-    def test_upload_command_table_invalid_schema(self):
-        """Test command table upload."""
-        command_table_entries = [
-            {
-                "index": 1,
-                "waveform": {
-                    "playZero": True,
-                    "length": 128
-                }
-            }
-        ]
-        with unittest.mock.patch("qmi.instruments.zurich_instruments.hdawg.json", spec=json) as json_patch:
-            json_patch.validate = Mock(side_effect=[ValueError("Invalid schema")])
-            with self.assertRaises(ValueError) as verr_2:
-                self.hdawg.upload_command_table(0, command_table_entries)
-
-        self.assertEqual("Invalid schema.", str(verr_2.exception))
+        zhinst_patch.CommandTable.reset_mock()
 
     def test_upload_empty_command_table(self):
         """Test command table upload."""
         table = []
         awg_index = 0
-        # Create the command table from the provided entries.
-        command_table = {
-            "header": {"version":"0.4"}, "table": table
-        }
-        set_vector = "/{}/awgs/{}/commandtable/data".format(_DEVICE_NAME, awg_index)
 
-        self.hdawg.upload_command_table(awg_index, table)
-        self._daq_server.setVector.assert_called_once_with(set_vector, json.dumps(command_table, allow_nan=False).replace(" ", ""))
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit"
+        ) as zhinst_patch:
+            zhinst_patch.CommandTable = Mock(return_value=self.CommandTableMock)
+            self.hdawg.upload_command_table(awg_index, table)
+
+        zhinst_patch.CommandTable.assert_called_once()
+        # Assert that all indexes have not been changed.
+        for n, entry in enumerate(self.CommandTableMock.table):
+            self.assertEqual(0, entry.waveform.length)
+            self.assertFalse(entry.waveform.playZero)
+
+        zhinst_patch.CommandTable.reset_mock()
 
     def test_upload_empty_command_table_invalid_index_error(self):
         """Test command table upload."""
         table = []
-        awg_index = 1
-        # Create the command table from the provided entries.
-        command_table = {
-            "header": {"version":"0.4"}, "table": table
-        }
-        set_vector = "/{}/awgs/{}/commandtable/data".format(_DEVICE_NAME, awg_index)
+        awg_index = ZurichInstruments_Hdawg.NUM_AWGS
 
-        with self.assertRaises(KeyError):
-            self.hdawg.upload_command_table(awg_index, table)
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit"
+        ):
+            self._device.awgs = [] * ZurichInstruments_Hdawg.NUM_AWGS
+            with self.assertRaises(IndexError):
+                self.hdawg.upload_command_table(awg_index, table)
 
     def test_upload_invalid_command_table(self):
         """Test invalid command table upload."""
@@ -1133,19 +1054,25 @@ class TestHDAWG(unittest.TestCase):
                 }
             }
         ]
-        with self.assertRaises(ValueError) as verr:
-            self.hdawg.upload_command_table(0, command_table_entries)
-
         with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.json", spec=json
-            ) as json_patch, unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.jsonschema", spec=jsonschema
-        ) as schema_patch:
-            json_patch.loads = Mock(return_value=json.loads(_SCHEMA["/DEV8888/awgs/0/commandtable/schema"][0]["vector"]))
-            json_patch.dumps = Mock(side_effect=[TypeError("Ugly value")])
-            schema_patch.validate = Mock()
-            with self.assertRaises(ValueError) as verr_2:
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit"
+        ) as zhinst_patch:
+            zhinst_patch.CommandTable = Mock(return_value=self.CommandTableMock)
+            with self.assertRaises(ValueError) as verr:
                 self.hdawg.upload_command_table(0, command_table_entries)
+
+            with unittest.mock.patch(
+                    "qmi.instruments.zurich_instruments.hdawg.json", spec=json
+                ) as json_patch, unittest.mock.patch(
+                    "qmi.instruments.zurich_instruments.hdawg.jsonschema", spec=jsonschema
+            ) as schema_patch:
+                json_patch.loads = Mock(return_value=json.loads(_SCHEMA["/DEV8888/awgs/0/commandtable/schema"][0]["vector"]))
+                json_patch.dumps = Mock(side_effect=[TypeError("Ugly value")])
+                schema_patch.validate = Mock()
+                with self.assertRaises(ValueError) as verr_2:
+                    self.hdawg.upload_command_table(0, command_table_entries)
 
         self.assertEqual("Invalid command table.", str(verr.exception))
         self.assertEqual("Invalid value in command table.", str(verr_2.exception))
