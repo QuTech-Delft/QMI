@@ -1065,9 +1065,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Get schema from the device and use it to create an empty command table
         schema = awg_node.commandtable.load_validation_schema()
         command_table = zhinst.toolkit.CommandTable(schema)
-        # Clean up the provided entries and add them into the command table.
-        [command_table_entries.pop(e) for e in range(len(command_table_entries))[::-1] if
-         len(command_table_entries[e]) == 0]
         command_table = self._add_command_table_entries(command_table, command_table_entries)
         if save_as_file:
             # Save command table as a JSON file.
