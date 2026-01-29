@@ -167,7 +167,7 @@ class TestBristol_871A(TestCase):
         mock_transport_scpi = MagicMock(spec=QMI_Transport)
         mock_transport_scpi_str = MagicMock()
         mock_name = MagicMock()
-        mock_scpi = MagicMock(spec=ScpiProtocol)
+        self.mock_scpi = MagicMock(spec=ScpiProtocol)
         mock_reader = MagicMock(spec=_ReaderThread)
         mock_queue = MagicMock()
 
@@ -178,12 +178,10 @@ class TestBristol_871A(TestCase):
                 return mock_transport_serial
 
         with patch(
-            "qmi.instruments.bristol.bristol_871a.create_transport",
-            side_effect=se_create_transport,
-        ), patch("qmi.instruments.bristol.bristol_871a.ScpiProtocol", mock_scpi), patch(
-            "qmi.instruments.bristol.bristol_871a._ReaderThread", mock_reader
-        ), patch(
-            "qmi.instruments.bristol.bristol_871a.collections.deque", mock_queue
+            "qmi.instruments.bristol.bristol_871a.create_transport", side_effect=se_create_transport,
+        ), patch("qmi.instruments.bristol.bristol_871a.ScpiProtocol", self.mock_scpi
+        ), patch("qmi.instruments.bristol.bristol_871a._ReaderThread", mock_reader
+        ), patch("qmi.instruments.bristol.bristol_871a.collections.deque", mock_queue
         ):
             instr = Bristol_871A(
                 MagicMock(),
@@ -194,7 +192,7 @@ class TestBristol_871A(TestCase):
 
         self.meta = TestMeta871a(
             serial=mock_transport_serial,
-            scpi_protocol=mock_scpi,
+            scpi_protocol=self.mock_scpi,
             scpi_transport=mock_transport_scpi,
             serial_str=mock_transport_serial_str,
             scpi_str=mock_transport_scpi_str,
@@ -264,9 +262,13 @@ class TestBristol_871A(TestCase):
     def test_ask_scpi(self):
         """Bristol_871A._ask_scpi(), happy flow."""
         mock_cmd = MagicMock()
-        rt_val = self.meta.instr._ask_scpi(mock_cmd)
-        self.meta.scpi_protocol().ask.assert_called_once_with(mock_cmd)
-        self.assertEqual(rt_val, self.meta.scpi_protocol().ask().rstrip("\r\n"))
+        with patch("qmi.instruments.bristol.bristol_871a.ScpiProtocol", self.mock_scpi) as scpi_patch:
+            rt_val = self.meta.instr._ask_scpi(mock_cmd)
+
+        # self.meta.scpi_protocol().ask.assert_called_once_with(mock_cmd)
+        # self.assertEqual(rt_val, self.meta.scpi_protocol().ask().rstrip("\r\n"))
+        scpi_patch().ask.assert_called_once_with(mock_cmd)
+        self.assertEqual(rt_val, scpi_patch().ask().rstrip("\r\n"))
 
     def test_reset(self):
         """Bristol_871A.reset(), happy flow."""
