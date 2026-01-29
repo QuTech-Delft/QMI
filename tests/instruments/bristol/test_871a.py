@@ -1,18 +1,13 @@
 """Test for the Bristol 871A driver."""
-import struct
+from dataclasses import dataclass
 import logging
-
 from math import isnan
-
+import struct
+from typing import cast
 from unittest import TestCase
 from unittest.mock import MagicMock
 from unittest.mock import patch
 from unittest.mock import call
-
-from typing import cast
-
-from dataclasses import dataclass
-
 
 from qmi.core.transport import QMI_Transport
 from qmi.core.scpi_protocol import ScpiProtocol
@@ -21,6 +16,7 @@ from qmi.instruments.bristol.bristol_871a import _ReaderThread
 from qmi.instruments.bristol.bristol_871a import Measurement
 from qmi.core.exceptions import QMI_InstrumentException
 
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 # Disable all logging
 logging.disable(logging.CRITICAL)
@@ -31,7 +27,6 @@ class TestMetaReaderThread:
     """Test meta data."""
 
     transport: MagicMock
-    super: MagicMock
     queue: MagicMock()
     reader: _ReaderThread
 
@@ -46,7 +41,6 @@ class TestMeta871a:
     scpi_protocol: MagicMock
     scpi_str: MagicMock
     name: MagicMock
-    super: MagicMock
     reader: MagicMock
     queue: MagicMock()
     instr: Bristol_871A
@@ -60,21 +54,14 @@ class TestReaderThread(TestCase):
 
         reader = _ReaderThread(mock_transport, mock_queue)
 
-        self._patcher_super = patch(
-            "qmi.instruments.bristol.bristol_871a.super", mock_super
-        )
-        self._patcher_super.start()
-
         self.meta = TestMetaReaderThread(
             transport=mock_transport,
-            super=mock_super,
             queue=mock_queue,
             reader=reader,
         )
 
     def tearDown(self):
         self.meta = None
-        self._patcher_super.stop()
 
     def test_init(self):
         """_ReaderThread.__init__(), happy flow"""
@@ -181,7 +168,6 @@ class TestBristol_871A(TestCase):
         mock_transport_scpi_str = MagicMock()
         mock_name = MagicMock()
         mock_scpi = MagicMock(spec=ScpiProtocol)
-        mock_super = MagicMock()
         mock_reader = MagicMock(spec=_ReaderThread)
         mock_queue = MagicMock()
 
@@ -206,11 +192,6 @@ class TestBristol_871A(TestCase):
                 mock_transport_serial_str,
             )
 
-        self._patcher_super = patch(
-            "qmi.instruments.bristol.bristol_871a.super", mock_super
-        )
-        self._patcher_super.start()
-
         self.meta = TestMeta871a(
             serial=mock_transport_serial,
             scpi_protocol=mock_scpi,
@@ -218,7 +199,6 @@ class TestBristol_871A(TestCase):
             serial_str=mock_transport_serial_str,
             scpi_str=mock_transport_scpi_str,
             name=mock_name,
-            super=mock_super,
             reader=mock_reader,
             queue=mock_queue,
             instr=cast(Bristol_871A, instr),
@@ -226,7 +206,6 @@ class TestBristol_871A(TestCase):
 
     def tearDown(self):
         self.meta = None
-        self._patcher_super.stop()
 
     def test_init(self):
         """Bristol_871A.__init__(), happy flow"""
@@ -243,7 +222,7 @@ class TestBristol_871A(TestCase):
         """Bristol_871A.__init__(), value error handling"""
         with self.assertRaises(ValueError):
             Bristol_871A(
-                object(),
+                QMI_Context("Bristol_test"),
                 "fouteboel",
                 None,
                 None,
@@ -256,7 +235,6 @@ class TestBristol_871A(TestCase):
         self.meta.instr.open()
         self.meta.scpi_transport.open.assert_called_once_with()
         self.meta.serial.open.assert_called_once_with()
-        self.meta.super().open.assert_called_once_with()
         self.meta.instr._scpi_handshake.assert_called_once_with()
 
     def test_open_scpi_handshake_exception(self):
@@ -271,10 +249,9 @@ class TestBristol_871A(TestCase):
         self.meta.instr._check_is_open = MagicMock()
 
         self.meta.instr.close()
-        self.meta.instr._check_is_open.assert_called_once_with()
+        self.meta.instr._check_is_open.assert_has_calls([call(), call()])  # Once in close and once in super().close
         self.meta.reader().shutdown.assert_called_once_with()
         self.meta.reader().join.assert_called_once_with()
-        self.meta.super().close.assert_called_once_with()
         self.meta.serial.close.assert_called_once_with()
         self.meta.scpi_transport.close.assert_called_once_with()
 
