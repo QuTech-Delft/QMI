@@ -118,17 +118,10 @@ class TestQmiTransportFactory(unittest.TestCase):
         with open_close(QMI_UdpTransport("localhost", int(self.server_port) - 1)) as trans:
 
             # Send some bytes from server to transport.
-            loop = asyncio.new_event_loop()
-            if loop.is_closed():
-                asyncio.set_event_loop(loop)
-
-            loop.run_until_complete(the_call())
+            asyncio.run(the_call())
             # Receive message through transport.
             data = trans.read_until(b"\n", timeout=1.0)
             self.assertEqual(data, b"aap noot\n")
-
-            if loop.is_running():
-                loop.close()
 
             w_data = b"aap noot\n"
             trans.write(w_data)
@@ -618,11 +611,7 @@ class TestQmiUdpTransport(unittest.TestCase):
                 l.stop()
 
             # Send some bytes from server to transport.
-            loop = asyncio.new_event_loop()
-            if loop.is_closed():
-                asyncio.set_event_loop(loop)
-
-            loop.run_until_complete(the_call())
+            asyncio.run(the_call())
             try:
                 # The same should happen with read_until (triggers exception).
                 with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException):
@@ -634,9 +623,6 @@ class TestQmiUdpTransport(unittest.TestCase):
                     raise AssertionError from t_exc
 
                 trans.discard_read()
-
-            if loop.is_running():
-                loop.close()
 
             # Send some bytes from server to transport.
             self.server_sock.sendto(s.encode(), trans._address)
