@@ -1,11 +1,11 @@
 """Instrument driver for the Bristol 871A Laser Wavelength Meter."""
 
-import collections
+from collections import deque
 import logging
 import math
 import struct
 import time
-from typing import NamedTuple, Callable
+from typing import NamedTuple, Deque
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
@@ -37,16 +37,13 @@ class _ReaderThread(QMI_Thread):
     # Check for thread shutdown request every POLL_DURATION seconds.
     POLL_DURATION = 0.100
 
-    def __init__(self, transport: QMI_Transport, queue: collections.deque) -> None:
-        # A more specific type annotation would be "queue: Deque[Measurement]".
-        # However we can not use it because "Deque" does not exist in Python 3.5.3.
+    def __init__(self, transport: QMI_Transport, queue: Deque[Measurement]) -> None:
         super().__init__()
         self._transport = transport
         self._queue = queue
 
     def run(self) -> None:
         """Read measurements from serial port and append to internal queue."""
-
         while not self._shutdown_requested:
             # Read next measurement from serial stream.
             measurement = self._read_measurement()
@@ -232,7 +229,7 @@ class Bristol_871A(QMI_Instrument):
         self._scpi_protocol: None | ScpiProtocol = None
         self._serial_transport: None | QMI_Transport = None
         self._reader_thread: None | _ReaderThread = None
-        self._reader_queue: collections.deque = collections.deque(maxlen=queue_size)
+        self._reader_queue: deque = deque(maxlen=queue_size)
 
         if scpi_transport is not None:
             self._scpi_transport = create_transport(scpi_transport)

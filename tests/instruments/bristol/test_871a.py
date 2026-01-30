@@ -5,7 +5,7 @@ import logging
 from math import isnan
 import struct
 from unittest import TestCase
-from unittest.mock import Mock, Mock
+from unittest.mock import Mock
 from unittest.mock import patch
 from unittest.mock import call
 
@@ -151,7 +151,6 @@ class TestBristol_871A(TestCase):
         mock_transport_scpi = Mock(spec=QMI_Transport)
         transport_scpi_str = "scpi:roosh:kangaroo"
         self.mock_scpi = Mock(spec=ScpiProtocol)
-        self.mock_reader = Mock(spec=_ReaderThread)
         self.mock_queue = Mock()
 
         def se_create_transport(transport):
@@ -161,10 +160,9 @@ class TestBristol_871A(TestCase):
                 return mock_transport_serial
 
         with patch(
-            "qmi.instruments.bristol.bristol_871a.create_transport", side_effect=se_create_transport,
+            "qmi.instruments.bristol.bristol_871a.create_transport", se_create_transport,
         ), patch("qmi.instruments.bristol.bristol_871a.ScpiProtocol", self.mock_scpi
-        ), patch("qmi.instruments.bristol.bristol_871a._ReaderThread", self.mock_reader
-        ), patch("qmi.instruments.bristol.bristol_871a.collections.deque", self.mock_queue
+        ), patch("qmi.instruments.bristol.bristol_871a.deque", self.mock_queue
         ):
             self.instr = Bristol_871A(
                 QMI_Context("bristol_871_test_ctx"),
@@ -179,8 +177,6 @@ class TestBristol_871A(TestCase):
         self.assertEqual(self.instr._serial_transport, self.instr._serial_transport)
         self.mock_scpi.assert_called_once_with(self.instr._scpi_transport)
         self.assertEqual(self.instr._scpi_protocol, self.instr._scpi_protocol)
-        self.mock_reader.assert_called_once_with(self.instr._serial_transport, self.instr._reader_queue)
-        self.instr._reader_thread.start.assert_called_once_with()
 
     def test_init_value_error(self):
         """Bristol_871A.__init__(), value error handling"""
@@ -229,8 +225,6 @@ class TestBristol_871A(TestCase):
 
         self.instr.close()
         self.instr._check_is_open.assert_has_calls([call(), call()])  # Once in close and once in super().close
-        self.instr._reader_thread.shutdown.assert_called_once_with()
-        self.instr._reader_thread.join.assert_called_once_with()
         self.instr._serial_transport.close.assert_called_once_with()
         self.instr._scpi_transport.close.assert_called_once_with()
 
