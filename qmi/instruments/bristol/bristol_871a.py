@@ -216,8 +216,7 @@ class Bristol_871A(QMI_Instrument):
                               If not specified, the SCPI channel will not be opened.
 
         Raises:
-            ValueError:                       At least one of scpi_transport or serial_transport must be specified.
-            QMI_TransportDescriptorException: A bad transport string was specified.
+            QMI_UsageException: At least one of scpi_transport or serial_transport must be specified.
         """
         super().__init__(context, name)
 
