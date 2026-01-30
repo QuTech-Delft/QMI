@@ -5,10 +5,10 @@ import logging
 import math
 import struct
 import time
-from typing import List, NamedTuple, Optional
+from typing import NamedTuple, Callable
 
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_InstrumentException
+from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.scpi_protocol import ScpiProtocol
@@ -56,11 +56,11 @@ class _ReaderThread(QMI_Thread):
                 # NOTE: Appending to a deque is thread-safe.
                 self._queue.append(measurement)
 
-    def _read_measurement(self) -> Optional[Measurement]:
+    def _read_measurement(self) -> None | Measurement:
         """Read a single measurement from the serial port.
 
         Returns:
-            Next measurement, or None if shutdown requested before a complete measurement was received.
+            measurement: Measurement, or None if shutdown was requested before receiving a complete measurement.
         """
 
         # Skip until start-of-measurement byte.
@@ -205,37 +205,34 @@ class Bristol_871A(QMI_Instrument):
         self,
         context: QMI_Context,
         name: str,
-        scpi_transport: Optional[str],
-        serial_transport: Optional[str],
+        scpi_transport: None | str,
+        serial_transport: None | str,
         queue_size: int = DEFAULT_QUEUE_SIZE,
     ) -> None:
         """Initialize the instrument driver.
 
         Args:
-            name: Name for this instrument instance.
-            scpi_transport: QMI transport descriptor for the SCPI channel.
-                If not specified, the SCPI channel will not be opened.
+            name:             Name for this instrument instance.
+            scpi_transport:   QMI transport descriptor for the SCPI channel.
+                              If not specified, the SCPI channel will not be opened.
             serial_transport: QMI transport descriptor for the serial output channel.
-                If not specified, the SCPI channel will not be opened.
+                              If not specified, the SCPI channel will not be opened.
 
         Raises:
-            ValueError: At least one of scpi_transport or serial_transport must be specified.
-            QMI_TransportDescriptorException: a bad transport string was specified.
+            ValueError:                       At least one of scpi_transport or serial_transport must be specified.
+            QMI_TransportDescriptorException: A bad transport string was specified.
         """
         super().__init__(context, name)
 
         if scpi_transport is None and serial_transport is None:
-            raise ValueError(
+            raise QMI_UsageException(
                 "Either scpi_transport or serial_transport should be specified."
             )
-
-        self._scpi_transport = None  # type: Optional[QMI_Transport]
-        self._scpi_protocol = None  # type: Optional[ScpiProtocol]
-        self._serial_transport = None  # type: Optional[QMI_Transport]
-        self._reader_thread = None  # type: Optional[_ReaderThread]
-        self._reader_queue = collections.deque(
-            maxlen=queue_size
-        )  # type: collections.deque
+        self._scpi_transport: None | QMI_Transport = None
+        self._scpi_protocol: None | ScpiProtocol = None
+        self._serial_transport: None | QMI_Transport = None
+        self._reader_thread: None | _ReaderThread = None
+        self._reader_queue: collections.deque = collections.deque(maxlen=queue_size)
 
         if scpi_transport is not None:
             self._scpi_transport = create_transport(scpi_transport)
@@ -256,13 +253,14 @@ class Bristol_871A(QMI_Instrument):
             self._scpi_transport.open()
         if self._serial_transport is not None:
             self._serial_transport.open()
-        super().open()
         if self._scpi_transport is not None:
             try:
                 self._scpi_handshake()
             except Exception:
                 self._scpi_transport.close()
                 raise
+
+        super().open()
 
     @rpc_method
     def close(self) -> None:
@@ -272,11 +270,14 @@ class Bristol_871A(QMI_Instrument):
         if self._reader_thread is not None:
             self._reader_thread.shutdown()
             self._reader_thread.join()
-        super().close()
+
         if self._serial_transport is not None:
             self._serial_transport.close()
+
         if self._scpi_transport is not None:
             self._scpi_transport.close()
+
+        super().close()
 
     def _write_scpi(self, cmd: str) -> None:
         """Send SCPI command to instrument."""
@@ -309,9 +310,8 @@ class Bristol_871A(QMI_Instrument):
         resp = self._ask_scpi("*IDN?")
         words = resp.rstrip().split(",")
         if len(words) != 4:
-            raise QMI_InstrumentException(
-                "Unexpected response to *IDN?, got {!r}".format(resp)
-            )
+            raise QMI_InstrumentException(f"Unexpected response to *IDN?, got {resp!r}")
+
         return QMI_InstrumentIdentification(
             vendor=words[0].strip(),
             model=words[1].strip(),
@@ -330,9 +330,8 @@ class Bristol_871A(QMI_Instrument):
             )
             if resp.find(b"no connections available") >= 0:
                 _logger.error("Can not connect to %s SCPI port (%r)", self._name, resp)
-                raise QMI_InstrumentException(
-                    "Can not connect to {} SCPI port".format(self._name)
-                )
+                raise QMI_InstrumentException(f"Can not connect to {self._name} SCPI port")
+
             if resp.find(b"Bristol Instruments") >= 0:
                 # This is almost the last line of the welcome message. One more empty line follows.
                 break
@@ -347,9 +346,7 @@ class Bristol_871A(QMI_Instrument):
             )
             if resp.startswith(b"*IDN?"):
                 # Got command echo. This should never happen.
-                raise QMI_InstrumentException(
-                    "Instrument {} sent unexpected command echo".format(self._name)
-                )
+                raise QMI_InstrumentException(f"Instrument {self._name} sent unexpected command echo")
             if resp.startswith(b"BRISTOL"):
                 # Got IDN response.
                 break
@@ -358,16 +355,16 @@ class Bristol_871A(QMI_Instrument):
     def _parse_int(resp: str, cmd: str) -> int:
         """Parse integer response from instrument.
 
-        Return integer value or raise QMI_InstrumentException.
+        Returns:
+            resp: Response as integer.
+
+        Raises:
+             QMI_InstrumentException: On unexpected return value type.
         """
         try:
             return int(resp)
         except ValueError:
-            raise QMI_InstrumentException(
-                "Expecting integer response to command {!r} but got {!r}".format(
-                    cmd, resp
-                )
-            )
+            raise QMI_InstrumentException(f"Expecting integer response to command {cmd!r} but got {resp!r}")
 
     @staticmethod
     def is_valid_measurement(measurement: Measurement) -> bool:
@@ -383,18 +380,16 @@ class Bristol_871A(QMI_Instrument):
         timestamp = time.time()
         words = resp.split(",")
         if len(words) != 4:
-            raise QMI_InstrumentException(
-                "Unexpected response to :READ:ALL? ({!r})".format(resp)
-            )
+            raise QMI_InstrumentException(f"Unexpected response to :READ:ALL? ({resp!r})")
+
         try:
             index = int(words[0])
             status = int(words[1])
             wavelength = float(words[2])
             power = float(words[3])
         except ValueError:
-            raise QMI_InstrumentException(
-                "Unexpected response to :READ:ALL? ({!r})".format(resp)
-            )
+            raise QMI_InstrumentException("Unexpected response to :READ:ALL? ({resp!r})")
+
         # Erroneous measurements are signified by the 'status', but also by the
         # (observed, undocumented) fact that the 'wavelength' is returned as 0.0.
         # To prevent accidents, we replace this error value by NaN.
@@ -418,9 +413,9 @@ class Bristol_871A(QMI_Instrument):
     def get_auto_calibration_method(self) -> str:
         """Return the current auto-calibration method.
 
-        :return: "OFF" if auto-calibration is disabled;
-            "TIME" when time-driven auto-calibration enabled;
-            "TEMP" when temperature-driven auto-calibration enabled.
+        Returns: - "OFF" if auto-calibration is disabled;
+                 - "TIME" when time-driven auto-calibration enabled;
+                 - "TEMP" when temperature-driven auto-calibration enabled.
         """
         return self._ask_scpi(":SENS:CALI:METH?")
 
@@ -428,11 +423,13 @@ class Bristol_871A(QMI_Instrument):
     def set_auto_calibration_method(self, method: str) -> None:
         """Set auto-calibration method.
 
-        :argument method: Valid values are "OFF" or "TIME" or "TEMP".
+        Parameters:
+            method: Valid values are "OFF" or "TIME" or "TEMP".
         """
         method_upper = method.upper()
         if method_upper not in ("OFF", "TIME", "TEMP"):
-            raise ValueError("Invalid auto-calibration method {!r}".format(method))
+            raise ValueError(f"Invalid auto-calibration method {method!r}")
+
         self._write_scpi(":SENS:CALI:METH %s" % method_upper)
 
     @rpc_method
@@ -446,8 +443,9 @@ class Bristol_871A(QMI_Instrument):
     def set_auto_calibration_temperature(self, delta: int) -> None:
         """Set the temperature change that will initiate recalibration when temperature-driven calibration is enabled.
 
-        :argument delta: Temperature change that will initiate recalibration (in units of 0.1 degree Celcius).
-            Valid range: 1 to 50.
+        Parameters:
+            delta: Temperature change that will initiate recalibration (in units of 0.1 degree Celsius).
+                   Valid range: 1 to 50.
         """
         if delta < 1 or delta > 50:
             raise ValueError("Invalid temperature threshold for auto-calibration")
@@ -481,9 +479,10 @@ class Bristol_871A(QMI_Instrument):
     def get_trigger_method(self) -> str:
         """Return the current trigger method.
 
-        :return: Trigger method: "INT" for internal triggering;
-            "FALL" for external trigger on falling edge;
-            "RISE" for external trigger on rising edge.
+        Returns:
+            Trigger method: - "INT" for internal triggering;
+                            - "FALL" for external trigger on falling edge;
+                            - "RISE" for external trigger on rising edge.
         """
         return self._ask_scpi(":TRIG:SEQ:METH?")
 
@@ -491,7 +490,8 @@ class Bristol_871A(QMI_Instrument):
     def set_trigger_method(self, method: str) -> None:
         """Set the trigger method.
 
-        :argument method: Trigger method. Valid values: "INT", "FALL", "RISE".
+        Parameters:
+             method: Trigger method. Valid values: "INT", "FALL", "RISE".
         """
         method_upper = method.upper()
         if method_upper not in ("INT", "FALL", "RISE"):
@@ -509,9 +509,9 @@ class Bristol_871A(QMI_Instrument):
     def set_trigger_rate(self, rate: int) -> None:
         """Set trigger rate for the internal trigger.
 
-        Args:
+        Parameters:
             rate: Trigger rate in Hz, or 0 to adjust to optical illumination.
-                Valid values are 20, 50, 100, 250, 500, 1000 and 0.
+                  Valid values are 20, 50, 100, 250, 500, 1000 and 0.
         """
         if rate not in (0, 20, 50, 100, 250, 500, 1000):
             raise ValueError("Invalid trigger rate")
@@ -525,7 +525,7 @@ class Bristol_871A(QMI_Instrument):
         """Start recording samples in internal memory in the instrument.
 
         KNOWN FIRMWARE ISSUE: The MMEM INIT/OPEN/CLOSE/DATA? sequence often stops producing samples after running for
-            some hours.
+                              some hours.
         """
         self._write_scpi(":MMEM:INIT")
         self._write_scpi(":MMEM:OPEN")
@@ -535,16 +535,16 @@ class Bristol_871A(QMI_Instrument):
         """Stop recording samples in internal memory.
 
         KNOWN FIRMWARE ISSUE: The MMEM INIT/OPEN/CLOSE/DATA? sequence often stops producing samples after running for
-            some hours.
+                              some hours.
         """
         self._write_scpi(":MMEM:CLOSE")
 
     @rpc_method
-    def get_memory_contents(self) -> List[Measurement]:
+    def get_memory_contents(self) -> list[Measurement]:
         """Fetch recorded samples from internal memory.
 
         KNOWN FIRMWARE ISSUE: The MMEM INIT/OPEN/CLOSE/DATA? sequence often stops producing samples after running for
-            some hours.
+                              some hours.
         """
 
         self._write_scpi(":MMEM:DATA?")
@@ -554,11 +554,8 @@ class Bristol_871A(QMI_Instrument):
         message_length = 20
         nbytes = len(data)
         if nbytes % message_length != 0:
-            raise QMI_InstrumentException(
-                "Expected multiple of 20 bytes in memory but got {} bytes".format(
-                    nbytes
-                )
-            )
+            raise QMI_InstrumentException(f"Expected multiple of 20 bytes in memory but got {nbytes} bytes")
+
         nsamples = nbytes // message_length
 
         # Unpack measurement values:
@@ -566,7 +563,7 @@ class Bristol_871A(QMI_Instrument):
         #   power: float
         #   status: uint32
         #   index: uint32
-        ret = []  # type: List[Measurement]
+        ret: list[Measurement] = []
         timestamp = time.time()
         for i in range(nsamples):
             sample = data[i * message_length : (i + 1) * message_length]
@@ -581,7 +578,7 @@ class Bristol_871A(QMI_Instrument):
         return ret
 
     @rpc_method
-    def get_streaming_measurements(self) -> List[Measurement]:
+    def get_streaming_measurements(self) -> list[Measurement]:
         """Return streaming measurements received from the instrument.
 
         If the instrument uses a serial transport (in addition to the SCPI transport),
