@@ -213,7 +213,7 @@ class Bristol_871A(QMI_Instrument):
             scpi_transport:   QMI transport descriptor for the SCPI channel.
                               If not specified, the SCPI channel will not be opened.
             serial_transport: QMI transport descriptor for the serial output channel.
-                              If not specified, the SCPI channel will not be opened.
+                              If not specified, the serial channel will not be opened.
 
         Raises:
             QMI_UsageException: At least one of scpi_transport or serial_transport must be specified.
