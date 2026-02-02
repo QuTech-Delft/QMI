@@ -139,13 +139,13 @@ class Bristol_871A(QMI_Instrument):
     Either of the channels (but not both) may be left unspecified at instantiation time.
 
     Attributes:
-        CONDITION_BITS: A dictionary mapping condition values to messages.
-        STATUS_BITS: A dictionary mapping status bit indices to a descriptive message.
+        CONDITION_BITS:     A dictionary mapping condition values to messages.
+        STATUS_BITS:        A dictionary mapping status bit indices to a descriptive message.
         DEFAULT_QUEUE_SIZE: An integer that indicates the size of the RS-422 message queue, if no value is specified
-            in the constructor.
-        RESPONSE_TIMEOUT: The timeout for SCPI commands, in seconds.
-        STATUS_MASK: Bitmask value of all status bits that have a defined meaning.
-        STATUS_GOOD: Status value of a wavelength measurement without any issues.
+                            in the constructor.
+        RESPONSE_TIMEOUT:   The timeout for SCPI commands, in seconds.
+        STATUS_MASK:        Bitmask value of all status bits that have a defined meaning.
+        STATUS_GOOD:        Status value of a wavelength measurement without any issues.
     """
 
     _rpc_constants = ["CONDITION_BITS", "STATUS_BITS", "STATUS_MASK", "STATUS_GOOD"]
@@ -208,7 +208,7 @@ class Bristol_871A(QMI_Instrument):
     ) -> None:
         """Initialize the instrument driver.
 
-        Args:
+        Parameters:
             name:             Name for this instrument instance.
             scpi_transport:   QMI transport descriptor for the SCPI channel.
                               If not specified, the SCPI channel will not be opened.
@@ -458,7 +458,8 @@ class Bristol_871A(QMI_Instrument):
     def set_auto_calibration_time(self, interval: int) -> None:
         """Set the time interval for recalibration (when time-driven calibration is enabled).
 
-        :argument interval: Recalibration interval in minutes. Valid range: 5 to 1440.
+        Parameters:
+            interval: Recalibration interval in minutes. Valid range is 5 to 1440.
         """
         if interval < 5 or interval > 1440:
             raise ValueError("Invalid time interval for auto-calibration")
