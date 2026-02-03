@@ -461,6 +461,12 @@ class QMI_Context:
 
         return os.path.normpath(string.Template(file_name).substitute(mapping))
 
+    def run(self, _rpc_thread_run: Callable) -> None:
+        """Run thread. From Python 3.14 onwards objects that are run within a context, need a `run` method with
+        a single input where the callable to run is given. Addition of this function should have no effect when
+        using earlier Python versions."""
+        _rpc_thread_run()
+
     def start(self) -> None:
         """Start the context.
 

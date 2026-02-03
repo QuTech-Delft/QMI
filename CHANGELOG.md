@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.52.0-beta.0] - Unreleased
 
 ### Added
+- `run` method in `QMI_Context` class to accommodate for `threading.Thread` changes in Python 3.14.
+- `standard-xdrlib` from "dead batteries" as a dependency to fix issues coming from removal of `xdrlib` from standard library.
 - `grouping=2` input parameter in the `ZurichInstruments_Hdawg` to enable initialization directly in wanted grouping mode.
 - Addition of `set_awg_module_index` method to set the AWG module index number.
 - Addition of new methods in Zurich Instruments HDAWG QMI driver.
@@ -17,9 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zurich Instruments HDAWG QMI driver refactoring to be based mainly on the zhinst.toolkit package to allow easier 4x2 and 2x4 grouping modes and use.
 
 ### Fixed
+- Moving of `_snicaddr` in psutil package v2.7 from `_common` to `_ntuples` module, which caused an error with `qmi_proc`.
 - Now referring to "AWG core", and using `awg_core` in methods where erroneously was referred to "AWG index" and `awg_index`.
 
 ### Removed
+- Removed `xdrlib-py` import for Python 3.13 version, where it was needed for python-vxi11 package.
 
 ## [0.51.0] - 2025-12-09
 
