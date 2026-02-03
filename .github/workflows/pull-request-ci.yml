@@ -18,9 +18,9 @@ env:
 jobs:
   build:
     strategy:
-      max-parallel: 3
+      max-parallel: 4
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
 
     uses: ./.github/workflows/reusable-ci-workflows.yml
     with:
@@ -55,7 +55,13 @@ jobs:
           name: coverage-results-3.11
           path: .
 
-      - name: Generate and push badges
+      - name: Get coverage log file from Python latest build
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-results-3.14
+          path: .
+
+      - name: Generate and push badges for with python 3.11
         run: |
           git fetch origin "${{ github.head_ref }}" || true
           git checkout "${{ github.head_ref }}"
