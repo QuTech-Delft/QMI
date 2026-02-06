@@ -18,6 +18,7 @@ import numpy as np
 
 # Lazy import of the zhinst module. See the function _import_modules() below.
 if TYPE_CHECKING:
+    import zhinst
     import zhinst.core
     import zhinst.utils
     from zhinst.core import ziDAQServer, AwgModule
@@ -42,6 +43,7 @@ def _import_modules() -> None:
     """
     global zhinst
     if zhinst is None:
+        import zhinst
         import zhinst.core  # pylint: disable=W0621
         import zhinst.utils
         from zhinst.core import ziDAQServer, AwgModule
@@ -124,14 +126,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         assert self._awg_module is not None
         return self._awg_module
 
-    @property
-    def awg_channel_map(self) -> list[int]:
-        """Channel map for AWG channels to correct core index, based on current grouping and channel range."""
-        return [
-            (awg_channel // (2 ** (self._grouping + 1))) *
-            (self._grouping % 2 + 1) for awg_channel in range(self.NUM_CHANNELS)
-        ]
-
+    # @property
+    # def awg_channel_map(self) -> list[int]:
+    #     """Channel map for AWG channels to correct core index, based on current grouping and channel range."""
+    #     return [
+    #         (awg_channel // (2 ** (self._grouping + 1))) *
+    #         (self._grouping % 2 + 1) for awg_channel in range(self.NUM_CHANNELS)
+    #     ]
+    #
     @staticmethod
     def _process_parameter_replacements(sequencer_program: str, replacements: dict[str, str | int | float]) -> str:
         """Process parameter replacements for sequencer code.
@@ -510,14 +512,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                       0,1 for 2x4 group mode;
                       0,1,2,3 for 4x2 group mode.
         """
-        if index != 0:
-            # Then we need to check
-            if (
-                    (self._grouping == 0 and index not in range(1, 4)) or
-                    (self._grouping == 1 and index > 1) or
-                    self._grouping == 2
-            ):
-                raise ValueError(f"Invalid index, {index}, for group mode {self._grouping}.")
+        if index not in range(self.NUM_AWGS):
+            raise ValueError(f"Index number {index} is invalid.")
 
         self.awg_module.set("index", index)
         self._verify_awg_module_state()
@@ -536,8 +532,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             1 - If the AWG sequencer is currently running.
             0 - If the AWG sequencer is not running.
         """
-        if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
 
         self._check_is_open()
         return self._get_int(f"awgs/{awg_core}/enable")
@@ -649,8 +645,10 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                              the 4 least significant bits of each sample
                              represent the 4 marker channels.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
+
         self._check_is_open()
-        assert awg_core in self.awg_channel_map, f"Invalid AWG core ({awg_core}) for group mode {self._grouping}."
         waveform_data = zhinst.utils.convert_awg_waveform(wave1, wave2, markers)
         waveform_address = f"/{self._device_name}/awgs/{awg_core}/waveform/waves/{waveform_index}"
         self.daq_server.setVector(waveform_address, waveform_data)
@@ -727,8 +725,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._check_is_open()
 
         # Check AWG core number.
-        if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
 
         # Get schema from the device
         schema_node = f"/{self._device_name:s}/awgs/{awg_core}/commandtable/schema"
@@ -976,9 +974,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: Digital trigger index is invalid.
             ValueError: Trigger source value is invalid.
         """
-        if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
-        if trigger < 0 or trigger > 1:
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
+        if trigger not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid digital trigger index.")
         if value not in range(self.NUM_CHANNELS):
             raise ValueError("Invalid trigger source.")
@@ -1007,9 +1005,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: Digital trigger index is invalid.
             ValueError: Trigger slope value is invalid.
         """
-        if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
-        if trigger < 0 or trigger > 1:
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
+        if trigger not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid digital trigger index.")
         if value < 0 or value > 3:
             raise ValueError("Invalid trigger slope.")
@@ -1034,8 +1032,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
             amplitude: A dimensionless scaling factor applied to the digital signal.
         """
-        if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
 
@@ -1059,8 +1057,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: AWG core number is invalid.
             ValueError: AWG channel pair index is invalid.
         """
-        if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
 
@@ -1085,8 +1083,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             0: If last sample is not held.
             1: If last sample is held.
         """
-        if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}")
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
 
@@ -1109,8 +1107,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: AWG channel pair index is invalid.
             ValueError: Invalid hold state value.
         """
-        if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
         if value not in (0, 1):
@@ -1340,8 +1338,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: AWG index number is invalid.
             ValueError: DIO bit index is invalid.
         """
-        if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
         if value < 0 or value > 31:
             raise ValueError("Invalid DIO bit index.")
 
@@ -1364,8 +1362,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: AWG index number is invalid.
             ValueError: DIO strobe slope value is invalid.
         """
-        if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
         if value < 0 or value > 3:
             raise ValueError("Invalid slope.")
 
@@ -1387,8 +1385,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
             value: User register value.
         """
-        if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index.")
 
@@ -1408,8 +1406,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError: AWG index number is invalid.
             ValueError: Register index is invalid.
         """
-        if awg_core not in self.awg_channel_map:
-            raise ValueError(f"Invalid AWG core ({awg_core}) for group mode {self._grouping}.")
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index.")
 
