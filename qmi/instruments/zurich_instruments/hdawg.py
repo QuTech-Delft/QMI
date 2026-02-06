@@ -7,6 +7,7 @@ import os.path
 import re
 import time
 from typing import TYPE_CHECKING, Any, cast
+import warnings
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_ApplicationException, QMI_RuntimeException, QMI_TimeoutException
@@ -272,11 +273,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
             integer: Value from node tree.
         """
+        if not node_path.startswith(f"/{self._device_name}"):
+            node_path = f"/{self._device_name}/{node_path}".replace("//", "/")
+
         if awg_channel is not None:
             awg_node = self.awg_channel_map[awg_channel]
             return awg_node.root.connection.getInt(node_path)
 
-        return self.daq_server.getInt('/' + self._device_name + '/' + node_path)
+        return self.daq_server.getInt(node_path)
 
     def _get_double(self, node_path: str, awg_channel: None | int = None) -> float:
         """Get a double value from the nodetree.
@@ -288,11 +292,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
             double: Value from node tree.
         """
+        if not node_path.startswith(f"/{self._device_name}"):
+            node_path = f"/{self._device_name}/{node_path}".replace("//", "/")
+
         if awg_channel is not None:
             awg_node = self.awg_channel_map[awg_channel]
             return awg_node.root.connection.getDouble(node_path)
 
-        return self.daq_server.getDouble('/' + self._device_name + '/' + node_path)
+        return self.daq_server.getDouble(node_path)
 
     def _get_string(self, node_path: str, awg_channel: None | int = None) -> str:
         """Get a string value from the nodetree.
@@ -304,11 +311,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
             string: Value from node tree.
         """
+        if not node_path.startswith(f"/{self._device_name}"):
+            node_path = f"/{self._device_name}/{node_path}".replace("//", "/")
+
         if awg_channel is not None:
             awg_node = self.awg_channel_map[awg_channel]
             return awg_node.root.connection.getString(node_path)
 
-        return self.daq_server.getString('/' + self._device_name + '/' + node_path)
+        return self.daq_server.getString(node_path)
 
     def _set_value(self, node_path: str, value: str | int | float, awg_channel: None | int = None) -> None:
         """Set a value in the nodetree. Can be a string, integer, or a floating point number.
@@ -318,12 +328,15 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:       Value to set for the node.
             awg_channel: Optional, an AWG channel to get the node for. Default is None.
         """
+        if not node_path.startswith(f"/{self._device_name}"):
+            node_path = f"/{self._device_name}/{node_path}".replace("//", "/")
+
         if awg_channel is not None:
             awg_node = self.awg_channel_map[awg_channel]
             awg_node.root.connection.set(node_path, value)
             return
 
-        self.daq_server.set('/' + self._device_name + '/' + node_path, value)
+        self.daq_server.set(node_path, value)
 
     def _set_int(self, node_path: str, value: int, awg_channel: None | int = None) -> None:
         """Set an integer value in the device node tree.
@@ -333,12 +346,15 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:       Integer value to write.
             awg_channel: Optional, an AWG channel to get the node for. Default is None.
         """
+        if not node_path.startswith(f"/{self._device_name}"):
+            node_path = f"/{self._device_name}/{node_path}".replace("//", "/")
+
         if awg_channel is not None:
             awg_node = self.awg_channel_map[awg_channel]
             awg_node.root.connection.set(node_path, value)
             return
 
-        self.daq_server.setInt('/' + self._device_name + '/' + node_path, value)
+        self.daq_server.setInt(node_path, value)
 
     def _set_double(self, node_path: str, value: float, awg_channel: None | int = None) -> None:
         """Set a floating point value in the device node tree.
@@ -348,12 +364,15 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:       Floating point value to write.
             awg_channel: Optional, an AWG channel to get the node for. Default is None.
         """
+        if not node_path.startswith(f"/{self._device_name}"):
+            node_path = f"/{self._device_name}/{node_path}".replace("//", "/")
+
         if awg_channel is not None:
             awg_node = self.awg_channel_map[awg_channel]
             awg_node.root.connection.set(node_path, value)
             return
 
-        self.daq_server.setDouble('/' + self._device_name + '/' + node_path, value)
+        self.daq_server.setDouble(node_path, value)
 
     def _wait_compile(self) -> CompilerStatus:
         """Wait until the compilation is done or timeout. See also
@@ -643,8 +662,11 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             index: AWG module index number.
 
         Raises:
-            ValueError: If the given index value is invalid for the current grouping mode.
+            ValueError: If the given index value is invalid.
         """
+        if index not in range(self.NUM_AWGS):
+            raise ValueError(f"Index number {index} is invalid.")
+
         self.awg_module.set("index", index)
 
     @rpc_method
@@ -1059,8 +1081,10 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError:           Invalid value in the command table despite successful validation.
             RuntimeError:         If the upload of command table on core {awg_index} failed.
         """
-        self._check_is_open()
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("AWG core number is not valid.")
 
+        self._check_is_open()
         awg_node = self.device.awgs[awg_core]
         # Get schema from the device and use it to create an empty command table
         schema = awg_node.commandtable.load_validation_schema()
@@ -1159,7 +1183,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
             0: The reference clock is locked.
             1: There was an error locking to the reference clock.
-            2: The device is busy locking to the reference clock.
+            2: The device is busy locking the reference clock.
         """
         self._check_is_open()
         _logger.info("[%s] Getting status of reference clock", self._name)
@@ -1249,6 +1273,25 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._set_double(f"triggers/out/{trigger}/delay", value)
 
     @rpc_method
+    def get_trigger_level(self, trigger: int) -> float:
+        """Get the trigger voltage level of a specific trigger input.
+
+        Parameters:
+            trigger: Trigger index in the range 0 to 7, corresponding to trigger inputs 1 to 8 on the front panel.
+
+        Returns:
+            value:   Trigger level in Volt, range -10.0 to +10.0 exclusive.
+
+        Raises:
+            ValueError: By invalid trigger index value.
+        """
+        if trigger not in range(self.NUM_CHANNELS):
+            raise ValueError("Invalid trigger index.")
+
+        self._check_is_open()
+        return self.device.triggers.in_[trigger].level()
+
+    @rpc_method
     def set_trigger_level(self, trigger: int, value: float) -> None:
         """Set the trigger voltage level for a specific trigger input.
 
@@ -1307,9 +1350,12 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:    Trigger source in the range 0 to 7, corresponding to trigger inputs 1 to 8 on the front panel.
 
         Raises:
-            ValueError: - Digital trigger index is invalid.
+            ValueError: - AWG core number is not valid.
+                        - Digital trigger index is invalid.
                         - Trigger source value is invalid.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("Invalid AWG core number.")
         if trigger not in (0, 1):
             raise ValueError("Invalid digital trigger index.")
         if value not in range(self.NUM_CHANNELS):
@@ -1335,9 +1381,12 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                         3 - trigger on rising and falling edge.
 
         Raises:
-            ValueError: - Digital trigger index is invalid.
+            ValueError: - AWG core number is not valid.
+                        - Digital trigger index is invalid.
                         - Trigger slope value is invalid.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("Invalid AWG core number.")
         if trigger < 0 or trigger > 1:
             raise ValueError("Invalid digital trigger index.")
         if value < 0 or value > 3:
@@ -1418,8 +1467,12 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:    DIO bit index in the range 0 to 31.
 
         Raises:
-            ValueError: DIO bit index is invalid.
+            ValueError: - AWG core number is not valid.
+                        - DIO bit index is invalid.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("Invalid AWG core number.")
+
         value = int(value)  # Conversion just in case input is e.g. bool. ZhInst checks the type.
         if value < 0 or value > 31:
             raise ValueError("Invalid DIO bit index.")
@@ -1440,8 +1493,11 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                             3 - trigger on rising and falling edge.
 
         Raises:
-            ValueError: DIO strobe slope value is invalid.
+            ValueError: - AWG core number is not valid.
+                        - DIO strobe slope value is invalid.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("Invalid AWG core number.")
         if value < 0 or value > 3:
             raise ValueError("Invalid slope.")
 
@@ -1450,7 +1506,25 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def get_output_amplitude(self, awg_core: int, channel: int) -> float:
-        """Get the output amplitude scaling factor of the specified channel.
+        warnings.warn(
+            f"{self.get_output_amplitude.__name__} is now deprecated. Please use {self.get_output_gain.__name__}. " +
+            "We reserve this function for the future to use getting the sine peak amplitude" +
+            " (../sines/{awg_core}/amplitudes/{channel}).", DeprecationWarning
+        )
+        return self.get_output_gain(awg_core, channel)
+
+    @rpc_method
+    def set_output_amplitude(self, awg_core: int, channel: int, value: float) -> None:
+        warnings.warn(
+            f"{self.set_output_amplitude.__name__} is now deprecated. Please use {self.set_output_gain.__name__}." +
+            "We reserve this function for the future to use setting the sine peak amplitude" +
+            " (../sines/{awg_core}/amplitudes/{channel}).", DeprecationWarning
+        )
+        return self.set_output_gain(awg_core, channel, value)
+
+    @rpc_method
+    def get_output_gain(self, awg_core: int, channel: int) -> float:
+        """Get the output scaling factor (gain) of the specified channel.
 
         Parameters:
             awg_core: AWG core number in the range 0 to 3. The AWG index selects a pair of output channels.
@@ -1459,20 +1533,23 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                       within the selected channel pair.
 
         Raises:
-            ValueError: AWG channel pair index is invalid.
+            ValueError: - AWG core number is not valid.
+                        - AWG channel pair index is invalid.
 
         Returns:
             amplitude: A dimensionless scaling factor applied to the digital signal.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("Invalid AWG core number.")
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
 
         self._check_is_open()
-        return self._get_double(f"awgs/{awg_core}/outputs/{channel}/amplitude")
+        return self._get_double(f"awgs/{awg_core}/outputs/{channel}/gains/{channel}")
 
     @rpc_method
-    def set_output_amplitude(self, awg_core: int, channel: int, value: float) -> None:
-        """Set the output scaling factor of the specified channel.
+    def set_output_gain(self, awg_core: int, channel: int, value: float) -> None:
+        """Set the output scaling factor (gain) of the specified channel.
 
         The amplitude is a dimensionless scaling factor applied to the digital signal.
 
@@ -1481,16 +1558,21 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                       Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
             channel:  Channel index in the range 0 to 1, selecting the first or second output channel
                       within the selected channel pair.
-            value:    Amplitude scale factor.
+            value:    Amplitude scale factor in range -1...+1.
 
         Raises:
-            ValueError: AWG channel pair index is invalid.
+            ValueError: - AWG core number is not valid.
+                        - AWG channel pair index is invalid.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("Invalid AWG core number.")
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
+        if not -1.0 <= value <= 1.0:
+            raise ValueError("Output amplitude scaling factor is limited in range -1.0 ... +1.0")
 
         self._check_is_open()
-        self._set_double(f"awgs/{awg_core}/outputs/{channel}/amplitude", value)
+        self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/{channel}", value)
 
     @rpc_method
     def get_output_channel_hold(self, awg_core: int, channel: int) -> int:
@@ -1503,12 +1585,15 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                       within the selected channel pair.
 
         Raises:
-            ValueError: AWG channel pair index is invalid.
+            ValueError: - AWG core number is not valid.
+                        - AWG channel pair index is invalid.
 
         Returns:
             0: If last sample is not held.
             1: If last sample is held.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("Invalid AWG core number.")
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
 
@@ -1527,9 +1612,12 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:    Hold state; 0 = False, 1 = True.
 
         Raises:
-            ValueError: - AWG channel pair index is invalid.
+            ValueError: - AWG core number is not valid.
+                        - AWG channel pair index is invalid.
                         - Invalid hold state value.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("Invalid AWG core number.")
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
         if value not in (0, 1):
@@ -1566,8 +1654,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:       Output state; 0 = output off, 1 = output on.
 
         Raises:
-            ValueError: Output channel number is invalid.
-            ValueError: Invalid output channel state value.
+            ValueError: - Output channel number is invalid.
+                        - Invalid output channel state value.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
             raise ValueError("Invalid channel index.")
@@ -1581,21 +1669,22 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def set_output_channel_range(self, awg_channel: int, value: float) -> None:
-        """Set voltage range of the specified wave output channel.
+        """Set voltage range of the specified wave output channel. The available ranges are, based on testing,
+        0.2V, 0.4V, 0.6V, 0.8V, 1V, 1.5V, 2V, 3V, 4V and 5V.
 
         Parameters:
             awg_channel: Channel index in the range 0 to 7, corresponding to wave outputs 1 to 8 on the front panel.
             value:       Output range in Volt. The instrument selects the next higher available range.
 
         Raises:
-            ValueError: Output channel number is invalid.
-            ValueError: Voltage range is invalid.
+            ValueError: - Output channel number is invalid.
+                        - Voltage range is invalid.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
             raise ValueError("Invalid channel index.")
 
         value = float(value)  # Conversion just in case input is e.g. int. ZhInst checks the type.
-        if value < 0 or value > 5.0:
+        if not 0.2 <= value <= 5.0:
             raise ValueError(f"Invalid channel output range: {value}.")
 
         self._check_is_open()
@@ -1612,8 +1701,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:       Offset in Volt, in range -1.25 to +1.25 V.
 
         Raises:
-            ValueError: Output channel number is invalid.
-            ValueError: Voltage offset is invalid.
+            ValueError: - Output channel number is invalid.
+                        - Voltage offset is invalid.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
             raise ValueError("Invalid channel index.")
@@ -1655,8 +1744,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:       Delay in seconds, range 0 to 26e-9.
 
         Raises:
-            ValueError: Output channel number is invalid.
-            ValueError: Delay value is invalid.
+            ValueError: - Output channel number is invalid.
+                        - Delay value is invalid.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
             raise ValueError("Invalid channel index.")
@@ -1680,8 +1769,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:       1 to enable the direct output path, 0 to disable.
 
         Raises:
-            ValueError: Output channel number is invalid.
-            ValueError: Direct value is invalid.
+            ValueError: - Output channel number is invalid.
+                        - Direct value is invalid.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
             raise ValueError("Invalid channel index.")
@@ -1702,8 +1791,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:       1 to enable the output filter, 0 to disable.
 
         Raises:
-            ValueError: Output channel number is invalid.
-            ValueError: Filter value is invalid.
+            ValueError: - Output channel number is invalid.
+                        - Filter value is invalid.
         """
         if awg_channel not in range(self.NUM_CHANNELS):
             raise ValueError(f"Invalid output channel: {awg_channel}.")
@@ -1725,7 +1814,13 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
             1 - If the AWG sequencer is currently running.
             0 - If the AWG sequencer is not running.
+
+        Raises:
+            ValueError: AWG core number is not valid.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("Invalid AWG core number.")
+
         self._check_is_open()
         return self.device.awgs[awg_core].enable()
 
@@ -1740,8 +1835,12 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:    1 to enable the AWG core, 0 to disable.
 
         Raises:
-            ValueError: AWG core enable value is invalid.
+            ValueError: - AWG core number is not valid.
+                        - AWG core enable value is invalid.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("Invalid AWG core number.")
+
         value = int(value)  # Conversion just in case input is e.g. bool. ZhInst checks the type.
         if value not in (0, 1):
             raise ValueError("Invalid enable value")
@@ -1757,12 +1856,15 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             awg_core: AWG core number.
             reg:      Register index in the range 0 to 15.
 
-        Raises:
-            ValueError: Register index is invalid.
-
         Returns:
             value: User register value.
+
+        Raises:
+            ValueError: - AWG core number is not valid.
+                        - Register index is invalid.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("Invalid AWG core number.")
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index.")
 
@@ -1779,8 +1881,11 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             value:    Integer value to write to the register.
 
         Raises:
-            ValueError: Register index is invalid.
+            ValueError: - AWG core number is not valid.
+                        - Register index is invalid.
         """
+        if awg_core not in range(self.NUM_AWGS):
+            raise ValueError("Invalid AWG core number.")
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index")
 

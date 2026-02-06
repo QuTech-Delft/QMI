@@ -9,6 +9,7 @@ import warnings
 
 import numpy as np
 
+import qmi.instruments.zurich_instruments.hdawg
 from qmi.instruments.zurich_instruments import ZurichInstruments_Hdawg
 from qmi.core.exceptions import QMI_InvalidOperationException, QMI_ApplicationException, QMI_TimeoutException, \
     QMI_RuntimeException
@@ -233,10 +234,23 @@ class WaveformMock:
         self.length = 0
         self.playZero = False
 
+    def __dict__(self):
+        return {"length": self.length, "playZero": self.playZero}
+
+    def get_sequence_snippet(self):
+        return "snippy-snip"
+
 
 class ParameterMock:
     def __init__(self):
         self.waveform = WaveformMock()
+
+    def __dict__(self):
+        return {"waveform": self.waveform.__dict__()}
+
+
+class ValidationError(Exception):
+    pass
 
 
 class CompilerStatusNotReady(enum.IntEnum):
@@ -496,6 +510,11 @@ class TestHDAWG(unittest.TestCase):
 
         class CommandTableMock:
             table = [ParameterMock() for _ in range(1024)]
+            self._table = table
+
+            @staticmethod
+            def as_dict():
+                return {f"index {k}": v.__dict__() for k, v in enumerate(self._table)}
 
         logging.getLogger("qmi.instruments.zurich_instruments.hdawg").setLevel(logging.CRITICAL)
 
@@ -534,43 +553,43 @@ class TestHDAWG(unittest.TestCase):
 
     def _check_get_value_string(self, node_path):
         expected_calls = [
-            call.getString("/{}/{}".format(_DEVICE_NAME, node_path))
+            call.getString(f"/{_DEVICE_NAME}/{node_path}")
         ]
         self._daq_server.assert_has_calls(expected_calls)
 
     def _check_get_value_int(self, node_path):
         expected_calls = [
-            call.getInt("/{}/{}".format(_DEVICE_NAME, node_path))
+            call.getInt(f"/{_DEVICE_NAME}/{node_path}")
         ]
         self._daq_server.assert_has_calls(expected_calls)
 
     def _check_get_value_float(self, node_path):
         expected_calls = [
-            call.getDouble("/{}/{}".format(_DEVICE_NAME, node_path))
+            call.getDouble(f"/{_DEVICE_NAME}/{node_path}")
         ]
         self._daq_server.assert_has_calls(expected_calls)
 
     def _check_set_value(self, node_path, value):
         expected_calls = [
-            call.set("/{}/{}".format(_DEVICE_NAME, node_path), value)
+            call.set(f"/{_DEVICE_NAME}/{node_path}", value)
         ]
         self._daq_server.assert_has_calls(expected_calls)
 
     def _check_set_value_int(self, node_path, value):
         expected_calls = [
-            call.setInt("/{}/{}".format(_DEVICE_NAME, node_path), value)
+            call.setInt(f"/{_DEVICE_NAME}/{node_path}", value)
         ]
         self._daq_server.assert_has_calls(expected_calls)
 
     def _check_get_value_double(self, node_path):
         expected_calls = [
-            call.getDouble("/{}/{}".format(_DEVICE_NAME, node_path))
+            call.getDouble(f"/{_DEVICE_NAME}/{node_path}")
         ]
         self._daq_server.assert_has_calls(expected_calls)
 
     def _check_set_value_double(self, node_path, value):
         expected_calls = [
-            call.setDouble("/{}/{}".format(_DEVICE_NAME, node_path), value)
+            call.setDouble(f"/{_DEVICE_NAME}/{node_path}", value)
         ]
         self._daq_server.assert_has_calls(expected_calls)
 
@@ -581,6 +600,13 @@ class TestHDAWG(unittest.TestCase):
         self.hdawg.set_node_value(node, value)
         self._check_set_value(node, value)
 
+        channel = 3
+        node_mock = self.hdawg.awg_channel_map[channel]
+
+        self.hdawg.set_node_value(node, value, channel)
+
+        node_mock.root.connection.set.assert_called_once_with(f"/{_DEVICE_NAME}/{node}", value)
+
     def test_generic_get_string(self):
         """Test getter."""
         node = "my/test/node"
@@ -589,6 +615,13 @@ class TestHDAWG(unittest.TestCase):
         result = self.hdawg.get_node_string(node)
         self._check_get_value_string(node)
         self.assertEqual(result, value)
+
+        channel = 0
+        node_mock = self.hdawg.awg_channel_map[channel]
+
+        self.hdawg.get_node_string(node, channel)
+
+        node_mock.root.connection.getString.assert_called_once_with(f"/{_DEVICE_NAME}/{node}")
 
     def test_generic_get_int(self):
         """Test getter."""
@@ -599,12 +632,26 @@ class TestHDAWG(unittest.TestCase):
         self._check_get_value_int(node)
         self.assertEqual(result, value)
 
+        channel = 2
+        node_mock = self.hdawg.awg_channel_map[channel]
+
+        self.hdawg.get_node_int(node, channel)
+
+        node_mock.root.connection.getInt.assert_called_once_with(f"/{_DEVICE_NAME}/{node}")
+
     def test_generic_set_int(self):
         """Test setter."""
         node = "my/test/node"
         value = 123
         self.hdawg.set_node_int(node, value)
         self._check_set_value_int(node, value)
+
+        channel = 5
+        node_mock = self.hdawg.awg_channel_map[channel]
+
+        self.hdawg.set_node_value(node, value, channel)
+
+        node_mock.root.connection.set.assert_called_once_with(f"/{_DEVICE_NAME}/{node}", value)
 
     def test_generic_get_double(self):
         """Test getter."""
@@ -615,12 +662,43 @@ class TestHDAWG(unittest.TestCase):
         self._check_get_value_double(node)
         self.assertEqual(result, value)
 
+        channel = 4
+        node_mock = self.hdawg.awg_channel_map[channel]
+
+        self.hdawg.get_node_double(node, channel)
+
+        node_mock.root.connection.getDouble.assert_called_once_with(f"/{_DEVICE_NAME}/{node}")
+
     def test_generic_set_double(self):
         """Test setter."""
         node = "my/test/node"
         value = 123.345
         self.hdawg.set_node_double(node, value)
         self._check_set_value_double(node, value)
+
+        channel = 7
+        node_mock = self.hdawg.awg_channel_map[channel]
+
+        self.hdawg.set_node_value(node, value, channel)
+
+        node_mock.root.connection.set.assert_called_once_with(f"/{_DEVICE_NAME}/{node}", value)
+
+    def test_get_idn(self):
+        """Test get_idn."""
+        vendor = "Zurich Instruments"
+        model = "h-dog"
+        serial = "1234"
+        version = 3
+        version_info = {"zi": {"about": {"version": {"value": [version, 2, 1]}}}}
+        self._daq_server.get = Mock(return_value=version_info)
+        self._daq_server.getString = Mock(side_effect=[model, serial])
+
+        idn = self.hdawg.get_idn()
+
+        self.assertEqual(vendor, idn.vendor)
+        self.assertEqual(model, idn.model)
+        self.assertEqual(serial, idn.serial)
+        self.assertEqual(version, idn.version)
 
     def test_compile_and_upload(self):
         """Test compile sequence."""
@@ -631,13 +709,11 @@ class TestHDAWG(unittest.TestCase):
             n += $INCR;
         }
         """
-
         replacements = {
             "$FILE": "w_a",
             "$COUNT": 100,
             "$INCR": 3.14
         }
-
         expected_source = """
         wave w = "w_a";
         var n = 0.0;
@@ -835,7 +911,7 @@ class TestHDAWG(unittest.TestCase):
     def test_elf_upload_timeout(self):
         """Test timed-out ELF upload sequence."""
         upload_progress = [0.0, 0.5]
-        self.hdawg.UPLOAD_TIMEOUT = 0.1
+        self.hdawg.UPLOAD_TIMEOUT = 0.10
         self.hdawg.POLL_PERIOD = 0.05
         source = "while(true) {}"
         expected_exception = f"Upload process timed out (timeout={self.hdawg.UPLOAD_TIMEOUT}) at {upload_progress[1] * 100}%"
@@ -863,6 +939,101 @@ class TestHDAWG(unittest.TestCase):
         self._awg_module.awg.raw_module.getInt.assert_has_calls(expected_calls_getint)
         self._awg_module.awg.raw_module.getDouble.assert_has_calls(expected_calls_getdouble)
         self.assertFalse(self.hdawg.compilation_successful())
+
+    def test_compile_and_upload_to_specific_channel(self):
+        """Test compiling and uploading with awg_channel input."""
+        channel = 1
+        mock_node = self.hdawg.awg_channel_map[channel]
+        source = """
+        wave w = "$FILE";
+        var n = 0.0;
+        for(i = 0; i < $COUNT; i++) {
+            n += $INCR;
+        }
+        """
+        replacements = {
+            "$FILE": "w_a",
+            "$COUNT": 100,
+            "$INCR": 3.14
+        }
+        expected_source = """
+        wave w = "w_a";
+        var n = 0.0;
+        for(i = 0; i < 100; i++) {
+            n += 3.14;
+        }
+        """
+        mock_node.load_sequencer_program.return_value = {"messages": ""}
+        self._awg_module.awg.raw_module.getInt = Mock(side_effect=[0, 0, 0])  # compiler status; get index; elf status
+
+        self.hdawg.compile_and_upload(source, replacements, awg_channel=channel)
+        # Assert
+        mock_node.load_sequencer_program.assert_called_once_with(expected_source),
+        self.assertTrue(self.hdawg.compilation_successful())
+
+    def test_compile_and_upload_to_specific_channel_excepts(self):
+        """Test compiling and uploading with awg_channel input."""
+        channel = 0
+        mock_node = self.hdawg.awg_channel_map[channel]
+        source = """
+        wave w = "$FILE";
+        var n = 0.0;
+        for(i = 0; i < $COUNT; i++) {
+            n += $INCR;
+        }
+        """
+        replacements = {
+            "$FILE": "w_a",
+            "$COUNT": 100,
+            "$INCR": 3.14
+        }
+        expected_source = """
+        wave w = "w_a";
+        var n = 0.0;
+        for(i = 0; i < 100; i++) {
+            n += 3.14;
+        }
+        """
+        expected_error = "Loading sequencer program failed."
+        mock_node.load_sequencer_program.return_value = {"messages": "Sorry, failed"}
+        self._awg_module.awg.raw_module.getInt = Mock(side_effect=[0, 0, 0])  # compiler status; get index; elf status
+
+        with self.assertRaises(QMI_RuntimeException) as q_run_err:
+            self.hdawg.compile_and_upload(source, replacements, awg_channel=channel)
+
+        # Assert
+        mock_node.load_sequencer_program.assert_called_once_with(expected_source),
+        self.assertEqual(expected_error, str(q_run_err.exception))
+
+    def test_compile_sequencer_program(self):
+        """Test compiling sequencer program."""
+        channel = 4
+        program = "Very short program"
+        node_mock = self.hdawg.awg_channel_map[channel]
+        node_mock.compile_sequencer_program.return_value = (program.encode(), {})
+
+        _, __ = self.hdawg.compile_sequencer_program(channel, program)
+
+        node_mock.compile_sequencer_program.assert_called_once_with(program)
+
+    def test_upload_compiled_program(self):
+        """Test uploading a compiled program."""
+        channel = 6
+        comp_prog = b"Compiled Very short program"
+        node_mock = self.hdawg.awg_channel_map[channel]
+
+        _ = self.hdawg.upload_compiled_program(channel, comp_prog)
+
+        node_mock.elf.data.assert_called_once_with(comp_prog)
+
+    def test_get_sequence_snippet(self):
+        """Test getting a sequence snippet"""
+        expected_snippet = "snippy-snip"
+        waveforms_mock = WaveformMock()
+
+        snippet = self.hdawg.get_sequence_snippet(waveforms_mock)
+
+        self.assertEqual(expected_snippet, snippet)
 
     def test_upload_waveform(self):
         """Test waveform upload."""
@@ -976,6 +1147,87 @@ class TestHDAWG(unittest.TestCase):
         self.assertEqual(self._daq_server.set.call_count, np.ceil(batch_size / 10))
         [utils_patch.assert_has_calls(c[2]) for c in expected_utils_calls]
 
+    def test_write_to_waveform_memory(self):
+        """Test writing to waveform memory with and without indexes"""
+        channel = 5
+        node_mock = self.hdawg.awg_channel_map[channel]
+        wf_mock = Mock()
+        # No indexes test
+        self.hdawg.write_to_waveform_memory(channel, wf_mock, None)
+
+        node_mock.write_to_waveform_memory.assert_called_once_with(wf_mock)
+        node_mock.reset_mock()
+
+        # With indexes test
+        indexes = [0, 2]
+        self.hdawg.write_to_waveform_memory(channel, wf_mock, indexes)
+
+        node_mock.write_to_waveform_memory.assert_called_once_with(wf_mock, indexes)
+
+    def test_read_from_waveform_memory(self):
+        """Test reading from waveform memory with and without indexes."""
+        channel = 6
+        node_mock = self.hdawg.awg_channel_map[channel]
+        # No indexes test
+        _ = self.hdawg.read_from_waveform_memory(channel, None)
+
+        node_mock.read_from_waveform_memory.assert_called_once_with()
+        node_mock.reset_mock()
+
+        # With indexes test
+        indexes = [0, 2]
+        self.hdawg.read_from_waveform_memory(channel, indexes)
+
+        node_mock.read_from_waveform_memory.assert_called_once_with(indexes)
+
+    def test_upload_waveforms_per_awg_core(self):
+        """Test uploading a 'large' batch of waveforms (more than batch size limit but exact multiple of)."""
+        unpacked_waveforms = []
+        batch_size = 30
+        for i in range(batch_size):
+            awg_index = i % 4
+            waveform_index = i
+            wave1 = np.array([i + 1, i + 2, i + 3])
+            wave2 = np.array([i + 4, i + 5, i + 6])
+            markers = np.array([i + 7, i + 8, i + 9])
+            unpacked_waveforms.append((awg_index, waveform_index, wave1, wave2, markers))
+
+        core_mock_0 = self._device.awgs[0]
+        core_mock_1 = self._device.awgs[1]
+        core_mock_2 = self._device.awgs[2]
+        core_mock_3 = self._device.awgs[3]
+        with unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.zhinst"
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.Waveforms"
+        ) as wf_patch:
+            self.hdawg.upload_waveforms_per_awg_core(unpacked_waveforms)
+
+        core_mock_0.write_to_waveform_memory.assert_called_with(wf_patch())
+        core_mock_1.write_to_waveform_memory.assert_called_with(wf_patch())
+        core_mock_2.write_to_waveform_memory.assert_called_with(wf_patch())
+        core_mock_3.write_to_waveform_memory.assert_called_with(wf_patch())
+
+    def test_get_schema(self):
+        """Test getting a schema for a channel."""
+        channel = 0
+        node_mock = self.hdawg.awg_channel_map[channel]
+
+        _ = self.hdawg.get_schema(channel)
+
+        node_mock.commandtable.load_validation_schema.assert_called_once_with()
+
+    def test_get_command_table(self):
+        """Test getting a command table for a channel."""
+        channel = 0
+        node_mock = self.hdawg.awg_channel_map[channel]
+
+        _ = self.hdawg.get_command_table(channel)
+
+        node_mock.commandtable.load_from_device.assert_called_once_with()
+
     def test_upload_command_table(self):
         """Test command table upload."""
         command_table_entries = [
@@ -988,13 +1240,23 @@ class TestHDAWG(unittest.TestCase):
             }
         ]
 
-        with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+        with unittest.mock.patch("builtins.open", unittest.mock.mock_open()), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.zhinst"
         ), unittest.mock.patch(
             "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit"
         ) as zhinst_patch:
             zhinst_patch.CommandTable = Mock(return_value=self.CommandTableMock)
-            self.hdawg.upload_command_table(0, command_table_entries)
+            with unittest.mock.patch(
+                    "qmi.instruments.zurich_instruments.hdawg.json", spec=json
+                ) as json_patch, unittest.mock.patch(
+                    "qmi.instruments.zurich_instruments.hdawg.jsonschema", spec=jsonschema
+            ) as schema_patch:
+                json_patch.loads = Mock(
+                    return_value=json.loads(_SCHEMA["/DEV8888/awgs/0/commandtable/schema"][0]["vector"])
+                )
+                json_patch.dumps = Mock()
+                schema_patch.validate = Mock()
+                self.hdawg.upload_command_table(0, command_table_entries, save_as_file=True)
 
         zhinst_patch.CommandTable.assert_called_once()
         # Assert that only index 1 was changed, as intended
@@ -1009,7 +1271,7 @@ class TestHDAWG(unittest.TestCase):
         zhinst_patch.CommandTable.reset_mock()
 
     def test_upload_empty_command_table(self):
-        """Test command table upload."""
+        """Test empty command table upload."""
         table = []
         awg_index = 0
 
@@ -1029,20 +1291,6 @@ class TestHDAWG(unittest.TestCase):
 
         zhinst_patch.CommandTable.reset_mock()
 
-    def test_upload_empty_command_table_invalid_index_error(self):
-        """Test command table upload."""
-        table = []
-        awg_index = ZurichInstruments_Hdawg.NUM_AWGS
-
-        with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.zhinst"
-        ), unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit"
-        ):
-            self._device.awgs = [] * ZurichInstruments_Hdawg.NUM_AWGS
-            with self.assertRaises(IndexError):
-                self.hdawg.upload_command_table(awg_index, table)
-
     def test_upload_invalid_command_table(self):
         """Test invalid command table upload."""
         command_table_entries = [
@@ -1054,14 +1302,24 @@ class TestHDAWG(unittest.TestCase):
                 }
             }
         ]
+        core = 0
+        expected_runtime_error = f"The upload of command table on core {core} failed."
+        expected_validation_error = "Invalid command table."
+        expected_value_error = "Invalid value in command table."
+
         with unittest.mock.patch(
-                "qmi.instruments.zurich_instruments.hdawg.zhinst"
-        ), unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit"
-        ) as zhinst_patch:
-            zhinst_patch.CommandTable = Mock(return_value=self.CommandTableMock)
-            with self.assertRaises(ValueError) as verr:
-                self.hdawg.upload_command_table(0, command_table_entries)
+            "qmi.instruments.zurich_instruments.hdawg.zhinst"
+        ), unittest.mock.patch.object(
+            qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.exceptions, "ValidationError", ValidationError
+        ):
+            self._device.awgs[0].commandtable.upload_to_device.side_effect = [
+                RuntimeError("Run b4 they Findus!"), ValidationError("Invalid")
+            ]
+            with self.assertRaises(RuntimeError) as r_err:
+                self.hdawg.upload_command_table(core, command_table_entries)
+
+            with self.assertRaises(ValueError) as v_err:
+                self.hdawg.upload_command_table(core, command_table_entries)
 
             with unittest.mock.patch(
                     "qmi.instruments.zurich_instruments.hdawg.json", spec=json
@@ -1071,28 +1329,74 @@ class TestHDAWG(unittest.TestCase):
                 json_patch.loads = Mock(return_value=json.loads(_SCHEMA["/DEV8888/awgs/0/commandtable/schema"][0]["vector"]))
                 json_patch.dumps = Mock(side_effect=[TypeError("Ugly value")])
                 schema_patch.validate = Mock()
-                with self.assertRaises(ValueError) as verr_2:
-                    self.hdawg.upload_command_table(0, command_table_entries)
+                with self.assertRaises(ValueError) as v_err_2:
+                    self.hdawg.upload_command_table(core, command_table_entries, save_as_file=True)
 
-        self.assertEqual("Invalid command table.", str(verr.exception))
-        self.assertEqual("Invalid value in command table.", str(verr_2.exception))
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.json", spec=json
+            ) as json_patch, unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.jsonschema", spec=jsonschema
+        ) as schema_patch:
+            json_patch.loads = Mock(return_value=json.loads(_SCHEMA["/DEV8888/awgs/0/commandtable/schema"][0]["vector"]))
+            json_patch.dumps = Mock(side_effect=[TypeError("Ugly value")])
+            schema_patch.validate = Mock()
+
+        self.assertEqual(expected_runtime_error, str(r_err.exception))
+        self.assertEqual(expected_validation_error, str(v_err.exception))
+        self.assertEqual(expected_value_error, str(v_err_2.exception))
 
     def test_upload_command_table_wrong_awg(self):
         """Test invalid command table upload."""
-        with self.assertRaises(ValueError):
-            self.hdawg.upload_command_table(-1, [])
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+        ), unittest.mock.patch(
+            "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit"
+        ):
+            with self.assertRaises(ValueError):
+                self.hdawg.upload_command_table(-1, [])
 
-        with self.assertRaises(ValueError):
-            self.hdawg.upload_command_table(4, [])
+            with self.assertRaises(ValueError):
+                self.hdawg.upload_command_table(4, [])
 
     def test_sync(self):
         """Test sync method."""
         self.hdawg.sync()
 
-        expected_daq_server_calls = [
-            call.sync()
-        ]
-        self.assertEqual(self._daq_server.mock_calls, expected_daq_server_calls)
+        self.hdawg._session.sync.assert_called_once_with()
+
+    def test_enable_sequencer(self):
+        """Test enabling sequencer on specific channel."""
+        channel_1 = 3
+        channel_2 = 7
+
+        node_mock_1 = self.hdawg.awg_channel_map[channel_1]
+        node_mock_2 = self.hdawg.awg_channel_map[channel_2]
+
+        self.hdawg.enable_sequencer(channel_1)
+        node_mock_1.enable_sequencer.assert_called_once_with(single=True)
+        node_mock_1.reset_mock()
+
+        self.hdawg.enable_sequencer(channel_2, False)
+        node_mock_2.enable_sequencer.assert_called_once_with(single=False)
+
+    def test_wait_done(self):
+        """Test wait_done call."""
+        channel = 6
+        timeout = 0.0
+        channel_mock = self.hdawg.awg_channel_map[channel]
+
+        self.hdawg.wait_done(channel, timeout)
+
+        channel_mock.wait_done.assert_called_once_with(timeout=timeout)
+
+    def test_get_awg_module_index(self):
+        """Test gettings AWG module index."""
+        self._awg_module.awg.raw_module.getInt.return_value = 3
+
+        index = self.hdawg.get_awg_module_index()
+
+        self._awg_module.awg.raw_module.getInt.assert_called_once_with("index")
+        self.assertEqual(3, index)
 
     def test_set_awg_module_index(self):
         """Test setting AWG module index with good values."""
@@ -1109,42 +1413,65 @@ class TestHDAWG(unittest.TestCase):
     def test_set_awg_module_index_exceptions(self):
         """Test setting AWG module index with wrong values w.r.t. grouping."""
         self._awg_module.finished.side_effect = [False, True]  # For close
-        groupings = list(range(3))
-        for grouping in groupings:
-            self.hdawg._grouping = grouping
-            nok_indexes = list(range((3 - grouping), grouping * 2 + 2))
-            nok_indexes = [-1, 4] if not nok_indexes else nok_indexes
-            for index in nok_indexes:
-                with self.assertRaises(ValueError):
-                    self.hdawg.set_awg_module_index(index)
+        nok_indexes = [-1, 4]
+        for index in nok_indexes:
+            with self.assertRaises(ValueError):
+                self.hdawg.set_awg_module_index(index)
 
-    def test_awg_core_enabled(self):
-        """Test AWG enable on/off."""
+    def test_get_awg_core_enabled(self):
+        """Test getting AWG core enable state."""
         self.hdawg.get_awg_core_enabled(0)
-        self._check_get_value_int("awgs/0/enable")
+        self._device.awgs[0].enable.assert_called_once_with()
+        self._device.reset_mock()
         self.hdawg.get_awg_core_enabled(3)
-        self._check_get_value_int("awgs/3/enable")
+        self._device.awgs[3].enable.assert_called_once_with()
+
+    def test_set_awg_core_enabled(self):
+        """Test AWG core enable on/off."""
+        self.hdawg.set_awg_core_enabled(0, 1)
+        self._device.awgs[0].enable.assert_called_once_with(1)
+        self._device.reset_mock()
+        self.hdawg.set_awg_core_enabled(3, 0)
+        self._device.awgs[3].enable.assert_called_once_with(0)
+
+    def test_set_awg_core_enabled_invalid_values(self):
+        """Test AWG core enable on/off with invalid inputs"""
+        with self.assertRaises(ValueError):
+            self.hdawg.set_awg_core_enabled(9, 1)
 
         with self.assertRaises(ValueError):
-            self.hdawg.get_awg_module_enabled(-1)
+            self.hdawg.set_awg_core_enabled(0, 3)
 
-        with self.assertRaises(ValueError):
-            self.hdawg.get_awg_module_enabled(4)
+    def test_get_awg_module_enabled(self):
+        self.hdawg.get_awg_module_enabled()
+        self.hdawg.awg_module.getInt.assert_called_once_with("awg/enable")
 
+    def test_set_awg_module_enabled(self):
+        expected_awg_module_calls = [
+            call("awg/enable", 0),
+            call("awg/enable", 1),
+        ]
+
+        self._awg_module.reset_mock()
         self.hdawg.set_awg_module_enabled(0)
         self.hdawg.set_awg_module_enabled(1)
 
-        expected_awg_module_calls = [
-            call.set("awg/enable", 0),
-            call.set("awg/enable", 1)
-        ]
-        self.assertEqual(expected_awg_module_calls, self._awg_module.mock_calls)
+        self._awg_module.awg.raw_module.set.assert_has_calls(expected_awg_module_calls)
 
         with self.assertRaises(ValueError):
             self.hdawg.set_awg_module_enabled(-1)
 
         with self.assertRaises(ValueError):
             self.hdawg.set_awg_module_enabled(2)
+
+    def test_get_channel_grouping(self):
+        """Test setting channel grouping."""
+        self._daq_server.getInt.return_value = 1
+
+        grouping = self.hdawg.get_channel_grouping()
+
+        self._check_get_value_int("system/awg/channelgrouping")
+        self.assertEqual(1, grouping)
 
     def test_set_channel_grouping(self):
         """Test setting channel grouping."""
@@ -1157,11 +1484,11 @@ class TestHDAWG(unittest.TestCase):
     def test_set_reference_clock_source(self):
         """Test reference clock source setting."""
         self.hdawg.set_reference_clock_source(0)
-        self._check_set_value_int("system/clocks/referenceclock/source", 0)
+        self._device.system.clocks.referenceclock.source.assert_called_once_with(0)
         self.hdawg.set_reference_clock_source(1)
-        self._check_set_value_int("system/clocks/referenceclock/source", 1)
+        self._device.system.clocks.referenceclock.source.assert_called_with(1)
         self.hdawg.set_reference_clock_source(2)
-        self._check_set_value_int("system/clocks/referenceclock/source", 2)
+        self._device.system.clocks.referenceclock.source.assert_called_with(2)
 
         with self.assertRaises(ValueError):
             self.hdawg.set_reference_clock_source(3)
@@ -1169,28 +1496,28 @@ class TestHDAWG(unittest.TestCase):
     def test_get_reference_clock_status(self):
         """Test reference clock source status."""
         self.hdawg.get_reference_clock_status()
-        self._check_get_value_int("system/clocks/referenceclock/status")
+        self._device.system.clocks.referenceclock.status.assert_called_once_with()
 
     def test_set_sample_clock_frequency(self):
         """"Test sample clock setting."""
         self.hdawg.set_sample_clock_frequency(1234.5e6)
-        self._check_set_value_double("system/clocks/sampleclock/freq", 1234.5e6)
+        self._device.system.clocks.sampleclock.freq.assert_called_once_with(1234.5e6)
 
     def test_get_sample_clock_status(self):
         """Test reference clock source status."""
         self.hdawg.get_sample_clock_status()
-        self._check_get_value_int("system/clocks/sampleclock/status")
+        self._device.system.clocks.sampleclock.status.assert_called_once_with()
 
     def test_set_trigger_impedance(self):
         """Test trigger impedance setting."""
         self.hdawg.set_trigger_impedance(0, 0)
-        self._check_set_value_int("triggers/in/0/imp50", 0)
+        self._device.triggers.in_[0].imp50.assert_called_once_with(0)
         self.hdawg.set_trigger_impedance(0, 1)
-        self._check_set_value_int("triggers/in/0/imp50", 1)
+        self._device.triggers.in_[0].imp50.assert_called_with(1)
         self.hdawg.set_trigger_impedance(7, 0)
-        self._check_set_value_int("triggers/in/7/imp50", 0)
+        self._device.triggers.in_[7].imp50.assert_called_with(0)
         self.hdawg.set_trigger_impedance(7, 1)
-        self._check_set_value_int("triggers/in/7/imp50", 1)
+        self._device.triggers.in_[7].imp50.assert_called_with(1)
 
         with self.assertRaises(ValueError):
             self.hdawg.set_trigger_impedance(-1, 0)
@@ -1204,20 +1531,30 @@ class TestHDAWG(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.hdawg.set_trigger_impedance(8, 2)
 
+    def test_get_trigger_level(self):
+        """test getting a trigger level."""
+        trigger = 1
+
+        self.hdawg.get_trigger_level(trigger)
+
+        self._device.triggers.in_[trigger].level.assert_called_once_with()
+
+    def test_get_trigger_level_excepts(self):
+        """test getting a trigger level with invalid trigger numbers."""
+        triggers = [-1, self.hdawg.NUM_CHANNELS]
+
+        for trigger in triggers:
+            with self.assertRaises(ValueError):
+                self.hdawg.get_trigger_level(trigger)
+
     def test_set_trigger_level(self):
         """Test trigger level setting."""
-        self.hdawg.set_trigger_level(0, 0.0)
-        self._check_set_value_double("triggers/in/0/level", 0.0)
-        self.hdawg.set_trigger_level(0, -5.0)
-        self._check_set_value_double("triggers/in/0/level", -5.0)
-        self.hdawg.set_trigger_level(0, 5.0)
-        self._check_set_value_double("triggers/in/0/level", 5.0)
-        self.hdawg.set_trigger_level(7, 0.0)
-        self._check_set_value_double("triggers/in/7/level", 0.0)
-        self.hdawg.set_trigger_level(7, -5.0)
-        self._check_set_value_double("triggers/in/7/level", -5.0)
-        self.hdawg.set_trigger_level(7, 5.0)
-        self._check_set_value_double("triggers/in/7/level", 5.0)
+        triggers = [0, 7]
+        levels = [-5.0, 0, 5.0]
+        for trigger, level in zip(triggers, levels):
+            self._device.reset_mock()
+            self.hdawg.set_trigger_level(trigger, level)
+            self._device.triggers.in_[trigger].level.assert_called_once_with(level)
 
         with self.assertRaises(ValueError):
             self.hdawg.set_trigger_level(-1, 0)
@@ -1269,14 +1606,12 @@ class TestHDAWG(unittest.TestCase):
 
     def test_set_dig_trigger_source(self):
         """Test digital trigger source setting."""
-        self.hdawg.set_dig_trigger_source(0, 0, 0)
-        self._check_set_value_int("awgs/0/auxtriggers/0/channel", 0)
-        self.hdawg.set_dig_trigger_source(3, 0, 0)
-        self._check_set_value_int("awgs/3/auxtriggers/0/channel", 0)
-        self.hdawg.set_dig_trigger_source(0, 1, 0)
-        self._check_set_value_int("awgs/0/auxtriggers/1/channel", 0)
-        self.hdawg.set_dig_trigger_source(0, 0, 7)
-        self._check_set_value_int("awgs/0/auxtriggers/0/channel", 7)
+        cores = [0, 3]
+        triggers = [0, 1]
+        for core, trigger in zip(cores, triggers):
+            self._device.reset_mock()
+            self.hdawg.set_dig_trigger_source(core, trigger, core * 2)
+            self._device.awgs[core].auxtriggers[trigger].channel.assert_called_once_with(core * 2)
 
         with self.assertRaises(ValueError):
             self.hdawg.set_dig_trigger_source(-1, 0, 0)
@@ -1298,14 +1633,12 @@ class TestHDAWG(unittest.TestCase):
 
     def test_set_dig_trigger_slope(self):
         """Test digital trigger slope setting."""
-        self.hdawg.set_dig_trigger_slope(0, 0, 0)
-        self._check_set_value_int("awgs/0/auxtriggers/0/slope", 0)
-        self.hdawg.set_dig_trigger_slope(3, 0, 0)
-        self._check_set_value_int("awgs/3/auxtriggers/0/slope", 0)
-        self.hdawg.set_dig_trigger_slope(0, 1, 0)
-        self._check_set_value_int("awgs/0/auxtriggers/1/slope", 0)
-        self.hdawg.set_dig_trigger_slope(0, 0, 3)
-        self._check_set_value_int("awgs/0/auxtriggers/0/slope", 3)
+        cores = [0, 3]
+        triggers = [0, 1]
+        for core, trigger in zip(cores, triggers):
+            self._device.reset_mock()
+            self.hdawg.set_dig_trigger_slope(core, trigger, core)
+            self._device.awgs[core].auxtriggers[trigger].slope.assert_called_once_with(core)
 
         with self.assertRaises(ValueError):
             self.hdawg.set_dig_trigger_slope(-1, 0, 0)
@@ -1325,67 +1658,49 @@ class TestHDAWG(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.hdawg.set_dig_trigger_slope(0, 0, 4)
 
-    def test_set_output_amplitude(self):
-        """Test output amplitude setting."""
-        self.hdawg.set_output_amplitude(0, 0, 1.0)
-        self._check_set_value_double("awgs/0/outputs/0/amplitude", 1.0)
-        self.hdawg.set_output_amplitude(0, 1, 1.0)
-        self._check_set_value_double("awgs/0/outputs/1/amplitude", 1.0)
-        self.hdawg.set_output_amplitude(0, 0, -1.0)
-        self._check_set_value_double("awgs/0/outputs/0/amplitude", -1.0)
-        self.hdawg.set_output_amplitude(0, 1, -1.0)
-        self._check_set_value_double("awgs/0/outputs/1/amplitude", -1.0)
-        self.hdawg.set_output_amplitude(3, 0, 1.0)
-        self._check_set_value_double("awgs/3/outputs/0/amplitude", 1.0)
-        self.hdawg.set_output_amplitude(3, 1, 1.0)
-        self._check_set_value_double("awgs/3/outputs/1/amplitude", 1.0)
-        self.hdawg.set_output_amplitude(3, 0, -1.0)
-        self._check_set_value_double("awgs/3/outputs/0/amplitude", -1.0)
-        self.hdawg.set_output_amplitude(3, 1, -1.0)
-        self._check_set_value_double("awgs/3/outputs/1/amplitude", -1.0)
+    def test_set_output_gain(self):
+        """Test output gain setting."""
+        cores = [0, 3]
+        channels = [0, 1]
+        for core, channel in zip(cores, channels):
+            self._device.reset_mock()
+            self.hdawg.set_output_gain(core, channel, 0.1 * core)
+            self._check_set_value_double(f"awgs/{core}/outputs/{channel}/gains/{channel}", 0.1 * core)
 
         with self.assertRaises(ValueError):
-            self.hdawg.set_output_amplitude(-1, 0, 1.0)
+            self.hdawg.set_output_gain(-1, 0, 1.0)
 
         with self.assertRaises(ValueError):
-            self.hdawg.set_output_amplitude(4, 0, 1.0)
+            self.hdawg.set_output_gain(4, 0, 1.0)
 
         with self.assertRaises(ValueError):
-            self.hdawg.set_output_amplitude(0, -1, 1.0)
+            self.hdawg.set_output_gain(0, -1, 1.0)
 
         with self.assertRaises(ValueError):
-            self.hdawg.set_output_amplitude(0, 3, 1.0)
-
-    def test_get_output_amplitude(self):
-        """Test output amplitude query."""
-        self.hdawg.get_output_amplitude(0, 0)
-        self._check_get_value_double("awgs/0/outputs/0/amplitude")
-        self.hdawg.get_output_amplitude(0, 1)
-        self._check_get_value_double("awgs/0/outputs/1/amplitude")
-        self.hdawg.get_output_amplitude(0, 0)
-        self._check_get_value_double("awgs/0/outputs/0/amplitude")
-        self.hdawg.get_output_amplitude(0, 1)
-        self._check_get_value_double("awgs/0/outputs/1/amplitude")
-        self.hdawg.get_output_amplitude(3, 0)
-        self._check_get_value_double("awgs/3/outputs/0/amplitude")
-        self.hdawg.get_output_amplitude(3, 1)
-        self._check_get_value_double("awgs/3/outputs/1/amplitude")
-        self.hdawg.get_output_amplitude(3, 0)
-        self._check_get_value_double("awgs/3/outputs/0/amplitude")
-        self.hdawg.get_output_amplitude(3, 1)
-        self._check_get_value_double("awgs/3/outputs/1/amplitude")
+            self.hdawg.set_output_gain(0, 3, 1.0)
 
         with self.assertRaises(ValueError):
-            self.hdawg.get_output_amplitude(-1, 0)
+            self.hdawg.set_output_gain(0, 0, 1.1)
+
+    def test_get_output_gain(self):
+        """Test output gain query."""
+        cores = [0, 3]
+        channels = [0, 1]
+        for core, channel in zip(cores, channels):
+            self.hdawg.get_output_gain(core, channel)
+            self._check_get_value_double(f"awgs/{core}/outputs/{channel}/gains/{channel}")
 
         with self.assertRaises(ValueError):
-            self.hdawg.get_output_amplitude(4, 0)
+            self.hdawg.get_output_gain(-1, 0)
 
         with self.assertRaises(ValueError):
-            self.hdawg.get_output_amplitude(0, -1)
+            self.hdawg.get_output_gain(4, 0)
 
         with self.assertRaises(ValueError):
-            self.hdawg.get_output_amplitude(0, 3)
+            self.hdawg.get_output_gain(0, -1)
+
+        with self.assertRaises(ValueError):
+            self.hdawg.get_output_gain(0, 3)
 
     def test_set_output_channel_hold(self):
         """Test output hold setting."""
@@ -1488,14 +1803,12 @@ class TestHDAWG(unittest.TestCase):
 
     def test_set_output_channel_range(self):
         """Test output channel range setting."""
-        self.hdawg.set_output_channel_range(0, 0.0)
-        self._check_set_value_double("sigouts/0/range", 0.0)
-        self.hdawg.set_output_channel_range(0, 5.0)
-        self._check_set_value_double("sigouts/0/range", 5.0)
-        self.hdawg.set_output_channel_range(7, 0.0)
-        self._check_set_value_double("sigouts/7/range", 0.0)
-        self.hdawg.set_output_channel_range(7, 5.0)
-        self._check_set_value_double("sigouts/7/range", 5.0)
+        valid_values = [0.2, 2, 5]
+        for value in valid_values:
+            self.hdawg.set_output_channel_range(0, value)
+            self._check_set_value_double("sigouts/0/range", value)
+            self.hdawg.set_output_channel_range(7, value)
+            self._check_set_value_double("sigouts/7/range", value)
 
     def test_set_output_channel_range_out_of_range(self):
         with self.assertRaises(ValueError):
@@ -1623,8 +1936,10 @@ class TestHDAWG(unittest.TestCase):
     def test_set_dio_mode(self):
         """Test DIO mode setting."""
         for i in range(4):
+            self._device.reset_mock()
             self.hdawg.set_dio_mode(i)
-            self._check_set_value_int("dios/0/mode", i)
+            self._device.dios[0].mode.assert_called_once_with(i)
+            # self._check_set_value_int("dios/0/mode", i)
 
         with self.assertRaises(ValueError):
             self.hdawg.set_dio_mode(-1)
@@ -1635,14 +1950,29 @@ class TestHDAWG(unittest.TestCase):
     def test_set_dio_drive(self):
         """Test DIO drive setting."""
         for i in range(16):
+            self._device.reset_mock()
             self.hdawg.set_dio_drive(i)
-            self._check_set_value_int("dios/0/drive", i)
+            self._device.dios[0].drive.assert_called_once_with(i)
+            # self._check_set_value_int("dios/0/drive", i)
 
         with self.assertRaises(ValueError):
             self.hdawg.set_dio_drive(-1)
 
         with self.assertRaises(ValueError):
             self.hdawg.set_dio_drive(16)
+
+    def test_set_digital_output(self):
+        """Test setting all digital channels as outputs."""
+        dio = self.hdawg.device.dios[0]
+
+        self.hdawg.set_digital_output(True)
+
+        dio.output.assert_called_once_with(1)
+        dio.reset_mock()
+
+        self.hdawg.set_digital_output(0)
+
+        dio.output.assert_called_once_with(0)
 
     def test_set_dio_strobe_index(self):
         """Test DIO strobe index setting."""
