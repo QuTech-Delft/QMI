@@ -1537,7 +1537,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                         - AWG channel pair index is invalid.
 
         Returns:
-            amplitude: A dimensionless scaling factor applied to the digital signal.
+            gain: A dimensionless scaling factor applied to the digital signal.
         """
         if awg_core not in range(self.NUM_AWGS):
             raise ValueError("Invalid AWG core number.")
@@ -1551,14 +1551,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     def set_output_gain(self, awg_core: int, channel: int, value: float) -> None:
         """Set the output scaling factor (gain) of the specified channel.
 
-        The amplitude is a dimensionless scaling factor applied to the digital signal.
+        The gain is a dimensionless scaling factor applied to the digital signal.
 
         Parameters:
             awg_core: AWG core number in the range 0 to 3. The AWG index selects a pair of output channels.
                       Index 0 selects output channels 1 and 2, index 1 selects channels 2 and 3 etc.
             channel:  Channel index in the range 0 to 1, selecting the first or second output channel
                       within the selected channel pair.
-            value:    Amplitude scale factor in range -1...+1.
+            value:    Gain in range -1...+1.
 
         Raises:
             ValueError: - AWG core number is not valid.
@@ -1569,7 +1569,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         if channel not in range(self.NUM_CHANNELS_PER_AWG):
             raise ValueError("Invalid channel pair index.")
         if not -1.0 <= value <= 1.0:
-            raise ValueError("Output amplitude scaling factor is limited in range -1.0 ... +1.0")
+            raise ValueError("Output gain is limited in range -1.0 ... +1.0")
 
         self._check_is_open()
         self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/{channel}", value)
