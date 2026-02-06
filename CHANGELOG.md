@@ -11,12 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `standard-xdrlib` from "dead batteries" as a dependency to fix issues coming from removal of `xdrlib` from standard library.
 - `grouping=2` input parameter in the `ZurichInstruments_Hdawg` to enable initialization directly in wanted grouping mode.
 - Addition of `set_awg_module_index` method to set the AWG module index number.
-- Addition of new methods in Zurich Instruments HDAWG QMI driver.
+- Addition of other new methods in Zurich Instruments HDAWG QMI driver. For example, now it is also possible to upload sequencer programs, command tables and waveforms to specific channel | core.
 
 ### Changed
 - All ZI grouping modes are now allowed in methods.
-- For all calls using the "/awgs/n/" the AWG core number (n) is checked based on current grouping mode.
 - Zurich Instruments HDAWG QMI driver refactoring to be based mainly on the zhinst.toolkit package to allow easier 4x2 and 2x4 grouping modes and use.
+- DeprecationWarning on the `set|get_output_amplitude` methods in the HDAWG driver, as the new firmware points to rather using `outputs/n/gains/n`. Use `set|get_output_gain` from now on.
 
 ### Fixed
 - Moving of `_snicaddr` in psutil package v2.7 from `_common` to `_ntuples` module, which caused an error with `qmi_proc`.
