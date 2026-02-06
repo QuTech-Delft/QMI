@@ -1079,7 +1079,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             ValueError:           Invalid AWG core number.
             ValueError:           Validation of the command table failed.
             ValueError:           Invalid value in the command table despite successful validation.
-            RuntimeError:         If the upload of command table on core {awg_index} failed.
+            RuntimeError:         If the upload of command table on core awg_core failed.
         """
         if awg_core not in range(self.NUM_AWGS):
             raise ValueError("AWG core number is not valid.")
