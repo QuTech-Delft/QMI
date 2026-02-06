@@ -1953,7 +1953,6 @@ class TestHDAWG(unittest.TestCase):
             self._device.reset_mock()
             self.hdawg.set_dio_drive(i)
             self._device.dios[0].drive.assert_called_once_with(i)
-            # self._check_set_value_int("dios/0/drive", i)
 
         with self.assertRaises(ValueError):
             self.hdawg.set_dio_drive(-1)
