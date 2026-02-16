@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Moving of `_snicaddr` in psutil package v2.7 from `_common` to `_ntuples` module, which caused an error with `qmi_proc`.
 - Now referring to "AWG core", and using `awg_core` in methods where erroneously was referred to "AWG index" and `awg_index`.
+- Process management logging path now resolves correctly also for cases where the config file path starts with the `~`, indicating home directory location.
 
 ### Removed
 - Removed `xdrlib-py` import for Python 3.13 version, where it was needed for python-vxi11 package.
