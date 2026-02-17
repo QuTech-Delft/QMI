@@ -36,10 +36,6 @@ classifiers=[
 ]
 keywords=["qmi", "hardware", "software", "interface", "laboratory", "physics"]
 dependencies = [
-    # For generating an installable package and deploying
-    "setuptools",
-    "wheel",
-    "twine",
     # For scientific data processing and visualisation
     "numpy",
     "scipy",
