@@ -11,6 +11,8 @@ matplotlib
 pyserial
 pyusb
 python-vxi11
+# For legacy python-vxi11
+standard-xdrlib
 # For miscellaneous functionality
 pytz
 psutil
