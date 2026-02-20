@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.51.2] - 2026-02-20
+
+### Added
+- `run` method in `QMI_Context` class as this is now required for Python 3.14, after changes in `threading` module.
+
+### Fixed
+- Log file location config for services in `qmi_proc.py`. Location string starting with tilde (~) is now interpreted correctly to be the user's home directory.
+- Minor edits in docstrings, tutorial and .gitignore file.
+
 ## [0.51.1] - 2026-01-26
 
 ### Fixed

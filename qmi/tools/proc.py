@@ -326,6 +326,8 @@ def start_local_process(context_name: str) -> int:
     else:
         output_dir = qmi.context().get_qmi_home_dir()
 
+    # Replace tilde with full path as otherwise it might be literally used
+    output_dir = output_dir.replace("~", os.path.expanduser("~")) if output_dir.startswith("~") else output_dir
     # Create output log file.
     datetime = time.strftime("%Y%m%d_%H%M%S", time.gmtime())
     output_file_name = os.path.join(output_dir, context_name + "_" + datetime + ".out")

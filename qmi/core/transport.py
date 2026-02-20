@@ -1321,7 +1321,7 @@ def create_transport(
       - "port" (for UDP and TCP transports) specifies the UDP/TCP port number of the server/client.
       - "connect_timeout" is TCP connection timeout.
 
-     Serial:
+    Serial:
       - "device" is the name of the serial port, for example "COM3" or "/dev/ttyUSB0".
       - "baudrate" specifies the number of bits per second.
         This attribute is only required for instruments with a configurable baud rate.
