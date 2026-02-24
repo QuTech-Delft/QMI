@@ -180,7 +180,7 @@ class TestThorlabsK10cr2Methods(unittest.TestCase):
     def test_get_idn(self):
         """Test the get_idn method."""
         # First two values are hardcoded, and the two latter are based on the standard return value for read in `setUp`
-        expected_idn = ["Thorlabs", "K10CR2", 3297859, "3.2.3"]
+        expected_idn = ["Thorlabs", "K10CR2", 3297859, "9.2.3"]
         # We expect to write MESSAGE_ID 0x0005 (_AptMsgHwReqInfo)
         expected_write = struct.pack(self._pack, 0x0005) + b"P\x01"  # This is 5001 == 0x1389
 
