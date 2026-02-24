@@ -9,7 +9,6 @@ after creating a virtual COM port for the internal USB serial port in the instru
 
 import logging
 import time
-import warnings
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
@@ -25,7 +24,6 @@ from qmi.instruments.thorlabs.apt_protocol import (
     AptProtocol,
     AptChannelState,
     AptChannelStopMode,
-    VelocityParams,
     HomeParams,
     MotorStatus,
 )
@@ -292,32 +290,6 @@ class Thorlabs_K10CRxBase(QMI_Instrument):
 
         resp = self._get_velocity_params()
         return resp.accel / self.ACCELERATION_FACTOR
-
-    @rpc_method
-    def get_velocity_params(self) -> VelocityParams:
-        """Return the current maximum velocity and acceleration."""
-        self._check_is_open()
-        warnings.warn(
-            f"{self.get_velocity_params.__name__} has been deprecated. " +
-            f"Please use {self.get_velocity.__name__} and {self.get_acceleration.__name__} instead.",
-            DeprecationWarning
-        )
-
-        # Send request message.
-        req_msg = self._apt_protocol.create(
-            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_REQ_VEL_PARAMS.value],
-            chan_ident=self._channel
-        )
-        reply_msg = self._apt_protocol.create(
-            APT_MESSAGE_TYPE_TABLE[AptMessageId.MOT_GET_VEL_PARAMS.value]
-        )
-
-        # Receive response
-        resp = self._apt_protocol.ask(req_msg, reply_msg)
-        return VelocityParams(
-            max_velocity=(resp.max_vel / self.VELOCITY_FACTOR),
-            acceleration=(resp.accel / self.ACCELERATION_FACTOR)
-        )
 
     @rpc_method
     def set_velocity(self, max_velocity: float) -> None:

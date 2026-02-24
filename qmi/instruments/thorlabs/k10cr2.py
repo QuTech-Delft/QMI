@@ -21,7 +21,7 @@ class Thorlabs_K10CR2(Thorlabs_K10CRxBase):
     """Instrument driver for the Thorlabs K10CR2/M motorized rotational mount."""
 
     # Maximum velocity in degrees/second
-    MAX_VELOCITY = 10
+    MAX_VELOCITY = 20
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize driver.

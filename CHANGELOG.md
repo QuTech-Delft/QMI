@@ -9,14 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `run` method in `QMI_Context` class to accommodate for `threading.Thread` changes in Python 3.14.
 - `standard-xdrlib` from "dead batteries" as a dependency to fix issues coming from removal of `xdrlib` from standard library.
+- Base class for Thorlabs K10CRx instruments in qmi.instruments.thorlabs.k10crx module.
+- Driver for Thorlabs K10RC2 instrument. It is based on the new base class for K10CRx instruments.
 
 ### Changed
+- Changed Thorlabs K10CR1 to derive from new base class for K10CRx instruments.
 
 ### Fixed
 - Moving of `_snicaddr` in psutil package v2.7 from `_common` to `_ntuples` module, which caused an error with `qmi_proc`.
 
 ### Removed
 - Removed `xdrlib-py` import for Python 3.13 version, where it was needed for python-vxi11 package.
+- Removed deprecated `get_velocity_params` function in Thorlabs K10CRx driver, and the respective `VelocityParams` dataclass in the APT protocol.
 
 ## [0.51.0] - 2025-12-09
 
