@@ -191,7 +191,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
             # At this point, the replacement value should be a string.
             if not isinstance(replacement, str):
-                raise ValueError("Cannot handle replacement value of type {!r}".format(type(replacement)))
+                raise ValueError(f"Cannot handle replacement value of type {type(replacement)!r}")
 
             # Perform the replacement.
             if SEQC_PAR_PATTERN.fullmatch(parameter):
@@ -199,14 +199,15 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                 parameter_pattern = f"\\{parameter}\\b"  # escape the '$' and add word boundary match
                 sequencer_program = re.sub(parameter_pattern, replacement, sequencer_program)
             else:
-                raise NameError("Replacement parameter has an invalid name: {}".format(parameter))
+                raise NameError(f"Replacement parameter has an invalid name: {parameter}")
 
         # Check if there are any unreplaced parameters left in the source code; this will not compile.
         leftover_parameters = SEQC_PAR_PATTERN.findall(sequencer_program)
         if leftover_parameters:
-            raise KeyError("Variables left in sequencer program that were not in replacement dictionary: {}".format(
-                ', '.join(leftover_parameters)
-            ))
+            raise KeyError(
+                "Variables left in sequencer program that were not in replacement dictionary: " +
+                f"{', '.join(leftover_parameters)}."
+            )
 
         return sequencer_program
 
@@ -246,7 +247,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         # Check if there are any lines left (we do not check if that is executable code; the compiler will do that).
         if len(seqc_statements) == 0:
-            raise QMI_ApplicationException("Source string does not contain executable statements")
+            raise QMI_ApplicationException("Source string does not contain executable statements.")
 
     @staticmethod
     def _control_waveform_inputs(
@@ -434,7 +435,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             _logger.warning("Compilation finished with warnings: %s", warning_message)
             ok_to_proceed = True
         else:
-            raise ValueError("Unknown compiler status: {}".format(compilation_result))
+            raise ValueError(f"Unknown compiler status: {compilation_result}")
 
         return ok_to_proceed
 
@@ -753,7 +754,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         value = int(value)  # Conversion just in case input is e.g. bool. ZhInst checks the type.
         if value not in (0, 1):
-            raise ValueError("Invalid enable value")
+            raise ValueError("Invalid enable value.")
 
         self._check_is_open()
         self.device.awgs[awg_core].enable(value)
