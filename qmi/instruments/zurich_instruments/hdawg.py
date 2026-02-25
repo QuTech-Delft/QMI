@@ -1631,7 +1631,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             " (../sines/{awg_core}/amplitudes/{channel}).", DeprecationWarning
         )
         awg_channel = awg_core * 2 + channel
-        return self.get_output_gain(awg_channel)
+        return self.get_output_gain(awg_channel)  # type: ignore
 
     @rpc_method
     def set_output_amplitude(self, awg_core: int, channel: int, value: float) -> None:
@@ -1680,7 +1680,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def set_output_gain(
-        self, awg_channel: int, value: float | list[float, float], gain_index: int = 0) -> None:
+        self, awg_channel: int, value: float | list[float], gain_index: int = 0) -> None:
         """Set the output scaling factor[s] (gain[s]) of the specified channel.
 
         The gain is a dimensionless scaling factor applied to the digital signal.
@@ -1710,9 +1710,10 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                     f"[{self._name}]: Gain index set as {gain_index}, but two gain values given." +
                     f"Setting only the respective value ({value[gain_index]}) from the inputs."
                 )
-                value = value[gain_index]
+                self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/{gain_index}", value[gain_index])
 
-            self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/{gain_index}", value)
+            else:
+                self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/{gain_index}", value)
 
         else:
             if isinstance(value, list | tuple):
