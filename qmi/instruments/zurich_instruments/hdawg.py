@@ -95,6 +95,22 @@ class UploadStatus(enum.IntEnum):
 class ZurichInstruments_HDAWG(QMI_Instrument):
     """Instrument driver for the Zürich Instruments HDAWG.
 
+    In this driver we employ the AWG module index-to-AWG core mapping as defined in Table 3.1 and
+    Table 3.2 in LabOne Programming manual Revision 22.08. As a summary, we thus define that on:
+    - grouping mode 0 we have four AWG modules, indexed 0..3, and the indexes map 1-to-1 to the
+      respective AWG cores 0..3.
+    - grouping mode 1 we have two AWG modules, indexed 0 and 1, which map to AWG cores 0-1 and 2-3.
+    - grouping mode 2 we have one AWG module, indexed as 0, which maps to AWG cores 0..3.
+
+    The now used zhinst-toolkit package does not make this distinction. It does allow also referencing
+    to any sequencer or node-tree value from any core in the same module index in grouped modes. For
+    example, in grouping mode 1, a sequencer on AWG core 0 can be enabled by calling
+    `device.awgs[1].enable(1)`. In this QMI driver we have decided to restrict this feature by allowing
+    the user to refer only to the module index, which would then translate to AWG core number - in
+    grouping mode 1 to either 0 (index 0) or 2 (index 1). For grouping mode 2, only index 0, referring
+    to core 0, is allowed. This to avoid possible confusion about what is the current grouping mode and
+    make sure the user knows in calls made, if the grouping mode is not as expected.
+
     Attributes:
         COMPILE_TIMEOUT:      The default timeout in seconds for a program compilation.
         UPLOAD_TIMEOUT:       The default timeout in seconds for uploading a compiled program.
@@ -142,9 +158,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         # Import the "zhinst" modules.
         _import_modules()
 
-        # Create mapping
-        self._awg_channel_map: list[awg.AWG] = []
-
         # Connect to Zurich Instruments Data Server
         self._session = zhinst.toolkit.Session(self._server_host, self._server_port)
 
@@ -172,6 +185,22 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return [
             self.device.awgs[awg_channel // 2] for awg_channel in range(self.NUM_CHANNELS)
         ]
+
+    @property
+    def valid_awg_index_map(self) -> list[int]:
+        """Mapping of AWG channels to correct AWG module index, based on channel range 0-7 and current grouping mode."""
+        return [
+            awg_channel % (2 ** (2 - self._grouping)) for awg_channel in range(self.NUM_CHANNELS)
+        ]
+
+    def _valid_awg_core_map(self) -> list[list[int]]:
+        """Mapping of valid AWG cores, based on current grouping mode."""
+        if self._grouping == 2:
+            return [list(range(4))]
+        if self._grouping == 1:
+            return [[0, 1], [2, 3]]
+        else:
+            return [[0], [1], [2], [3]]
 
     @staticmethod
     def _process_parameter_replacements(sequencer_program: str, replacements: dict[str, str | int | float]) -> str:
@@ -265,6 +294,13 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                 wave2 = np.zeros(wave1.shape)
 
         return markers, wave1, wave2
+
+    def _awg_index_to_awg_core(self, awg_index: int) -> int:
+        """Convert AWG core index to AWG core number if in grouping mode 1."""
+        if self._grouping == 1:
+            return awg_index * 2
+
+        return awg_index
 
     def _get_int(self, node_path: str, awg_channel: None | int = None) -> int:
         """Get an integer value from the nodetree.
@@ -376,6 +412,26 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             return
 
         self.daq_server.setDouble(node_path, value)
+
+    def _set_awg_module_index(self, index: int):
+        """Set the AWG module index. Possible values are dependent on grouping and are:
+         - 0 for 1x8 group mode;
+         - 0,1 for 2x4 group mode;
+         - 0,1,2,3 for 4x2 group mode.
+
+        The currently set AWG module index, together with current grouping mode, defines which AWG cores will
+        be [en|dis]abled when 'set_awg_module_enabled' is called.
+
+        Parameters:
+            index: AWG module index number in range 0..3.
+
+        Raises:
+            ValueError: If the given index value is invalid.
+        """
+        if index not in self.valid_awg_index_map:
+            raise ValueError(f"Index number {index} is invalid.")
+
+        self.awg_module.set("index", index)
 
     def _wait_compile(self) -> CompilerStatus:
         """Wait until the compilation is done or timeout. See also
@@ -652,29 +708,8 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._grouping = grouping
 
     @rpc_method
-    def set_awg_module_index(self, index: int):
-        """Set the AWG module index. Possible values are dependent on grouping and are:
-         - 0 for 1x8 group mode;
-         - 0,1 for 2x4 group mode;
-         - 0,1,2,3 for 4x2 group mode.
-
-        NOTE: It is possible to set any value regardless of the mode, so it is up to the user to control
-              if the given index is valid.
-
-        Parameters:
-            index: AWG module index number.
-
-        Raises:
-            ValueError: If the given index value is invalid.
-        """
-        if index not in range(self.NUM_AWGS):
-            raise ValueError(f"Index number {index} is invalid.")
-
-        self.awg_module.set("index", index)
-
-    @rpc_method
     def get_awg_module_index(self) -> int:
-        """Get the current AWG module index. Possible values are dependent on grouping.
+        """Get the current set AWG module index.
 
         Returns:
             index: AWG module index number.
@@ -682,15 +717,36 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return self.awg_module.getInt("index")
 
     @rpc_method
-    def get_awg_module_enabled(self) -> int:
-        """Return the current enable status of the AWG module.
+    def set_awg_module_index(self, index: int):
+        """Set the AWG module index.
 
-        Returns:
-            1 - If the AWG sequencer is currently running.
-            0 - If the AWG sequencer is not running.
+        The currently set AWG module index, together with current grouping mode, defines which AWG cores will
+        be [en|dis]abled when 'set_awg_module_enabled' is called.
+
+        NOTE: It is possible to set any value regardless of the grouping mode, so it is up to the user to control
+              if the given index is valid.
+
+        Parameters:
+            index: AWG module index number in range 0..3.
 
         Raises:
-            ValueError: AWG index number is invalid.
+            ValueError: If the given index value is invalid.
+        """
+        warnings.warn(
+            f"{self.get_awg_module_index.__name__} will be deprecated.", DeprecationWarning
+        )
+        if index not in range(self.NUM_AWGS):
+            raise ValueError(f"Index number {index} is invalid.")
+
+        self.awg_module.set("index", index)
+
+    @rpc_method
+    def get_awg_module_enabled(self) -> int:
+        """Return the current enable status of the currently selected AWG module.
+
+        Returns:
+            1 - If the AWG module sequencer[s] is | are currently running.
+            0 - If the AWG module sequencer[s] is | are not running.
         """
         self._check_is_open()
         return self.awg_module.getInt("awg/enable")
@@ -702,12 +758,21 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Enabling the AWG starts execution of the currently loaded sequencer program. This is equal to calling
         'awg_module.execute()'. Disabling is equal to 'awg_module.finish()'.
 
+        NOTE: Without prior setting of correct module index, depending on the grouping mode, this call
+              might just silently ignore any issues and execute, but nothing will happen. Setting the AWG index
+              separately before each call is a bit clumsy approach, so we opt to favour the new method
+              'set_awg_enabled'.
+
         Parameters:
             value: 1 to enable the AWG module, 0 to disable.
 
         Raises:
             ValueError: AWG module enable value is invalid.
         """
+        warnings.warn(
+            f"{self.set_awg_module_enabled.__name__} will be deprecated. Please use {self.set_awg_enabled.__name__}.",
+              DeprecationWarning
+        )
         value = int(value)  # Conversion just in case input is e.g. bool. ZhInst checks the type.
         if value not in (0, 1):
             raise ValueError("Invalid value")
@@ -716,75 +781,50 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self.awg_module.set("awg/enable", value)
 
     @rpc_method
-    def get_awg_core_enabled(self, awg_core: int) -> int:
-        """Return the current enable status of the AWG module.
+    def get_awg_enabled(self, awg_index: int) -> int:
+        """Return the current enable status of the AWG module associated with input AWG module index.
 
         Parameters:
-            awg_core: AWG core number.
+            awg_index: AWG module index number.
 
         Returns:
             1 - If the AWG sequencer is currently running.
             0 - If the AWG sequencer is not running.
 
         Raises:
-            ValueError: AWG core number is not valid.
+            ValueError: AWG module index number is not valid.
         """
-        if awg_core not in range(self.NUM_AWGS):
-            raise ValueError("Invalid AWG core number.")
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
 
         self._check_is_open()
+        awg_core = self._awg_index_to_awg_core(awg_index)
         return self.device.awgs[awg_core].enable()
 
     @rpc_method
-    def set_awg_core_enabled(self, awg_core: int, value: int) -> None:
-        """Enable or disable an AWG core.
+    def set_awg_enabled(self, awg_index: int, value: int) -> None:
+        """Enable or disable AWG core associated with input AWG module index.
 
         Uploading a sequencer program or waveform or command table is possible only while the AWG core is disabled.
 
         Parameters:
-            awg_core: AWG core number.
-            value:    1 to enable the AWG core, 0 to disable.
+            awg_index: AWG module index number.
+            value:     1 to enable the AWG core, 0 to disable.
 
         Raises:
-            ValueError: - AWG core number is not valid.
+            ValueError: - AWG module index number is not valid.
                         - AWG core enable value is invalid.
         """
-        if awg_core not in range(self.NUM_AWGS):
-            raise ValueError("Invalid AWG core number.")
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
 
         value = int(value)  # Conversion just in case input is e.g. bool. ZhInst checks the type.
         if value not in (0, 1):
             raise ValueError("Invalid enable value.")
 
         self._check_is_open()
+        awg_core = self._awg_index_to_awg_core(awg_index)
         self.device.awgs[awg_core].enable(value)
-
-    @rpc_method
-    def upload_sequencer_program(self, awg_channel: int, sequencer_program: str) -> None:
-        """A sequencer program is compiled and uploaded using the toolkit's load_sequencer_program function.
-        It is recommended to follow-up this command with the `self.channel_ready(awg_channel)` call before
-        trying to upload the command table or to activate the sequencer.
-
-        NOTE: If using this in grouping mode 2 (1x8), valid channel values for the sequencer programs are
-              1 and 2 ONLY. It is not recommended to use in that grouping mode as the programs might need editing.
-
-        Parameters:
-            awg_channel:       AWG channel number to compile the program for, in range 0...7.
-            sequencer_program: The sequencer program as a string.
-        """
-        try:
-            # Load sequencer program. Equivalent to compiling and uploading.
-            result = self.awg_channel_map[awg_channel].load_sequencer_program(sequencer_program)
-            result_ok = result["messages"] == ""
-            if not result_ok:
-                raise RuntimeError
-
-        except (RuntimeError, TimeoutError) as err:
-            _logger.exception(f"Loading sequencer program %s failed: %s", sequencer_program, str(err))
-            raise QMI_RuntimeException("Loading sequencer program failed.") from err
-
-        self._last_compilation_successful = True
-        return
 
     @rpc_method
     def compile_sequencer_program(self, awg_channel: int, sequencer_program: str) -> tuple[bytes, Any]:
@@ -836,6 +876,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self,
         sequencer_program: str,
         replacements: None | dict[str, str | int | float] = None,
+        awg_index: int = 0,
     ) -> None:
         """Compile and upload the sequencer_program, after performing textual replacements.
 
@@ -855,6 +896,11 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             sequencer_program: Full text of the sequencer script.
             replacements:      Optional dictionary of (parameter, value) pairs. Every occurrence of the parameter in
                                the sequencer program will be replaced with the specified value.
+            awg_index:         AWG module index number. Default is 0.
+
+        Raises:
+            QMI_RuntimeException: - If compilation did not succeed.
+                                  - If ELF upload did not succeed.
         """
         self._check_is_open()
         replacements = replacements or {}
@@ -862,7 +908,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         sequencer_program = self._process_parameter_replacements(sequencer_program, replacements)
         self._check_program_not_empty(sequencer_program)
         self._last_compilation_successful = False
-        # Compile and upload for current AWG module index.
+        # Set current AWG module index from input.
+        self._set_awg_module_index(awg_index)
+        # Compile and upload for this AWG module index.
         self.awg_module.set("compiler/upload", 1)
         self.awg_module.set("compiler/sourcestring", sequencer_program)
         # Check for compiling timeout
@@ -1107,9 +1155,10 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def upload_command_table(
-        self, awg_core: int, command_table_entries: list[dict[str, Any]], save_as_file: bool = False
+        self, awg_index: int, command_table_entries: list[list[dict[str, Any]]], save_as_file: bool = False
     ) -> None:
-        """Upload a new command table to the AWG.
+        """Upload a new command table to the AWG core or cores. This function will automatically upload the
+        command table to all cores that are present in given AWG module index in current grouping mode.
 
         Command tables are needed for using e.g. `assignWaveIndex` and must be uploaded before the sequencer program
         is executed. Do not upload while a program is running. Note that each core that is used by the sequencer
@@ -1125,50 +1174,47 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         https://json-schema.org/draft-07.
 
         Parameters:
-            awg_core:               0-based number of AWG core to apply the table to (0 .. 3).
-            command_table_entries:  Actual command table as a list of entries (dicts).
-            save_as_file:           Set to True to save the validated JSON command table in a file. Default is False.
+            awg_index:             AWG module index number.
+            command_table_entries: List of command tables as a list of entries (dicts) per core.
+            save_as_file:          Set to True to save the validated JSON command table in a file. Default is False.
 
         Raises:
-            ValueError:   Invalid AWG core number.
-            ValueError:   Validation of the command table failed.
-            ValueError:   Invalid value in the command table despite successful validation.
-            RuntimeError: If the upload of command table on core awg_core failed. In 2x4 and 4x2 grouping modes the
-                          reason often is that there are no waveforms and | or sequencers uploaded to the respective
-                          group, e.g. in 2x4 mode, waveforms were uploaded on channels 0...3, but then trying to upload
-                          command table to core 2 or 3 which refer now to channels 4...7. Otherwise, could be and
-                          error in the JSON file with similar channel number vs core number mismatch.
+            ValueError:   - Invalid AWG module index number.
+                          - Validation of the command table failed.
+                          - Invalid value in the command table despite successful validation.
+            RuntimeError: If the upload of command table on core awg module index failed.
         """
-        if awg_core not in range(self.NUM_AWGS):
-            raise ValueError("AWG core number is not valid.")
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
 
         self._check_is_open()
-        awg_node = self.device.awgs[awg_core]
-        # Get schema from the device and use it to create an empty command table
-        schema = awg_node.commandtable.load_validation_schema()
-        command_table = zhinst.toolkit.CommandTable(schema)
-        command_table = self._add_command_table_entries(command_table, command_table_entries)
-        if save_as_file:
-            # Save command table as a JSON file.
+        for awg_core in self._valid_awg_core_map()[awg_index]:
+            awg_node = self.device.awgs[awg_core]
+            # Get schema from the device and use it to create an empty command table
+            schema = awg_node.commandtable.load_validation_schema()
+            command_table = zhinst.toolkit.CommandTable(schema)
+            command_table = self._add_command_table_entries(command_table, command_table_entries[awg_core])
+            if save_as_file:
+                # Save command table as a JSON file.
+                try:
+                    # Convert the command table to JSON.
+                    command_table_as_json = json.dumps(command_table.as_dict(), allow_nan=False, separators=(",", ":"))
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("Invalid value in command table.") from exc
+
+                with open(os.path.join(f"{os.path.dirname(__file__)}", f"cmd_table_{awg_core}.json"), "w") as out:
+                    out.write(command_table_as_json)
+
+            # Upload command table
+            upload_start_time = time.monotonic()  # For debug purposes only
             try:
-                # Convert the command table to JSON.
-                command_table_as_json = json.dumps(command_table.as_dict(), allow_nan=False, separators=(",", ":"))
-            except (TypeError, ValueError) as exc:
-                raise ValueError("Invalid value in command table.") from exc
-
-            with open(os.path.join(f"{os.path.dirname(__file__)}", f"cmd_table_{awg_core}.json"), "w") as out:
-                out.write(command_table_as_json)
-
-        # Upload command table
-        upload_start_time = time.monotonic()  # For debug purposes only
-        try:
-            awg_node.commandtable.upload_to_device(command_table, validate=True, check_upload=True)
-        except RuntimeError as exc:
-            _logger.error("The upload of command table on core %s failed.", awg_core, exc_info=exc)
-            raise RuntimeError(f"The upload of command table on core {awg_core} failed.") from exc
-        except zhinst.toolkit.exceptions.ValidationError as exc:
-            _logger.exception("The provided command table is not valid", exc_info=exc)
-            raise ValueError("Invalid command table.") from exc
+                awg_node.commandtable.upload_to_device(command_table, validate=True, check_upload=True)
+            except RuntimeError as exc:
+                _logger.error("The upload of command table on core %s failed.", awg_core, exc_info=exc)
+                raise RuntimeError(f"The upload of command table on core {awg_core} failed.") from exc
+            except zhinst.toolkit.exceptions.ValidationError as exc:
+                _logger.exception("The provided command table is not valid", exc_info=exc)
+                raise ValueError("Invalid command table.") from exc
 
         _logger.debug(
             "Command Table upload finished in %.1f seconds (status=%d)",
@@ -1408,41 +1454,42 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self.device.triggers.in_[trigger].imp50(value)
 
     @rpc_method
-    def set_dig_trigger_source(self, awg_core: int, trigger: int, value: int) -> None:
+    def set_dig_trigger_source(self, awg_index: int, trigger: int, value: int) -> None:
         """Select the source of a specific digital trigger channel.
 
         There are two digital trigger channels which can be accessed in the
         sequencer program via calls to "waitDigTrigger()" and "playWaveDigTrigger()".
 
         Parameters:
-            awg_core: AWG core number.
-            trigger:  Digital trigger index in the range 0 to 1, corresponding to digital triggers 1 and 2.
-            value:    Trigger source in the range 0 to 7, corresponding to trigger inputs 1 to 8 on the front panel.
+            awg_index: AWG module index number.
+            trigger:   Digital trigger index in the range 0 to 1, corresponding to digital triggers 1 and 2.
+            value:     Trigger source in the range 0 to 7, corresponding to trigger inputs 1 to 8 on the front panel.
 
         Raises:
-            ValueError: - AWG core number is not valid.
+            ValueError: - AWG module index number is not valid.
                         - Digital trigger index is invalid.
                         - Trigger source value is invalid.
         """
-        if awg_core not in range(self.NUM_AWGS):
-            raise ValueError("Invalid AWG core number.")
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
         if trigger not in (0, 1):
             raise ValueError("Invalid digital trigger index.")
         if value not in range(self.NUM_CHANNELS):
             raise ValueError("Invalid trigger source.")
 
         self._check_is_open()
+        awg_core = self._awg_index_to_awg_core(awg_index)
         self.device.awgs[awg_core].auxtriggers[trigger].channel(value)
 
     @rpc_method
-    def set_dig_trigger_slope(self, awg_core: int, trigger: int, value: int) -> None:
+    def set_dig_trigger_slope(self, awg_index: int, trigger: int, value: int) -> None:
         """Set the trigger slope of a specific digital trigger channel.
 
         There are two digital trigger channels which can be accessed in the
         sequencer program vi calls to "waitDigTrigger()" and "playWaveDigTrigger()".
 
         Parameters:
-            awg_core: AWG core number.
+            awg_index: AWG module index number.
             trigger:  Digital trigger index in the range 0 to 1, corresponding to digital triggers 1 and 2.
             value:    Trigger slope:
                         0 - level sensitive (trigger on high signal);
@@ -1451,18 +1498,19 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                         3 - trigger on rising and falling edge.
 
         Raises:
-            ValueError: - AWG core number is not valid.
+            ValueError: - AWG module index number is not valid.
                         - Digital trigger index is invalid.
                         - Trigger slope value is invalid.
         """
-        if awg_core not in range(self.NUM_AWGS):
-            raise ValueError("Invalid AWG core number.")
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
         if trigger < 0 or trigger > 1:
             raise ValueError("Invalid digital trigger index.")
         if value < 0 or value > 3:
             raise ValueError("Invalid trigger slope.")
 
         self._check_is_open()
+        awg_core = self._awg_index_to_awg_core(awg_index)
         self.device.awgs[awg_core].auxtriggers[trigger].slope(value)
 
     @rpc_method
@@ -1527,37 +1575,38 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self.device.dios[0].output(int(value))
 
     @rpc_method
-    def set_dio_valid_index(self, awg_core: int, index: int) -> None:
+    def set_dio_valid_index(self, awg_index: int, index: int) -> None:
         """Set the DIO bit to use as the VALID signal to indicate a valid input is available.
 
         Parameters:
-            awg_core: The AWG core to set the DIO bit index.
+            awg_index: The AWG core to set the DIO bit index.
             index:    The DIO VALID bit index number.
         """
-        if awg_core not in range(self.NUM_AWGS):
-            raise ValueError("Invalid AWG core number.")
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
 
         index = int(index)  # Conversion just in case input is e.g. bool. ZhInst checks the type.
         if index < 0 or index > 31:
             raise ValueError("Invalid DIO VALID bit index.")
 
         self._check_is_open()
+        awg_core = self._awg_index_to_awg_core(awg_index)
         self.device.awgs[awg_core].dio.valid.index(index)
 
     @rpc_method
-    def set_dio_polarity(self, awg_core: int, polarity: int | str) -> None:
+    def set_dio_polarity(self, awg_index: int, polarity: int | str) -> None:
         """Set polarity of the VALID bit that indicates that a valid input is available.
 
         Parameters:
-            awg_core: The AWG core to set the DIO bit index.
+            awg_index: The AWG core to set the DIO bit index.
             polarity: The polarity value. Possible values are:
                       - 0 or "none": None - VALID bit is ignored.
                       - 1 or "low": Low - VALID bit must be logical zero.
                       - 2 or "high": High - VALID bit must be logical high.
                       - 3 or "both": Both - VALID bit may be logical high or zero.
         """
-        if awg_core not in range(self.NUM_AWGS):
-            raise ValueError("Invalid AWG core number.")
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
 
         if isinstance(polarity, str):
             polarity = polarity.lower()
@@ -1574,38 +1623,40 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                 raise ValueError("Invalid DIO polarity value.")
 
         self._check_is_open()
+        awg_core = self._awg_index_to_awg_core(awg_index)
         self.device.awgs[awg_core].dio.valid.polarity(polarity)
 
     @rpc_method
-    def set_dio_strobe_index(self, awg_core: int, value: int) -> None:
+    def set_dio_strobe_index(self, awg_index: int, value: int) -> None:
         """Select the DIO strobe index to be used as a trigger for playback.
 
         The sequencer program uses this trigger by calling "playWaveDIO()".
 
         Parameters:
-            awg_core: AWG core number.
+            awg_index: AWG module index number.
             value:    DIO bit index in the range 0 to 31.
 
         Raises:
-            ValueError: - AWG core number is not valid.
+            ValueError: - AWG module index number is not valid.
                         - DIO bit index is invalid.
         """
-        if awg_core not in range(self.NUM_AWGS):
-            raise ValueError("Invalid AWG core number.")
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
 
         value = int(value)  # Conversion just in case input is e.g. bool. ZhInst checks the type.
         if value < 0 or value > 31:
             raise ValueError("Invalid DIO strobe index.")
 
         self._check_is_open()
+        awg_core = self._awg_index_to_awg_core(awg_index)
         self._set_int(f"awgs/{awg_core}/dio/strobe/index", value)
 
     @rpc_method
-    def set_dio_strobe_slope(self, awg_core: int, value: int) -> None:
+    def set_dio_strobe_slope(self, awg_index: int, value: int) -> None:
         """Select the signal edge that should activate the strobe trigger.
 
         Parameters:
-            awg_core: AWG core number.
+            awg_index: AWG module index number.
             value:    Slope type:
                             0 - off;
                             1 - trigger on rising edge;
@@ -1613,21 +1664,22 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                             3 - trigger on rising and falling edge.
 
         Raises:
-            ValueError: - AWG core number is not valid.
+            ValueError: - AWG module index number is not valid.
                         - DIO strobe slope value is invalid.
         """
-        if awg_core not in range(self.NUM_AWGS):
-            raise ValueError("Invalid AWG core number.")
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
         if value < 0 or value > 3:
             raise ValueError("Invalid slope.")
 
         self._check_is_open()
+        awg_core = self._awg_index_to_awg_core(awg_index)
         self._set_int(f"awgs/{awg_core}/dio/strobe/slope", value)
 
     @rpc_method
     def get_output_amplitude(self, awg_core: int, channel: int) -> float:
         warnings.warn(
-            f"{self.get_output_amplitude.__name__} is now deprecated. Please use {self.get_output_gain.__name__}. " +
+            f"{self.get_output_amplitude.__name__} will be deprecated. Please use {self.get_output_gain.__name__}. " +
             "We reserve this function for the future to use getting the sine peak amplitude" +
             " (../sines/{awg_core}/amplitudes/{channel}).", DeprecationWarning
         )
@@ -1637,7 +1689,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     @rpc_method
     def set_output_amplitude(self, awg_core: int, channel: int, value: float) -> None:
         warnings.warn(
-            f"{self.set_output_amplitude.__name__} is now deprecated. Please use {self.set_output_gain.__name__}." +
+            f"{self.set_output_amplitude.__name__} will be deprecated. Please use {self.set_output_gain.__name__}." +
             "We reserve this function for the future to use setting the sine peak amplitude" +
             " (../sines/{awg_core}/amplitudes/{channel}).", DeprecationWarning
         )
@@ -1949,45 +2001,47 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._set_int(f"sigouts/{awg_channel}/filter", value)
 
     @rpc_method
-    def get_user_register(self, awg_core: int, reg: int) -> int:
+    def get_user_register(self, awg_index: int, reg: int) -> int:
         """Return the value of the specified user register.
 
         Parameters:
-            awg_core: AWG core number.
+            awg_index: AWG module index number.
             reg:      Register index in the range 0 to 15.
 
         Returns:
             value: User register value.
 
         Raises:
-            ValueError: - AWG core number is not valid.
+            ValueError: - AWG module index number is not valid.
                         - Register index is invalid.
         """
-        if awg_core not in range(self.NUM_AWGS):
-            raise ValueError("Invalid AWG core number.")
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index.")
 
         self._check_is_open()
+        awg_core = self._awg_index_to_awg_core(awg_index)
         return self._get_int(f"awgs/{awg_core}/userregs/{reg}")
 
     @rpc_method
-    def set_user_register(self, awg_core: int, reg: int, value: int) -> None:
+    def set_user_register(self, awg_index: int, reg: int, value: int) -> None:
         """Change the value of the specified user register.
 
         Parameters:
-            awg_core: AWG core number.
+            awg_index: AWG module index number.
             reg:      Register index in the range 0 to 15.
             value:    Integer value to write to the register.
 
         Raises:
-            ValueError: - AWG core number is not valid.
+            ValueError: - AWG module index number is not valid.
                         - Register index is invalid.
         """
-        if awg_core not in range(self.NUM_AWGS):
-            raise ValueError("Invalid AWG core number.")
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
         if not 0 <= reg <= 15:
             raise ValueError("Invalid register index")
 
         self._check_is_open()
+        awg_core = self._awg_index_to_awg_core(awg_index)
         self._set_int(f"awgs/{awg_core}/userregs/{reg}", value)

@@ -295,15 +295,15 @@ class TestHDAWGInit(unittest.TestCase):
             ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
             ) as session_patch:
-            self.hdawg = ZurichInstruments_Hdawg(
+            hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
                 server_host=_DEVICE_HOST,
                 server_port=_DEVICE_PORT,
                 device_name=_DEVICE_NAME
             )
-            self.hdawg.open()
-            self.hdawg.close()
+            hdawg.open()
+            hdawg.close()
 
         expected_session_calls = [
             call(_DEVICE_HOST, _DEVICE_PORT),
@@ -326,7 +326,7 @@ class TestHDAWGInit(unittest.TestCase):
                 ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
             ) as session_patch:
-                self.hdawg = ZurichInstruments_Hdawg(
+                hdawg = ZurichInstruments_Hdawg(
                     self.ctx,
                     "HDAWG",
                     server_host=_DEVICE_HOST,
@@ -334,8 +334,8 @@ class TestHDAWGInit(unittest.TestCase):
                     device_name=_DEVICE_NAME,
                     grouping=grouping
                 )
-                self.hdawg.open()
-                self.hdawg.close()
+                hdawg.open()
+                hdawg.close()
 
             expected_session_calls = [
                 call(_DEVICE_HOST, _DEVICE_PORT),
@@ -355,7 +355,7 @@ class TestHDAWGInit(unittest.TestCase):
         expected_exception = f"Invalid grouping number: {invalid_grouping_mode}"
 
         with self.assertRaises(ValueError) as v_err:
-            self.hdawg = ZurichInstruments_Hdawg(
+            hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
                 server_host=_DEVICE_HOST,
@@ -375,7 +375,7 @@ class TestHDAWGInit(unittest.TestCase):
         ) as session_patch:
             self._awg_module.awg.raw_module = None
             session_patch().modules = self._awg_module
-            self.hdawg = ZurichInstruments_Hdawg(
+            hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
                 server_host=_DEVICE_HOST,
@@ -383,7 +383,7 @@ class TestHDAWGInit(unittest.TestCase):
                 device_name=_DEVICE_NAME
             )
             with self.assertRaises(AssertionError):
-                self.hdawg.open()
+                hdawg.open()
 
         expected_session_calls = [
             call(_DEVICE_HOST, _DEVICE_PORT),
@@ -399,7 +399,7 @@ class TestHDAWGInit(unittest.TestCase):
             "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
         ) as session_patch:
             session_patch().daq_server = None
-            self.hdawg = ZurichInstruments_Hdawg(
+            hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
                 server_host=_DEVICE_HOST,
@@ -407,7 +407,7 @@ class TestHDAWGInit(unittest.TestCase):
                 device_name=_DEVICE_NAME
             )
             with self.assertRaises(AssertionError):
-                self.hdawg.open()
+                hdawg.open()
 
         expected_session_calls = [
             call(_DEVICE_HOST, _DEVICE_PORT),
@@ -425,15 +425,15 @@ class TestHDAWGInit(unittest.TestCase):
                 "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
             ) as session_patch:
             session_patch().modules = self._awg_module
-            self.hdawg = ZurichInstruments_Hdawg(
+            hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
                 server_host=_DEVICE_HOST,
                 server_port=_DEVICE_PORT,
                 device_name=_DEVICE_NAME
             )
-            self.hdawg.open()
-            self.hdawg.close()
+            hdawg.open()
+            hdawg.close()
 
         expected_session_calls = [
             call(_DEVICE_HOST, _DEVICE_PORT),
@@ -459,16 +459,16 @@ class TestHDAWGInit(unittest.TestCase):
                 "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
             ) as session_patch:
             session_patch().modules = self._awg_module
-            self.hdawg = ZurichInstruments_Hdawg(
+            hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
                 server_host=_DEVICE_HOST,
                 server_port=_DEVICE_PORT,
                 device_name=_DEVICE_NAME
             )
-            self.hdawg.open()
+            hdawg.open()
             with self.assertRaises(AssertionError):
-                self.hdawg.close()
+                hdawg.close()
 
         expected_session_calls = [
             call(_DEVICE_HOST, _DEVICE_PORT),
@@ -490,18 +490,18 @@ class TestHDAWGInit(unittest.TestCase):
             ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
             ):
-            self.hdawg = ZurichInstruments_Hdawg(
+            hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
                 server_host=_DEVICE_HOST,
                 server_port=_DEVICE_PORT,
                 device_name=_DEVICE_NAME
             )
-            self.hdawg.open()
+            hdawg.open()
             with self.assertRaises(QMI_InvalidOperationException):
-                self.hdawg.open()
+                hdawg.open()
 
-            self.hdawg.close()
+            hdawg.close()
 
     def test_failed_close_notopen(self):
         """Close device that is not open."""
@@ -510,7 +510,7 @@ class TestHDAWGInit(unittest.TestCase):
             ), unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
             ):
-            self.hdawg = ZurichInstruments_Hdawg(
+            hdawg = ZurichInstruments_Hdawg(
                 self.ctx,
                 "HDAWG",
                 server_host=_DEVICE_HOST,
@@ -518,7 +518,41 @@ class TestHDAWGInit(unittest.TestCase):
                 device_name=_DEVICE_NAME
             )
             with self.assertRaises(QMI_InvalidOperationException):
-                self.hdawg.close()
+                hdawg.close()
+
+    def test_internal_set_awg_module_index(self):
+        """Test the internal function _set_awg_module_index with all grouping modes."""
+        valids = [[0], [0, 1], [0, 1, 2, 3]]
+        invalids = [[1, 2, 3], [2, 3], []]
+        with unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst"
+            ), unittest.mock.patch(
+                "qmi.instruments.zurich_instruments.hdawg.zhinst.toolkit.Session"
+            ) as session_patch:
+            hdawg = ZurichInstruments_Hdawg(
+                self.ctx,
+                "HDAWG",
+                server_host=_DEVICE_HOST,
+                server_port=_DEVICE_PORT,
+                device_name=_DEVICE_NAME
+            )
+            hdawg.open()
+            # Start is default grouping mode 1x8
+            grouping = 2
+            for valid, invalid in zip(valids, invalids):
+                hdawg.set_channel_grouping(grouping)
+                # Happy flow through valid
+                for v in valid:
+                    hdawg._set_awg_module_index(v)
+
+                # Invalid raises exception
+                for i in invalid:
+                    with self.assertRaises(ValueError):
+                        hdawg._set_awg_module_index(i)
+
+                grouping -= 1
+
+            hdawg.close()
 
 
 class TestHDAWG(unittest.TestCase):
@@ -548,6 +582,8 @@ class TestHDAWG(unittest.TestCase):
 
         self.CommandTableMock = CommandTableMock
 
+        self.grouping = 0  # Use grouping mode as base line for method tests
+
         with unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst"
             ), unittest.mock.patch(
@@ -561,7 +597,8 @@ class TestHDAWG(unittest.TestCase):
                 "HDAWG",
                 server_host=_DEVICE_HOST,
                 server_port=_DEVICE_PORT,
-                device_name=_DEVICE_NAME
+                device_name=_DEVICE_NAME,
+                grouping=self.grouping
             )
             self.hdawg.open()
 
@@ -864,7 +901,8 @@ class TestHDAWG(unittest.TestCase):
 
         expected_calls = [
             call("device", _DEVICE_NAME),
-            call("index", 0),
+            call("index", 0),  # From 'open'
+            call("index", 0),  # From the tested call
             call("compiler/upload", 1),
             call("compiler/sourcestring", source),
         ]
@@ -883,7 +921,8 @@ class TestHDAWG(unittest.TestCase):
 
         expected_calls_set = [
             call.awg.raw_module.set("device", _DEVICE_NAME),
-            call.awg.raw_module.set("index", 0),
+            call.awg.raw_module.set("index", 0),  # From 'open'
+            call.awg.raw_module.set("index", 0),  # From the tested call
             call.awg.raw_module.set("compiler/upload", 1),
             call.awg.raw_module.set("compiler/sourcestring", source),
         ]
@@ -909,7 +948,8 @@ class TestHDAWG(unittest.TestCase):
 
         expected_calls_set = [
             call.awg.raw_module.set("device", _DEVICE_NAME),
-            call.awg.raw_module.set("index", 0),
+            call.awg.raw_module.set("index", 0),  # From 'open'
+            call.awg.raw_module.set("index", 0),  # From the tested call
             call.awg.raw_module.set("compiler/upload", 1),
             call.awg.raw_module.set("compiler/sourcestring", source),
         ]
@@ -936,7 +976,8 @@ class TestHDAWG(unittest.TestCase):
 
         expected_calls_set = [
             call.awg.raw_module.set("device", _DEVICE_NAME),
-            call.awg.raw_module.set("index", 0),
+            call.awg.raw_module.set("index", 0),  # From 'open'
+            call.awg.raw_module.set("index", 0),  # From the tested call
             call.awg.raw_module.set("compiler/upload", 1),
             call.awg.raw_module.set("compiler/sourcestring", source),
         ]
@@ -966,7 +1007,8 @@ class TestHDAWG(unittest.TestCase):
 
         expected_calls_set = [
             call.awg.raw_module.set("device", _DEVICE_NAME),
-            call.awg.raw_module.set("index", 0),
+            call.awg.raw_module.set("index", 0),  # From 'open'
+            call.awg.raw_module.set("index", 0),  # From the tested call
             call.awg.raw_module.set("compiler/upload", 1),
             call.awg.raw_module.set("compiler/sourcestring", source),
         ]
@@ -984,32 +1026,6 @@ class TestHDAWG(unittest.TestCase):
         self._awg_module.awg.raw_module.getInt.assert_has_calls(expected_calls_getint)
         self._awg_module.awg.raw_module.getDouble.assert_has_calls(expected_calls_getdouble)
         self.assertFalse(self.hdawg.compilation_successful())
-
-    def test_upload_sequencer_program(self):
-        """Test uploading sequencer program."""
-        channel = 4
-        program = "Very short program"
-        node_mock = self.hdawg.awg_channel_map[channel]
-        node_mock.load_sequencer_program.return_value = ({"messages": ""})
-
-        self.hdawg.upload_sequencer_program(channel, program)
-
-        node_mock.load_sequencer_program.assert_called_once_with(program)
-
-    def test_upload_sequencer_program_fails(self):
-        """Test exception on uploading sequencer program."""
-        channel = 6
-        program = "Too short program"
-        expected_exception = "Loading sequencer program failed."
-
-        node_mock = self.hdawg.awg_channel_map[channel]
-        node_mock.load_sequencer_program.return_value = ({"messages": "I failed :("})
-
-        with self.assertRaises(QMI_RuntimeException) as run_err:
-            self.hdawg.upload_sequencer_program(channel, program)
-
-        self.assertEqual(expected_exception, str(run_err.exception))
-        node_mock.load_sequencer_program.assert_called_once_with(program)
 
     def test_compile_sequencer_program(self):
         """Test compiling sequencer program."""
@@ -1061,7 +1077,7 @@ class TestHDAWG(unittest.TestCase):
 
         core_0.write_to_waveform_memory.assert_called_once_with(waveforms_patch())
         expected_daq_server_calls = [
-            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2)
+            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", self.grouping)
         ]
         self._daq_server.assert_has_calls(expected_daq_server_calls)
         waveforms_patch.assert_has_calls([expected_call], any_order=True)
@@ -1085,7 +1101,7 @@ class TestHDAWG(unittest.TestCase):
 
         core_0.write_to_waveform_memory.assert_called_once_with(waveforms_patch())
         expected_daq_server_calls = [
-            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", 2)
+            call.setInt(f"/{_DEVICE_NAME}/system/awg/channelgrouping", self.grouping)
         ]
         self._daq_server.assert_has_calls(expected_daq_server_calls)
         call_made = waveforms_patch.mock_calls[1]
@@ -1268,7 +1284,7 @@ class TestHDAWG(unittest.TestCase):
 
     def test_upload_command_table(self):
         """Test command table upload."""
-        command_table_entries = [
+        command_table_entries = [[
             {
                 "index": 1,
                 "waveform": {
@@ -1276,7 +1292,7 @@ class TestHDAWG(unittest.TestCase):
                     "length": 128
                 }
             }
-        ]
+        ] * 4]
 
         with unittest.mock.patch("builtins.open", unittest.mock.mock_open()), unittest.mock.patch(
             "qmi.instruments.zurich_instruments.hdawg.zhinst"
@@ -1299,18 +1315,18 @@ class TestHDAWG(unittest.TestCase):
         zhinst_patch.CommandTable.assert_called_once()
         # Assert that only index 1 was changed, as intended
         for n, entry in enumerate(self.CommandTableMock.table):
-            if n != command_table_entries[0]["index"]:
+            if n != command_table_entries[0][0]["index"]:
                 self.assertEqual(0, entry.waveform.length)
                 self.assertFalse(entry.waveform.playZero)
             else:
-                self.assertEqual(command_table_entries[0]["waveform"]["length"], entry.waveform.length)
+                self.assertEqual(command_table_entries[0][0]["waveform"]["length"], entry.waveform.length)
                 self.assertTrue(entry.waveform.playZero)
 
         zhinst_patch.CommandTable.reset_mock()
 
     def test_upload_empty_command_table(self):
         """Test empty command table upload."""
-        table = []
+        table = [[] * 4]
         awg_index = 0
 
         with unittest.mock.patch(
@@ -1331,7 +1347,7 @@ class TestHDAWG(unittest.TestCase):
 
     def test_upload_invalid_command_table(self):
         """Test invalid command table upload."""
-        command_table_entries = [
+        command_table_entries = [[
             {
                 "index": 1,
                 "waveform": {
@@ -1339,7 +1355,7 @@ class TestHDAWG(unittest.TestCase):
                     "length": 123  # must be multiple of 16
                 }
             }
-        ]
+        ] * 4]
         core = 0
         expected_runtime_error = f"The upload of command table on core {core} failed."
         expected_validation_error = "Invalid command table."
@@ -1384,7 +1400,7 @@ class TestHDAWG(unittest.TestCase):
         self.assertEqual(expected_value_error, str(v_err_2.exception))
 
     def test_upload_command_table_wrong_awg(self):
-        """Test invalid command table upload."""
+        """Test command table upload to invalid index number."""
         with unittest.mock.patch(
                 "qmi.instruments.zurich_instruments.hdawg.zhinst"
         ), unittest.mock.patch(
@@ -1395,6 +1411,20 @@ class TestHDAWG(unittest.TestCase):
 
             with self.assertRaises(ValueError):
                 self.hdawg.upload_command_table(4, [])
+
+            # Test on grouping mode 1
+            self.hdawg.set_channel_grouping(1)
+            with self.assertRaises(ValueError):
+                self.hdawg.upload_command_table(2, [])
+
+            with self.assertRaises(ValueError):
+                self.hdawg.upload_command_table(3, [])
+
+            # Test on grouping mode 2
+            self.hdawg.set_channel_grouping(2)
+            for _ in range(1, 4):
+                with self.assertRaises(ValueError):
+                    self.hdawg.upload_command_table(_, [])
 
     def test_sync(self):
         """Test sync method."""
@@ -1479,37 +1509,37 @@ class TestHDAWG(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.hdawg.set_awg_module_index(index)
 
-    def test_get_awg_core_enabled(self):
+    def test_get_awg_enabled(self):
         """Test getting AWG core enable state."""
-        self.hdawg.get_awg_core_enabled(0)
+        self.hdawg.get_awg_enabled(0)
         self._device.awgs[0].enable.assert_called_once_with()
         self._device.reset_mock()
-        self.hdawg.get_awg_core_enabled(3)
+        self.hdawg.get_awg_enabled(3)
         self._device.awgs[3].enable.assert_called_once_with()
 
-    def test_get_awg_core_enabled_invalid_cores(self):
+    def test_get_awg_enabled_invalid_cores(self):
         """Test getting AWG core enable states with wrong core numbers"""
         with self.assertRaises(ValueError):
-            self.hdawg.get_awg_core_enabled(9)
+            self.hdawg.get_awg_enabled(9)
 
         with self.assertRaises(ValueError):
-            self.hdawg.get_awg_core_enabled(-1)
+            self.hdawg.get_awg_enabled(-1)
 
-    def test_set_awg_core_enabled(self):
+    def test_set_awg_enabled(self):
         """Test AWG core enable on/off."""
-        self.hdawg.set_awg_core_enabled(0, 1)
+        self.hdawg.set_awg_enabled(0, 1)
         self._device.awgs[0].enable.assert_called_once_with(1)
         self._device.reset_mock()
-        self.hdawg.set_awg_core_enabled(3, 0)
+        self.hdawg.set_awg_enabled(3, 0)
         self._device.awgs[3].enable.assert_called_once_with(0)
 
-    def test_set_awg_core_enabled_invalid_values(self):
+    def test_set_awg_enabled_invalid_values(self):
         """Test AWG core enable on/off with invalid inputs"""
         with self.assertRaises(ValueError):
-            self.hdawg.set_awg_core_enabled(9, 1)
+            self.hdawg.set_awg_enabled(9, 1)
 
         with self.assertRaises(ValueError):
-            self.hdawg.set_awg_core_enabled(0, 3)
+            self.hdawg.set_awg_enabled(0, 3)
 
     def test_get_awg_module_enabled(self):
         self.hdawg.get_awg_module_enabled()
