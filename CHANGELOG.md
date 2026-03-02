@@ -10,8 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `run` method in `QMI_Context` class to accommodate for `threading.Thread` changes in Python 3.14.
 - `standard-xdrlib` from "dead batteries" as a dependency to fix issues coming from removal of `xdrlib` from standard library.
 - `grouping=2` input parameter in the `ZurichInstruments_Hdawg` to enable initialization directly in wanted grouping mode.
-- Addition of `set_awg_module_index` method to set the AWG module index number.
-- Addition of other new methods in Zurich Instruments HDAWG QMI driver. For example, now it is also possible to upload sequencer programs, command tables and waveforms to specific channel | core.
+- Addition of new methods in Zurich Instruments HDAWG QMI driver. For example, now it is also possible to upload sequencer programs, command tables and waveforms to specific AWG channel or AWG (core) index. Also setting DIO VALID index and polarity is now possible.
 - Python 3.14 CI pipelines.
 
 ### Changed

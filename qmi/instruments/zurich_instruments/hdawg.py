@@ -717,30 +717,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return self.awg_module.getInt("index")
 
     @rpc_method
-    def set_awg_module_index(self, index: int):
-        """Set the AWG module index.
-
-        The currently set AWG module index, together with current grouping mode, defines which AWG cores will
-        be [en|dis]abled when 'set_awg_module_enabled' is called.
-
-        NOTE: It is possible to set any value regardless of the grouping mode, so it is up to the user to control
-              if the given index is valid.
-
-        Parameters:
-            index: AWG module index number in range 0..3.
-
-        Raises:
-            ValueError: If the given index value is invalid.
-        """
-        warnings.warn(
-            f"{self.get_awg_module_index.__name__} will be deprecated.", DeprecationWarning
-        )
-        if index not in range(self.NUM_AWGS):
-            raise ValueError(f"Index number {index} is invalid.")
-
-        self.awg_module.set("index", index)
-
-    @rpc_method
     def get_awg_module_enabled(self) -> int:
         """Return the current enable status of the currently selected AWG module.
 

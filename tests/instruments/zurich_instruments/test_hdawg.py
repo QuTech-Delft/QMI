@@ -1489,26 +1489,6 @@ class TestHDAWG(unittest.TestCase):
         self._awg_module.awg.raw_module.getInt.assert_called_once_with("index")
         self.assertEqual(3, index)
 
-    def test_set_awg_module_index(self):
-        """Test setting AWG module index with good values."""
-        side_effect = [True, False] * 7  # group 0 = 4x, group 1 = 2x, group 2 = 1x
-        self._awg_module.finished.side_effect = side_effect + [False, True]  # For close
-        groupings = list(range(3))
-        for grouping in groupings:
-            self.hdawg._grouping = grouping
-            ok_indexes = list(range((2 - grouping) * 2))
-            ok_indexes = [0] if not ok_indexes else ok_indexes
-            for index in ok_indexes:
-                self.hdawg.set_awg_module_index(index)
-
-    def test_set_awg_module_index_exceptions(self):
-        """Test setting AWG module index with wrong values w.r.t. grouping."""
-        self._awg_module.finished.side_effect = [False, True]  # For close
-        nok_indexes = [-1, 4]
-        for index in nok_indexes:
-            with self.assertRaises(ValueError):
-                self.hdawg.set_awg_module_index(index)
-
     def test_get_awg_enabled(self):
         """Test getting AWG core enable state."""
         self.hdawg.get_awg_enabled(0)
