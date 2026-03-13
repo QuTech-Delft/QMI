@@ -62,6 +62,20 @@ class Yokogawa_DLM4038(QMI_Instrument):
         return channels
 
     @staticmethod
+    def _data_format_check(data_format: str) -> str:
+        """Check the data format string and return in SCPI style."""
+        data_formats = {
+            "ascii": "ASCii",
+            "byte": "BYTE",
+            "rbyte": "RBYTe",
+            "word": "WORD"
+        }
+        if data_format.lower() not in data_formats:
+            raise QMI_InstrumentException(f"Unexpected data format, got {data_format}")
+
+        return data_formats[data_format.lower()]
+
+    @staticmethod
     def _data_type_check(data_type: str) -> str:
         """Check the data type string and return in SCPI style."""
         if data_type.lower() == "binary":
@@ -70,6 +84,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
             data_type = "ASCii"
         else:
             raise QMI_InstrumentException(f"Unexpected data type, got {data_type}")
+
         return data_type
 
     def _channel_value_setter(
@@ -280,17 +295,13 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
     @rpc_method
     def set_channel_position(self, channels: int | list[int] | str, position: float | list[float]) -> None:
-        """
-        Changes the position of the specified channels in volts.
-        """
+        """Changes the position of the specified channels in volts."""
         checked_chs = self._channels_check(channels)
         self._channel_value_setter(checked_chs, position, "POSition")
 
     @rpc_method
     def get_channel_position(self, channels: int | list[int] | str) -> np.ndarray:
-        """
-        Returns the current position for the specified channels in volts.
-        """
+        """Returns the current position for the specified channels in volts."""
         checked_chs = self._channels_check(channels)
         position = self._channel_value_getter(checked_chs, "POSition", 11)
 
@@ -315,22 +326,6 @@ class Yokogawa_DLM4038(QMI_Instrument):
         self._scpi_protocol.write(f":TRIGger:ATRigger:SIMPle:LEVel {voltage}V")
 
     @rpc_method
-    def set_number_data_points(self, length: int) -> None:
-        """Sets the scope acquire length.
-
-        Parameters:
-            length: The acquire length value.
-        """
-        self._scpi_protocol.write(f":ACQuire:RLENgth {length}")
-
-    @rpc_method
-    def get_number_data_points(self) -> int:
-        """
-        Gets the number of data points that will be saved.
-        """
-        return int(self._scpi_protocol.ask(":WAVeform:LENGth?")[10:])  # TODO: range 10:-1 needs to be checked with HW
-
-    @rpc_method
     def set_average(self, average: int) -> None:
         """Sets the mode to average and set the average count.
 
@@ -346,28 +341,151 @@ class Yokogawa_DLM4038(QMI_Instrument):
         self._scpi_protocol.write(":ACQUIRE:MODE NORMAL")
 
     @rpc_method
+    def set_number_data_points(self, length: int) -> None:
+        """Sets the scope acquire length.
+
+        Parameters:
+            length: The acquire length value.
+        """
+        self._scpi_protocol.write(f":ACQuire:RLENgth {length}")
+
+    @rpc_method
+    def get_number_data_points(self) -> int:
+        """Gets the number of data points that will be saved."""
+        return int(self._scpi_protocol.ask(":WAVeform:LENGth?")[10:])
+    
+    @rpc_method
+    def set_data_format(self, data_format: str) -> None:
+        """Set the waveform data format to specific type.
+
+        Parameters:
+            data_format:        What format to send the data in. Possible options: 
+        """
+        data_format = self._data_format_check(data_format)
+        self._scpi_protocol.write(":WAVeform:FORMat {data_format}")
+
+    @rpc_method
+    def set_waveform_trace_channel(self, channel: int) -> None:
+        """Set the waveform (channel) number to obtain the waveform trace data from.
+        
+        Parameters:
+            channel:           Waveform (channel) number.
+        """
+        assert channel in range(1, self.CHANNELS + 1), f"Invalid waveform channel number {channel}"
+        self._scpi_protocol.write(f":WAVeform:TRACE {channel}")
+
+    @rpc_method
+    def get_waveform_trace_data(self, data_format: str) -> np.ndarray:
+        """Get waveform (channel) trace data from single waveform.
+        
+        Returns:
+            trace_data:        The trace data formatted according to the given data format.
+        """
+        data_format = self._data_format_check(data_format)
+        # Get raw trace data
+        raw_data = self._scpi_protocol.ask(":WAVeform:SEND?")
+        # Manipulate and return
+        if data_format == "ASCii":
+            return np.array([float(x) for x in raw_data.split(',')])
+        
+        '''<Block Data>
+        <Block data> is any 8-bit data. It is only used in 
+        response messages on the DLM4000. The syntax is as 
+        follows:
+        Form Example
+        #N<N-digit decimal number><data byte sequence>#800000010ABCDEFGHIJ
+        • #N
+        Indicates that the data is <block data>. “N” indicates 
+        the number of succeeding data bytes (digits) in 
+        ASCII code.
+        • <N-digit decimal number>
+        Indicates the number of bytes of data (example: 
+        00000010 = 10 bytes).
+        • <Data byte sequence>
+        Expresses the actual data (example: ABCDEFGHIJ).
+        • Data is comprised of 8-bit values (0 to 255). This 
+        means that the ASCII code “0AH,” which stands for 
+        “NL,” can also be included in the data. Hence, care 
+        must be taken when programming the controller'''
+        range = self.get_waveform_data_range()  # TODO
+        offset = self.get_waveform_data_offset()  # TODO
+        position = 0.0
+        if data_format == "WORD":
+            division = 3200.0
+
+        elif data_format == "BYTE":
+            division = 12.5
+
+        elif data_format == "RBYTe":
+            division = 25.0
+            position = self.get_waveform_position()  # TODO
+
+        data_points = ...
+        for dp in data_points:
+            value = range * (dp - position) / division + offset
+
+    @rpc_method
+    def get_waveforms_trace_data(self, channels: list[int], data_format: str = "ascii") -> np.ndarray:
+        """Returns the on-screen traces from specified waveforms (channels) in the form of a 2D numpy array.
+        Data is streamed via ethernet in the given format.
+
+        Parameters:
+            channels:           A list of the waveform numbers (waveform channels) to return data from.
+            data_format:        What format to send the data in. Possible formats are:
+                                'ascii' | 'byte' | 'rbyte' | 'word'. Default is 'ascii'
+
+        Returns:
+            traces:             An array where each row is a channel trace. 
+                                Channel order corresponds to 'channels' parameter.
+        """
+        # Expected length of each trace
+        num_points = self.get_number_data_points()
+
+        # Initialize data array
+        traces = np.zeros((len(channels), num_points))
+
+        # Stop to acquire data
+        self.stop()
+
+        # Set data format
+        self.set_data_format(data_format)
+
+        # Get trace data from each defined channel
+        for i, waveform in enumerate(channels):
+            # Set which channel to get data from
+            self.set_waveform_trace_channel(waveform)
+            # Transfer data from the stopped acquisition
+            resp = self.get_waveform_trace_data(data_format)
+            traces[i] = np.array([float(x) for x in resp.split(',')])
+
+        # Start continuous acquisition again
+        self.start()
+
+        return traces
+        
+    @rpc_method
     def save_file(self, name: str, data_type: str = "binary", waiting_time: float = 12.0) -> None:
         """Saves in the internal memory the file with a name "nameXXX.csv".
         Here XXX labels the files that have the same name with numbers from 000 to 999.
 
         Parameters:
             name:         The preposition of the file name.
-            data_type:    Specify with type: 'binary' for raw data and 'ascii' for csv data.
+            data_type:    Specify data type: 'binary' for raw data and 'ascii' for csv data.
             waiting_time: Time to wait for saving the file. In seconds.
         """
         data_type = self._data_type_check(data_type)
 
         # Stop in order to acquire the data
-        self._scpi_protocol.write(":STOP")
+        self.stop()
         # Parameters of the saved file
-        self._scpi_protocol.write(":WAV:FORM BYTE")
+        self.set_data_format("byte")
         _ = self.get_number_data_points()
         self._scpi_protocol.write(f":FILE:SAVE:NAME {name}")
         self._scpi_protocol.write(f":FILE:SAVE:{data_type}:EXECute")
         # waits until the save is completed
         time.sleep(waiting_time)
         # Starts again, notice that at least a time of 10*time_division is needed to get a full spectrum after starting
-        self._scpi_protocol.write(":START")
+        self.start()
 
     @rpc_method
     def find_file_name(self, name: str, select_files: str = "last") -> list[str]:
@@ -428,7 +546,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
             shutil.copy(f"{self._directory_oscilloscope}{f}", destination)
 
     @rpc_method
-    def delete_file(self, name: str, select_files: str = "last", data_type: str = "binary") -> None:
+    def delete_file(self, name: str, select_files: str = "last", data_format: str = "binary") -> None:
         """Deletes files in the oscilloscope with names 'nameXXX.csv'.
         It can be chosen whether to delete the last file created with that name (higher XXX) with select_files = 'last'
         or to delete all of them with select_files = 'all'.
@@ -436,15 +554,15 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Parameters:
             name:         Preposition of file names to find.
             select_files: Optional parameter to select only the "last" file (default) or "all" the files.
-            data_type:    Specify with type: 'binary' for raw data and 'ascii' for csv data file.
+            data_format:    Specify with type: 'binary' for raw data and 'ascii' for csv data file.
         """
-        data_type = self._data_type_check(data_type)
+        data_format = self._data_format_check(data_format)
 
         # Stops in order to delete the data
         self.stop()
         file_names = self.find_file_name(name, select_files)
         for f in file_names:
-            self._scpi_protocol.write(f':FILE:DELete:{data_type}:EXECute "{f[:-4]}"')
+            self._scpi_protocol.write(f':FILE:DELete:{data_format}:EXECute "{f[:-4]}"')
 
         # Starts again, notice that at least a time of 10*time_division is needed to get a full spectrum after starting
         self.start()
