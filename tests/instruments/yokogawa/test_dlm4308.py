@@ -1,6 +1,8 @@
 import unittest
 from unittest.mock import patch, MagicMock
 
+import numpy as np
+
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_Vxi11Transport
 from qmi.core.instrument import QMI_InstrumentIdentification
@@ -592,6 +594,28 @@ class TestMethodsCase(unittest.TestCase):
         # Assert
         self._transport_mock.write.assert_called_once_with(expected_write)
 
+    def test_set_average(self):
+        """Test set_average method that first sets the mode to average, and then the average value."""
+        # Arrange
+        average = 2**5
+        expected_write = [
+            unittest.mock.call(f":ACQUIRE:MODE AVERAGE\n".encode()),
+            unittest.mock.call(f":ACQUIRE:AVERAGE:COUNT {average}\n".encode())
+        ]
+        # Act
+        self.yokogawa.set_average(average)
+        # Assert
+        self._transport_mock.write.assert_has_calls(expected_write)
+
+    def test_set_normal(self):
+        """Test set_normal method."""
+        # Arrange
+        expected_write = f":ACQUIRE:MODE NORMAL\n".encode()
+        # Act
+        self.yokogawa.set_normal()
+        # Assert
+        self._transport_mock.write.assert_called_once_with(expected_write)
+
     def test_set_number_data_points(self):
         """Test set_number_data_points method."""
         # Arrange
@@ -615,27 +639,65 @@ class TestMethodsCase(unittest.TestCase):
         self._transport_mock.write.assert_called_once_with(expected_write)
         self.assertEqual(expected_ndp, ndp)
 
-    def test_set_average(self):
-        """Test set_average method that first sets the mode to average, and then the average value."""
+    def test_set_data_format(self):
+        """Test setting all data formats with set_data_format."""
         # Arrange
-        average = 2**5
-        expected_write = [
-            unittest.mock.call(f":ACQUIRE:MODE AVERAGE\n".encode()),
-            unittest.mock.call(f":ACQUIRE:AVERAGE:COUNT {average}\n".encode())
-        ]
-        # Act
-        self.yokogawa.set_average(average)
-        # Assert
-        self._transport_mock.write.assert_has_calls(expected_write)
+        all_formats = ["ascii", "BYTE", "RBYTE", "Word"]
+        expected_formats = ["ASCii", "BYTE", "RBYTe", "WORD"]
 
-    def test_set_normal(self):
-        """Test set_normal method."""
+        for fmt_in, fmt_exp in zip(all_formats, expected_formats):
+            expected_write = f":WAVeform:FORMat {fmt_exp}\n".encode()
+            # Act
+            self.yokogawa.set_data_format(fmt_in)
+            # Assert
+            self._transport_mock.write.assert_called_once_with(expected_write)
+            self._transport_mock.write.reset_mock()
+
+    def test_set_data_format_invalid(self):
+        """Test setting an invalid data format with set_data_format."""
         # Arrange
-        expected_write = f":ACQUIRE:MODE NORMAL\n".encode()
+        invalid_format = "BINary"  # Is a data _type_
+        expected_exception = f"Unexpected data format, got {invalid_format}"
+        # Act & Assert
+        with self.assertRaises(QMI_InstrumentException) as exc:
+            self.yokogawa.set_data_format(invalid_format)
+
+        self.assertEqual(expected_exception, str(exc.exception))
+
+    def test_set_waveform_trace_channel(self):
+        """Test switching waveform trace channel with set_waveform_trace_channel."""
+        # Arrange
+        channel = 2
+        expected_write = f":WAVeform:TRACE {channel}\n".encode()
         # Act
-        self.yokogawa.set_normal()
+        self.yokogawa.set_waveform_trace_channel(channel)
         # Assert
         self._transport_mock.write.assert_called_once_with(expected_write)
+
+    def test_set_waveform_trace_channel_out_of_range(self):
+        """Test switching waveform trace channel with invalid channel numbers."""
+        # Arrange
+        channels = [0, Yokogawa_Dlm4038.CHANNELS + 1]
+        # Act
+        for channel in channels:
+            with self.assertRaises(ValueError):
+                self.yokogawa.set_waveform_trace_channel(channel)
+
+    def test_get_waveform_trace_data_ascii(self):
+        """Test getting waveform trace data in ASCII format."""
+        # Arrange
+        # data = bytes(range(32))
+        # header_data = b"#800000032" + data
+        expected_trace_data = np.arange(-5, 5, 32)
+        data_string = ",".join([str(x) for x in expected_trace_data])
+        expected_write = b":WAVeform:SEND?\n"
+        return_value = b"WAV:SEND: " + f"{data_string}\n".encode("ascii")
+        self._transport_mock.read_until.return_value = return_value
+        # Act
+        trace_data = self.yokogawa.get_waveform_trace_data("ascii")
+        # Assert
+        self._transport_mock.write.assert_called_once_with(expected_write)
+        self.assertEqual(expected_trace_data, trace_data)
 
     def test_save_file(self):
         """Test save_file method using default binary 'type'."""
