@@ -18,7 +18,7 @@ import time
 
 import numpy as np
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
+from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException, QMI_RuntimeException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.scpi_protocol import ScpiProtocol
@@ -183,7 +183,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Returns:
             time_division: The current Time/div value in seconds.
         """
-        return float(self._scpi_protocol.ask(":TIMEBASE:TDIV?")[9:])
+        return float(self._scpi_protocol.ask(":TIMebase:TDIV?")[9:])
 
     @rpc_method
     def set_high_resolution(self, state: bool) -> None:
@@ -286,7 +286,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
             channels: A single channel number or a list of selected channels. Use "all" for all channels.
 
         Returns:
-            v_max: An array of waveform maximum voltage values, respective to the size of given input channels.
+            v_max:    An array of waveform maximum voltage values, respective to the size of given input channels.
         """
         checked_chs = self._channels_check(channels)
         v_max = self._channel_value_getter(checked_chs, "MAXimum:VALUE", 19, "MEASure")
@@ -359,17 +359,50 @@ class Yokogawa_DLM4038(QMI_Instrument):
         """Set the waveform data format to specific type.
 
         Parameters:
-            data_format:        What format to send the data in. Possible options: 
+            data_format: In which format to send the data in. Possible options:
+                         'ASCII', 'BYTE', RBYTE', 'WORD'.
         """
         data_format = self._data_format_check(data_format)
         self._scpi_protocol.write(":WAVeform:FORMat {data_format}")
+
+    @rpc_method
+    def get_waveform_data_range(self) -> float:
+        """Queries the waveform data range.
+
+        Returns:
+            data_range: The waveform data range multiplication factor.
+        """
+        data_range = self._scpi_protocol.ask(":WAVeform:RANGe?")[10:]
+        return float(data_range)
+
+    @rpc_method
+    def get_waveform_data_offset(self) -> float:
+        """Queries the offset value used to convert the waveform data.
+        
+        Returns:
+            data_offset: The waveform data offset value.
+        """
+        data_offset = self._scpi_protocol.ask(":WAVeform:OFFSet?")[10:]
+        return float(data_offset)
+    
+    @rpc_method
+    def get_waveform_position(self) -> int:
+        """Queries the waveform vertical position.
+        
+        This is used only when the waveform data format is set as RBYTE.
+
+        Returns:
+            wf_position: The waveform vertical position.
+        """
+        wf_position = self._scpi_protocol.ask(":WAVeform:POSition?")[9:]
+        return int(wf_position)
 
     @rpc_method
     def set_waveform_trace_channel(self, channel: int) -> None:
         """Set the waveform (channel) number to obtain the waveform trace data from.
         
         Parameters:
-            channel:           Waveform (channel) number.
+            channel: Waveform (channel) number.
         """
         assert channel in range(1, self.CHANNELS + 1), f"Invalid waveform channel number {channel}"
         self._scpi_protocol.write(f":WAVeform:TRACE {channel}")
@@ -377,9 +410,15 @@ class Yokogawa_DLM4038(QMI_Instrument):
     @rpc_method
     def get_waveform_trace_data(self, data_format: str) -> np.ndarray:
         """Get waveform (channel) trace data from single waveform.
-        
+
+        In ASCII format the data is in a comma-separated list of float voltage values.
+
+        In any other format, the data is returned as block data. Block data is any 8-bit data. It is only used in
+        response messages on the DLM4000. The syntax is as follows:
+          #N<N-digit decimal number><data byte sequence>
+
         Returns:
-            trace_data:        The trace data formatted according to the given data format.
+            trace_data: The trace data formatted according to the given data format.
         """
         data_format = self._data_format_check(data_format)
         # Get raw trace data
@@ -387,29 +426,13 @@ class Yokogawa_DLM4038(QMI_Instrument):
         # Manipulate and return
         if data_format == "ASCii":
             return np.array([float(x) for x in raw_data.split(',')])
-        
-        '''<Block Data>
-        <Block data> is any 8-bit data. It is only used in 
-        response messages on the DLM4000. The syntax is as 
-        follows:
-        Form Example
-        #N<N-digit decimal number><data byte sequence>#800000010ABCDEFGHIJ
-        • #N
-        Indicates that the data is <block data>. “N” indicates 
-        the number of succeeding data bytes (digits) in 
-        ASCII code.
-        • <N-digit decimal number>
-        Indicates the number of bytes of data (example: 
-        00000010 = 10 bytes).
-        • <Data byte sequence>
-        Expresses the actual data (example: ABCDEFGHIJ).
-        • Data is comprised of 8-bit values (0 to 255). This 
-        means that the ASCII code “0AH,” which stands for 
-        “NL,” can also be included in the data. Hence, care 
-        must be taken when programming the controller'''
+
+        # Check that we have block data format, where the string must start with a hash.
+        assert raw_data.startswith('#'), "Unexpected response from ':WAVeform:SEND?'."
+        # Obtain conversion factors
         range = self.get_waveform_data_range()  # TODO
         offset = self.get_waveform_data_offset()  # TODO
-        position = 0.0
+        position = 0
         if data_format == "WORD":
             division = 3200.0
 
@@ -420,9 +443,23 @@ class Yokogawa_DLM4038(QMI_Instrument):
             division = 25.0
             position = self.get_waveform_position()  # TODO
 
-        data_points = ...
-        for dp in data_points:
-            value = range * (dp - position) / division + offset
+        # 'N' indicates the number of succeeding data bytes (digits) in ASCII code.
+        no_of_bytes = int(raw_data[1])
+        # <N-digit decimal number> indicates the number of bytes of data.
+        data_points = int(raw_data[2:2+no_of_bytes])
+        # <Data byte sequence> expresses the actual data.
+        raw_data = raw_data[2+no_of_bytes:]  # slice header
+        # Data is comprised of 8-bit values (0 to 255).
+        data_bytes = raw_data.encode('latin1')
+        if data_points != len(data_bytes):
+            raise QMI_RuntimeException(
+                f"Expected {data_points} data points in block, but " +
+                f"block is of length {data_bytes}."
+            )
+
+        # Get the data from the byte string as _signed_ integer array.
+        data = np.frombuffer(data_bytes, dtype=np.int8, count=data_points)
+        return range * (data - position) / division + offset
 
     @rpc_method
     def get_waveforms_trace_data(self, channels: list[int], data_format: str = "ascii") -> np.ndarray:
@@ -430,13 +467,13 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Data is streamed via ethernet in the given format.
 
         Parameters:
-            channels:           A list of the waveform numbers (waveform channels) to return data from.
-            data_format:        What format to send the data in. Possible formats are:
-                                'ascii' | 'byte' | 'rbyte' | 'word'. Default is 'ascii'
+            channels:    A list of the waveform numbers (waveform channels) to return data from.
+            data_format: Which format to send the data in. Possible formats are:
+                         'ascii' | 'byte' | 'rbyte' | 'word'. Default is 'ascii'.
 
         Returns:
-            traces:             An array where each row is a channel trace. 
-                                Channel order corresponds to 'channels' parameter.
+            traces:      An array where each row is a channel trace. 
+                         Channel order corresponds to 'channels' parameter.
         """
         # Expected length of each trace
         num_points = self.get_number_data_points()
