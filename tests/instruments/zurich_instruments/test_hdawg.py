@@ -657,7 +657,7 @@ class TestHDAWG(unittest.TestCase):
         self._check_set_value(node, value)
 
         channel = 3
-        node_mock = self.hdawg.awg_channel_map[channel]
+        node_mock = self.hdawg._get_awg_node(channel)
 
         self.hdawg.set_node_value(node, value, channel)
 
@@ -673,7 +673,7 @@ class TestHDAWG(unittest.TestCase):
         self.assertEqual(result, value)
 
         channel = 0
-        node_mock = self.hdawg.awg_channel_map[channel]
+        node_mock = self.hdawg._get_awg_node(channel)
 
         self.hdawg.get_node_string(node, channel)
 
@@ -689,7 +689,7 @@ class TestHDAWG(unittest.TestCase):
         self.assertEqual(result, value)
 
         channel = 2
-        node_mock = self.hdawg.awg_channel_map[channel]
+        node_mock = self.hdawg._get_awg_node(channel)
 
         self.hdawg.get_node_int(node, channel)
 
@@ -703,7 +703,7 @@ class TestHDAWG(unittest.TestCase):
         self._check_set_value_int(node, value)
 
         channel = 5
-        node_mock = self.hdawg.awg_channel_map[channel]
+        node_mock = self.hdawg._get_awg_node(channel)
 
         self.hdawg.set_node_int(node, value, channel)
 
@@ -719,7 +719,7 @@ class TestHDAWG(unittest.TestCase):
         self.assertEqual(result, value)
 
         channel = 4
-        node_mock = self.hdawg.awg_channel_map[channel]
+        node_mock = self.hdawg._get_awg_node(channel)
 
         self.hdawg.get_node_double(node, channel)
 
@@ -733,7 +733,7 @@ class TestHDAWG(unittest.TestCase):
         self._check_set_value_double(node, value)
 
         channel = 7
-        node_mock = self.hdawg.awg_channel_map[channel]
+        node_mock = self.hdawg._get_awg_node(channel)
 
         self.hdawg.set_node_double(node, value, channel)
 
@@ -1027,36 +1027,6 @@ class TestHDAWG(unittest.TestCase):
         self._awg_module.awg.raw_module.getDouble.assert_has_calls(expected_calls_getdouble)
         self.assertFalse(self.hdawg.compilation_successful())
 
-    def test_compile_sequencer_program(self):
-        """Test compiling sequencer program."""
-        channel = 4
-        program = "Very short program"
-        node_mock = self.hdawg.awg_channel_map[channel]
-        node_mock.compile_sequencer_program.return_value = (program.encode(), {})
-
-        _, __ = self.hdawg.compile_sequencer_program(channel, program)
-
-        node_mock.compile_sequencer_program.assert_called_once_with(program)
-
-    def test_upload_compiled_program(self):
-        """Test uploading a compiled program."""
-        channel = 6
-        comp_prog = b"Compiled Very short program"
-        node_mock = self.hdawg.awg_channel_map[channel]
-
-        _ = self.hdawg.upload_compiled_program(channel, comp_prog)
-
-        node_mock.elf.data.assert_called_once_with(comp_prog)
-
-    def test_get_sequence_snippet(self):
-        """Test getting a sequence snippet"""
-        expected_snippet = "snippy-snip"
-        waveforms_mock = WaveformMock()
-
-        snippet = self.hdawg.get_sequence_snippet(waveforms_mock)
-
-        self.assertEqual(expected_snippet, snippet)
-
     def test_upload_waveform(self):
         """Test waveform upload. Here also lists happen to work if all three are defined.
         Also the 'assert_has_calls' works directly as the forwarded parameters are still lists.
@@ -1068,7 +1038,7 @@ class TestHDAWG(unittest.TestCase):
         markers = [7, 8, 9]
 
         expected_call = call().__setitem__(index, (wave1, wave2, markers))
-        core_0 = self.hdawg.awg_channel_map[core]
+        core_0 = self.hdawg._get_awg_node(core)
 
         with unittest.mock.patch(
             "qmi.instruments.zurich_instruments.hdawg.Waveforms"
@@ -1092,7 +1062,7 @@ class TestHDAWG(unittest.TestCase):
         wave2 = None
         markers = np.array([7, 8, 9])
 
-        core_0 = self.hdawg.awg_channel_map[core]
+        core_0 = self.hdawg._get_awg_node(core)
 
         with unittest.mock.patch(
             "qmi.instruments.zurich_instruments.hdawg.Waveforms"
@@ -1201,86 +1171,14 @@ class TestHDAWG(unittest.TestCase):
         self.assertEqual(self._daq_server.set.call_count, np.ceil(batch_size / 10))
         [utils_patch.assert_has_calls(c[2]) for c in expected_utils_calls]
 
-    def test_write_to_waveform_memory(self):
-        """Test writing to waveform memory with and without indexes"""
-        channel = 5
-        node_mock = self.hdawg.awg_channel_map[channel]
-        wf_mock = Mock()
-        # No indexes test
-        self.hdawg.write_to_waveform_memory(channel, wf_mock, None)
-
-        node_mock.write_to_waveform_memory.assert_called_once_with(wf_mock)
-        node_mock.reset_mock()
-
-        # With indexes test
-        indexes = [0, 2]
-        self.hdawg.write_to_waveform_memory(channel, wf_mock, indexes)
-
-        node_mock.write_to_waveform_memory.assert_called_once_with(wf_mock, indexes)
-
-    def test_read_from_waveform_memory(self):
-        """Test reading from waveform memory with and without indexes."""
-        channel = 6
-        node_mock = self.hdawg.awg_channel_map[channel]
-        # No indexes test
-        _ = self.hdawg.read_from_waveform_memory(channel, None)
-
-        node_mock.read_from_waveform_memory.assert_called_once_with()
-        node_mock.reset_mock()
-
-        # With indexes test
-        indexes = [0, 2]
-        self.hdawg.read_from_waveform_memory(channel, indexes)
-
-        node_mock.read_from_waveform_memory.assert_called_once_with(indexes)
-
-    def test_upload_waveforms_per_awg_core(self):
-        """Test uploading a 'large' batch of waveforms (more than batch size limit but exact multiple of)."""
-        unpacked_waveforms = []
-        batch_size = 30
-        for i in range(batch_size):
-            awg_index = i % 4
-            waveform_index = i
-            wave1 = np.array([i + 1, i + 2, i + 3])
-            wave2 = np.array([i + 4, i + 5, i + 6])
-            markers = np.array([i + 7, i + 8, i + 9])
-            unpacked_waveforms.append((awg_index, waveform_index, wave1, wave2, markers))
-
-        core_mock_0 = self._device.awgs[0]
-        core_mock_1 = self._device.awgs[1]
-        core_mock_2 = self._device.awgs[2]
-        core_mock_3 = self._device.awgs[3]
-        with unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.zhinst"
-        ), unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.zhinst.utils"
-        ), unittest.mock.patch(
-            "qmi.instruments.zurich_instruments.hdawg.Waveforms"
-        ) as wf_patch:
-            self.hdawg.upload_waveforms_per_awg_core(unpacked_waveforms)
-
-        core_mock_0.write_to_waveform_memory.assert_called_with(wf_patch())
-        core_mock_1.write_to_waveform_memory.assert_called_with(wf_patch())
-        core_mock_2.write_to_waveform_memory.assert_called_with(wf_patch())
-        core_mock_3.write_to_waveform_memory.assert_called_with(wf_patch())
-
     def test_get_schema(self):
         """Test getting a schema for a channel."""
         channel = 0
-        node_mock = self.hdawg.awg_channel_map[channel]
+        node_mock = self.hdawg._get_awg_node(channel)
 
         _ = self.hdawg.get_schema(channel)
 
         node_mock.commandtable.load_validation_schema.assert_called_once_with()
-
-    def test_get_command_table(self):
-        """Test getting a command table for a channel."""
-        channel = 0
-        node_mock = self.hdawg.awg_channel_map[channel]
-
-        _ = self.hdawg.get_command_table(channel)
-
-        node_mock.commandtable.load_from_device.assert_called_once_with()
 
     def test_upload_command_table(self):
         """Test command table upload."""
@@ -1437,8 +1335,8 @@ class TestHDAWG(unittest.TestCase):
         channel_1 = 3
         channel_2 = 7
 
-        node_mock_1 = self.hdawg.awg_channel_map[channel_1]
-        node_mock_2 = self.hdawg.awg_channel_map[channel_2]
+        node_mock_1 = self.hdawg._get_awg_node(channel_1)
+        node_mock_2 = self.hdawg._get_awg_node(channel_2)
 
         self.hdawg.enable_sequencer(channel_1)
         node_mock_1.enable_sequencer.assert_called_once_with(single=True)
@@ -1450,7 +1348,7 @@ class TestHDAWG(unittest.TestCase):
     def test_channel_ready(self):
         """Test channel_ready when it is ready."""
         channel = 2
-        node_mock = self.hdawg.awg_channel_map[channel]
+        node_mock = self.hdawg._get_awg_node(channel)
 
         ready = self.hdawg.channel_ready(channel)
 
@@ -1460,7 +1358,7 @@ class TestHDAWG(unittest.TestCase):
     def test_channel_ready_excepts(self):
         """Test channel_ready when it is ready."""
         channel = 2
-        node_mock = self.hdawg.awg_channel_map[channel]
+        node_mock = self.hdawg._get_awg_node(channel)
         node_mock.ready.return_value = False
         self.hdawg.COMPILE_TIMEOUT = 0.05
         self.hdawg.UPLOAD_TIMEOUT = 0.05
@@ -1474,7 +1372,7 @@ class TestHDAWG(unittest.TestCase):
         """Test wait_done call."""
         channel = 6
         timeout = 0.0
-        channel_mock = self.hdawg.awg_channel_map[channel]
+        channel_mock = self.hdawg._get_awg_node(channel)
 
         self.hdawg.wait_done(channel, timeout)
 
@@ -2089,8 +1987,8 @@ class TestHDAWG(unittest.TestCase):
 
     def test_set_dio_valid_index(self):
         """Test DIO VALID signal index setting."""
-        core_0 = self.hdawg.awg_channel_map[0]
-        core_3 = self.hdawg.awg_channel_map[3]
+        core_0 = self.hdawg._get_awg_node(0)
+        core_3 = self.hdawg._get_awg_node(3)
 
         self.hdawg.set_dio_valid_index(0, 0)
         self.hdawg.set_dio_valid_index(0, 31)
@@ -2118,8 +2016,8 @@ class TestHDAWG(unittest.TestCase):
 
     def test_set_dio_polarity(self):
         """Test DIO polarity setting."""
-        core_0 = self.hdawg.awg_channel_map[0]
-        core_3 = self.hdawg.awg_channel_map[3]
+        core_0 = self.hdawg._get_awg_node(0)
+        core_3 = self.hdawg._get_awg_node(3)
         self.hdawg.set_dio_polarity(0, 0)
         self.hdawg.set_dio_polarity(0, 3)
         self.hdawg.set_dio_polarity(3, 0)
@@ -2146,8 +2044,8 @@ class TestHDAWG(unittest.TestCase):
 
     def test_set_dio_polarity_with_strings(self):
         """Test DIO polarity setting with string values."""
-        core_0 = self.hdawg.awg_channel_map[0]
-        core_3 = self.hdawg.awg_channel_map[3]
+        core_0 = self.hdawg._get_awg_node(0)
+        core_3 = self.hdawg._get_awg_node(3)
         self.hdawg.set_dio_polarity(0, "none")
         self.hdawg.set_dio_polarity(0, "both")
         self.hdawg.set_dio_polarity(3, "0")
