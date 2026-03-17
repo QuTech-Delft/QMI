@@ -386,11 +386,12 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
         In ASCII format the data is in a comma-separated list of float voltage values.
 
-        In any other format, the data is as block data. Block data is any 8-bit data. It is only used in
-        response messages on the DLM4000. The syntax is as follows:
-        #N<N-digit decimal number><data byte sequence>
+        In any other format, the data is as block data. Block data is signed 8-bit data in 'BYTE' and 'RBYTe'
+        data formats. 'RBYTe' has also reverse order of data points. In 'WORD' format the data block contains
+        signed 16-bit data in little-endiand order. The block data syntax is as follows:
+        "#N<N-digit decimal number><data byte sequence>"
 
-        The block data needs to be converted into volts. The respective conversion formula depends on the
+        The block data needs to be converted into Volts. The respective conversion formula depends on the
         data format. See the DLM4000 series user's manual for details.
 
         NOTE: This implementation does not include the use of the <NRf> parameter.
@@ -410,27 +411,13 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
         # Check that we have block data format, where the string must start with a hash.
         assert raw_data.startswith('#'), f"Unexpected response {raw_data!r} for ':WAVeform:SEND?'."
-        # Obtain conversion factors
-        data_range = self._scpi_protocol.ask(":WAVeform:RANGe?")[10:]
-        data_offset = self._scpi_protocol.ask(":WAVeform:OFFSet?")[10:]
-        position = 0
-        if data_format == "WORD":
-            division = 3200.0
-
-        elif data_format == "BYTE":
-            division = 12.5
-
-        elif data_format == "RBYTe":
-            division = 25.0
-            position = self._scpi_protocol.ask(":WAVeform:POSition?")[9:]
-
         # 'N' indicates the number of succeeding data bytes (digits) in ASCII code.
         no_of_bytes = int(raw_data[1])
         # <N-digit decimal number> indicates the number of bytes of data.
         data_points = int(raw_data[2:2+no_of_bytes])
         # <Data byte sequence> expresses the actual data.
         raw_data = raw_data[2+no_of_bytes:]  # slice header
-        # Data is comprised of 8-bit values (0 to 255).
+        # Data is comprised of signed 8-bit values, or 16-bit 'words' in little-endian order.
         data_bytes = raw_data.encode('latin1')
         # TODO: There might be newline character[s]. Should check and remove?
         if data_points != len(data_bytes):
@@ -442,8 +429,26 @@ class Yokogawa_DLM4038(QMI_Instrument):
                 f"Expected {data_points} data points in block, but block is of length {len(data_bytes)}."
             )
 
-        # Get the data from the byte string as _signed_ integer array.
-        data = np.frombuffer(data_bytes, dtype=np.int8, count=data_points)
+        # Obtain conversion factors. Hard-coded division values are from the manual.
+        data_range = float(self._scpi_protocol.ask(":WAVeform:RANGe?")[10:])
+        data_offset = float(self._scpi_protocol.ask(":WAVeform:OFFSet?")[10:])
+        position = 0
+        if data_format == "WORD":
+            division = 3200.0
+            # Get the data from the byte string in little-endian byte order.
+            data = np.frombuffer(data_bytes, dtype='<i2')
+
+        elif data_format == "BYTE":
+            division = 12.5
+            # Get the data from the byte string as _signed_ integer array.
+            data = np.frombuffer(data_bytes, dtype=np.int8, count=data_points)
+
+        else:  # data_format == "RBYTe"
+            division = 25.0
+            position = int(self._scpi_protocol.ask(":WAVeform:POSition?")[9:])
+            # Get the data from the byte string as _signed_ integer array.
+            data = np.frombuffer(data_bytes, dtype=np.int8, count=data_points)
+
         _logger.debug(
             "[%s] Data (up to first 1000 points) before conversion is %d.", self._name, data[:1000]
         )
