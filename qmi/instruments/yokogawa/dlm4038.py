@@ -108,13 +108,14 @@ class Yokogawa_DLM4038(QMI_Instrument):
         elif isinstance(values, list) and isinstance(channels, list):
             # Multi-channel setter with values per channel
             if len(values) != len(channels):
+                _logger.error("[%s] Invalid number of values (%d), for %d channels", self._name, len(values), len(channels))
                 raise QMI_UsageException(f"Invalid number of values ({len(values)}) for {len(channels)} channels.")
 
             for chan, val in zip(channels, values):
                 self._scpi_protocol.write(f":CHANnel{chan}:{parameter} {val}{unit}")
 
         else:
-            _logger.error("%s {parameter} not set due to invalid parameters: %d, %d", self._name, channels, values)
+            _logger.error("[%s] %s not set due to invalid inputs: %d, %d", self._name, parameter, channels, values)
 
     def _channel_value_getter(
             self, channels: int | list[int], parameter: str, val_start: int, preposition: str = ""
@@ -131,6 +132,10 @@ class Yokogawa_DLM4038(QMI_Instrument):
             current_value = self._scpi_protocol.ask(f"{preposition}:CHANnel{chan}:{parameter}?")
             values.append(current_value[val_start:])
 
+        _logger.debug(
+            "[%s] Obtained values %d for query %s:CHANnel_}:%s? for channels %d.",
+            self._name, preposition, parameter, channels
+        )
         return values
 
     @rpc_method
@@ -366,38 +371,6 @@ class Yokogawa_DLM4038(QMI_Instrument):
         self._scpi_protocol.write(":WAVeform:FORMat {data_format}")
 
     @rpc_method
-    def get_waveform_data_range(self) -> float:
-        """Queries the waveform data range.
-
-        Returns:
-            data_range: The waveform data range multiplication factor.
-        """
-        data_range = self._scpi_protocol.ask(":WAVeform:RANGe?")[10:]
-        return float(data_range)
-
-    @rpc_method
-    def get_waveform_data_offset(self) -> float:
-        """Queries the offset value used to convert the waveform data.
-        
-        Returns:
-            data_offset: The waveform data offset value.
-        """
-        data_offset = self._scpi_protocol.ask(":WAVeform:OFFSet?")[10:]
-        return float(data_offset)
-    
-    @rpc_method
-    def get_waveform_position(self) -> int:
-        """Queries the waveform vertical position.
-        
-        This is used only when the waveform data format is set as RBYTE.
-
-        Returns:
-            wf_position: The waveform vertical position.
-        """
-        wf_position = self._scpi_protocol.ask(":WAVeform:POSition?")[9:]
-        return int(wf_position)
-
-    @rpc_method
     def set_waveform_trace_channel(self, channel: int) -> None:
         """Set the waveform (channel) number to obtain the waveform trace data from.
         
@@ -413,9 +386,14 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
         In ASCII format the data is in a comma-separated list of float voltage values.
 
-        In any other format, the data is returned as block data. Block data is any 8-bit data. It is only used in
+        In any other format, the data is as block data. Block data is any 8-bit data. It is only used in
         response messages on the DLM4000. The syntax is as follows:
-          #N<N-digit decimal number><data byte sequence>
+        #N<N-digit decimal number><data byte sequence>
+
+        The block data needs to be converted into volts. The respective conversion formula depends on the
+        data format. See the DLM4000 series user's manual for details.
+
+        NOTE: This implementation does not include the use of the <NRf> parameter.
 
         Returns:
             trace_data: The trace data formatted according to the given data format.
@@ -425,13 +403,16 @@ class Yokogawa_DLM4038(QMI_Instrument):
         raw_data = self._scpi_protocol.ask(":WAVeform:SEND?")
         # Manipulate and return
         if data_format == "ASCii":
+            _logger.debug(
+                "[%s] Raw data (up to first 1000 characters) is %s.", self._name, raw_data[:1000]
+            )
             return np.array([float(x) for x in raw_data.split(',')])
 
         # Check that we have block data format, where the string must start with a hash.
-        assert raw_data.startswith('#'), "Unexpected response from ':WAVeform:SEND?'."
+        assert raw_data.startswith('#'), f"Unexpected response {raw_data!r} for ':WAVeform:SEND?'."
         # Obtain conversion factors
-        range = self.get_waveform_data_range()  # TODO
-        offset = self.get_waveform_data_offset()  # TODO
+        data_range = self._scpi_protocol.ask(":WAVeform:RANGe?")[10:]
+        data_offset = self._scpi_protocol.ask(":WAVeform:OFFSet?")[10:]
         position = 0
         if data_format == "WORD":
             division = 3200.0
@@ -441,7 +422,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
         elif data_format == "RBYTe":
             division = 25.0
-            position = self.get_waveform_position()  # TODO
+            position = self._scpi_protocol.ask(":WAVeform:POSition?")[9:]
 
         # 'N' indicates the number of succeeding data bytes (digits) in ASCII code.
         no_of_bytes = int(raw_data[1])
@@ -451,15 +432,22 @@ class Yokogawa_DLM4038(QMI_Instrument):
         raw_data = raw_data[2+no_of_bytes:]  # slice header
         # Data is comprised of 8-bit values (0 to 255).
         data_bytes = raw_data.encode('latin1')
+        # TODO: There might be newline character[s]. Should check and remove?
         if data_points != len(data_bytes):
+            _logger.debug(
+                "[%s] Data tracing error. Expected %i data points in block, but block is of length %i. " +
+                "Raw data (up to first 1000 bytes) is %b.", self._name, data_points, len(data_bytes), raw_data[:1000]
+            )
             raise QMI_RuntimeException(
-                f"Expected {data_points} data points in block, but " +
-                f"block is of length {data_bytes}."
+                f"Expected {data_points} data points in block, but block is of length {len(data_bytes)}."
             )
 
         # Get the data from the byte string as _signed_ integer array.
         data = np.frombuffer(data_bytes, dtype=np.int8, count=data_points)
-        return range * (data - position) / division + offset
+        _logger.debug(
+            "[%s] Data (up to first 1000 points) before conversion is %d.", self._name, data[:1000]
+        )
+        return data_range * (data - position) / division + data_offset
 
     @rpc_method
     def get_waveforms_trace_data(self, channels: list[int], data_format: str = "ascii") -> np.ndarray:
@@ -472,8 +460,8 @@ class Yokogawa_DLM4038(QMI_Instrument):
                          'ascii' | 'byte' | 'rbyte' | 'word'. Default is 'ascii'.
 
         Returns:
-            traces:      An array where each row is a channel trace. 
-                         Channel order corresponds to 'channels' parameter.
+            traces:      An array where each row is a channel trace.
+                         Channel order corresponds to 'channels' input parameter.
         """
         # Expected length of each trace
         num_points = self.get_number_data_points()
@@ -489,11 +477,11 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
         # Get trace data from each defined channel
         for i, waveform in enumerate(channels):
+            _logger.info("[%s] Obtaining trace data for waveform %i in format %s", self._name, waveform, data_format)
             # Set which channel to get data from
             self.set_waveform_trace_channel(waveform)
             # Transfer data from the stopped acquisition
-            resp = self.get_waveform_trace_data(data_format)
-            traces[i] = np.array([float(x) for x in resp.split(',')])
+            traces[i] = self.get_waveform_trace_data(data_format)
 
         # Start continuous acquisition again
         self.start()
@@ -503,7 +491,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
     @rpc_method
     def save_file(self, name: str, data_type: str = "binary", waiting_time: float = 12.0) -> None:
         """Saves in the internal memory the file with a name "nameXXX.csv".
-        Here XXX labels the files that have the same name with numbers from 000 to 999.
+        Here, XXX labels the files that have the same name with numbers from 000 up to 999.
 
         Parameters:
             name:         The preposition of the file name.
