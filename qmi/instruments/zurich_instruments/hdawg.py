@@ -721,6 +721,10 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             1 - If the AWG module sequencer[s] is | are currently running.
             0 - If the AWG module sequencer[s] is | are not running.
         """
+        warnings.warn(
+            f"{self.get_awg_module_enabled.__name__} will be deprecated. Please use {self.get_awg_enabled.__name__}.",
+              DeprecationWarning
+        )
         self._check_is_open()
         return self.awg_module.getInt("awg/enable")
 
