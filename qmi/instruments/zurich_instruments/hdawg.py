@@ -875,7 +875,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
     def validate_waveforms(
         self, waveforms: Waveforms,
         compiled_sequencer_program: None | bytes = None,
-        awg_core: int = None
+        awg_core: None | int = None
     ) -> None:
         """Validate if the waveforms match the sequencer program.
 
