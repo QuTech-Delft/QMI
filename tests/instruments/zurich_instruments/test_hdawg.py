@@ -657,7 +657,7 @@ class TestHDAWG(unittest.TestCase):
         self._check_set_value(node, value)
 
         channel = 3
-        node_mock = self.hdawg._get_awg_node(channel)
+        node_mock = self.hdawg.device.awgs[channel // 2]
 
         self.hdawg.set_node_value(node, value, channel)
 
@@ -673,7 +673,7 @@ class TestHDAWG(unittest.TestCase):
         self.assertEqual(result, value)
 
         channel = 0
-        node_mock = self.hdawg._get_awg_node(channel)
+        node_mock = self.hdawg.device.awgs[channel // 2]
 
         self.hdawg.get_node_string(node, channel)
 
@@ -689,7 +689,7 @@ class TestHDAWG(unittest.TestCase):
         self.assertEqual(result, value)
 
         channel = 2
-        node_mock = self.hdawg._get_awg_node(channel)
+        node_mock = self.hdawg.device.awgs[channel // 2]
 
         self.hdawg.get_node_int(node, channel)
 
@@ -703,7 +703,7 @@ class TestHDAWG(unittest.TestCase):
         self._check_set_value_int(node, value)
 
         channel = 5
-        node_mock = self.hdawg._get_awg_node(channel)
+        node_mock = self.hdawg.device.awgs[channel // 2]
 
         self.hdawg.set_node_int(node, value, channel)
 
@@ -719,7 +719,7 @@ class TestHDAWG(unittest.TestCase):
         self.assertEqual(result, value)
 
         channel = 4
-        node_mock = self.hdawg._get_awg_node(channel)
+        node_mock = self.hdawg.device.awgs[channel // 2]
 
         self.hdawg.get_node_double(node, channel)
 
@@ -733,7 +733,7 @@ class TestHDAWG(unittest.TestCase):
         self._check_set_value_double(node, value)
 
         channel = 7
-        node_mock = self.hdawg._get_awg_node(channel)
+        node_mock = self.hdawg.device.awgs[channel // 2]
 
         self.hdawg.set_node_double(node, value, channel)
 
@@ -1038,7 +1038,7 @@ class TestHDAWG(unittest.TestCase):
         markers = [7, 8, 9]
 
         expected_call = call().__setitem__(index, (wave1, wave2, markers))
-        core_0 = self.hdawg._get_awg_node(core)
+        core_0 = self.hdawg.device.awgs[core]
 
         with unittest.mock.patch(
             "qmi.instruments.zurich_instruments.hdawg.Waveforms"
@@ -1062,7 +1062,7 @@ class TestHDAWG(unittest.TestCase):
         wave2 = None
         markers = np.array([7, 8, 9])
 
-        core_0 = self.hdawg._get_awg_node(core)
+        core_0 = self.hdawg.device.awgs[core]
 
         with unittest.mock.patch(
             "qmi.instruments.zurich_instruments.hdawg.Waveforms"
@@ -1172,13 +1172,18 @@ class TestHDAWG(unittest.TestCase):
         [utils_patch.assert_has_calls(c[2]) for c in expected_utils_calls]
 
     def test_get_schema(self):
-        """Test getting a schema for a channel."""
-        channel = 0
-        node_mock = self.hdawg._get_awg_node(channel)
+        """Test getting a schema for a core index."""
+        core_index = 0  # Equal to core number
+        node_mock = self.hdawg.device.awgs[core_index]
 
-        _ = self.hdawg.get_schema(channel)
+        _ = self.hdawg.get_schema(core_index)
 
         node_mock.commandtable.load_validation_schema.assert_called_once_with()
+
+    def test_get_schema_wrong_index(self):
+        """Test getting schema excepts at wrong index."""
+        with self.assertRaises(ValueError):
+            self.hdawg.get_schema(4)
 
     def test_upload_command_table(self):
         """Test command table upload."""
@@ -1335,30 +1340,37 @@ class TestHDAWG(unittest.TestCase):
         channel_1 = 3
         channel_2 = 7
 
-        node_mock_1 = self.hdawg._get_awg_node(channel_1)
-        node_mock_2 = self.hdawg._get_awg_node(channel_2)
+        node_mock_1 = self.hdawg.device.awgs[channel_1 // 2]
+        node_mock_2 = self.hdawg.device.awgs[channel_2 // 2]
 
-        self.hdawg.enable_sequencer(channel_1)
+        index_1 = channel_1 // (2 ** (self.grouping + 1))
+        self.hdawg.enable_sequencer(index_1)
         node_mock_1.enable_sequencer.assert_called_once_with(single=True)
         node_mock_1.reset_mock()
 
-        self.hdawg.enable_sequencer(channel_2, False)
+        index_2 = channel_2 // (2 ** (self.grouping + 1))
+        self.hdawg.enable_sequencer(index_2, False)
         node_mock_2.enable_sequencer.assert_called_once_with(single=False)
+
+    def test_enable_sequencer_excepts(self):
+        """Test that the enable_sequencer excepts with wrong AWG core index."""
+        with self.assertRaises(ValueError):
+            self.hdawg.enable_sequencer(-1)
 
     def test_channel_ready(self):
         """Test channel_ready when it is ready."""
         channel = 2
-        node_mock = self.hdawg._get_awg_node(channel)
+        node_mock = self.hdawg.device.awgs[channel // 2]
 
         ready = self.hdawg.channel_ready(channel)
 
         node_mock.ready.assert_called_once_with()
         self.assertTrue(ready)
 
-    def test_channel_ready_excepts(self):
-        """Test channel_ready when it is ready."""
+    def test_channel_ready_not(self):
+        """Test channel_ready when it is not ready."""
         channel = 2
-        node_mock = self.hdawg._get_awg_node(channel)
+        node_mock = self.hdawg.device.awgs[channel // 2]
         node_mock.ready.return_value = False
         self.hdawg.COMPILE_TIMEOUT = 0.05
         self.hdawg.UPLOAD_TIMEOUT = 0.05
@@ -1368,15 +1380,26 @@ class TestHDAWG(unittest.TestCase):
 
         self.assertFalse(not_ready)
 
+    def test_channel_ready_excepts(self):
+        """Test that channel_ready excepts at wrong core index."""
+        with self.assertRaises(ValueError):
+            self.hdawg.channel_ready(4)
+
     def test_wait_done(self):
         """Test wait_done call."""
         channel = 6
         timeout = 0.0
-        channel_mock = self.hdawg._get_awg_node(channel)
+        channel_mock = self.hdawg.device.awgs[channel // 2]
+        index = channel // (2 ** (self.grouping + 1))
 
-        self.hdawg.wait_done(channel, timeout)
+        self.hdawg.wait_done(index, timeout)
 
         channel_mock.wait_done.assert_called_once_with(timeout=timeout)
+
+    def test_wait_done_excepts(self):
+        """Test wait_done excepts at wrong core index number."""
+        with self.assertRaises(ValueError):
+            self.hdawg.wait_done(4)
 
     def test_get_awg_module_index(self):
         """Test gettings AWG module index."""
@@ -1395,10 +1418,10 @@ class TestHDAWG(unittest.TestCase):
         self.hdawg.get_awg_enabled(3)
         self._device.awgs[3].enable.assert_called_once_with()
 
-    def test_get_awg_enabled_invalid_cores(self):
-        """Test getting AWG core enable states with wrong core numbers"""
+    def test_get_awg_enabled_invalid_indexes(self):
+        """Test getting AWG core enable states with wrong core index numbers"""
         with self.assertRaises(ValueError):
-            self.hdawg.get_awg_enabled(9)
+            self.hdawg.get_awg_enabled(4)
 
         with self.assertRaises(ValueError):
             self.hdawg.get_awg_enabled(-1)
@@ -1412,9 +1435,9 @@ class TestHDAWG(unittest.TestCase):
         self._device.awgs[3].enable.assert_called_once_with(0)
 
     def test_set_awg_enabled_invalid_values(self):
-        """Test AWG core enable on/off with invalid inputs"""
+        """Test AWG core index enable on/off with invalid inputs"""
         with self.assertRaises(ValueError):
-            self.hdawg.set_awg_enabled(9, 1)
+            self.hdawg.set_awg_enabled(4, 1)
 
         with self.assertRaises(ValueError):
             self.hdawg.set_awg_enabled(0, 3)
@@ -1987,8 +2010,8 @@ class TestHDAWG(unittest.TestCase):
 
     def test_set_dio_valid_index(self):
         """Test DIO VALID signal index setting."""
-        core_0 = self.hdawg._get_awg_node(0)
-        core_3 = self.hdawg._get_awg_node(3)
+        core_0 = self.hdawg.device.awgs[0]
+        core_3 = self.hdawg.device.awgs[3]
 
         self.hdawg.set_dio_valid_index(0, 0)
         self.hdawg.set_dio_valid_index(0, 31)
@@ -2016,8 +2039,8 @@ class TestHDAWG(unittest.TestCase):
 
     def test_set_dio_polarity(self):
         """Test DIO polarity setting."""
-        core_0 = self.hdawg._get_awg_node(0)
-        core_3 = self.hdawg._get_awg_node(3)
+        core_0 = self.hdawg.device.awgs[0]
+        core_3 = self.hdawg.device.awgs[3]
         self.hdawg.set_dio_polarity(0, 0)
         self.hdawg.set_dio_polarity(0, 3)
         self.hdawg.set_dio_polarity(3, 0)
@@ -2044,8 +2067,8 @@ class TestHDAWG(unittest.TestCase):
 
     def test_set_dio_polarity_with_strings(self):
         """Test DIO polarity setting with string values."""
-        core_0 = self.hdawg._get_awg_node(0)
-        core_3 = self.hdawg._get_awg_node(3)
+        core_0 = self.hdawg.device.awgs[0]
+        core_3 = self.hdawg.device.awgs[3]
         self.hdawg.set_dio_polarity(0, "none")
         self.hdawg.set_dio_polarity(0, "both")
         self.hdawg.set_dio_polarity(3, "0")

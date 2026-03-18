@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 import warnings
 
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_ApplicationException, QMI_RuntimeException, QMI_TimeoutException
+from qmi.core.exceptions import QMI_ApplicationException, QMI_RuntimeException, QMI_TimeoutException, QMI_UsageException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 
@@ -279,10 +279,6 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         return markers, wave1, wave2
 
-    def _get_awg_node(self, awg_channel: int) -> "awg.AWG":
-        """Get correct AWG node for given AWG channel."""
-        return self.device.awgs[awg_channel // 2]
-
     def _get_awg_cores_for_index(self, awg_index: int) -> list[int]:
         """Get valid AWG core number or numbers for AWG index, based on current grouping mode."""
         if self._grouping == 2:
@@ -299,112 +295,112 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
         return awg_index
 
-    def _get_int(self, node_path: str, awg_channel: None | int = None) -> int:
+    def _get_int(self, node_path: str, awg_core: None | int = None) -> int:
         """Get an integer value from the nodetree.
 
         Parameters:
-            node_path:   The path to the node to be queried.
-            awg_channel: Optional, an AWG channel to get the node for. Default is None.
+            node_path: The path to the node to be queried.
+            awg_core:  Optional, an AWG core number of the node. Default is None.
 
         Returns:
-            integer: Value from node tree.
+            integer:   Value from node tree.
         """
         if not node_path.startswith(f"/{self._device_name}"):
             node_path = f"/{self._device_name}/{node_path}".replace("//", "/")
 
-        if awg_channel is not None:
-            awg_node = self._get_awg_node(awg_channel)
+        if awg_core is not None:
+            awg_node = self.device.awgs[awg_core]
             return awg_node.root.connection.getInt(node_path)
 
         return self.daq_server.getInt(node_path)
 
-    def _get_double(self, node_path: str, awg_channel: None | int = None) -> float:
+    def _get_double(self, node_path: str, awg_core: None | int = None) -> float:
         """Get a double value from the nodetree.
 
         Parameters:
-            node_path:   The path to the node to be queried.
-            awg_channel: Optional, an AWG channel to get the node for. Default is None.
+            node_path: The path to the node to be queried.
+            awg_core:  Optional, an AWG core number of the node. Default is None.
 
         Returns:
-            double: Value from node tree.
+            double:    Value from node tree.
         """
         if not node_path.startswith(f"/{self._device_name}"):
             node_path = f"/{self._device_name}/{node_path}".replace("//", "/")
 
-        if awg_channel is not None:
-            awg_node = self._get_awg_node(awg_channel)
+        if awg_core is not None:
+            awg_node = self.device.awgs[awg_core]
             return awg_node.root.connection.getDouble(node_path)
 
         return self.daq_server.getDouble(node_path)
 
-    def _get_string(self, node_path: str, awg_channel: None | int = None) -> str:
+    def _get_string(self, node_path: str, awg_core: None | int = None) -> str:
         """Get a string value from the nodetree.
 
         Parameters:
-            node_path:   The path to the node to be queried.
-            awg_channel: Optional, an AWG channel to get the node for. Default is None.
+            node_path: The path to the node to be queried.
+            awg_core:  Optional, an AWG core number of the node. Default is None.
 
         Returns:
-            string: Value from node tree.
+            string:    Value from node tree.
         """
         if not node_path.startswith(f"/{self._device_name}"):
             node_path = f"/{self._device_name}/{node_path}".replace("//", "/")
 
-        if awg_channel is not None:
-            awg_node = self._get_awg_node(awg_channel)
+        if awg_core is not None:
+            awg_node = self.device.awgs[awg_core]
             return awg_node.root.connection.getString(node_path)
 
         return self.daq_server.getString(node_path)
 
-    def _set_value(self, node_path: str, value: str | int | float, awg_channel: None | int = None) -> None:
+    def _set_value(self, node_path: str, value: str | int | float, awg_core: None | int = None) -> None:
         """Set a value in the nodetree. Can be a string, integer, or a floating point number.
 
         Parameters:
-            node_path:   The path to the node to be queried.
-            value:       Value to set for the node.
-            awg_channel: Optional, an AWG channel to get the node for. Default is None.
+            node_path: The path to the node to be queried.
+            value:     Value to set for the node.
+            awg_core:  Optional, an AWG core number of the node. Default is None.
         """
         if not node_path.startswith(f"/{self._device_name}"):
             node_path = f"/{self._device_name}/{node_path}".replace("//", "/")
 
-        if awg_channel is not None:
-            awg_node = self._get_awg_node(awg_channel)
+        if awg_core is not None:
+            awg_node = self.device.awgs[awg_core]
             awg_node.root.connection.set(node_path, value)
             return
 
         self.daq_server.set(node_path, value)
 
-    def _set_int(self, node_path: str, value: int, awg_channel: None | int = None) -> None:
+    def _set_int(self, node_path: str, value: int, awg_core: None | int = None) -> None:
         """Set an integer value in the device node tree.
 
         Parameters:
-            node_path:   Path in the device tree, relative to the "/devNNNN/" subtree.
-            value:       Integer value to write.
-            awg_channel: Optional, an AWG channel to get the node for. Default is None.
+            node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
+            value:     Integer value to write.
+            awg_core:  Optional, an AWG core number of the node. Default is None.
         """
         if not node_path.startswith(f"/{self._device_name}"):
             node_path = f"/{self._device_name}/{node_path}".replace("//", "/")
 
-        if awg_channel is not None:
-            awg_node = self._get_awg_node(awg_channel)
+        if awg_core is not None:
+            awg_node = self.device.awgs[awg_core]
             awg_node.root.connection.set(node_path, value)
             return
 
         self.daq_server.setInt(node_path, value)
 
-    def _set_double(self, node_path: str, value: float, awg_channel: None | int = None) -> None:
+    def _set_double(self, node_path: str, value: float, awg_core: None | int = None) -> None:
         """Set a floating point value in the device node tree.
 
         Parameters:
-            node_path:   Path in the device tree, relative to the "/devNNNN/" subtree.
-            value:       Floating point value to write.
-            awg_channel: Optional, an AWG channel to get the node for. Default is None.
+            node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
+            value:     Floating point value to write.
+            awg_core:  Optional, an AWG core number of the node. Default is None.
         """
         if not node_path.startswith(f"/{self._device_name}"):
             node_path = f"/{self._device_name}/{node_path}".replace("//", "/")
 
-        if awg_channel is not None:
-            awg_node = self._get_awg_node(awg_channel)
+        if awg_core is not None:
+            awg_node = self.device.awgs[awg_core]
             awg_node.root.connection.set(node_path, value)
             return
 
@@ -604,23 +600,23 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         )
 
     @rpc_method
-    def get_node_string(self, node_path: str, awg_channel: None | int = None) -> str:
+    def get_node_string(self, node_path: str, awg_core: None | int = None) -> str:
         """Get a string value for the node.
 
         Parameters:
             node_path: The node to query.
-            awg_channel: Optional, an AWG channel to get the node for. Default is None.
+            awg_core:  Optional, an AWG core number of the node. Default is None.
 
         Returns:
-            string: Value for the given node.
+            string:    Value from the given node path.
         """
         self._check_is_open()
         _logger.info("[%s] Getting string value for node [%s]", self._name, node_path)
 
-        return self._get_string(node_path, awg_channel)
+        return self._get_string(node_path, awg_core)
 
     @rpc_method
-    def set_node_value(self, node_path: str, value: int | float | str, awg_channel: None | int = None) -> None:
+    def set_node_value(self, node_path: str, value: int | float | str, awg_core: None | int = None) -> None:
         """Write a value to the device node tree.
 
         Requires LabOne version 21.08 or newer.
@@ -628,50 +624,57 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Parameters:
             node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
             value:     Value to write.
+            awg_core:  Optional, an AWG core number of the node. Default is None.
         """
-        self._set_value(node_path, value, awg_channel)
+        self._set_value(node_path, value, awg_core)
 
     @rpc_method
-    def get_node_int(self, node_path: str, awg_channel: None | int = None) -> int:
+    def get_node_int(self, node_path: str, awg_core: None | int = None) -> int:
         """Get an integer value in the device node tree.
 
         Parameters:
-            node_path:   Path in the device tree, relative to the "/devNNNN/" subtree.
-            awg_channel: Optional, an AWG channel to get the node for. Default is None.
+            node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
+            awg_core:  Optional, an AWG core number of the node. Default is None.
+
+        Returns:
+            integer:   Value from node tree.
         """
-        return self._get_int(node_path, awg_channel)
+        return self._get_int(node_path, awg_core)
 
     @rpc_method
-    def set_node_int(self, node_path: str, value: int, awg_channel: None | int = None) -> None:
+    def set_node_int(self, node_path: str, value: int, awg_core: None | int = None) -> None:
         """Set an integer value in the device node tree.
 
         Parameters:
-            node_path:   Path in the device tree, relative to the "/devNNNN/" subtree.
-            value:       Integer value to write.
-            awg_channel: Optional, an AWG channel to get the node for. Default is None.
+            node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
+            value:     Integer value to write.
+            awg_core:  Optional, an AWG core number of the node. Default is None.
         """
-        self._set_int(node_path, value, awg_channel)
+        self._set_int(node_path, value, awg_core)
 
     @rpc_method
-    def get_node_double(self, node_path: str, awg_channel: None | int = None) -> float:
+    def get_node_double(self, node_path: str, awg_core: None | int = None) -> float:
         """Get a floating point value in the device node tree.
 
         Parameters:
-            node_path:   Path in the device tree, relative to the "/devNNNN/" subtree.
-            awg_channel: Optional, an AWG channel to get the node for. Default is None.
+            node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
+            awg_core:  Optional, an AWG core number of the node. Default is None.
+
+        Returns:
+            double:    Value from node tree.
         """
-        return self._get_double(node_path, awg_channel)
+        return self._get_double(node_path, awg_core)
 
     @rpc_method
-    def set_node_double(self, node_path: str, value: float, awg_channel: None | int = None) -> None:
+    def set_node_double(self, node_path: str, value: float, awg_core: None | int = None) -> None:
         """Set a floating point value in the device node tree.
 
         Parameters:
-            node_path:   Path in the device tree, relative to the "/devNNNN/" subtree.
-            value:       Floating point value to write.
-            awg_channel: Optional, an AWG channel to get the node for. Default is None.
+            node_path: Path in the device tree, relative to the "/devNNNN/" subtree.
+            value:     Floating point value to write.
+            awg_core:  Optional, an AWG core number of the node. Default is None.
         """
-        self._set_double(node_path, value, awg_channel)
+        self._set_double(node_path, value, awg_core)
 
     @rpc_method
     def get_channel_grouping(self) -> int:
@@ -870,35 +873,39 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
 
     @rpc_method
     def validate_waveforms(
-        self,
-        awg_channel: int,
-        waveforms: Waveforms,
+        self, waveforms: Waveforms,
         compiled_sequencer_program: None | bytes = None,
+        awg_core: int = None
     ) -> None:
         """Validate if the waveforms match the sequencer program.
 
         Parameters:
-            awg_channel:                AWG channel number [0-7].
             waveforms:                  Waveforms to validate.
-            compiled_sequencer_program: Optional sequencer program.
-                                        If this is not provided then information from the device is used.
+            compiled_sequencer_program: Optional sequencer program. If this is not provided then information from the
+                                        device is used.
+            awg_core:                   Optional AWG core number. This must be given if no compiled sequencer program
+                                        was given as an input. If both are given as an input, this input is ignored.
         """
+        if compiled_sequencer_program is None and awg_core is None:
+            raise QMI_UsageException("Either a compiled sequencer program or AWG core number must be given as input.")
+
         self._check_is_open()
         _logger.info("[%s] Validating waveforms", self._name)
-        # Get the AWG node/core
-        awg_node = self._get_awg_node(awg_channel)
-        waveforms.validate(
-            compiled_sequencer_program if compiled_sequencer_program else awg_node.waveform.descriptors()
-        )
+        if compiled_sequencer_program is not None:
+            waveforms.validate(compiled_sequencer_program)
+
+        else:
+            # Get the AWG node for core and validate
+            awg_node = self.device.awgs[awg_core]
+            waveforms.validate(awg_node.waveform.descriptors())
 
     @rpc_method
-    def upload_waveform(
-        self,
-        awg_channel: int,
+    def upload_waveform(self,
+        awg_core: int,
         waveform_index: int,
         wave1: np.ndarray,
         wave2: None | np.ndarray = None,
-        markers: None | np.ndarray = None,
+        markers: None | np.ndarray = None
     ) -> None:
         """Upload new waveform data to the AWG.
 
@@ -912,7 +919,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         This can be inspected in the "Waveform Viewer" in the LabOne user interface.
 
         Parameters:
-            awg_channel:     AWG channel number [0-7].
+            awg_core:        AWG core number [0-3].
             waveform_index:  0-based index of the waveform array.
             wave1:           Array containing waveform floating point samples in range -1.0 .. +1.0
                              for the first core channel. Note that if wave1 is a complex array, the
@@ -927,9 +934,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         markers, wave1, wave2 = self._control_waveform_inputs(markers, wave1, wave2)
 
         waveform[waveform_index] = (wave1, wave2, markers)
-        self.validate_waveforms(awg_channel, waveform)
+        self.validate_waveforms(waveform, awg_core=awg_core)
         # Get the AWG node
-        awg_node = self._get_awg_node(awg_channel)
+        awg_node = self.device.awgs[awg_core]
         awg_node.write_to_waveform_memory(waveform)
 
     @rpc_method
@@ -973,19 +980,23 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             self.daq_server.set(waves_set)
 
     @rpc_method
-    def get_schema(self, awg_channel: int) -> dict[str, Any]:
+    def get_schema(self, awg_index: int) -> dict[str, Any]:
         """Get the schema for the respective core of the channel from the device.
 
         Parameters:
-            awg_channel: AWG channel number [0-7].
+            awg_index: AWG core index number.
 
         Returns:
             schema: The node's validation schema.
         """
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
+
         self._check_is_open()
-        _logger.info("[%s] Getting schema for channel [%d]", self._name, awg_channel)
-        # Get the AWG node/core
-        awg_node = self._get_awg_node(awg_channel)
+        _logger.info("[%s] Getting schema for channel [%d]", self._name, awg_index)
+        # Get the AWG node from index
+        awg_core = self._awg_index_to_awg_core(awg_index)
+        awg_node = self.device.awgs[awg_core]
 
         return awg_node.commandtable.load_validation_schema()
 
@@ -1069,26 +1080,41 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         self._session.sync()
 
     @rpc_method
-    def enable_sequencer(self, awg_channel: int, disable_when_finished: bool = True) -> None:
+    def enable_sequencer(self, awg_index: int, disable_when_finished: bool = True) -> None:
         """Enable the sequencer.
 
         Parameters:
-            awg_channel:           AWG channel number [0-7].
+            awg_index:             AWG core index number.
             disable_when_finished: Flag to disable sequencer after it finishes execution. Default is True.
         """
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
+
         self._check_is_open()
         _logger.info("[%s] Enabling sequencer", self._name)
-        # Get the AWG node/core
-        awg_node = self._get_awg_node(awg_channel)
+        # Get the AWG node from index
+        awg_core = self._awg_index_to_awg_core(awg_index)
+        awg_node = self.device.awgs[awg_core]
         awg_node.enable_sequencer(single=disable_when_finished)
 
     @rpc_method
-    def channel_ready(self, awg_channel: int) -> bool:
+    def channel_ready(self, awg_index: int) -> bool:
         """Query if the AWG channel is ready. Recommended to use after respective channel's
-        'load_sequencer_program' call."""
+        'load_sequencer_program' call.
+
+        Parameters:
+            awg_index: AWG module index number.
+
+        Returns:
+            boolean:   True for ready, False for busy.
+        """
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
+
         start_time = time.monotonic()
-        # Get the AWG node/core
-        awg_node = self._get_awg_node(awg_channel)
+        # Get the AWG node from index
+        awg_core = self._awg_index_to_awg_core(awg_index)
+        awg_node = self.device.awgs[awg_core]
         while not awg_node.ready():
             time.sleep(self.POLL_PERIOD)
             if time.monotonic() - start_time > (self.COMPILE_TIMEOUT + self.UPLOAD_TIMEOUT):
@@ -1097,17 +1123,21 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         return True
 
     @rpc_method
-    def wait_done(self, awg_channel: int, timeout: float = 10.0) -> None:
+    def wait_done(self, awg_index: int, timeout: float = 10.0) -> None:
         """Wait for AWG sequencer to finish.
 
         Parameters:
-            awg_channel: AWG channel number [0-7].
-            timeout:     Optional timeout in seconds. Default is 10s.
+            awg_index: AWG core index number.
+            timeout:   Optional timeout in seconds. Default is 10s.
         """
+        if awg_index not in self.valid_awg_index_map:
+            raise ValueError(f"Invalid AWG index number {awg_index} for grouping mode {self._grouping}.")
+
         self._check_is_open()
         _logger.info("[%s] Waiting for sequencer to finish", self._name)
-        # Get the AWG node/core
-        awg_node = self._get_awg_node(awg_channel)
+        # Get the AWG node from index
+        awg_core = self._awg_index_to_awg_core(awg_index)
+        awg_node = self.device.awgs[awg_core]
         awg_node.wait_done(timeout=timeout)
 
     @rpc_method
