@@ -33,21 +33,28 @@ _logger = logging.getLogger(__name__)
 
 
 class Thorlabs_K10CRxBase(QMI_Instrument):
-    """Instrument driver for the Thorlabs K10CRX/M motorized rotational mount."""
+    """Instrument driver for the Thorlabs K10CRX/M motorized rotational mount.
+    
+    Attributes:
+        RESPONSE_TIMEOUT:      The default response timeout of 1.0 seconds for APT protocol queries.
+        MICROSTEPS_PER_DEGREE: Number of microsteps per degree of rotation. 
+                               Full revolution is 409600 micro-steps with rotation of 3 degrees.
+        VELOCITY_FACTOR:       Internal velocity factor for 1 degree/second.
+        MAX_VELOCITY:          Maximum velocity in degrees/second. This set to 0 as it changes depending on
+                               the exact K10CRx model, and will be overriden in the respective child class.
+        ACCELERATION_FACTOR:   Internal acceleration factor for 1 degree/second/second for the mount.
+                               The value is based on K10CR1 as no data for K10CR2 found.
+        MAX_ACCELERATION:      Maximum acceleration in degrees/second^2.
+    """
     _rpc_constants = ["RESPONSE_TIMEOUT", "MAX_VELOCITY", "MAX_ACCELERATION"]
 
     RESPONSE_TIMEOUT = 1.0
-
-    # Number of microsteps per degree of rotation. Full revolution is 409600 micro-steps with rotation of 3 degrees.
-    MICROSTEPS_PER_DEGREE = 409600.0 / 3.0
-
-    # Internal velocity factor for 1 degree/second. Maximum velocity in degrees/second
-    VELOCITY_FACTOR = 7329109.0
     MAX_VELOCITY = 0
-
-    # Internal acceleration factor for 1 degree/second/second. Maximum acceleration in degrees/second^2
-    ACCELERATION_FACTOR = 1502.0  # Based on K10CR1 as no data for K10CR2 found
     MAX_ACCELERATION = 20
+
+    MICROSTEPS_PER_DEGREE = 409600.0 / 3.0
+    VELOCITY_FACTOR = 7329109.0
+    ACCELERATION_FACTOR = 1502.0  # Based on K10CR1 as no data for K10CR2 found
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize driver.
