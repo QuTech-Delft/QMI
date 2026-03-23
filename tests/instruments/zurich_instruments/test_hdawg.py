@@ -1357,18 +1357,18 @@ class TestHDAWG(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.hdawg.enable_sequencer(-1)
 
-    def test_channel_ready(self):
-        """Test channel_ready when it is ready."""
+    def test_sequencer_ready(self):
+        """Test sequencer_ready when it is ready."""
         channel = 2
         node_mock = self.hdawg.device.awgs[channel // 2]
 
-        ready = self.hdawg.channel_ready(channel)
+        ready = self.hdawg.sequencer_ready(channel)
 
         node_mock.ready.assert_called_once_with()
         self.assertTrue(ready)
 
-    def test_channel_ready_not(self):
-        """Test channel_ready when it is not ready."""
+    def test_sequencer_ready_not(self):
+        """Test sequencer_ready when it is not ready."""
         channel = 2
         node_mock = self.hdawg.device.awgs[channel // 2]
         node_mock.ready.return_value = False
@@ -1376,14 +1376,14 @@ class TestHDAWG(unittest.TestCase):
         self.hdawg.UPLOAD_TIMEOUT = 0.05
         self.hdawg.POLL_PERIOD = 0.05
 
-        not_ready = self.hdawg.channel_ready(channel)
+        not_ready = self.hdawg.sequencer_ready(channel)
 
         self.assertFalse(not_ready)
 
-    def test_channel_ready_excepts(self):
-        """Test that channel_ready excepts at wrong core index."""
+    def test_sequencer_ready_excepts(self):
+        """Test that sequencer_ready excepts at wrong core index."""
         with self.assertRaises(ValueError):
-            self.hdawg.channel_ready(4)
+            self.hdawg.sequencer_ready(4)
 
     def test_wait_done(self):
         """Test wait_done call."""

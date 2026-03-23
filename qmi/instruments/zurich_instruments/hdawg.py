@@ -714,6 +714,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         Returns:
             index: AWG module index number.
         """
+        warnings.warn(
+            f"{self.get_awg_module_index.__name__} will be deprecated.", DeprecationWarning
+        )
         return self.awg_module.getInt("index")
 
     @rpc_method
@@ -1098,9 +1101,9 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         awg_node.enable_sequencer(single=disable_when_finished)
 
     @rpc_method
-    def channel_ready(self, awg_index: int) -> bool:
-        """Query if the AWG channel is ready. Recommended to use after respective channel's
-        'load_sequencer_program' call.
+    def sequencer_ready(self, awg_index: int) -> bool:
+        """Query if the sequencer[s] has[|have] been loaded and ready to use. Recommended to use after respective
+        channel's 'load_sequencer_program' call.
 
         Parameters:
             awg_index: AWG module index number.
