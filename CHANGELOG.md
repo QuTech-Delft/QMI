@@ -9,11 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `run` method in `QMI_Context` class to accommodate for `threading.Thread` changes in Python 3.14.
 - `standard-xdrlib` from "dead batteries" as a dependency to fix issues coming from removal of `xdrlib` from standard library.
+- `grouping=2` input parameter in the `ZurichInstruments_Hdawg` to enable initialization directly in wanted grouping mode.
+- Addition of new methods in Zurich Instruments HDAWG QMI driver. For example, now it is also possible to upload sequencer programs, command tables and waveforms to specific AWG channel or AWG (core) index. Also setting DIO VALID index and polarity is now possible.
+- Python 3.14 CI pipelines.
 
 ### Changed
+- API changing Zurich Instruments HDAWG QMI driver refactoring to be based mainly on the zhinst.toolkit package to allow easier 4x2 and 2x4 grouping modes and use. The driver now uses also `zhinst-toolkit` package as basis.
+- DeprecationWarning on the `set|get_output_amplitude` methods in the HDAWG driver, as the new firmware points to rather using `outputs/n/gains/n`. Use `set|get_output_gain` from now on.
 
 ### Fixed
 - Moving of `_snicaddr` in psutil package v2.7 from `_common` to `_ntuples` module, which caused an error with `qmi_proc`.
+- Process management logging path now resolves correctly also for cases where the config file path starts with the `~`, indicating home directory location.
+- Issue with Python 3.14 compatibility in `QMI_Context` class. Addition of `run` method with specific input parameter fixes the issue.
 
 ### Removed
 - Removed `xdrlib-py` import for Python 3.13 version, where it was needed for python-vxi11 package.
