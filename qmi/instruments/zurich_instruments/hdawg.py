@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     import zhinst.core
     import zhinst.toolkit
     import zhinst.toolkit.driver
-    import zhinst.toolkit.driver.nodes.awg as awg
     import zhinst.toolkit.exceptions
     import zhinst.utils
     from zhinst.core import ziDAQServer
@@ -31,7 +30,7 @@ if TYPE_CHECKING:
     from zhinst.toolkit.driver.devices import HDAWG
     from zhinst.toolkit.driver.modules.base_module import ZIModule
 else:
-    zhinst, awg = None, None
+    zhinst = None
     ziDAQServer, HDAWG, Waveforms, ZIModule = None, None, None, None
 
 # Global variable holding the logger for this module.
@@ -60,13 +59,12 @@ def _import_modules() -> None:
     to avoid an unnecessary dependency for programs that do not access
     the instrument directly.
     """
-    global zhinst, awg, ziDAQServer, Waveforms, HDAWG, ZIModule
+    global zhinst, ziDAQServer, Waveforms, HDAWG, ZIModule
     if zhinst is None:
         import zhinst
         import zhinst.core
         import zhinst.toolkit
         import zhinst.toolkit.driver
-        import zhinst.toolkit.driver.nodes.awg as awg
         import zhinst.toolkit.exceptions
         import zhinst.utils
         from zhinst.core import ziDAQServer
