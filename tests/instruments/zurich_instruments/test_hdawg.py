@@ -1664,7 +1664,6 @@ class TestHDAWG(unittest.TestCase):
         for channel in channels:
             gain_index = channel % 2
             gain = self.hdawg.get_output_gain(channel, gain_index)
-            print(f"{gain=}")
             core = channel // 2
             output = channel % 2
             self._check_get_value_double(f"awgs/{core}/outputs/{output}/gains/{gain_index}")
