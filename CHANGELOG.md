@@ -12,10 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `grouping=2` input parameter in the `ZurichInstruments_Hdawg` to enable initialization directly in wanted grouping mode.
 - Addition of new methods in Zurich Instruments HDAWG QMI driver. For example, now it is also possible to upload sequencer programs, command tables and waveforms to specific AWG channel or AWG (core) index. Also setting DIO VALID index and polarity is now possible.
 - Python 3.14 CI pipelines.
+- Dependency on `h5netcdf` package in `pyproject.toml`.
 
 ### Changed
 - API changing Zurich Instruments HDAWG QMI driver refactoring to be based mainly on the zhinst.toolkit package to allow easier 4x2 and 2x4 grouping modes and use. The driver now uses also `zhinst-toolkit` package as basis.
 - DeprecationWarning on the `set|get_output_amplitude` methods in the HDAWG driver, as the new firmware points to rather using `outputs/n/gains/n`. Use `set|get_output_gain` from now on.
+- All modules in `qmi.data` were made compatible also with `h5netcdf` package. It can now be used equivalently with the `h5py`-based HDF5 data files when providing `backend="h5netcdf"` input parameter on specific class initializations and calls.
 
 ### Fixed
 - Moving of `_snicaddr` in psutil package v2.7 from `_common` to `_ntuples` module, which caused an error with `qmi_proc`.

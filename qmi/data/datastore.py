@@ -3,11 +3,13 @@
 import os
 import os.path
 import re
-import shutil
 import time
-from typing import List, Optional, Any
+from typing import Any
+
 import json
+import h5netcdf
 import h5py
+import shutil
 
 from qmi.core.exceptions import QMI_UsageException
 import qmi.data.dataset
@@ -33,19 +35,14 @@ class DataFolder:
       - plotted images.
     """
 
-    def __init__(self,
-                 folder_path: str,
-                 label: Optional[str],
-                 date_str: Optional[str],
-                 time_str: Optional[str]
-                 ) -> None:
+    def __init__(self, folder_path: str, label: str | None, date_str: str | None, time_str: str | None) -> None:
         """Initialize a DataFolder instance.
 
         Parameters:
             folder_path: Path to the directory representing the DataFolder.
-            label: Optional label of the folder (indicating type of measurement)
-            date_str: Optional date code of the folder.
-            time_str: Optional time code of the folder.
+            label:       Optional label of the folder (indicating type of measurement)
+            date_str:    Optional date code of the folder.
+            time_str:    Optional time code of the folder.
 
         Raises:
             FileNotFoundError: If the specified DataFolder does not exist.
@@ -62,9 +59,38 @@ class DataFolder:
     def __repr__(self) -> str:
         return f"DataFolder({self.folder_path!r})"
 
-    def write_config(self, config: Any) -> None:
-        """Write QMI configuration to a file in the data folder.
+    def _hdf5_file(self, name: str, mode: str, backend: str) -> h5py.File | h5netcdf.File:
+        """Create a new, or open, HDF5 file in the data folder.
+
+        Parameters:
+            name:    Base name of the HDF5 file, without the extension ".h5".
+            mode:    File mode.
+            backend: Backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
+
+        Returns:
+            A `File` object representing the HDF5 file.
+
+        Raises:
+            ValueError: If the `name` has non-latin character(s).
+            ValueError: Invalid HDF5 file backend.
         """
+        if not re.match(r"^[-_a-zA-Z0-9(),]+$", name):
+            raise ValueError(f"Invalid name {name!r}")
+
+        filename = name + ".h5"
+        file_path = os.path.join(self.folder_path, filename)
+
+        if backend == "h5py":
+            return h5py.File(file_path, mode=mode)
+
+        elif backend == "h5netcdf":
+            return h5netcdf.File(file_path, mode=mode, decode_vlen_strings=False)
+
+        else:
+            raise ValueError(f"Invalid backend type {backend}")
+
+    def write_config(self, config: Any) -> None:
+        """Write QMI configuration to a file in the data folder."""
         # Resolve file name for the config
         config_fn = ""
         if self.label:
@@ -97,30 +123,42 @@ class DataFolder:
         """
         shutil.copy2(filename, self.folder_path)
 
-    def write_dataset(self, ds: DataSet, file_format: str = "hdf5", overwrite: bool = False) -> None:
+    def write_dataset(
+        self, ds: DataSet, file_format: str = "hdf5", overwrite: bool = False, backend: str = "h5py"
+    ) -> None:
         """Write the specified DataSet to a new or existing file in the data folder.
 
         The file name will be determined from the name of the DataSet.
 
         Parameters:
-            ds: DataSet instance to write.
+            ds:          DataSet instance to write.
             file_format: File format specification.
-                "hdf5" - selects HDF5 format (default)
-                "text" - selects a space-separated text format
-            overwrite: Allow user to overwrite an existing dataset. Default is false.
+                "hdf5"     - selects HDF5 format with (default)
+                "text"     - selects a space-separated text format
+            overwrite:   Allow user to overwrite an existing dataset. Default is False.
+            backend:     Select backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
 
         Raises:
-            OSError: If the data folder already contains a file with the same name.
+            ValueError: Dataset name is invalid.
+            ValueError: Invalid HDF5 file backend.
+            OSError:    If the data folder already contains a file with the same name.
         """
-
         if not re.match(r"^[-_a-zA-Z0-9(),]+$", ds.name):
             raise ValueError(f"Invalid DataSet name {ds.name!r}")
 
         if file_format == "hdf5":
             filename = ds.name + ".h5"
             file_path = os.path.join(self.folder_path, filename)
-            with h5py.File(file_path, "w" if overwrite else "x") as f:
-                qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+            if backend == "h5py":
+                with h5py.File(file_path, "w" if overwrite else "x") as f:
+                    qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+
+            elif backend == "h5netcdf":
+                with h5netcdf.File(file_path, "w" if overwrite else "x", decode_vlen_strings=False) as f:
+                    qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+
+            else:
+                raise ValueError(f"Invalid backend type {backend}.")
 
         elif file_format == "text":
             filename = ds.name + ".dat"
@@ -129,35 +167,49 @@ class DataFolder:
                 qmi.data.dataset.write_dataset_to_text(ds, f)
 
         else:
-            raise QMI_UsageException(f"Unknown file format {file_format!r}")
+            raise QMI_UsageException(f"Unknown file format {file_format!r}.")
 
-    def read_dataset(self, name: str) -> DataSet:
+    def read_dataset(self, name: str, backend: str = "h5py") -> DataSet:
         """Read a DataSet from the data folder.
 
         The file name and format will be determined from the name of
         the DataSet and the contents of the data folder.
 
         Parameters:
-            name: Name of the dataset.
+            name:    Name of the dataset.
+            backend: Select backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
 
         Returns:
-            DataSet instance loaded from the data folder.
+            DataSet: Instance loaded from the data folder.
 
         Raises:
+            ValueError:        Dataset name is invalid.
+            ValueError:        Invalid HDF5 file backend.
             FileNotFoundError: If the data folder does not contain the specified dataset.
         """
-
         # Check that the name is safe (no path names).
         if os.path.split(name)[0]:
             raise ValueError(f"Invalid dataset name {name!r}")
 
         # Look for a HDF5 file with matching name.
         file_path = os.path.join(self.folder_path, name + ".h5")
-        if os.path.isfile(file_path):
-            with h5py.File(file_path, "r") as f:
-                if name not in f:
-                    raise FileNotFoundError(f"No dataset {name!r} found in {file_path}")
-                return qmi.data.dataset.read_dataset_from_hdf5(f[name])
+        if os.path.isfile(file_path):        
+            if backend == "h5py":
+                with h5py.File(file_path, "r") as f:
+                    if name not in f:
+                        raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
+
+                    return qmi.data.dataset.read_dataset_from_hdf5(f[name])
+
+            elif backend == "h5netcdf":
+                with h5netcdf.File(file_path, "r", decode_vlen_strings=False) as f:
+                    if name not in f:
+                        raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
+
+                    return qmi.data.dataset.read_dataset_from_hdf5(f[name], f)
+                
+            else:
+                raise ValueError(f"Invalid backend type {backend}.")
 
         # Look for a text file with matching name.
         file_path = os.path.join(self.folder_path, name + ".dat")
@@ -168,52 +220,36 @@ class DataFolder:
         # File not found.
         raise FileNotFoundError(f"No dataset {name!r} found in {self.folder_path}")
 
-    def make_hdf5file(self, name: str) -> h5py.File:
+    def make_hdf5file(self, name: str, backend: str = "h5py") -> h5py.File | h5netcdf.File:
         """Create a new HDF5 file in the data folder.
 
         An error occurs if the specified file already exists.
 
         Parameters:
-            name: Base name of the HDF5 file, without the extension ".h5".
+            name:    Base name of the HDF5 file, without the extension ".h5".
+            backend: Select backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
 
         Returns:
             A `File` object representing the HDF5 file.
             See http://docs.h5py.org/ for information on how to use this object.
-
-        Raises:
-            ValueError: If the `name` has non-latin character(s).
         """
-        if not re.match(r"^[-_a-zA-Z0-9(),]+$", name):
-            raise ValueError(f"Invalid name {name!r}")
+        return self._hdf5_file(name, "x", backend)
 
-        filename = name + ".h5"
-        file_path = os.path.join(self.folder_path, filename)
-
-        return h5py.File(file_path, mode="x")
-
-    def open_hdf5file(self, name: str, write_mode: bool = False) -> h5py.File:
+    def open_hdf5file(self, name: str, write_mode: bool = False, backend: str = "h5py") -> h5py.File | h5netcdf.File:
         """Open an existing HDF5 file in the data folder.
 
         Parameters:
-            name: Base name of the HDF5 file, without the extension ".h5".
+            name:       Base name of the HDF5 file, without the extension ".h5".
             write_mode: True to open the file in read/write mode, False to open the file in read-only mode.
+            backend:    Select backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
 
         Returns:
             A `File` object representing the HDF5 file.
             See http://docs.h5py.org/ for information on how to use this object.
-
-        Raises:
-            ValueError: If the `name` has non-latin character(s).
         """
-        if not re.match(r"^[-_a-zA-Z0-9(),]+$", name):
-            raise ValueError(f"Invalid name {name!r}")
-
-        filename = name + ".h5"
-        file_path = os.path.join(self.folder_path, filename)
-
         mode = "r+" if write_mode else "r"
-        return h5py.File(file_path, mode=mode)
-
+        return self._hdf5_file(name, mode, backend)
+    
 
 class DataStore:
     """A DataStore represents a collection of stored data.
@@ -251,17 +287,14 @@ class DataStore:
         """
         self.basedir = basedir
         if not os.path.isdir(basedir):
-            raise FileNotFoundError(f"DataStore base directory {basedir!r} not found")
+            raise FileNotFoundError(f"DataStore base directory {basedir!r} not found.")
 
     def __repr__(self) -> str:
         return f"DataStore({self.basedir!r})"
 
-    def make_folder(self,
-                    label: str,
-                    timestamp: Optional[float] = None,
-                    date_str: Optional[str] = None,
-                    time_str: Optional[str] = None
-                    ) -> DataFolder:
+    def make_folder(
+        self, label: str, timestamp: float | None = None, date_str: str | None = None, time_str: str | None = None
+    ) -> DataFolder:
         """Create a new DataFolder with a unique name within the DataStore.
 
         Optionally, either "timestamp" or both "date_str" and "time_str"
@@ -269,13 +302,13 @@ class DataStore:
         When neither are specified, the current date and time will be used.
 
         Parameters:
-            label: Short label describing the measurement. This label will be part of the directory name in the
-                file system. It should not contain whitespace or strange characters.
+            label:     Short label describing the measurement. This label will be part of the directory name in the
+                       file system. It should not contain whitespace or strange characters.
             timestamp: Optional POSIX timestamp to use for the folder name.
-            date_str: Optional date code to use for the folder name. If specified, it must be a string of 8 digits in
-                YYYYmmdd format.
-            time_str: Optional time code to use for the folder name. If specified, it must be a string of 6 digits in
-                HHMMSS format.
+            date_str:  Optional date code to use for the folder name. If specified, it must be a string of 8 digits in
+                       YYYYmmdd format.
+            time_str:  Optional time code to use for the folder name. If specified, it must be a string of 6 digits in
+                       HHMMSS format.
 
         Returns:
             New DataFolder instance.
@@ -287,7 +320,7 @@ class DataStore:
         # Determine date_str and time_str.
         if (date_str is None) or (time_str is None):
             if (date_str is not None) or (time_str is not None):
-                raise ValueError("Specify both date_str and time_str or neither")
+                raise ValueError("Specify both date_str and time_str or neither.")
             # Generate date_str and time_str from timestamp.
             if timestamp is None:
                 timestamp = time.time()
@@ -297,20 +330,21 @@ class DataStore:
                 tm = time.gmtime(timestamp)
             date_str = time.strftime("%Y%m%d", tm)
             time_str = time.strftime("%H%M%S", tm)
+
         else:
             # Specified by user.
             if timestamp is not None:
-                raise ValueError("Do not specify date_str, time_str and timestamp together")
+                raise ValueError("Do not specify date_str, time_str and timestamp together.")
             if not re.match(r"^[0-9]{8}$", date_str):
-                raise ValueError("Invalid format for date_str")
+                raise ValueError("Invalid format for date_str.")
             if not re.match(r"^[0-9]{6}$", time_str):
-                raise ValueError("Invalid format for time_str")
+                raise ValueError("Invalid format for time_str.")
 
         # Check label format.
         if (not isinstance(label, str)) or (not label):
-            raise ValueError("Label must be a non-empty string")
+            raise ValueError("Label must be a non-empty string.")
         if not re.match(r"^[-_a-zA-Z0-9().,]+$", label):
-            raise ValueError("Invalid characters in label")
+            raise ValueError("Invalid characters in label.")
 
         # Ensure date subdirectory exists.
         date_path = os.path.join(self.basedir, date_str)
@@ -326,7 +360,7 @@ class DataStore:
         rel_path = _relative_folder_path(date_str, time_str, label)
         full_path = os.path.join(self.basedir, rel_path)
         if os.path.exists(full_path):
-            raise FileExistsError(f"Directory {full_path!r} already exists")
+            raise FileExistsError(f"Directory {full_path!r} already exists.")
         os.mkdir(full_path)
 
         return DataFolder(full_path, label, date_str, time_str)
@@ -337,7 +371,7 @@ class DataStore:
         Parameters:
             date_str: Date code of the DataFolder.
             time_str: Time code of the DataFolder.
-            label: Label of the DataFolder.
+            label:    Label of the DataFolder.
 
         Returns:
             The matching DataFolder.
@@ -354,10 +388,9 @@ class DataStore:
         """Open the DataFolder with the specified path in the filesystem.
 
         Parameters:
-            path: Path to the DataFolder.
-            The path may be either an absolute path,
-            or a relative path from the DataStore base directory,
-            or a relative path from the current directory.
+            path: Path to the DataFolder. The path may be either an absolute path,
+                  or a relative path from the DataStore base directory,
+                  or a relative path from the current directory.
 
         Returns:
             The matching DataFolder instance.
@@ -371,21 +404,20 @@ class DataStore:
             path = os.path.join(self.basedir, path)
 
         if not os.path.isdir(path):
-            raise FileNotFoundError(f"Data folder {path!r} not found")
+            raise FileNotFoundError(f"Data folder {path!r} not found.")
 
         return DataFolder(path, label=None, date_str=None, time_str=None)
 
-    def list_folders(self, label: Optional[str] = None) -> List[DataFolder]:
+    def list_folders(self, label: str | None = None) -> list[DataFolder]:
         """Return a list of DataFolder items in the DataStore.
 
         This function may be slow when used on a large DataStore.
 
         Parameters:
-            label: Optional folder label. When specified, only folders
-            with a matching name are returned.
+            label: Optional folder label. When specified, only folders with a matching name are returned.
 
         Returns:
-            List of matching DataFolder items.
+            ret: List of matching DataFolder items.
         """
 
         ret = []
@@ -410,13 +442,13 @@ class DataStore:
 
         return ret
 
-    def find_latest_folder(self, label: str, date_str: Optional[str] = None) -> Optional[DataFolder]:
+    def find_latest_folder(self, label: str, date_str: str | None = None) -> DataFolder | None:
         """Find the most recent matching DataFolder item.
 
         Parameters:
-            label: Folder label to search for.
+            label:    Folder label to search for.
             date_str: Optional date code to restrict the search. When not specified, the most recent matching folder
-                from any date is returned.
+                      from any date is returned.
         Returns:
             Most recent matching DataFolder, or None if no matching DataFolder exists.
         """

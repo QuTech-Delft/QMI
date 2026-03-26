@@ -39,6 +39,7 @@ dependencies = [
     # For scientific data processing and visualisation
     "numpy",
     "scipy",
+    "h5netcdf",
     "h5py>=3.7.0",
     # For hardware interfacing
     "pyserial",

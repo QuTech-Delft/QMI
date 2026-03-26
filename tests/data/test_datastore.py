@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Test datastore module."""
 
@@ -9,7 +9,8 @@ import inspect
 import json
 import time
 
-from h5py._hl.files import File
+from h5py import File
+from h5netcdf import File as NetCdfFile
 
 from qmi.data.datastore import DataFolder, DataStore
 from qmi.core.config_defs import CfgLogging
@@ -62,7 +63,7 @@ class TestDataFolder(unittest.TestCase):
             os.remove(os.path.join(os.getcwd(), "test.json"))
 
     def test_02_make_file_copy(self):
-        """Make a copy of a file"""
+        """Make a copy of a file."""
         # Arrange
         name = "test.file"
         expected_copied_file = os.path.join(os.getcwd(), name)
@@ -85,8 +86,7 @@ class TestDataFolder(unittest.TestCase):
             os.remove(expected_copied_file)
 
     def test_03_write_dataset_to_hdf5(self):
-        """Write a data set as HDF5 file.
-        """
+        """Write a data set as HDF5 file."""
         # Arrange
         dataset = _create_dataset()
         expected_file = os.path.join(os.getcwd(), dataset.name + ".h5")
@@ -99,9 +99,22 @@ class TestDataFolder(unittest.TestCase):
         finally:
             os.remove(expected_file)
 
+    def test_03b_write_dataset_to_hdf5_h5netcdf(self):
+        """Write a data set as HDF5 file with h5netcdf backend."""
+        # Arrange
+        dataset = _create_dataset()
+        expected_file = os.path.join(os.getcwd(), dataset.name + ".h5")
+        # Act
+        try:
+            self.datafolder.write_dataset(dataset, backend="h5netcdf")
+            # Assert
+            self.assertTrue(os.path.isfile(expected_file))
+
+        finally:
+            os.remove(expected_file)
+
     def test_04_write_dataset_to_dat(self):
-        """Write a data set as DAT file.
-        """
+        """Write a data set as DAT file."""
         # Arrange
         dataset = _create_dataset()
         expected_file = os.path.join(os.getcwd(), dataset.name + ".dat")
@@ -115,8 +128,7 @@ class TestDataFolder(unittest.TestCase):
             os.remove(expected_file)
 
     def test_05_write_dataset_wrong_file_format_raises_exception(self):
-        """Wrong file format string raises an expection
-        """
+        """Wrong file format string raises an expection"""
         # Arrange
         dataset = _create_dataset()
         # Act and assert
@@ -124,7 +136,7 @@ class TestDataFolder(unittest.TestCase):
             self.datafolder.write_dataset(dataset, file_format="boh")
 
     def test_06_read_dataset_in_hdf5(self):
-        """See that we can read in a data set in HDF5 format"""
+        """See that we can read in a data set in HDF5 format."""
         # Arrange
         expected_dataset = _create_dataset()
         expected_file = os.path.join(os.getcwd(), expected_dataset.name + ".h5")
@@ -132,6 +144,31 @@ class TestDataFolder(unittest.TestCase):
             self.datafolder.write_dataset(expected_dataset)
             # Act
             dataset = self.datafolder.read_dataset(expected_dataset.name)
+            # Assert
+            self.assertEqual(expected_dataset.name, dataset.name)
+            self.assertDictEqual(expected_dataset.attrs, dataset.attrs)
+            self.assertListEqual(expected_dataset.axis_label, dataset.axis_label)
+            self.assertListEqual(expected_dataset.axis_scale, dataset.axis_scale)
+            self.assertListEqual(expected_dataset.axis_unit, dataset.axis_unit)
+            self.assertListEqual(expected_dataset.column_label, dataset.column_label)
+            self.assertListEqual(expected_dataset.column_unit, dataset.column_unit)
+            self.assertEqual(expected_dataset.data.min(), dataset.data.min())
+            self.assertEqual(expected_dataset.data.max(), dataset.data.max())
+            self.assertEqual(expected_dataset.data.size, dataset.data.size)
+            self.assertEqual(expected_dataset.timestamp, dataset.timestamp)
+
+        finally:
+            os.remove(expected_file)
+
+    def test_06b_read_dataset_in_hdf5_h5netcdf_backend(self):
+        """See that we can read in a data set in HDF5 format with h5netcdf backend."""
+        # Arrange
+        expected_dataset = _create_dataset()
+        expected_file = os.path.join(os.getcwd(), expected_dataset.name + ".h5")
+        try:
+            self.datafolder.write_dataset(expected_dataset, backend="h5netcdf")
+            # Act
+            dataset = self.datafolder.read_dataset(expected_dataset.name, backend="h5netcdf")
             # Assert
             self.assertEqual(expected_dataset.name, dataset.name)
             self.assertDictEqual(expected_dataset.attrs, dataset.attrs)
@@ -181,7 +218,7 @@ class TestDataFolder(unittest.TestCase):
             self.datafolder.read_dataset("boh")
 
     def test_09_make_hdf5_file(self):
-        """Make a hdf5 file"""
+        """Make a hdf5 file."""
         # Arrange
         name = "expected"
         expected_file = os.path.join(os.getcwd(), name + ".h5")
@@ -190,6 +227,20 @@ class TestDataFolder(unittest.TestCase):
             with self.datafolder.make_hdf5file(name) as hdf5_file:
                 self.assertTrue(os.path.isfile(expected_file))
                 self.assertEqual(type(hdf5_file), File)
+
+        finally:
+            os.remove(expected_file)
+
+    def test_09b_make_hdf5_file_h5netcdf_backend(self):
+        """Make a hdf5 file with h5netcdf backend."""
+        # Arrange
+        name = "expected"
+        expected_file = os.path.join(os.getcwd(), name + ".h5")
+        # Act
+        try:
+            with self.datafolder.make_hdf5file(name, backend="h5netcdf") as hdf5_file:
+                self.assertTrue(os.path.isfile(expected_file))
+                self.assertEqual(type(hdf5_file), NetCdfFile)
 
         finally:
             os.remove(expected_file)
@@ -203,7 +254,7 @@ class TestDataFolder(unittest.TestCase):
             self.datafolder.make_hdf5file(name)
 
     def test_11_open_hdf5_file(self):
-        """Open a hdf5 file"""
+        """Open a hdf5 file."""
         # Arrange
         name = "expected"
         expected_file = os.path.join(os.getcwd(), name + ".h5")
@@ -218,6 +269,22 @@ class TestDataFolder(unittest.TestCase):
         finally:
             os.remove(expected_file)
 
+    def test_11b_open_hdf5_file_h5netcdf_backend(self):
+        """Open a hdf5 file with h5netcdf backend."""
+        # Arrange
+        name = "expected"
+        expected_file = os.path.join(os.getcwd(), name + ".h5")
+        # Act and Assert
+        try:
+            with self.datafolder.make_hdf5file(name, backend="h5netcdf"):
+                self.assertTrue(os.path.isfile(expected_file))
+
+            with self.datafolder.open_hdf5file(name, backend="h5netcdf") as hdf5_file:
+                self.assertEqual(type(hdf5_file), NetCdfFile)
+
+        finally:
+            os.remove(expected_file)
+
     def test_12_open_hdf5_file_raises_exception_with_non_latin_characters(self):
         """Opening a file with non-latin characters raises and exception"""
         # Arrange
@@ -226,9 +293,8 @@ class TestDataFolder(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.datafolder.open_hdf5file(name)
 
-    def test_13_write_dataset_again(self):
-        """Write a data set if already exists.
-        """
+    def test_13_write_dataset_again_excepts(self):
+        """Write a data set raises an exception if it already exists."""
         # Arrange
         dataset = _create_dataset()
         expected_file = os.path.join(os.getcwd(), dataset.name + ".h5")
@@ -243,8 +309,7 @@ class TestDataFolder(unittest.TestCase):
             os.remove(expected_file)
 
     def test_14_write_dataset_again(self):
-        """Write a data set if already exists, but with overwrite flag set.
-        """
+        """Write a data set successs even if it already exists, as overwrite flag is set."""
         # Arrange
         dataset = _create_dataset()
         expected_file = os.path.join(os.getcwd(), dataset.name + ".h5")
