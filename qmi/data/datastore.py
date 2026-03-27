@@ -63,7 +63,7 @@ class DataFolder:
         """Create a new, or open, HDF5 file in the data folder.
 
         Parameters:
-            name:    Base name of the HDF5 file, without the extension ".h5".
+            name:    Base name of the HDF5 file, without the extension ".h5" or ".hdf5".
             mode:    File mode.
             backend: Backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
 
@@ -77,7 +77,7 @@ class DataFolder:
         if not re.match(r"^[-_a-zA-Z0-9(),]+$", name):
             raise ValueError(f"Invalid name {name!r}")
 
-        filename = name + ".h5"
+        filename = name + ".hdf5"
         file_path = os.path.join(self.folder_path, filename)
 
         if backend == "h5py":
@@ -147,7 +147,7 @@ class DataFolder:
             raise ValueError(f"Invalid DataSet name {ds.name!r}")
 
         if file_format == "hdf5":
-            filename = ds.name + ".h5"
+            filename = ds.name + ".hdf5"
             file_path = os.path.join(self.folder_path, filename)
             if backend == "h5py":
                 with h5py.File(file_path, "w" if overwrite else "x") as f:
@@ -191,31 +191,33 @@ class DataFolder:
         if os.path.split(name)[0]:
             raise ValueError(f"Invalid dataset name {name!r}")
 
-        # Look for a HDF5 file with matching name.
-        file_path = os.path.join(self.folder_path, name + ".h5")
-        if os.path.isfile(file_path):        
-            if backend == "h5py":
-                with h5py.File(file_path, "r") as f:
-                    if name not in f:
-                        raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
-
-                    return qmi.data.dataset.read_dataset_from_hdf5(f[name])
-
-            elif backend == "h5netcdf":
-                with h5netcdf.File(file_path, "r", decode_vlen_strings=False) as f:
-                    if name not in f:
-                        raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
-
-                    return qmi.data.dataset.read_dataset_from_hdf5(f[name], f)
-                
-            else:
-                raise ValueError(f"Invalid backend type {backend}.")
-
         # Look for a text file with matching name.
         file_path = os.path.join(self.folder_path, name + ".dat")
         if os.path.isfile(file_path):
             with open(file_path, "rt") as f:
                 return qmi.data.dataset.read_dataset_from_text(f)
+
+        # Look for a HDF5 file with matching name.
+        extensions = [".hdf5", ".h5"]
+        for ext in extensions:
+            file_path = os.path.join(self.folder_path, name + ext)
+            if os.path.isfile(file_path):
+                if backend == "h5py":
+                    with h5py.File(file_path, "r") as f:
+                        if name not in f:
+                            raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
+
+                        return qmi.data.dataset.read_dataset_from_hdf5(f[name])
+
+                elif backend == "h5netcdf":
+                    with h5netcdf.File(file_path, "r", decode_vlen_strings=False) as f:
+                        if name not in f:
+                            raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
+
+                        return qmi.data.dataset.read_dataset_from_hdf5(f[name], f)
+
+                else:
+                    raise ValueError(f"Invalid backend type {backend}.")
 
         # File not found.
         raise FileNotFoundError(f"No dataset {name!r} found in {self.folder_path}")
@@ -226,7 +228,7 @@ class DataFolder:
         An error occurs if the specified file already exists.
 
         Parameters:
-            name:    Base name of the HDF5 file, without the extension ".h5".
+            name:    Base name of the HDF5 file, without the extension ".h5" or ".hdf5".
             backend: Select backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
 
         Returns:
@@ -239,7 +241,7 @@ class DataFolder:
         """Open an existing HDF5 file in the data folder.
 
         Parameters:
-            name:       Base name of the HDF5 file, without the extension ".h5".
+            name:       Base name of the HDF5 file, without the extension ".h5" or ".hdf5".
             write_mode: True to open the file in read/write mode, False to open the file in read-only mode.
             backend:    Select backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
 

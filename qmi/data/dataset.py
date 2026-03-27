@@ -31,18 +31,18 @@ class DataSet:
         dataset.data[2, 0:5] += 1
 
     The following fields exist inside a DataSet instance. Application code may read or modify the contents of
-    these fields directly. However the shape and data type of these fields must not be changed.
+    these fields directly. However, the shape and data type of these fields must not be changed.
 
     Internal Variables:
-        ~DataSet.name:         Name of the dataset.
-        ~DataSet.data:         Numpy array containing the actual data.
-        ~DataSet.timestamp:    POSIX time stamp associated with the data.
-        axis_label:   List of strings specifying labels for the first (N-1) axes.
-        axis_unit:    List of strings specifying units for the first (N-1) axes.
-        axis_scale:   List of optional 1D Numpy arrays specifying value mappings for the first (N-1) axes.
-        column_label: List of strings specifying column labels.
-        column_unit:  List of strings specifying column units.
-        attrs:        Dictionary of application-specific attributes.
+        ~DataSet.name:      Name of the dataset.
+        ~DataSet.data:      Numpy array containing the actual data.
+        ~DataSet.timestamp: POSIX time stamp associated with the data.
+        axis_label:         List of strings specifying labels for the first (N-1) axes.
+        axis_unit:          List of strings specifying units for the first (N-1) axes.
+        axis_scale:         List of optional 1D Numpy arrays specifying value mappings for the first (N-1) axes.
+        column_label:       List of strings specifying column labels.
+        column_unit:        List of strings specifying column units.
+        attrs:              Dictionary of application-specific attributes.
 
     The entire dataset is kept in memory (RAM). This makes the dataset class unsuitable for very large amounts of data.
     """
