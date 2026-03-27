@@ -253,6 +253,38 @@ class TestDataFolder(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.datafolder.make_hdf5file(name)
 
+    def test_10b_make_hdf5_file_raises_exception_if_h5_file_exists(self):
+        """Making a HDF5 file fails when a matching .h5 file already exists."""
+        # Arrange
+        name = "existing_h5"
+        existing_file = os.path.join(os.getcwd(), name + ".h5")
+        try:
+            with File(existing_file, "x"):
+                pass
+
+            # Act and Assert
+            with self.assertRaises(IOError):
+                self.datafolder.make_hdf5file(name)
+
+        finally:
+            os.remove(existing_file)
+
+    def test_10c_make_hdf5_file_raises_exception_if_hdf5_file_exists(self):
+        """Making a HDF5 file fails when a matching .hdf5 file already exists."""
+        # Arrange
+        name = "existing_hdf5"
+        existing_file = os.path.join(os.getcwd(), name + ".hdf5")
+        try:
+            with File(existing_file, "x"):
+                pass
+
+            # Act and Assert
+            with self.assertRaises(IOError):
+                self.datafolder.make_hdf5file(name)
+
+        finally:
+            os.remove(existing_file)
+
     def test_11_open_hdf5_file(self):
         """Open a hdf5 file."""
         # Arrange
@@ -292,6 +324,30 @@ class TestDataFolder(unittest.TestCase):
         # Act and Assert
         with self.assertRaises(ValueError):
             self.datafolder.open_hdf5file(name)
+
+    def test_12b_open_hdf5_file_raises_exception_if_file_does_not_exist(self):
+        """Opening a HDF5 file fails when no matching file exists."""
+        # Arrange
+        name = "missing_file"
+        # Act and Assert
+        with self.assertRaises(FileNotFoundError):
+            self.datafolder.open_hdf5file(name)
+
+    def test_12c_open_hdf5_file_finds_h5_extension(self):
+        """Opening a HDF5 file also resolves files stored with the .h5 extension."""
+        # Arrange
+        name = "expected_h5"
+        expected_file = os.path.join(os.getcwd(), name + ".h5")
+        try:
+            with File(expected_file, "x"):
+                pass
+
+            # Act and Assert
+            with self.datafolder.open_hdf5file(name) as hdf5_file:
+                self.assertEqual(type(hdf5_file), File)
+
+        finally:
+            os.remove(expected_file)
 
     def test_13_write_dataset_again_excepts(self):
         """Write a data set raises an exception if it already exists."""

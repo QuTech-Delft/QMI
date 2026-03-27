@@ -71,14 +71,28 @@ class DataFolder:
             A `File` object representing the HDF5 file.
 
         Raises:
-            ValueError: If the `name` has non-latin character(s).
-            ValueError: Invalid HDF5 file backend.
+            ValueError:        If the `name` has non-latin character(s).
+            IOError:           If the file is already present and file mode does not allow truncation.
+            FileNotFoundError: If the file mode is set to read a file and the file was not found.
+            ValueError:        Invalid HDF5 file backend.
         """
         if not re.match(r"^[-_a-zA-Z0-9(),]+$", name):
             raise ValueError(f"Invalid name {name!r}")
 
-        filename = name + ".hdf5"
-        file_path = os.path.join(self.folder_path, filename)
+        if mode in ["r+", "r", "x"]:
+            for ext in [".h5", ".hdf5"]:
+                filename = name + ext
+                # Let's check the file exists.
+                file_path = os.path.join(self.folder_path, filename)
+                file_found = os.path.isfile(file_path)
+                if file_found:
+                    break
+
+            if mode == "x" and file_found:
+                raise IOError(f"The file {filename} already exists and not allowed to overwrite.")
+
+            if mode in ["r+", "r"] and not file_found:
+                raise FileNotFoundError(f"Could not find HDF5 file with name {name}.")
 
         if backend == "h5py":
             return h5py.File(file_path, mode=mode)
