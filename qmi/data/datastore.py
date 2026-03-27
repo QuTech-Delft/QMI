@@ -35,7 +35,9 @@ class DataFolder:
       - plotted images.
     """
 
-    def __init__(self, folder_path: str, label: str | None, date_str: str | None, time_str: str | None) -> None:
+    def __init__(
+        self, folder_path: str, label: str | None = None, date_str: str | None = None, time_str: str | None = None
+    ) -> None:
         """Initialize a DataFolder instance.
 
         Parameters:
