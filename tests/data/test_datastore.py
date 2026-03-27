@@ -89,7 +89,7 @@ class TestDataFolder(unittest.TestCase):
         """Write a data set as HDF5 file."""
         # Arrange
         dataset = _create_dataset()
-        expected_file = os.path.join(os.getcwd(), dataset.name + ".h5")
+        expected_file = os.path.join(os.getcwd(), dataset.name + ".hdf5")
         # Act
         try:
             self.datafolder.write_dataset(dataset)
@@ -103,7 +103,7 @@ class TestDataFolder(unittest.TestCase):
         """Write a data set as HDF5 file with h5netcdf backend."""
         # Arrange
         dataset = _create_dataset()
-        expected_file = os.path.join(os.getcwd(), dataset.name + ".h5")
+        expected_file = os.path.join(os.getcwd(), dataset.name + ".hdf5")
         # Act
         try:
             self.datafolder.write_dataset(dataset, backend="h5netcdf")
@@ -139,7 +139,7 @@ class TestDataFolder(unittest.TestCase):
         """See that we can read in a data set in HDF5 format."""
         # Arrange
         expected_dataset = _create_dataset()
-        expected_file = os.path.join(os.getcwd(), expected_dataset.name + ".h5")
+        expected_file = os.path.join(os.getcwd(), expected_dataset.name + ".hdf5")
         try:
             self.datafolder.write_dataset(expected_dataset)
             # Act
@@ -164,7 +164,7 @@ class TestDataFolder(unittest.TestCase):
         """See that we can read in a data set in HDF5 format with h5netcdf backend."""
         # Arrange
         expected_dataset = _create_dataset()
-        expected_file = os.path.join(os.getcwd(), expected_dataset.name + ".h5")
+        expected_file = os.path.join(os.getcwd(), expected_dataset.name + ".hdf5")
         try:
             self.datafolder.write_dataset(expected_dataset, backend="h5netcdf")
             # Act
@@ -221,7 +221,7 @@ class TestDataFolder(unittest.TestCase):
         """Make a hdf5 file."""
         # Arrange
         name = "expected"
-        expected_file = os.path.join(os.getcwd(), name + ".h5")
+        expected_file = os.path.join(os.getcwd(), name + ".hdf5")
         # Act
         try:
             with self.datafolder.make_hdf5file(name) as hdf5_file:
@@ -235,7 +235,7 @@ class TestDataFolder(unittest.TestCase):
         """Make a hdf5 file with h5netcdf backend."""
         # Arrange
         name = "expected"
-        expected_file = os.path.join(os.getcwd(), name + ".h5")
+        expected_file = os.path.join(os.getcwd(), name + ".hdf5")
         # Act
         try:
             with self.datafolder.make_hdf5file(name, backend="h5netcdf") as hdf5_file:
@@ -257,7 +257,7 @@ class TestDataFolder(unittest.TestCase):
         """Open a hdf5 file."""
         # Arrange
         name = "expected"
-        expected_file = os.path.join(os.getcwd(), name + ".h5")
+        expected_file = os.path.join(os.getcwd(), name + ".hdf5")
         # Act and Assert
         try:
             with self.datafolder.make_hdf5file(name):
@@ -273,7 +273,7 @@ class TestDataFolder(unittest.TestCase):
         """Open a hdf5 file with h5netcdf backend."""
         # Arrange
         name = "expected"
-        expected_file = os.path.join(os.getcwd(), name + ".h5")
+        expected_file = os.path.join(os.getcwd(), name + ".hdf5")
         # Act and Assert
         try:
             with self.datafolder.make_hdf5file(name, backend="h5netcdf"):
@@ -297,7 +297,7 @@ class TestDataFolder(unittest.TestCase):
         """Write a data set raises an exception if it already exists."""
         # Arrange
         dataset = _create_dataset()
-        expected_file = os.path.join(os.getcwd(), dataset.name + ".h5")
+        expected_file = os.path.join(os.getcwd(), dataset.name + ".hdf5")
         self.datafolder.write_dataset(dataset)
         # Act
         try:
@@ -309,10 +309,10 @@ class TestDataFolder(unittest.TestCase):
             os.remove(expected_file)
 
     def test_14_write_dataset_again(self):
-        """Write a data set successs even if it already exists, as overwrite flag is set."""
+        """Write a data set success even if it already exists, as overwrite flag is set."""
         # Arrange
         dataset = _create_dataset()
-        expected_file = os.path.join(os.getcwd(), dataset.name + ".h5")
+        expected_file = os.path.join(os.getcwd(), dataset.name + ".hdf5")
         self.datafolder.write_dataset(dataset)
         # Act
         try:
