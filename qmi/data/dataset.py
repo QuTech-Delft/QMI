@@ -336,6 +336,8 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group | h5netcdf.Gro
                 ds.dims[axis].attach_scale(ds_scale)
 
             else:
+                # With h5netcdf backend we cannot attach scaled data.
+                # Create a variable instead and attach it as an attribute to the dataset.
                 ds_scale = hdf_group.create_variable(
                     scale_name,
                     dimensions=(ds.dimensions[axis],),

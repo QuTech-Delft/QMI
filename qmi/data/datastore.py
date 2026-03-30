@@ -205,7 +205,7 @@ class DataFolder:
         """
         # Check that the name is safe (no path names).
         if os.path.split(name)[0]:
-            raise ValueError(f"Invalid dataset name {name!r}")
+            raise ValueError(f"Invalid dataset name {name!r}.")
 
         # Look for a text file with matching name.
         file_path = os.path.join(self.folder_path, name + ".dat")
