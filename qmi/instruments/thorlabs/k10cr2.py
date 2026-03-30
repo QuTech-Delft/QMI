@@ -1,4 +1,4 @@
-"""Instrument driver for the Thorlabs K10CR1/M motorized rotational mount.
+"""Instrument driver for the Thorlabs K10CR2/M motorized rotational mount.
 
 This driver communicates with the device via a USB serial port, using the Thorlabs APT protocol. For details,
 see the document "Thorlabs APT Controllers Host-Controller Communications Protocol", issue 25 from Thorlabs.
@@ -17,11 +17,11 @@ from qmi.instruments.thorlabs.k10crx import Thorlabs_K10CRxBase
 _logger = logging.getLogger(__name__)
 
 
-class Thorlabs_K10CR1(Thorlabs_K10CRxBase):
-    """Instrument driver for the Thorlabs K10CR1/M motorized rotational mount."""
+class Thorlabs_K10CR2(Thorlabs_K10CRxBase):
+    """Instrument driver for the Thorlabs K10CR2/M motorized rotational mount."""
 
     # Maximum velocity in degrees/second
-    MAX_VELOCITY = 10
+    MAX_VELOCITY = 20
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize driver.
@@ -40,10 +40,10 @@ class Thorlabs_K10CR1(Thorlabs_K10CRxBase):
     def open(self) -> None:
         try:
             super().open()
-            # Check that this device is a K10CR1 motor.
+            # Check that this device is a K10CR2 motor.
             # Otherwise we should not talk to it, since we don't want to send
             # inappropriate commands to some unsupported device.
-            self._check_k10crx("1")
+            self._check_k10crx("2")
 
         except Exception:
             # Close the transport if an error occurred during initialization of the instrument.

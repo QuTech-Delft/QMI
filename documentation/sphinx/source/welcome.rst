@@ -2,7 +2,7 @@
 Welcome to QMI!
 ===============
 
-You are reading the documentation of QMI, the Quantum Measurement Framework.
+You are reading the documentation of QMI, the Quantum Measurement Infrastructure framework.
 
 What is it?
 -----------
