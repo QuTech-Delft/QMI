@@ -640,7 +640,7 @@ class Teraxion_TFN(QMI_Instrument):
         """Get channel plan for specified grid.
 
         Returns:
-            an instance of Teraxion_TFNChannelPlan.
+            An instance of Teraxion_TFNChannelPlan.
         """
         _logger.info("Getting channel plan of instrument [%s]", self._name)
         self._check_is_open()

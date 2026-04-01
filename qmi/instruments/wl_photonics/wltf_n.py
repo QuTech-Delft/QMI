@@ -37,7 +37,7 @@ class WlPhotonics_WltfN(QMI_Instrument):
     """Instrument driver for the WL Photonics tunable narrowband wavelength filter.
 
     NOTE:: Before using the other commands after `open`, you have to call `get_idn` first to
-           update isntrument wavelength and step ranges.
+           update instrument wavelength and step ranges.
 
     The instrument moves at limited speed.
     At power-up the instrument might start from motor position being 0, meaning that at this initial position

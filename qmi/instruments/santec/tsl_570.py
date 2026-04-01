@@ -218,7 +218,7 @@ class Santec_Tsl570(QMI_Instrument):
 
         Returns:
             QMI_InstrumentIdentification: Data with e.g. idn.vendor = SANTEC, idn.model = TSL-570,
-            idn.serial = 21020001, idn.version = 0001.000.0001 (firmware version).
+                                          idn.serial = 21020001, idn.version = 0001.000.0001 (firmware version).
         """
         resp = self._scpi_protocol.ask("*IDN?")
         words = resp.rstrip().split(",")
@@ -237,7 +237,8 @@ class Santec_Tsl570(QMI_Instrument):
     @rpc_method
     def clear(self) -> None:
         """Clear Status. Clears all event registers and queues and reflects the summary in the Status Byte Register.
-        Clears the following items.
+
+        Clears the following items:
         ・Status Byte Register
         ・Standard Event Status Register
         ・Error Queue
@@ -606,7 +607,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Set the start frequency for a sweep.
 
         Parameters:
-            frequency: frequency in terahertz.
+            frequency: Frequency in terahertz.
         """
         unit = "THz"
         dec = 4  # 10 MHz resolution
@@ -633,7 +634,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Set the stop frequency for a sweep.
 
         Parameters:
-            frequency: frequency in terahertz.
+            frequency: Frequency in terahertz.
         """
         unit = "THz"
         dec = 4  # 10 MHz resolution
@@ -720,7 +721,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get dwell between sweep steps.
 
         Returns:
-            dwell: dwell in range [0, 1000[s.
+            dwell: Dwell in range [0, 1000[s.
         """
         return self._ask_float(":WAV:SWE:DWEL?")
 
@@ -743,7 +744,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get delay between sweeps.
 
         Returns:
-            delay: delay in range [0, 1000[s.
+            delay: Delay in range [0, 1000[s.
         """
         return self._ask_float(":WAV:SWE:DEL?")
 
@@ -868,7 +869,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get trigger output step.
 
         Returns:
-            step: step in range [0.0001, max wavelength]nm.
+            step: Step in range [0.0001, max wavelength]nm.
         """
         return self._ask_float(":TRIG:OUTP:STEP?")
 
