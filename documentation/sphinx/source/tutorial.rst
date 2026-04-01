@@ -11,6 +11,9 @@ Hello QMI!
 
 To start using QMI, the first steps are to import the :mod:`qmi` package, and next, call :py:func:`qmi.start() <qmi.core.context_singleton.start>` with a string argument that specifies our local *QMI context name*.
 The QMI context name allows other QMI programs to contact us, and to communicate with locally held instances of things like instruments and tasks that our context manages.
+
+.. Regarding the below line: as a new user of QMI I think I might be much more interested at this point in what a context is and how it is useful to me, rather than how to create one.
+
 More on that later.
 
 >>> import qmi
@@ -35,6 +38,9 @@ To end our time as a QMI-aware process, we should call :py:func:`qmi.stop() <qmi
 >>> qmi.stop()
 
 This allows the QMI context to stop the network connections and threads that it manages in a controlled way.
+
+.. If stopping the context is important, should we maybe be teaching our reader to use the context manager protocol instead of manually stopping and starting?
+.. That is guaranteed to stop the context on exit, exception and even on all but the most serious interpreter exits.
 
 If we don't call ``qmi.stop()`` explicitly and quit Python (or a script crashes), the orderly shutdown will still be performed
 as much as possible, while generating a warning message. However, an explicit close is preferable, so get it is a good habit to
@@ -77,10 +83,11 @@ We can look at the documentation of the Proxy instance:
 
 >>> help(nsg)
 
-This prints the docstring of the NoisySineGenerator class. It does also give a listing of all RPC methods, signals and class constants of the proxy instance as well.
+This prints the docstring of the NoisySineGenerator class.
+It also shows a listing of all RPC methods, signals and class constants of the proxy instance.
 
 As we can read in the help, our noisy sine generator ``nsg`` supports a bunch of methods, including the ``get_sample()`` method.
-We can retrieve that method's docstring as well by typing
+We can retrieve that method's docstring as well:
 
 >>> help(nsg.get_sample)
 
@@ -88,7 +95,11 @@ Now, let's give it a shot and see what happens:
 
 >>> nsg.get_sample()
 
-Whoops, we got an error! This is because we didn't "open" the instrument first. This is of course not necessary with a virtual instrument, but we have made it to simulate a real instrument, requiring thus "open" and "close" calls for connection.
+Whoops, we got an error! This is because we didn't "open" the instrument first.
+
+.. Without an explanation of what `open` does, it is not clear to the reader why this is "of course" not necessary for a virtual instrument.
+
+This is of course not necessary with a virtual instrument, but as it simulates a real instrument, we also simulate opening and closing a connection to it.
 
 >>> nsg.open()
 >>> nsg.get_sample()
@@ -120,6 +131,8 @@ Locking an instrument
 Because QMI allows networked access to remote instruments, there is the distinct possibility that more than one user accesses the same instrument.
 This can be intentional, for example a measurement script setting the frequency of a function generator while a GUI monitors and displays that frequency.
 However, it can also be unintentional, for example when a scheduled calibration routine tries to calibrate an instrument that is being used for a measurement.
+
+.. Idea: Would it maybe make sense to disambiguate between "const/concurrency safe" methods (so they do not require a lock) and methods that do require locking for safety?
 
 To prevent unintentional simultaneous access, you can lock an instrument, preventing others from using it.
 Locks are owned by the proxy, and only one proxy can own a lock at any time.
@@ -196,7 +209,9 @@ However, if you find yourself in a situation in which the locking proxy was lost
 >>> nsg2.is_locked()
 False
 
-It is also possible to unlock from another instrument proxy by providing the context name as well. See the example below, how to get from another context the instrument proxy. In a new terminal window, start up Python and do the following:
+It is also possible to get an instrument proxy from another context by providing that context's name as well as the instrument name.
+We can then use that proxy to lock the instrument from a different context.
+To show this in action, start up Python in a new terminal window and do the following:
 
 >>> import qmi
 >>> qmi.start("client")
@@ -207,13 +222,19 @@ True
 
 Configuration
 -------------
-
 Many aspects of QMI are configurable via a *configuration file*.
 The syntax of this file is very similar to `JSON <https://www.json.org/>`_,
 but unlike JSON, the configuration file may contain comments starting with a ``#`` character.
 
 By default, QMI attempts to read the configuration from a file named ``qmi.conf`` in
 the home directory (or the user folder on Windows).
+
+.. I wonder if this is not very unintuitive for a user.
+.. This is effectively device-specific global state that requires the user to always specify `config_file=None` to work around.
+.. Users who want this functionality can just automatically set the environment variable `QMI_CONFIG` to whatever location they want, but that would be a conscious decision.
+.. This also prevents the `qmi.start` call without the second argument from defaulting to an empty configuration instead.
+.. This also goes against the idea of Python virtual environments, where packages in a venv usually only interact with the state in that venv, so without global state.
+
 If you want to use a different file name or location, you can specify
 the configuration file path either as the second argument of ``qmi.start()``
 or in the environment variable ``QMI_CONFIG``.
@@ -313,7 +334,7 @@ and the answer to be sent to the second program.
 
     Sometimes the connecting to a peer context fails. One reason is that in the ``qmi.conf`` file the IP address
     or the port number is defined wrong. One way to check the available contexts to connect to is to use command
-    ``qmi.show_network_contexts()`` to list available contexts, showing their name, IP-address:port anc connection
+    ``qmi.show_network_contexts()`` to list available contexts, showing their name, IP-address:port and connection
     status:
 
     >>> name         address         connected
@@ -323,10 +344,11 @@ and the answer to be sent to the second program.
 
     If this doesn't match the IP:port configuration of your ``qmi.conf`` file, and you used "localhost" or "127.0.0.1" in your configuration,
     the reason is that the localhost address gets interpreted in the background as the IP address of the PC itself. But if you set something else and the
-    IP addresses do no match, the connection probably fails.
-    Also if the shown IP:port is not the one you defined in ``qmi.conf`` of ``instr_server``, the IP:Port you gave is not in the valid range of your system. In this case, ``qmi`` just sets other values in correct range.
-    If only the port number does not match, it might be possible the the ``qmi.conf`` was actually not read and QMI has set default (localhost) values. In that case,
-    define the config file location manually in ``qmi.start`` call.
+    IP addresses do not match, the connection probably fails.
+    Also if the shown IP:port is not the one you defined in ``qmi.conf`` of ``instr_server``, the IP:port you gave is not in the valid range of your system.
+    When this happens, ``qmi`` uses a random valid value instead.
+    If only the port number does not match, it might be possible the ``qmi.conf`` configuration file was actually not read and QMI has set default (localhost) values.
+    In that case, define the config file location manually in ``qmi.start`` call:
 
     >>> qmi.start("instr_server", config_file="<path_to_qmi.conf>")
 
@@ -336,16 +358,16 @@ and the answer to be sent to the second program.
 
     >>> qmi.context().connect_to_peer("instr_server", "145.90.38.138:0")
 
-    The IP address can be also "localhost" or "127.0.0.1" if that is used in the ``qmi.conf``.
+    The IP address can also be "localhost" or "127.0.0.1" if that is used in the ``qmi.conf``.
 
     **Windows**
 
-    If the port number is `0`, and you are on a Windows machine, trying to connect this peer will give you an error:
+    If you try to connect to port `0` on a Windows machine, you will get an error:
 
     >>> OSError: [WinError 10049] The requested address is not valid in its context
 
-    While on Linux this usually works, Windows does not allow this and you have to specify a non-zero port number for the context.
-    On most systems, port numbers up to 1023 are mostly reserved so it is best to use a port number > 1023.
+    Contrary to how Linux handles this case, Windows does not allow for usage of port zero and you have to specify a non-zero port number for the context.
+    On most systems, port numbers up to 1023 are reserved so it is best to use a port number > 1023.
 
 
 Using the 'autoconnect' option
@@ -371,6 +393,9 @@ One handy way of avoiding possible mistakes in defining the IP:port in ``qmi.con
 >>> nsg.get_sample()  # will raise an exception if "instr_server" was not found in ``contexts``
 >>> 60.1239025839
 
+.. I wonder if it would be better to not return a list of tuple[str, str] from `discover_peer_contexts()`, but instead return a structured datatype or even a NamedTuple instead.
+.. Currently, the caller has to remember what the fields in the tuple mean.
+.. I also wonder if this context discovery could not be done for the user instead, through a function like `find_context(name:str) -> Context | None` or similar.
 
 A simple QMI measurement script
 -------------------------------
@@ -410,6 +435,8 @@ Note that the script uses :py:class:`qmi.utils.context_managers.start_stop` to s
 This is just a convenient way to make sure that ``qmi.start()`` and ``qmi.stop()`` will always be called.
 Similarly, the `QMI_Instrument` objects are equipped with context managers that open and close the the instrument, calling ``nsg.open()`` and ``nsg.close()`` at the creation and destruction of the instance.
 
+.. I wonder why the `Context` object is not a context manager itself, like the instruments, instead requiring this external function to perform the basic starting and stopping management?
+
 .. note::
     Some users prefer to invoke scripts from an interactive Python session,
     using tricks based on ``execfile`` or ``reload`` commands.
@@ -425,18 +452,21 @@ Making a QMI task
 In some cases, it may be necessary to perform measurements while
 simultaneously running a continuous background task.
 A good example could be a control loop, which measures a signal and
-a corresponding adjustment of a parameter at a regular interval.
+performs a corresponding adjustment of some parameter at a regular interval.
 
 A *QMI Task* is a procedure which runs independently and continuously
 in the background inside a Python program.
 The same program can perform different activities in its main control
-flow while the task continues run in a separate background thread.
+flow while the task continues to run in a separate background thread.
 
 Creating a custom task involves creating a Python class which derives
 from :py:class:`qmi.core.task.QMI_Task`.
 To ensure that the task works correctly and remains accessible by
 remote Python programs, it should be defined in a *Python module*
 instead of the top-level script file.
+
+.. My immediate question while reading this was: "Why?" and I did not get an answer to that.
+.. I think an explanation of why this is necessary (potentially in a "Note" or "Advanced reading" section) would help comprehension and compliance.
 
 To demonstrate a custom task, create a new Python module inside
 the module path for your project. If you don't have a module path
@@ -511,6 +541,8 @@ Eventually, the main script calls the methods :py:func:`task.stop() <qmi.core.ta
 to tell the task to stop, followed by :py:func:`task.join() <qmi.core.task.QMI_TaskRunner.join>`
 to wait until the task is fully stopped.
 
+.. Would it make sense to make Task objects context managers as well so that starting, stopping and joining could all be done by the context manager protocol?
+
 Run the script from the shell command line::
 
     python task_demo.py
@@ -563,16 +595,27 @@ can be passed to `context.make_task()`. In the ``task_demo.py`` edit the ``make_
                 print("the task has been stopped")
 
 Now, the task runs at loop period of 1 us, and if executing the ``loop_iteration`` function takes longer than the ``loop_period``,
-it just skips to the next scheduled period, instead of trying to do the following period a.s.a.p. (``IMMEDIATE`` policy, which is default).
-This is probably useful in cases where we can get data at specific moments of time ONLY, but due to the high frequency of the loop period we cannot
-always do this. The third option is ``TERMINATE`` which stops the loop if a period gets overdue.
+it just skips to the next scheduled period as it uses policy ``SKIP``.
+This is probably useful in cases where we can only collect data at specific moments in time, but due to the high frequency of the loop period we might miss the next period.
+Other options for policies are the default of ``IMMEDIATE``, which tries to execute the following period as soon as possible, or ``TERMINATE`` which stops the loop if a period is overdue.
 
 Tasks and RPC methods
 ---------------------
 
-Tasks cannot have RPC methods in them by design choice. But, nevertheless in some special cases the user might like to monitor and control
-a value or values at some unknown moment while the task is running. For example, we would like to retrieve and control the ``amplitude`` value
-of our ``DemoTask``. To do this, first we need to make an attribute for the object by introducing it in ``__init__``::
+.. You lost me somewhere in this section.
+.. I think what first threw me off was that this is the first mention of RPCs in this tutorial and they are not explained at all.
+.. After that, we get a lot of code with very little explanation of what or why we are doing whatever we are doing.
+.. Some of it seems like hacks to get around having proper communication channels with a task, which I would expect would be part of the API.
+.. Finally, we get this nebulous concept of task settings, which I'm still not sure why I would need to use that over the previously implemented way of doing things.
+
+Tasks cannot have RPC methods in them by design.
+
+.. Similar to before: "Why?"
+
+Nevertheless, in some special cases the user might like to monitor and control
+a value or values at some unknown moment while the task is running.
+Say for example, that we would like to retrieve and control the ``amplitude`` value of our ``DemoTask``.
+To do this, first we need to make an attribute for the object by introducing it in ``__init__``::
 
    def __init__(self, task_runner, name, amplitude_factor=1.0):
         super().__init__(task_runner, name)
@@ -825,20 +868,20 @@ After a while, run ``qmi_proc stop proc_demo`` to stop the background process.
 Further options
 ===============
 
-The ``qmi_proc`` provides also other options to facilitate starting and stopping processes. Beyond "start" and "stop" there are:
-  - The "restart" option that simply calls first "stop" and then "start".
-  - Together with "start", "stop" or "restart" you can also add arguments:
+The ``qmi_proc`` provides also other options to facilitate starting and stopping processes. Beyond ``start`` and ``stop`` there are:
+  - The ``restart`` option that simply calls first ``stop`` and then ``start``.
+  - Together with ``start``, ``stop`` or ``restart`` you can also add arguments:
 
-    * "--all" to (re)start/stop all configured contexts in the QMI configuration file.
-    * "--locals" to (re)start/stop all configured LOCAL contexts.
-    * "--config <path_to_config_file>" to specify the configuration file to be used.
+    * ``--all`` to (re)start/stop all configured contexts in the QMI configuration file.
+    * ``--locals`` to (re)start/stop all configured LOCAL contexts.
+    * ``--config <path_to_config_file>`` to specify the configuration file to be used.
 
-Note that the "--all" and "--locals" options will work only for context in the configuration file that have
+Note that the ``--all`` and ``--locals`` options will work only for context in the configuration file that have
   - ``"enabled": true`` and
   - ``"program_module": "your.program.module"`` defined.
 
 Also, you cannot start or stop processes that are not configured in the configuration file.
-It is also possible to run the ``qmi_proc`` interactively in a "server" mode. Start it with::
+It is also possible to run the ``qmi_proc`` interactively in a ``server`` mode. Start it with::
 
   qmi_proc server <--config path/to/your.conf>
 
@@ -855,6 +898,11 @@ This functionality might get deprecated in the future.
 
 USBTMC devices
 ==============
+
+.. This section seems out of place.
+.. It does not follow from the rest of the tutorial and seems to be about troubleshooting.
+.. Maybe move this to a Troubleshooting page?
+.. Also, it is currently a sub-header of "Managing background processes", which seems incorrect.
 
 Connecting with USBTMC devices on Windows can be tricky. Make sure you have libusb1 and pyvisa installed.
 https://pypi.org/project/libusb1/ and https://pypi.org/project/PyVISA/ (and perhaps pyvisa-py).
