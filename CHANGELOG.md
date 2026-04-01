@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moving of `_snicaddr` in psutil package v2.7 from `_common` to `_ntuples` module, which caused an error with `qmi_proc`.
 - Process management logging path now resolves correctly also for cases where the config file path starts with the `~`, indicating home directory location.
 - Issue with Python 3.14 compatibility in `QMI_Context` class. Addition of `run` method with specific input parameter fixes the issue.
+- Instrument drivers `tsl_570.py`, `wltf_n.py` and `tfn.py` have now default values in dataclasses which are initiated in the driver class constructor. This is done to avoid Mypy error: 'Cannot access instance-only attribute "<attr>" on class object  [misc]"
 
 ### Removed
 - Removed `xdrlib-py` import for Python 3.13 version, where it was needed for python-vxi11 package.
