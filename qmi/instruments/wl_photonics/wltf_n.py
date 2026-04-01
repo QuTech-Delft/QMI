@@ -21,20 +21,23 @@ _logger = logging.getLogger(__name__)
 class _WavelengthRange:
     """Dataclass for wavelength instrument range."""
 
-    min: float
-    max: float
+    min: float = 0.0
+    max: float = 0.0
 
 
 @dataclass
 class _StepsRange:
     """Dataclass for frequency instrument range."""
 
-    min: int
-    max: int
+    min: int = 0.0
+    max: int = 0.0
 
 
 class WlPhotonics_WltfN(QMI_Instrument):
     """Instrument driver for the WL Photonics tunable narrowband wavelength filter.
+
+    NOTE:: Before using the other commands after `open`, you have to call `get_idn` first to
+           update isntrument wavelength and step ranges.
 
     The instrument moves at limited speed.
     At power-up the instrument might start from motor position being 0, meaning that at this initial position
@@ -71,8 +74,8 @@ class WlPhotonics_WltfN(QMI_Instrument):
         self._transport = create_transport(transport)
 
         # Instrument ranges for values. Will be updated in `open()`
-        self._wavelength_range = _WavelengthRange
-        self._steps_range = _StepsRange
+        self._wavelength_range = _WavelengthRange()
+        self._steps_range = _StepsRange()
 
         # Current motor position step value. Initialize with 0, it will be updated in `open()`
         self._motor_position = 0

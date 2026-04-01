@@ -9,7 +9,7 @@ from enum import Enum
 import logging
 import struct
 import time
-from typing import Optional, Type, TypeVar
+from typing import TypeVar
 from qmi.core.context import QMI_Context
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
@@ -90,8 +90,8 @@ class Teraxion_TFNCommand:
     Base class for Teraxion TFN commands.
     """
 
-    command_id: int
-    num_received_bytes: Optional[int]
+    command_id: int = -1
+    num_received_bytes: int | None = None
     module_address: int = 0x30
 
 
@@ -285,11 +285,10 @@ class Teraxion_TFN(QMI_Instrument):
 
     def _make_write_command(
         self,
-        cmd: Type[T],
-        value: Optional[bytes] = None
+        cmd: type[T],
+        value: bytes | None = None
     ) -> str:
-        """
-        Helper method to make the write command.
+        """Helper method to make the write command.
 
         Parameters:
             cmd:        A Teraxion_TFNCommand.
@@ -302,12 +301,8 @@ class Teraxion_TFN(QMI_Instrument):
         # make write command and return
         return f"{self.CMD_START_CONDITION}{write_mode:02x}{cmd.command_id:02x}{hex_val}{self.CMD_STOP_CONDTION}"
 
-    def _make_read_command(
-        self,
-        cmd: Type[T],
-    ) -> str:
-        """
-        Helper method to make the read command.
+    def _make_read_command(self, cmd: type[T]) -> str:
+        """Helper method to make the read command.
 
         Parameters:
             cmd:        A Teraxion_TFNCommand.
@@ -319,12 +314,11 @@ class Teraxion_TFN(QMI_Instrument):
 
     def _write(
         self,
-        cmd: Type[T],
-        value: Optional[bytes] = None,
+        cmd: type[T],
+        value: bytes | None = None,
         timeout: float = DEFAULT_READ_TIMEOUT,
     ) -> None:
-        """
-        Helper method to send a wrie command.
+        """Helper method to send a wrie command.
 
         Parameters:
             cmd:    A Teraxion_TFNCommand.
@@ -338,12 +332,11 @@ class Teraxion_TFN(QMI_Instrument):
 
     def _read(
         self,
-        cmd: Type[T],
-        value: Optional[bytes] = None,
+        cmd: type[T],
+        value: bytes | None = None,
         timeout: float = DEFAULT_READ_TIMEOUT,
     ) -> bytes:
-        """
-        Helper method to send a read command.
+        """Helper method to send a read command.
 
         Parameters:
             cmd:        A Teraxion_TFNCommand.
@@ -357,8 +350,7 @@ class Teraxion_TFN(QMI_Instrument):
         return bytes.fromhex(resp)
 
     def _set_startup_byte(self, tec_status: bool) -> None:
-        """
-        Set the startup byte of the TFN.
+        """Set the startup byte of the TFN.
 
         Parameters:
             tec_status: The status of the TECs on startup. True for all enable and False for all disabled.
@@ -387,11 +379,10 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def get_firmware_version(self) -> str:
-        """
-        Get firmware version of the TFN.
+        """Get firmware version of the TFN.
 
         Returns:
-            the firmware version.
+            The firmware version.
         """
         _logger.info("[%s] Getting firmware version of instrument", self._name)
         self._check_is_open()
@@ -404,11 +395,10 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def get_manufacturer_name(self) -> str:
-        """
-        Get manufacturer name of the TFN.
+        """Get manufacturer name of the TFN.
 
         Returns:
-            the name of the manufacturer.
+            The name of the manufacturer.
         """
         _logger.info("[%s] Getting manufacturer name of instrument", self._name)
         self._check_is_open()
@@ -421,11 +411,10 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def get_model_number(self) -> str:
-        """
-        Get model number of the TFN.
+        """Get model number of the TFN.
 
         Returns:
-            the model number.
+            The model number.
         """
         _logger.info("[%s] Getting model number of instrument", self._name)
         self._check_is_open()
@@ -438,11 +427,10 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def get_serial_number(self) -> str:
-        """
-        Get serial number of the TFN.
+        """Get serial number of the TFN.
 
         Returns:
-            the serial number.
+            The serial number.
         """
         _logger.info("[%s] Getting serial number of instrument", self._name)
         self._check_is_open()
@@ -455,11 +443,10 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def get_idn(self) -> QMI_InstrumentIdentification:
-        """
-        Get instrument identification of the TFN.
+        """Get instrument identification of the TFN.
         
         Returns:
-            an instance of QMI_InstrumentIdentification.
+            An instance of QMI_InstrumentIdentification.
         """
         _logger.info("[%s] Getting instrument identitification of instrument", self._name)
         self._check_is_open()
@@ -470,11 +457,10 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def get_manufacturing_date(self) -> date:
-        """
-        Get manufacturing date of the TFN.
+        """Get manufacturing date of the TFN.
 
         Returns:
-            the manufacturing date.
+            The manufacturing date.
         """
         _logger.info("[%s] Getting manufacturing date of instrument", self._name)
         self._check_is_open()
@@ -488,11 +474,10 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def get_status(self) -> Teraxion_TFNStatus:
-        """
-        Get status of the TFN.
+        """Get status of the TFN.
 
         Returns:
-            an instance of Teraxion_TFNStatus.
+            An instance of Teraxion_TFNStatus.
         """
         _logger.info("[%s] Getting status of instrument", self._name)
         self._check_is_open()
@@ -518,9 +503,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def reset(self) -> None:
-        """
-        Perform a software reset.
-        """
+        """Perform a software reset."""
         _logger.info("[%s] Software resetting instrument", self._name)
         self._check_is_open()
         cmd = Teraxion_TFNCommand_Reset
@@ -534,8 +517,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def set_frequency(self, frequency: float) -> None:
-        """
-        Set frequency setpoint of the TFN.
+        """Set frequency setpoint of the TFN.
 
         Parameters:
             frequency:  The frequency setpoint in GHz.
@@ -550,11 +532,10 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def get_frequency(self) -> float:
-        """
-        Get frequency setpoint of the TFN.
+        """Get frequency setpoint of the TFN.
 
         Returns:
-            the frequency setpoint in GHz.
+            The frequency setpoint in GHz.
         """
         _logger.info("Getting frequency of instrument [%s]", self._name)
         self._check_is_open()
@@ -567,8 +548,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def get_rtd_temperature(self, element: Teraxion_TFNElement) -> int:
-        """
-        Get the RTD temperature of the provided element.
+        """Get the RTD temperature of the provided element.
 
         Parameters:
             element: The element to get the temperature for.
@@ -588,9 +568,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def enable_device(self) -> None:
-        """
-        Enable the device and turn on TEC control.
-        """
+        """Enable the device and turn on TEC control."""
         _logger.info("[%s] Enabling instrument", self._name)
         self._check_is_open()
         # send command
@@ -599,9 +577,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def disable_device(self) -> None:
-        """
-        Disable the device and turn off TEC control.
-        """
+        """Disable the device and turn off TEC control."""
         _logger.info("[%s] Disabling instrument", self._name)
         self._check_is_open()
         # send command
@@ -610,8 +586,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def get_startup_byte(self) -> bool:
-        """
-        Get the startup byte of the TFN.
+        """Get the startup byte of the TFN.
 
         Returns:
             The status of the TECs on startup. True for all enable and False for all disabled.
@@ -627,25 +602,20 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def enable_tecs_on_startup(self) -> None:
-        """
-        Enable TECs on startup of TFN.
-        """
+        """Enable TECs on startup of TFN."""
         self._set_startup_byte(True)
 
     @rpc_method
     def disable_tecs_on_startup(self) -> None:
-        """
-        Disable TECs on startup of TFN.
-        """
+        """Disable TECs on startup of TFN."""
         self._set_startup_byte(False)
 
     @rpc_method
     def get_nominal_settings(self) -> Teraxion_TFNSettings:
-        """
-        Get nominal settings of the TFN.
+        """Get nominal settings of the TFN.
 
         Returns:
-            an instance of Teraxion_TFNSettings.
+            An instance of Teraxion_TFNSettings.
         """
         _logger.info("Getting frequency of instrument [%s]", self._name)
         self._check_is_open()
@@ -658,9 +628,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def save_nominal_settings(self) -> None:
-        """
-        Save nominal settings of the TFN. These settings are the current frequency and dispersion values.
-        """
+        """Save nominal settings of the TFN. These settings are the current frequency and dispersion values."""
         _logger.info("[%s] Saving nominal settings of instrument", self._name)
         self._check_is_open()
         # send command
@@ -669,8 +637,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def get_channel_plan(self) -> Teraxion_TFNChannelPlan:
-        """
-        Get channel plan for specified grid.
+        """Get channel plan for specified grid.
 
         Returns:
             an instance of Teraxion_TFNChannelPlan.
@@ -686,8 +653,7 @@ class Teraxion_TFN(QMI_Instrument):
 
     @rpc_method
     def set_i2c_address(self, address: int) -> None:
-        """
-        Set the I2C address of the TFN module. This all will need a power cycle to take effect.
+        """Set the I2C address of the TFN module. This all will need a power cycle to take effect.
         
         Parameters:
             address:    New I2C address for module.

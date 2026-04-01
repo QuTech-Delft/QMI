@@ -4,7 +4,6 @@ Instrument driver for the Santec TSL 570 laser.
 
 import logging
 from dataclasses import dataclass
-from typing import List, Union
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
@@ -21,24 +20,24 @@ _logger = logging.getLogger(__name__)
 class _WavelengthRange:
     """Dataclass for wavelength instrument range."""
 
-    min: float
-    max: float
+    min: float = 0.0
+    max: float = 0.0
 
 
 @dataclass
 class _FrequencyRange:
     """Dataclass for frequency instrument range."""
 
-    min: float
-    max: float
+    min: float = 0.0
+    max: float = 0.0
 
 
 @dataclass
 class _PowerLevelRange:
     """Dataclass for power level instrument range."""
 
-    min: float
-    max: float
+    min: float = 0.0
+    max: float = 0.0
 
 
 class Santec_Tsl570(QMI_Instrument):
@@ -106,11 +105,11 @@ class Santec_Tsl570(QMI_Instrument):
             default_timeout=self.DEFAULT_RESPONSE_TIMEOUT,
         )
         # Instrument ranges for values
-        self._wavelength_range = _WavelengthRange
-        self._frequency_range = _FrequencyRange
-        self._power_level_range = _PowerLevelRange
+        self._wavelength_range = _WavelengthRange()
+        self._frequency_range = _FrequencyRange()
+        self._power_level_range = _PowerLevelRange()
 
-    def _check_error(self) -> List[str]:
+    def _check_error(self) -> list[str]:
         """Read the instrument error queue and raise an exception if there is an error.
 
         Returns:
@@ -257,7 +256,7 @@ class Santec_Tsl570(QMI_Instrument):
         return response
 
     @rpc_method
-    def get_errors(self) -> List[str]:
+    def get_errors(self) -> list[str]:
         """Query all errors and alerts.
 
         Returns:
@@ -416,7 +415,7 @@ class Santec_Tsl570(QMI_Instrument):
         self._write_and_check_errors(":WAV:FIN:DIS")
 
     @rpc_method
-    def set_coherence_control_status(self, status: Union[bool, str]) -> None:
+    def set_coherence_control_status(self, status: bool | str) -> None:
         """Set the Coherence control status.
 
         Parameters:
@@ -445,7 +444,7 @@ class Santec_Tsl570(QMI_Instrument):
         return "ON" if status else "OFF"
 
     @rpc_method
-    def set_optical_output_status(self, status: Union[bool, str]) -> None:
+    def set_optical_output_status(self, status: bool | str) -> None:
         """Set the optical output status.
 
         Parameters:
@@ -888,7 +887,7 @@ class Santec_Tsl570(QMI_Instrument):
         return int(self._scpi_protocol.ask(":READ:POIN?"))
 
     @rpc_method
-    def readout_data(self) -> List[float]:
+    def readout_data(self) -> list[float]:
         """Read out wavelength logging data and convert it into floating point values. According to the manual
         the data points are returned in units of 0.1pm. Thus, value 0x0040F844 (little Endian order) = 4520000
         corresponds to 452.0000nm.

@@ -40,7 +40,7 @@ class TestSantecTsl570OpenClose(unittest.TestCase):
         close() command then just closes the connection to the instrument and the transport.
         """
         # Initially, the wavelength and power range should be bare data classes
-        expected_initial_out = "<class 'qmi.instruments.santec.tsl_570._{rng}Range'>"
+        expected_initial_out = "_{rng}Range(min=0.0, max=0.0)"
         self.assertEqual(expected_initial_out.format(rng="Wavelength"), str(self.instr._wavelength_range))
         self.assertEqual(expected_initial_out.format(rng="Frequency"), str(self.instr._frequency_range))
         self.assertEqual(expected_initial_out.format(rng="PowerLevel"), str(self.instr._power_level_range))
