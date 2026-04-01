@@ -56,6 +56,7 @@ The latest version of the documentation can be found [here](https://qmi.readthed
 ### Installing for generating documentation
 
 [//]: # (As we do not list any other optional installations, I wonder why we have decided to list this specifically?)
+[//]: # (Update: turns out this does not work. There is no [rtd] optional dependency list, so this needs updating to just say [dev])
 To install the necessary packages to perform documentation activities for QMI do:
 
 ```
@@ -64,6 +65,7 @@ pip install -e .[rtd]
 
 To build the 'readthedocs' documentation locally do:
 
+[//]: # (This also does not work: documentation/sphinx/make-docs does not exist. I think this should say something about scripts/run_docs_sphinx.sh.)
 ```
 cd documentation/sphinx
 ./make-docs
