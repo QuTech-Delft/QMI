@@ -29,8 +29,8 @@ class _WavelengthRange:
 class _StepsRange:
     """Dataclass for frequency instrument range."""
 
-    min: int = 0.0
-    max: int = 0.0
+    min: int = 0
+    max: int = 0
 
 
 class WlPhotonics_WltfN(QMI_Instrument):

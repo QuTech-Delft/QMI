@@ -34,9 +34,10 @@ class TestWlPhotonicsWltfNOpenCloseSerial(unittest.TestCase):
         close() command then just closes the connection to the instrument and the transport.
         """
         # Initially, the wavelength and power range should be bare data classes
-        expected_initial_out = "_{rng}Range(min=0.0, max=0.0)"
-        self.assertEqual(expected_initial_out.format(rng="Wavelength"), str(self.instr._wavelength_range))
-        self.assertEqual(expected_initial_out.format(rng="Steps"), str(self.instr._steps_range))
+        expected_initial_out_wl = "_WavelengthRange(min=0.0, max=0.0)"
+        expected_initial_out_steps = "_StepsRange(min=0, max=0)"
+        self.assertEqual(expected_initial_out_wl, str(self.instr._wavelength_range))
+        self.assertEqual(expected_initial_out_steps, str(self.instr._steps_range))
         # Arrange
         expected_wl_min = 1021.509
         expected_wl_max = 1072.505
@@ -103,9 +104,10 @@ class TestWlPhotonicsWltfNOpenClosePyUSB(unittest.TestCase):
         close() command then just closes the connection to the instrument and the transport.
         """
         # Initially, the wavelength and power range should be bare data classes
-        expected_initial_out = "_{rng}Range(min=0.0, max=0.0)"
-        self.assertEqual(expected_initial_out.format(rng="Wavelength"), str(self.instr._wavelength_range))
-        self.assertEqual(expected_initial_out.format(rng="Steps"), str(self.instr._steps_range))
+        expected_initial_out_wl = "_WavelengthRange(min=0.0, max=0.0)"
+        expected_initial_out_steps = "_StepsRange(min=0, max=0)"
+        self.assertEqual(expected_initial_out_wl, str(self.instr._wavelength_range))
+        self.assertEqual(expected_initial_out_steps, str(self.instr._steps_range))
         # Arrange
         expected_wl_min = 1021.509
         expected_wl_max = 1072.505
