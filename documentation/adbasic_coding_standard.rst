@@ -1,3 +1,4 @@
+.. I wonder why this file is in the repo? It seems to be completely ADWin specific and not directly related to QMI.
 ADbasic coding standard
 =======================
 
