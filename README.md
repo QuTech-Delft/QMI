@@ -55,6 +55,7 @@ The latest version of the documentation can be found [here](https://qmi.readthed
 
 ### Installing for generating documentation
 
+[//]: # (As we do not list any other optional installations, I wonder why we have decided to list this specifically?)
 To install the necessary packages to perform documentation activities for QMI do:
 
 ```
