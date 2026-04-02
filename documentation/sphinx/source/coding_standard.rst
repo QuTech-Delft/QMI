@@ -23,6 +23,10 @@ In the following, we follow the subsection structure of PEP-8.
 The ``▻`` symbol denotes a reference to a named section of PEP-8.
 Note that we only cite those sections where we deviate.
 
+.. It might be worth it to use the headers to link to the relevant sections of PEP-8.
+
+.. Also, it seems that the arrow symbol is just used in every section here, even if it does not reference PEP-8. Examples of this are the logger naming conventions and asserts.
+
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ Code Lay-out: Tabs or Spaces?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -114,6 +118,8 @@ All QMI code must be commented in English, using US-English spelling.
 ▻ Comments: Inline Comments
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. This does not deviate from PEP-8, so I don't think it should be here.
+
 PEP-8 mandates that inline comments should be separated from the statement by at least two spaces.
 
 ^^^^^^^^^^^^^^^^^^^^
@@ -132,27 +138,42 @@ Often class member variables are initialized at init time, and read-only after t
 make a private member variable, and provide a property to read it.  However, throughout QMI, we will simply make a
 variable name public, and explicitly document that the member is to be treated as read-only in the class documentation.
 
+.. This last part does not seem related to naming (other than not using a leading underscore).
+
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ Coding Conventions for ``__init__.py`` files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-In case of the top-level ``qmi`` package we do want to do a few things:
+In case of the top-level ``qmi`` package we want to do a few things:
 
-* Define QMI version and check the Python version running QMI.
-* Setup logging if ``QMI_DEBUG`` environment variable is set (as True). Otherwise start at ``qmi.start()``.
+* Define the QMI version and check the Python version running QMI.
+* Setup logging if the ``QMI_DEBUG`` environment variable is set (as True). Otherwise start at ``qmi.start()``.
+
+.. A previous page said that any value for QMI_DEBUG would do, so I am now not sure which is correct.
+
 * Selectively import symbols into the top-level ``qmi`` package.
 
-For instruments, you can use the __init__.py file to shorten import statements, by importing the instrument classes
+For instruments, you can use the ``__init__.py`` file to shorten import statements, by importing the instrument classes
 there. So, instead of doing ``from qmi.instruments.dummy.instrument import Dummy_Instrument`` you can import shortened
-``from qmi.instruments.dummy import Dummy_Instrument``. But please avoid using  the ``__all__ = [<Classes>]`` statement
-to avoid enabling the ``from xxx import *`` import statements. Also please note that using __init__.py to shorten
+``from qmi.instruments.dummy import Dummy_Instrument``.
+But please avoid using  the ``__all__ = [<Classes>]`` statement
+to avoid enabling the ``from xxx import *`` import statements.
+
+.. "from xxx import *" is not disabled if `__all__` is not set: it will simply import everything in the module.
+Also, not setting `__all__` means that according to PEP-8, any documented name in the module is now considered public.
+.. This is likely not what you want for maintainability.
+.. Finally, I don't think it is up to us to prescribe how users are allowed to use the package. If they want to do the asterisk import, they should be able to.
+
+Also please note that when using ``__init__.py`` to shorten
 import statements, careless use of it can lead to circular referencing which will make the code crash. Even the order
 of imports can have an effect on this.
 
-Otherwise, you can keep __init__.py files empty or write a short docstring describing the package.
+Otherwise, you can keep ``__init__.py`` files empty or write a short docstring describing the package.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ Coding Convention for assert statements
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. Note that asserting is disabled if you run Python in performance mode, so asserts are not reliable error detection mechanisms.
 
 Asserting is fine in cases where you need to assert something is really the case even if you are (nearly) 100% that it
 is so. For example in more complex data analysis scripts, or you want to assert system state before moving on.
@@ -178,9 +199,15 @@ or if it is set in the configuration file, the possible options are "INFO", "WAR
 "FATAL", "ERROR", "WARN", "NOTSET". "DEBUG" should not be used directly, but rather via the ``QMI_DEBUG``
 environment variable.
 
+.. This is a less complete repeat of the explanation of log levels in `design.rst`.
+
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ Coding Convention for logging argument strings
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. This section is vague on what it is saying: should one only use % formatting or are f-string allowed, for instance?
+.. Also, if this is indeed prescriptive in that you only use % formatting, might I suggest using the extra argument to logging instead, as that is more performant?
+.. See https://docs.python.org/3/library/logging.html#logging.Logger.debug and https://docs.astral.sh/ruff/rules/logging-percent-format/.
 
 We support the "old" way of string formatting with logging, using the `%` sign. See the
 `Python documentation <https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting>`_ for details.
@@ -188,6 +215,9 @@ We support the "old" way of string formatting with logging, using the `%` sign. 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ▻ Coding Convention to document exceptions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. This section is also vague: when is a function considered to be raising an exception "itself"?
+.. I would think that a divide by zero would be an exception in the function itself, for instance.
 
 If a function itself can raise an exception (like checking an input value), it should be described in the docstring
 which error can be raised and under which condition. Do not describe exceptions raised by any other calls of the
