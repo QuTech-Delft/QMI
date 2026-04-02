@@ -48,7 +48,9 @@ target-version = "py311"
 # Enable specific rule-sets. See https://docs.astral.sh/ruff/rules/ for documentation.
 select = [
     # Pylint: Static code analysis including errors, warnings, convention mismatches and refactor suggestions.
-    "PL",
+    "PLE",
+    "PLC",
+
 ]
 ignore = [
     # Pylint: Collection of rules against having too many of something (statements, parameters, branches, much more).
@@ -56,6 +58,9 @@ ignore = [
     # they will just reject any code with more than 5 parameters for instance.
     # Disabled because we do not want to put (configurable) arbitrary limits on our code.
     "PLR09",
+    # Pylint: import-outside-top-level
+    # We import outside the top level to reduce required dependencies and reduce import load.
+    "PLC0415",
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
