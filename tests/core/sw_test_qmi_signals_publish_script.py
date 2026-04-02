@@ -5,6 +5,7 @@ from typing import cast
 import qmi
 from qmi.core.rpc import QMI_RpcObject
 from qmi.core.pubsub import QMI_Signal
+import sys
 
 
 class DummyDataCreator(QMI_RpcObject):
@@ -49,4 +50,4 @@ if __name__ == "__main__":
     ddc.stop()
     pub_thread.join()
     qmi.stop()
-    exit()
+    sys.exit()

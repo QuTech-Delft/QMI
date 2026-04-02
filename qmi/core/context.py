@@ -1063,8 +1063,8 @@ class QMI_Context:
             print("No objects found.")
 
         else:
-            max_address_length = max(max(len(address) for address, _ in rpc_objects), 7)
-            max_class_name_length = max(max(len(class_name) for _, class_name in rpc_objects), 4)
+            max_address_length = max(*(len(address) for address, _ in rpc_objects), 7)
+            max_class_name_length = max(*(len(class_name) for _, class_name in rpc_objects), 4)
 
             print(f"{'address'.ljust(max_address_length)}  type")
             print(f"{'-' * max_address_length}  {'-' * max_class_name_length}")

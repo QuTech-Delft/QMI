@@ -18,7 +18,7 @@ from qmi.core.config_defs import CfgProcessManagement
 from qmi.core.config_defs import CfgProcessHost
 from qmi.core.config_struct import config_struct_from_dict
 from qmi.core.exceptions import QMI_ApplicationException
-import qmi.tools.proc as proc
+from qmi.tools import proc
 
 from tests.patcher import PatcherQmiContext as QMI_Context
 from tests.patcher import PatcherQmiRpcProxy as QMI_RpcProxy

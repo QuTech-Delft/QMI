@@ -697,7 +697,6 @@ class QMI_RpcProxy:
 
     def __exit__(self, *args, **kwargs):
         self.__exit__()
-        return
 
     def __repr__(self) -> str:
         return f"<rpc proxy for {self._rpc_object_address} ({self._rpc_class_fqn})>"

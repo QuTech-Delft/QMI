@@ -249,7 +249,7 @@ def run_adbasic_compiler(
     t1 = time.monotonic()
 
     # pylint: disable=subprocess-run-check
-    completed_process = subprocess.run(args=run_args, capture_output=True, cwd=working_dir)
+    completed_process = subprocess.run(check=False, args=run_args, capture_output=True, cwd=working_dir)
 
     t2 = time.monotonic()
     duration = (t2 - t1)
