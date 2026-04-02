@@ -67,6 +67,7 @@ dev = [
     "coverage",
     "pylint>=3.0",
     "mypy",
+    "ruff",
     # For generating documentation
     "sphinx",
     "sphinx_rtd_theme",
