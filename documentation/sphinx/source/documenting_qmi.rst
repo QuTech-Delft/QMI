@@ -2,7 +2,7 @@
 Documenting QMI
 ===============
 
-This section contains links that are useful while commenting QMI.
+This section contains links that are useful while writing Sphinx documentation for QMI.
 
 `Section 7.3.6 of the Python Developers Guide <https://devguide.python.org/documenting/#sections>`_ describes heading order. In our documentation, we start with the 'sections' level.
 
@@ -73,6 +73,9 @@ The following terms are recognized by the *Napoleon* parser:
 --------------------------
 Wishlist for documentation
 --------------------------
+
+.. This seems to be a TODO list. It might be better to capture this in issues.
+.. Also, I don't think any of these items are understandable to anyone who did not write them.
 
 * Referencing to some items is quite hard to understand and get right.
 * Autosummary could help.
