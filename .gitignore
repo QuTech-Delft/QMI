@@ -133,3 +133,5 @@ dmypy.json
 
 # Jetbrains IDEs settings
 .idea/
+
+uv.lock
