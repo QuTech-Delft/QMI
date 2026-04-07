@@ -14,11 +14,11 @@ If you are using e.g. Git Bash on Windows, the `bump-my-version` command probabl
     ```
 2. Run `bump-my-version` to update the files which contain references to `main` to the new stable branch.
     ```shell script
-    bump-my-version release --config-file=.bumpversion_switch.toml --commit
+    bump-my-version bump --config-file .bumpversion_switch.toml --commit release
     ```
 3. Run `bump-my-version` to create a release version and a tag:
     ```shell script
-    bump-my-version release --config-file=.bumpversion_release.toml --commit --tag
+    bump-my-version bump --config-file=.bumpversion_release.toml --commit --tag release
     ```
 4. Push the branch to origin and see that it passes the workflow.
     ```shell script
@@ -49,7 +49,7 @@ If you are using e.g. Git Bash on Windows, the `bump-my-version` command probabl
     ```
 11. Run `bump-my-version` to create the beta minor version on main:
     ```shell script
-    bump-my-version minor --config-file=.bumpversion_main.toml --allow-dirty --commit
+    bump-my-version bump --config-file=.bumpversion_main.toml --allow-dirty --commit minor
     ```
 12. Push the branch to origin:
     ```shell script
@@ -75,7 +75,7 @@ need another commit to fix the version numbering, or file-specific checkouts fro
     ```
 3. Run `bump-my-version` to create the beta patch version on stable:
     ```shell script
-    bump-my-version patch --config-file=.bumpversion_stable.toml --allow-dirty --commit
+    bump-my-version bump --config-file=.bumpversion_stable.toml --allow-dirty --commit patch
     ```
 4. Cherry-pick the patch into the stable branch:
     ```shell script
@@ -88,7 +88,7 @@ need another commit to fix the version numbering, or file-specific checkouts fro
     ```
 6. Run `bump-my-version` to create a release version and a tag:
     ```shell script
-    bump-my-version release --config-file=.bumpversion_release.toml  --allow-dirty --commit --tag
+    bump-my-version bump --config-file=.bumpversion_release.toml  --allow-dirty --commit --tag release
     ```
 7. Push the branch and tag to origin:
     ```shell script
