@@ -69,15 +69,3 @@ The following terms are recognized by the *Napoleon* parser:
 * Warns
 * Yield (alias of Yields)
 * Yields
-
---------------------------
-Wishlist for documentation
---------------------------
-
-.. This seems to be a TODO list. It might be better to capture this in issues.
-.. Also, I don't think any of these items are understandable to anyone who did not write them.
-
-* Referencing to some items is quite hard to understand and get right.
-* Autosummary could help.
-* Standard exception "ValueError" is not clickable (intersphinx?)
-
