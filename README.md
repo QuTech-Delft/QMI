@@ -1,4 +1,3 @@
-[![pylint](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/pylint.svg)](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/pylint.svg)
 [![mypy](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/mypy.svg)](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/mypy.svg)
 [![Documentation Status](https://readthedocs.org/projects/qmi/badge/?version=latest)](https://qmi.readthedocs.io/en/latest/?badge=latest)
 [![coverage](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/coverage.svg)](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/coverage.svg)
