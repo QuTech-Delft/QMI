@@ -21,21 +21,18 @@ PEP-8 Deviations
 
 In the following, we follow the subsection structure of PEP-8.
 The ``▻`` symbol denotes a reference to a named section of PEP-8.
+Section headers in this file will link to PEP-8 where appropriate.
 Note that we only cite those sections where we deviate.
 
-.. It might be worth it to use the headers to link to the relevant sections of PEP-8.
-
-.. Also, it seems that the arrow symbol is just used in every section here, even if it does not reference PEP-8. Examples of this are the logger naming conventions and asserts.
-
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ Code Lay-out: Tabs or Spaces?
+▻ `Code Lay-out: Tabs or Spaces? <https://peps.python.org/pep-0008/#tabs-or-spaces>`_
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Tabs are not allowed. Indentation is to be done solely with spaces. Only the standard PEP-8 indentation of 4 spaces is
 allowed.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ Code Lay-out: Maximum Line Length
+▻ `Code Lay-out: Maximum Line Length <https://peps.python.org/pep-0008/#maximum-line-length>`_
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 PEP-8 mandates a line length maximum of 79 characters, and 72 characters for docstrings and comments.
@@ -44,13 +41,13 @@ We feel this is too constraining, given today's wide-screen monitors.
 We mandate only a maximum line length of 119 characters, both for code and for comments and docstrings.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ Code Lay-out: Blank Lines
+▻ `Code Lay-out: Blank Lines <https://peps.python.org/pep-0008/#blank-lines>`_
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 PEP-8 suggests that the ASCII Form Feed (12) characters may be used. Don't.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ Code Lay-out Source File Encoding
+▻ `Code Lay-out: Source File Encoding <https://peps.python.org/pep-0008/#source-file-encoding>`_
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 All QMI source code files shall be UTF-8 files.
@@ -69,7 +66,7 @@ The last line of a Python source file must end in a single newline, with the pos
 completely empty. This can happen with '``__init__.py``' files used to signify that a directory is a package.
 
 ^^^^^^^^^^^^^^^
-▻ String Quotes
+▻ `String Quotes <https://peps.python.org/pep-0008/#string-quotes>`_
 ^^^^^^^^^^^^^^^
 
 For strings, we use double-quote characters.
@@ -80,20 +77,20 @@ Exception #2: In Python, sometimes shorts strings are used as a substitute for e
 written with single quotes.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ Whitespace in Expressions and Statements: Pet Peeves
+▻ `Whitespace in Expressions and Statements: Pet Peeves <https://peps.python.org/pep-0008/#pet-peeves>`_
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 We disagree with PEP-8 on forbidding more than one space around an assignment (or other) operator to align it with
 another. We allow it if it helps readability. Use your judgement.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ Whitespace in Expressions and Statements: Other Recommendations
+▻ `Whitespace in Expressions and Statements: Other Recommendations <https://peps.python.org/pep-0008/#other-recommendations>`_
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Trailing spaces are absolutely forbidden.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ When to Use Trailing Commas
+▻ `When to Use Trailing Commas <https://peps.python.org/pep-0008/#when-to-use-trailing-commas>`_
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 We allow trailing commas only if necessary, when writing a one-element tuple.
@@ -102,7 +99,7 @@ Always enclose one-element tuples in parentheses.
 In all other cases, trailing commas in lists, tuples, etc. are forbidden.
 
 ^^^^^^^^^^
-▻ Comments
+▻ `Comments <https://peps.python.org/pep-0008/#comments>`_
 ^^^^^^^^^^
 
 Comments should be complete sentences and thus start with a capital letter and end with a period.
@@ -114,16 +111,8 @@ In contrast to what is mandated by PEP-8, comment sentences should be separated 
 
 All QMI code must be commented in English, using US-English spelling.
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ Comments: Inline Comments
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. This does not deviate from PEP-8, so I don't think it should be here.
-
-PEP-8 mandates that inline comments should be separated from the statement by at least two spaces.
-
 ^^^^^^^^^^^^^^^^^^^^
-▻ Naming Conventions
+▻ `Naming Conventions <https://peps.python.org/pep-0008/#naming-conventions>`_
 ^^^^^^^^^^^^^^^^^^^^
 
 In general, follow PEP-8 recommendations.
@@ -140,28 +129,22 @@ variable name public, and explicitly document that the member is to be treated a
 
 .. This last part does not seem related to naming (other than not using a leading underscore).
 
+-------------------
+Specific coding conventions
+-------------------
+
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ Coding Conventions for ``__init__.py`` files
+``__init__.py`` files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 In case of the top-level ``qmi`` package we want to do a few things:
 
 * Define the QMI version and check the Python version running QMI.
-* Setup logging if the ``QMI_DEBUG`` environment variable is set (as True). Otherwise start at ``qmi.start()``.
-
-.. A previous page said that any value for QMI_DEBUG would do, so I am now not sure which is correct.
-
+* Setup logging if the ``QMI_DEBUG`` environment variable is set. Otherwise start at ``qmi.start()``.
 * Selectively import symbols into the top-level ``qmi`` package.
 
 For instruments, you can use the ``__init__.py`` file to shorten import statements, by importing the instrument classes
 there. So, instead of doing ``from qmi.instruments.dummy.instrument import Dummy_Instrument`` you can import shortened
 ``from qmi.instruments.dummy import Dummy_Instrument``.
-But please avoid using  the ``__all__ = [<Classes>]`` statement
-to avoid enabling the ``from xxx import *`` import statements.
-
-.. "from xxx import *" is not disabled if `__all__` is not set: it will simply import everything in the module.
-Also, not setting `__all__` means that according to PEP-8, any documented name in the module is now considered public.
-.. This is likely not what you want for maintainability.
-.. Finally, I don't think it is up to us to prescribe how users are allowed to use the package. If they want to do the asterisk import, they should be able to.
 
 Also please note that when using ``__init__.py`` to shorten
 import statements, careless use of it can lead to circular referencing which will make the code crash. Even the order
@@ -170,7 +153,7 @@ of imports can have an effect on this.
 Otherwise, you can keep ``__init__.py`` files empty or write a short docstring describing the package.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ Coding Convention for assert statements
+Assert statements
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. Note that asserting is disabled if you run Python in performance mode, so asserts are not reliable error detection mechanisms.
@@ -185,7 +168,7 @@ It should **not** be used to check input parameters or user-given parameters, wh
 (with possibly raising an exception on wrong input).
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ Coding Convention for logger naming policy
+Logger naming policy
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For modules that are not run as ``__main__``, we should always initialize the logger with
@@ -194,34 +177,30 @@ For modules that are not run as ``__main__``, we should always initialize the lo
 For modules that can be run as ``__main__``, we should make a check ``if __name__ is "__main__"`` and in that case set
 the logger name manually.
 
-If the logger is started normally (not in DEBUG mode), using ``qmi.start`` with ``console_loglevel=`` keyword argument,
-or if it is set in the configuration file, the possible options are "INFO", "WARNING" (default), "DEBUG", "CRITICAL",
-"FATAL", "ERROR", "WARN", "NOTSET". "DEBUG" should not be used directly, but rather via the ``QMI_DEBUG``
-environment variable.
-
-.. This is a less complete repeat of the explanation of log levels in `design.rst`.
-
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ Coding Convention for logging argument strings
+Logging argument strings
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. This section is vague on what it is saying: should one only use % formatting or are f-string allowed, for instance?
-.. Also, if this is indeed prescriptive in that you only use % formatting, might I suggest using the extra argument to logging instead, as that is more performant?
-.. See https://docs.python.org/3/library/logging.html#logging.Logger.debug and https://docs.astral.sh/ruff/rules/logging-percent-format/.
-
-We support the "old" way of string formatting with logging, using the `%` sign. See the
+We only use the "old" way of string formatting with logging, using the `%` sign. See the
 `Python documentation <https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting>`_ for details.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ Coding Convention to document exceptions
+Exception documentation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. This section is also vague: when is a function considered to be raising an exception "itself"?
 .. I would think that a divide by zero would be an exception in the function itself, for instance.
 
-If a function itself can raise an exception (like checking an input value), it should be described in the docstring
-which error can be raised and under which condition. Do not describe exceptions raised by any other calls of the
-method or e.g. accidentally dividing by zero etc.
+If a function includes raise statement or statements,
+the docstring should describe when the error or exception can be raised."
+
+For example:
+::
+    Raises:
+        ValueError: If value of 'b' is 0 as we cannot divide by zero.
+
+If we do not have the check, we would get the ZeroDivisionError but that we do not write in the docstring,
+as it comes from "outside", in this case from a builtin function.
 
 -------------------
 Semantic guidelines
@@ -231,7 +210,7 @@ This section provides guidelines that are concerned with the functionality of th
 and presentation of the code.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ The use of ``__init()__`` methods
+The use of ``__init()__`` methods
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For __init__ function a few conventions can be made:
@@ -240,7 +219,7 @@ For __init__ function a few conventions can be made:
     avoided as much as possible so that we do not need to do any assert ``self.xxx is not None`` later on.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-▻ The use of ``__del__()`` methods
+The use of ``__del__()`` methods
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 ``__del__()`` methods (also called finalizers) should be avoided in QMI code. A deviation to this is that if we use
