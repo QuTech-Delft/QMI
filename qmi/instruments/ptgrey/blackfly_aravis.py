@@ -98,7 +98,7 @@ def _import_modules() -> None:
     the instrument directly.
     """
 
-    global Aravis
+    global Aravis  # noqa: PLW0603
 
     with _aravis_mutex:
         if Aravis is None:

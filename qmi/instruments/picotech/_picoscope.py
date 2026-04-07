@@ -37,7 +37,7 @@ def _import_modules(library: str) -> None:
     parameters:
         library: module library string to import. Like "3000a"
     """
-    global _ps, COMMAND_DICT
+    global _ps, COMMAND_DICT  # noqa: PLW0602, PLW0603
     library = f"ps{library}"
     if _ps is None:
         ps_lib = importlib.import_module(f"picosdk.{library}")

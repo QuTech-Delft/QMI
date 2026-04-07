@@ -47,7 +47,7 @@ def _import_modules() -> None:
     to avoid an unnecessary dependency for programs that do not access
     the instrument directly.
     """
-    global ADwin
+    global ADwin  # noqa: PLW0603
     if ADwin is None:
         import ADwin  # pylint: disable=W0621
 

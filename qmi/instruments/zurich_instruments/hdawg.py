@@ -59,7 +59,7 @@ def _import_modules() -> None:
     to avoid an unnecessary dependency for programs that do not access
     the instrument directly.
     """
-    global zhinst, ziDAQServer, Waveforms, HDAWG, ZIModule
+    global zhinst, ziDAQServer, Waveforms, HDAWG, ZIModule  # noqa: PLW0603
     if zhinst is None:
         import zhinst
         import zhinst.core
@@ -198,7 +198,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         for parameter, replacement in replacements.items():
             # Convert replacements to "str".
             if isinstance(replacement, (int, float)):
-                replacement = repr(replacement)
+                replacement = repr(replacement)  # noqa: PLW2901
 
             # At this point, the replacement value should be a string.
             if not isinstance(replacement, str):

@@ -48,10 +48,7 @@ target-version = "py311"
 # Enable specific rule-sets. See https://docs.astral.sh/ruff/rules/ for documentation.
 select = [
     # Pylint: Static code analysis including errors, warnings, convention mismatches and refactor suggestions.
-    "PLE",
-    "PLC",
-    "PLR"
-
+    "PL",
 ]
 ignore = [
     # Pylint: Collection of rules against having too many of something (statements, parameters, branches, much more).

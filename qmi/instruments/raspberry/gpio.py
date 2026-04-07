@@ -22,7 +22,7 @@ def _import_modules() -> None:
     to avoid an unnecessary dependency for programs that do not access
     the instrument directly.
     """
-    global GPIO
+    global GPIO  # noqa: PLW0603
     if GPIO is None:
         from RPi import GPIO  # pylint: disable=W0621
 

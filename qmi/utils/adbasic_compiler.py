@@ -136,7 +136,7 @@ def _parse_stderr_lines(stderr_lines: list[str]) -> tuple[list[AdbasicError], li
                 line_number_int = int(line_number)
                 error = AdbasicError(error_number_int, error_description, error_line, filename, line_number_int)
                 errors.append(error)
-                line = line[match.end():]
+                line = line[match.end():]  # noqa: PLW2901
                 continue
 
             match = error_line_v2_pattern.match(line)
@@ -145,7 +145,7 @@ def _parse_stderr_lines(stderr_lines: list[str]) -> tuple[list[AdbasicError], li
                 error_number_int = int(error_number)
                 error = AdbasicError(error_number_int, error_description, "", filename, 0)
                 errors.append(error)
-                line = line[match.end():]
+                line = line[match.end():]  # noqa: PLW2901
                 continue
 
             match = error_invalid_option_pattern.match(line)
@@ -153,7 +153,7 @@ def _parse_stderr_lines(stderr_lines: list[str]) -> tuple[list[AdbasicError], li
                 (invalid_option, ) = match.groups()
                 error = AdbasicError(0, f"Invalid command line option: {invalid_option}", "", "", 0)
                 errors.append(error)
-                line = line[match.end():]
+                line = line[match.end():]  # noqa: PLW2901
                 continue
 
             match = compilation_aborted_line_pattern.match(line)
@@ -161,7 +161,7 @@ def _parse_stderr_lines(stderr_lines: list[str]) -> tuple[list[AdbasicError], li
                 error_description = match.group(0)
                 error = AdbasicError(0, error_description, "", "", 0)
                 errors.append(error)
-                line = line[match.end():]
+                line = line[match.end():]  # noqa: PLW2901
                 continue
 
             match = error_warning_count_line_pattern.match(line)
@@ -171,7 +171,7 @@ def _parse_stderr_lines(stderr_lines: list[str]) -> tuple[list[AdbasicError], li
                 if (error_count > 0) or (warning_count > 0):
                     error = AdbasicError(0, match.group(0), "", "", 0)
                     warnings.append(error)
-                line = line[match.end():]
+                line = line[match.end():]  # noqa: PLW2901
                 continue
 
             match = fixme_warning_count_line_pattern.match(line)
@@ -180,7 +180,7 @@ def _parse_stderr_lines(stderr_lines: list[str]) -> tuple[list[AdbasicError], li
                 if warning_count > 0:
                     error = AdbasicError(0, match.group(0), "", "", 0)
                     warnings.append(error)
-                line = line[match.end():]
+                line = line[match.end():]  # noqa: PLW2901
                 continue
 
             raise AdbasicCompilerException(f"Unrecognized ADbasic error string: {line!r}", [])
