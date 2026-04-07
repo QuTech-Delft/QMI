@@ -14,11 +14,11 @@ If you are using e.g. Git Bash on Windows, the `bump2version` command probably n
     ```
 2. Run `bump2version` to update the files which contain references to `main` to the new stable branch.
     ```shell script
-    bump2version release --config-file=.bumpversion_switch.cfg --commit
+    bump2version release --config-file=.bumpversion_switch.toml --commit
     ```
 3. Run `bump2version` to create a release version and a tag:
     ```shell script
-    bump2version release --config-file=.bumpversion_release.cfg --commit --tag
+    bump2version release --config-file=.bumpversion_release.toml --commit --tag
     ```
 4. Push the branch to origin and see that it passes the workflow.
     ```shell script
@@ -49,7 +49,7 @@ If you are using e.g. Git Bash on Windows, the `bump2version` command probably n
     ```
 11. Run `bump2version` to create the beta minor version on main:
     ```shell script
-    bump2version minor --config-file=.bumpversion_main.cfg --allow-dirty --commit
+    bump2version minor --config-file=.bumpversion_main.toml --allow-dirty --commit
     ```
 12. Push the branch to origin:
     ```shell script
@@ -75,7 +75,7 @@ need another commit to fix the version numbering, or file-specific checkouts fro
     ```
 3. Run `bump2version` to create the beta patch version on stable:
     ```shell script
-    bump2version patch --config-file=.bumpversion_stable.cfg --allow-dirty --commit
+    bump2version patch --config-file=.bumpversion_stable.toml --allow-dirty --commit
     ```
 4. Cherry-pick the patch into the stable branch:
     ```shell script
@@ -88,7 +88,7 @@ need another commit to fix the version numbering, or file-specific checkouts fro
     ```
 6. Run `bump2version` to create a release version and a tag:
     ```shell script
-    bump2version release --config-file=.bumpversion_release.cfg  --allow-dirty --commit --tag
+    bump2version release --config-file=.bumpversion_release.toml  --allow-dirty --commit --tag
     ```
 7. Push the branch and tag to origin:
     ```shell script
