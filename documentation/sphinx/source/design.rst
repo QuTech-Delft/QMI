@@ -152,43 +152,44 @@ Design Overview
 
 The figure above outlines the class inheritance and ownership relations of the most important classes in QMI.
 
-.. This is a reflection of the implementation, a view at what is currently there so to speak.
-.. Does that view represent the actual design, as a view of what we intend to be there?
-
 The boxes in this graph denote *classes*. Classes with a red border are *active classes*, meaning they are running in a dedicated thread.
-
-.. Accessibility concern here: colors can be hard to distinguish for colorblind people, like myself.
-.. Red and black are particularly hard to differentiate due to both being low-energy colors.
-.. Would a standard UML annotation (e.g: "<<thread>>") be a good replacement?
 
 Green arrows denote *inheritance*, i.e., an 'is-a' relation between classes.
 
 Blue arrows denote *ownership*. Ownerships arrows start in a named field of a class instance, and the arrow carries a label that shows how many
 instances are owned, e.g., '(one)' or '(zero or more)'.
 
-.. Why not use standard UML to disambiguate between inheritance and usage relationships (and plurality)?
-
 We discuss these classes below.
 
 **QMI Contexts**
 ================
-
-.. Not really a comment on this section per se, but I was wondering why the classes in QMI are prefixed with "QMI_".
-.. It seems to me that importing from the QMI package would already namespace things enough (`qmi.Context), or the user could do that themselves through `from QMI import Context as QMI_Context` if they want.
 
 The **QMI_Context** class is the centralized entry-point to all functionality of QMI. A QMI process has a single **QMI_Context** that
 is initialized by a call to ``qmi.start()`` and discarded by a call to ``qmi.stop()``. In between these calls, the context can be accessed
 by a call to ``qmi.context()``. The configuration of a context is based on customized *@configstruct* data classes **CfgQmi** and **CfgContext**. These
 are JSON-like structures and can be read in from a configuration file, or given as an argument input in ``qmi.start()``.
 
-The QMI_Context owns (directly or indirectly) all QMI-related objects in a process. Many of them are administrative in nature and will not normally
+The **QMI_Context** owns (directly or indirectly) all QMI-related objects in a process. Many of them are administrative in nature and will not normally
 be accessed by the user, but the **QMI_Instrument** and **QMI_Task** instances are examples of user-accessible projects that are
 managed and owned by the QMI_Context; the user merely gets a handle to them. **QMI_RpcObject** instances can also be directly accessed.
+
+^^^^^^^^^^^^^^^^
+Example usage
+^^^^^^^^^^^^^^^^
+
+.. image:: images/example_contexts.png
+
+We could have as an example three contexts: In context one, we have made two instances of **QMI_Instrument** (e.g. A signal generator and an oscilloscope
+on a lab PC). Then we have a second context, that runs a task, utilizing **QMI_LoopTask**, which is configured to make connection to context one, and to
+control the instruments in it. This context could reside e.g. in an office PC close to the lab. This second contexts now sends also out *settings* and
+*status* signals which can e.g. be forwarder to a database. Also on the office PC could run a third context that monitors the task status in context two
+and instrument status in context one. This context is hooked in the *status* signal and at specific signal values or circumstances could either tell
+context two to change settings or stop task, or send specific commands to the instruments in context one.
 
 **Threading in QMI**
 ====================
 
-The **QMI_Thread** class is a thin wrapper around bare Python threads, that support a common pattern for thread termination. The QMI_Thread is
+The **QMI_Thread** class is a thin wrapper around bare Python threads, that supports a common pattern for thread termination. The QMI_Thread is
 for internal use within QMI only; it is emphatically *not* intended to be used by QMI users. We prefer to hide the complexity of thread management
 as much as possible from QMI users, since they are error-prone and tend to lead to hard-to-understand code in the hands of non software-engineers.
 
@@ -208,22 +209,6 @@ This decision was made to keep the **QMI_Task** semantics as simple as possible;
 have to deal with the possibility that other methods can be run while it is active. This was deemed too error-prone and fragile for the intended
 users of QMI. Instead of that, the **QMI_Task.run()** method is instructed to explicitly handle incoming requests in its main loop. This behavior is
 highly stylized and, while strictly less powerful than supporting full RPC-capability, provides enough flexibility to handle the most common use-cases.
-
-Example contexts
-================
-
-.. This section confuses me and seems out of place.
-.. Before this, we were discussing the structural design of QMI, but now we have this example
-.. that does not explain why it is here, how it relates to the previous sections or what it should be showing.
-
-.. image:: images/example_contexts.png
-
-We could have as an example three contexts: In context one, we have made two instances of **QMI_Instrument** (e.g. A signal generator and an oscilloscope
-on a lab PC). Then we have a second context, that runs a task, utilizing **QMI_LoopTask**, which is configured to make connection to context one, and to
-control the instruments in it. This context could reside e.g. in an office PC close to the lab. This second contexts now sends also out *settings* and
-*status* signals which can e.g. be forwarder to a database. Also on the office PC could run a third context that monitors the task status in context two
-and instrument status in context one. This context is hooked in the *status* signal and at specific signal values or circumstances could either tell
-context two to change settings or stop task, or send specific commands to the instruments in context one.
 
 Blocking and Non-blocking Proxies
 =================================
@@ -246,19 +231,15 @@ You would make a regular call with
 
 >>> result = proxy_instrument.get_some_value()
 
-Now this could block the script making this call, and the RPC object itself, until (or if!) it returns. Instead we can make a call
+Now this could block the script making this call, and the RPC object itself, until (or if!) it returns.
+Instead, we can make the call through the ``rpc_nonblocking`` attribute to make the execution asynchronous like so:
 
 >>> result_future = proxy_instrument.rpc_nonblocking.get_some_value()
 >>> assert isinstance(future, QMI_RpcFuture)
 >>> # Could possibly do other calls here
 >>> result = result_future.wait()  # Blocks this script only, not the RPC object
 
-The call now uses function `non_blocking_rpc_method_call` that returns the **QMI_RpcFuture** object itself,
-
-.. The below part of this sentence is very stilted and I am not sure what it is trying to convey.
-
-and the result is then obtained in the
-call script (if it should return one) or just wait until the call is finished.
+The call now returns the **QMI_RpcFuture** object itself, which we can ``wait()`` on later to obtain the result (if any) when needed.
 
 Note that if the issue is slowly responding hardware, and several non-blocking calls are made which want to get a response from the hardware, this
 could lead into unexpected hardware responses and/or other kinds of issues, potentially even crashing the program.
@@ -352,13 +333,13 @@ The **MessageRouter** is a class that is capable of local and remote delivery of
 local message delivery skips the pickle/unpickle step and is therefore much more efficient. The MessageRouter has a *_socket_manager* that manages
 a bunch of 'live' sockets; the **UdpResponder** manages a single datagram socket that responds to UDP (broadcast) messages that are used to
 enumerate all QMI processes in a given network; a **PeerTcpConnection** is a live, bi-directional connection to another network-accessible QMI_Context;
-at any given the, the local QMI_Context may have sockets open to multiple QMI_Contexts in other processes or even computers. The single **TcpServer**
+at any given the, the local **QMI_Context** may have sockets open to multiple QMI_Contexts in other processes or even computers. The single **TcpServer**
 allows other QMI_Sockets to initiate a **PeerTcpConnection** to us.
 
-Message delivery among a set of QMI processes is always point-to-point; there is no routing. If a QMI process needs to exchanges messages with some
-other QMI process, it will need to have an active, direct **PeerTcpConnection**.
-
-.. This last paragraph confuses me: TCP has plenty of routing, so what is this trying to convey?
+Message delivery among a set of QMI processes is always point-to-point; there is no routing.
+In other words, for two QMI objects to communicate, they need to have an active, direct **PeerTcpConnection** to each other.
+Sending the message to a containing QMI object, say a context owning the instrument we want to talk to,
+will not result in the message being routed to the instrument.
 
 Messaging more in detail
 ========================
@@ -366,9 +347,6 @@ Messaging more in detail
 .. image:: images/class_diagram_messaging.png
 
 The figure above outlines the class inheritance, ownership, parameter type and usage relations of the QMI messaging and signalling.
-
-.. Similar to before, I feel like this could all just use standard UML.
-.. That would remove the need for an explanation of how to read the diagram as well.
 
 Green arrows denote *inheritance*, i.e., an 'is-a' relation between classes.
 
@@ -379,15 +357,12 @@ Black dashed arrows with open arrow heads means that a method call's argument or
 
 Black arrows with full arrow heads means that a method is implemented and/or called in the target class method.
 
-The **QMI_Message** can have multiple instances with unique source and destination addresses. The **QMI_RequestMessage** and **QMI_ReplyMessage**
-classes take a *request_id*, which is generated when making a request, as a random 64-bit integer string.
-
-.. Wait, is the request ID a 64-bit integer or a string?
-.. Also, wouldn't using a sequential counter instead of a random value reduce the likelihood of collisions?
-
-**QMI_InitialHandshakeMessage** is sent when making a connection
-to a peer, which tests whether the connection can receive messages.
-If messaging error occurs, a **QMI_ErrorReplyMessage** is formulated with a descriptive message and sent.
+The **QMI_Message** can have multiple instances with unique source and destination addresses.
+The **QMI_RequestMessage** and **QMI_ReplyMessage** classes take a *request_id*,
+which is generated when making a request, as a string containing the hexadecimal representation of a random 64-bit integer.
+**QMI_InitialHandshakeMessage** is sent when making a connection to a peer,
+which tests whether the connection can receive messages.
+If a messaging error occurs, a **QMI_ErrorReplyMessage** is formulated with a descriptive message and sent.
 
 All the messages are subclasses of **QMI_Message** and at delivery routed through the **MessageRouter.send_message** of the context.
 
@@ -401,18 +376,14 @@ the wanted data. For **QMI_Task** objects, the request to broadcast settings has
 has a standard loop that updates both "settings" (from its parent class) and "status" and, if implemented in some *Task*, publishes these signals. It also
 publishes data from custom signals, if implemented.
 
-Signals, whether publishers or subscribers, can be added to any RPC object, but their use will need more manual work. For example, when a
-QMI task or tasks are made to be part of a *service*, the service can then be made to control the signalling (also between tasks) and data publication.
-
-.. This is the first and only time so far that the concept of a "service" has been used.
-.. As it is not explained, I find it difficult to understand this sentence.
+Signals, whether publishers or subscribers, can be added to any RPC object, but their use will need more manual work.
+For example, when a QMI task or tasks are made to be part of a background process,
+the process can then be made to control the signalling (also between tasks) and data publication.
 
 Signalling more in detail
 =========================
 
 .. image:: images/class_diagram_signalling.png
-
-.. For completeness: this can be standard UML as well.
 
 The figure above outlines the class inheritance, ownership, parameter type and usage relations of the QMI messaging and signalling.
 
@@ -431,10 +402,6 @@ The signals use **QMI_SignalMessage** to broadcast signals between contexts. Eac
 unsubscribing is routed to **QMI_SignalSubscriber** class. The subscription of signals is done by using **QMI_SignalSubscriptionReply** which inherits from the **QMI_ReplyMessage**.
 Subscription and unsubscribing requires as *receiver* input parameter an instance of **QMI_SignalReceiver**, which contains a queue of received signals.
 When any such signal gets published, the published signal is automatically added to the receive queue of the **QMI_SignalReceiver**.
-
-The *_queue* of **QMI_SignalReceiver** is from *collections.deque*.
-
-.. Why is this implementation detail important enough to warrant a separate paragraph?
 
 Publishing of a signal is implemented in **QMI_RegisteredSignal.publish** which is an implementation of the abstract base class **QMI_Signal**.
 Actual publishing happens in **QMI_context** when the *publish_signal* method of the context is called. After that it is available for any receivers.
