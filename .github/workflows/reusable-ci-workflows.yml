@@ -11,7 +11,6 @@ on:
         type: string
 
 env:
-  PYLINT_MIN_SCORE: "9.00"
   COVERAGE_MIN_PERC: "90"
   COMPLEXITY_MAX_SCORE: "30"
   SOURCE_DIRS: "qmi/"
@@ -39,19 +38,14 @@ jobs:
           pip install --upgrade pip
           pip install '.[dev]'
 
-      - name: Run pylint
+      - name: Run ruff
         run: |
-          pylint --score=yes --load-plugins=pylint.extensions.mccabe --max-complexity=$COMPLEXITY_MAX_SCORE \
-            $SOURCE_DIRS | tee pylint-${{ inputs.python-version }}.log
-          PYLINT_SCORE=$(tail -n 2 pylint-${{ inputs.python-version }}.log \
-            | grep -o '[0-9]\{1,2\}\.[0-9]\{2\}' | head -n 1)
-          echo "Pylint score: $PYLINT_SCORE"
-          exit $(echo "$PYLINT_SCORE < $PYLINT_MIN_SCORE" | bc)
-      - name: Upload pylint results
+          ruff check --output-file "ruff-results-${{ inputs.python-version }}.log"
+      - name: Upload ruff results
         uses: actions/upload-artifact@v4
         with:
-          name: pylint-results-${{ inputs.python-version }}
-          path: pylint-${{ inputs.python-version }}.log
+          name: ruff-results-${{ inputs.python-version }}
+          path: ruff-results-${{ inputs.python-version }}.log
 
       - name: Run mypy
         run: |
