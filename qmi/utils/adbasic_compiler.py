@@ -7,18 +7,17 @@ It provides much nicer formatting of compiler errors, a working exit code, and h
 import argparse
 import logging
 import os
-from pathlib import Path
 import re
-import sys
 import shutil
 import subprocess
+import sys
 import time
+from pathlib import Path
 from typing import NamedTuple
 
 import colorama
 
 from qmi.core.exceptions import QMI_RuntimeException
-
 
 # Value used to mark high process priority.
 PRIO_HIGH = 1000
@@ -248,7 +247,6 @@ def run_adbasic_compiler(
 
     t1 = time.monotonic()
 
-    # pylint: disable=subprocess-run-check
     completed_process = subprocess.run(check=False, args=run_args, capture_output=True, cwd=working_dir)
 
     t2 = time.monotonic()

@@ -105,7 +105,7 @@ def _import_modules() -> None:
             # Import Aravis introspection module via GObject Introspection
             import gi
             gi.require_version('Aravis', '0.6')
-            from gi.repository import Aravis  # pylint: disable=W0621
+            from gi.repository import Aravis
             _logger.debug("Aravis library version: %s", Aravis._version)  # type: ignore
 
 

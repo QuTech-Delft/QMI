@@ -24,7 +24,7 @@ def _import_modules() -> None:
     """
     global GPIO  # noqa: PLW0603
     if GPIO is None:
-        from RPi import GPIO  # pylint: disable=W0621
+        from RPi import GPIO
 
 # See:
 #

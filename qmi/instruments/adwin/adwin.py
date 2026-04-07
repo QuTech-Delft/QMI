@@ -49,7 +49,7 @@ def _import_modules() -> None:
     """
     global ADwin  # noqa: PLW0603
     if ADwin is None:
-        import ADwin  # pylint: disable=W0621
+        import ADwin
 
 
 class Adwin_Base(QMI_Instrument):
