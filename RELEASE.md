@@ -4,7 +4,7 @@ This is the release procedure of a minor release for QMI. Major release procedur
 
 The `<major>`, `<minor>` and `<patch>` refer to the versioning numbers of the current release to be made.
 
-If you are using e.g. Git Bash on Windows, the `bump2version` command probably needs also extension: `bump2version.exe`.
+If you are using e.g. Git Bash on Windows, the `bump-my-version` command probably needs also extension: `bump-my-version.exe`.
 
 ## Steps
 
@@ -12,13 +12,13 @@ If you are using e.g. Git Bash on Windows, the `bump2version` command probably n
     ```shell script
     git checkout -b stable-{major}-{minor}
     ```
-2. Run `bump2version` to update the files which contain references to `main` to the new stable branch.
+2. Run `bump-my-version` to update the files which contain references to `main` to the new stable branch.
     ```shell script
-    bump2version release --config-file=.bumpversion_switch.toml --commit
+    bump-my-version release --config-file=.bumpversion_switch.toml --commit
     ```
-3. Run `bump2version` to create a release version and a tag:
+3. Run `bump-my-version` to create a release version and a tag:
     ```shell script
-    bump2version release --config-file=.bumpversion_release.toml --commit --tag
+    bump-my-version release --config-file=.bumpversion_release.toml --commit --tag
     ```
 4. Push the branch to origin and see that it passes the workflow.
     ```shell script
@@ -47,9 +47,9 @@ If you are using e.g. Git Bash on Windows, the `bump2version` command probably n
     ```shell script
     git add CHANGELOG.md
     ```
-11. Run `bump2version` to create the beta minor version on main:
+11. Run `bump-my-version` to create the beta minor version on main:
     ```shell script
-    bump2version minor --config-file=.bumpversion_main.toml --allow-dirty --commit
+    bump-my-version minor --config-file=.bumpversion_main.toml --allow-dirty --commit
     ```
 12. Push the branch to origin:
     ```shell script
@@ -73,9 +73,9 @@ need another commit to fix the version numbering, or file-specific checkouts fro
     ```shell script
     git add CHANGELOG.md
     ```
-3. Run `bump2version` to create the beta patch version on stable:
+3. Run `bump-my-version` to create the beta patch version on stable:
     ```shell script
-    bump2version patch --config-file=.bumpversion_stable.toml --allow-dirty --commit
+    bump-my-version patch --config-file=.bumpversion_stable.toml --allow-dirty --commit
     ```
 4. Cherry-pick the patch into the stable branch:
     ```shell script
@@ -86,9 +86,9 @@ need another commit to fix the version numbering, or file-specific checkouts fro
     git restore CHANGELOG.md
     git add CHANGELOG.md
     ```
-6. Run `bump2version` to create a release version and a tag:
+6. Run `bump-my-version` to create a release version and a tag:
     ```shell script
-    bump2version release --config-file=.bumpversion_release.toml  --allow-dirty --commit --tag
+    bump-my-version release --config-file=.bumpversion_release.toml  --allow-dirty --commit --tag
     ```
 7. Push the branch and tag to origin:
     ```shell script
