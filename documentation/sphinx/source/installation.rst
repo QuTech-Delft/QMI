@@ -54,10 +54,3 @@ The QMI project uses Mypy and Pylint in checking the code quality. For local che
 .. Should the line below mention where to find a full and complete list? Potentially in the source code?
 
 Note that this list might not be complete, as by introduction of new hardware drivers, new dependencies could be added.
-
-
-.. This TODO has not been handled for 3 years. Should it be removed?
-.. To be added:
-..
-.. import usb    "python3-usb"
-.. from gi.repository import Aravis ; Aravis is Linux only. "gi.repository" ?? "gobject introspection" only used in Linux.
