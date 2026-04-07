@@ -17,7 +17,7 @@ values = [
 ]
 
 [[tool.bumpversion.files]]
-filename = ".bumpversion_stable.cfg"
+filename = ".bumpversion_stable.toml"
 
 [[tool.bumpversion.files]]
 filename = "documentation/sphinx/source/conf.py"

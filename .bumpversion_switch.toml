@@ -18,24 +18,24 @@ values = [
 
 [[tool.bumpversion.files]]
 filename = "README.md"
-serialize = "{major}-{minor}"
+serialize = ["{major}-{minor}"]
 search = "main"
 replace = "stable-{new_version}"
 
 [[tool.bumpversion.files]]
-filename = ".bumpversion_stable.cfg"
-serialize = "{major}-{minor}"
+filename = ".bumpversion_stable.toml"
+serialize = ["{major}-{minor}"]
 search = "main"
 replace = "stable-{new_version}"
 
 [[tool.bumpversion.files]]
-filename = ".bumpversion_release.cfg"
-serialize = "{major}-{minor}"
+filename = ".bumpversion_release.toml"
+serialize = ["{major}-{minor}"]
 search = "main"
 replace = "stable-{new_version}"
 
 [[tool.bumpversion.files]]
 filename = "pyproject.toml"
-serialize = "{major}-{minor}"
+serialize = ["{major}-{minor}"]
 search = "main"
 replace = "stable-{new_version}"
