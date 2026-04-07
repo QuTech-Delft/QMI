@@ -33,3 +33,8 @@ filename = "qmi/__init__.py"
 filename = "CHANGELOG.md"
 search = "[{current_version}] - Unreleased"
 replace = "[{new_version}] - Unreleased"
+
+[[tool.bumpversion.files]]
+filename = "CITATION.cff"
+search = "v{current_version}"
+replace = "v{new_version}"
