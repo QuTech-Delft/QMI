@@ -10,7 +10,6 @@ In that case, replace any calls to `bump2version` with `bump2version.exe`.
 
 ## Steps
 
-[//]: # (Should this mention that you need to have bump2version installed through the [dev] dependencies?)
 1. Create a new branch name `stable-<major>-<minor>` and check it out locally.
     ```shell script
     git checkout -b stable-{major}-{minor}
