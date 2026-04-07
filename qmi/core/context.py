@@ -1108,7 +1108,7 @@ class QMI_Context:
             ValueError: If the given RPC object descriptor was not found.
         """
         if auto_connect:
-            self.connect_to_peer(rpc_object_name.split(".")[0], peer_address=host_port, ignore_duplicate=True)
+            self.connect_to_peer(rpc_object_name.split(".", maxsplit=1)[0], peer_address=host_port, ignore_duplicate=True)
 
         (context_id, object_id) = rpc_object_name.split(".", 1)
         context_proxy = self.make_peer_context_proxy(context_id)

@@ -50,6 +50,7 @@ select = [
     # Pylint: Static code analysis including errors, warnings, convention mismatches and refactor suggestions.
     "PLE",
     "PLC",
+    "PLR"
 
 ]
 ignore = [
@@ -61,6 +62,9 @@ ignore = [
     # Pylint: import-outside-top-level
     # We import outside the top level to reduce required dependencies and reduce import load.
     "PLC0415",
+    # Pylint: magic-value-comparison
+    # Device drivers use magic values a lot.
+    "PLR2004"
 ]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
