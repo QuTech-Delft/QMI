@@ -37,6 +37,12 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch_depth: 0
 
+      - name: Get ruff log file from Python 3.11 build
+        uses: actions/download-artifact@v4
+        with:
+          name: ruff-results-3.11
+          path: .
+
       - name: Get mypy log file from Python 3.11 build
         uses: actions/download-artifact@v4
         with:
@@ -60,6 +66,7 @@ jobs:
           git fetch origin "${{ github.head_ref }}" || true
           git checkout "${{ github.head_ref }}"
           pip install anybadge
+          anybadge -o -l ruff -v $(cat ruff-results-3.11.log | wc -l) -f $BADGES_DIR/ruff.svg -u 1=green 2=red 
           anybadge -o -l mypy -v $([ -n "$(tail -n 1 mypy-3.11.log | grep -e '^Succes')" ] && echo pass || echo fail) -f $BADGES_DIR/mypy.svg fail=red pass=green
           COVERAGE_PERC=$(grep "TOTAL" coverage-3.11.log | grep -Eo '[0-9.]+%' | sed 's/%//')
           anybadge -o -l coverage -v "$COVERAGE_PERC%" -f $BADGES_DIR/coverage.svg 60=red 80=orange 100=green
