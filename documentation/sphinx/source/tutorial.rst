@@ -11,9 +11,6 @@ Hello QMI!
 
 To start using QMI, the first steps are to import the :mod:`qmi` package, and next, call :py:func:`qmi.start() <qmi.core.context_singleton.start>` with a string argument that specifies our local *QMI context name*.
 The QMI context name allows other QMI programs to contact us, and to communicate with locally held instances of things like instruments and tasks that our context manages.
-
-.. Regarding the below line: as a new user of QMI I think I might be much more interested at this point in what a context is and how it is useful to me, rather than how to create one.
-
 More on that later.
 
 >>> import qmi
@@ -96,10 +93,9 @@ Now, let's give it a shot and see what happens:
 >>> nsg.get_sample()
 
 Whoops, we got an error! This is because we didn't "open" the instrument first.
-
-.. Without an explanation of what `open` does, it is not clear to the reader why this is "of course" not necessary for a virtual instrument.
-
-This is of course not necessary with a virtual instrument, but as it simulates a real instrument, we also simulate opening and closing a connection to it.
+Opening an instrument makes a connection to the instrument, which is potentially far away.
+Closing the instrument then closes the connection again.
+Now, for a  virtual instrument this is of course not necessary, but as it simulates a real instrument, we also simulate opening and closing.
 
 >>> nsg.open()
 >>> nsg.get_sample()
@@ -131,8 +127,6 @@ Locking an instrument
 Because QMI allows networked access to remote instruments, there is the distinct possibility that more than one user accesses the same instrument.
 This can be intentional, for example a measurement script setting the frequency of a function generator while a GUI monitors and displays that frequency.
 However, it can also be unintentional, for example when a scheduled calibration routine tries to calibrate an instrument that is being used for a measurement.
-
-.. Idea: Would it maybe make sense to disambiguate between "const/concurrency safe" methods (so they do not require a lock) and methods that do require locking for safety?
 
 To prevent unintentional simultaneous access, you can lock an instrument, preventing others from using it.
 Locks are owned by the proxy, and only one proxy can own a lock at any time.
@@ -226,18 +220,14 @@ Many aspects of QMI are configurable via a *configuration file*.
 The syntax of this file is very similar to `JSON <https://www.json.org/>`_,
 but unlike JSON, the configuration file may contain comments starting with a ``#`` character.
 
-By default, QMI attempts to read the configuration from a file named ``qmi.conf`` in
+You can specify the configuration file as the second argument of ``qmi.start()``.
+If no ``config_file`` argument is provided to ``start`` or the argument is ``None``,
+QMI will attempt to find a configuration file.
+First, it will check if the ``QMI_CONFIG`` environment variable is set and, if so,
+it will interpret its value as a path to the configuration file to use.
+If ``QMI_CONFIG`` is not set, QMI will attempt to read the configuration from a file named ``qmi.conf`` in
 the home directory (or the user folder on Windows).
-
-.. I wonder if this is not very unintuitive for a user.
-.. This is effectively device-specific global state that requires the user to always specify `config_file=None` to work around.
-.. Users who want this functionality can just automatically set the environment variable `QMI_CONFIG` to whatever location they want, but that would be a conscious decision.
-.. This also prevents the `qmi.start` call without the second argument from defaulting to an empty configuration instead.
-.. This also goes against the idea of Python virtual environments, where packages in a venv usually only interact with the state in that venv, so without global state.
-
-If you want to use a different file name or location, you can specify
-the configuration file path either as the second argument of ``qmi.start()``
-or in the environment variable ``QMI_CONFIG``.
+If no such file exists, it will default to an empty configuration.
 
 Let's create a configuration file with the following contents::
 
@@ -681,9 +671,6 @@ Tasks and RPC methods
 .. Finally, we get this nebulous concept of task settings, which I'm still not sure why I would need to use that over the previously implemented way of doing things.
 
 Tasks cannot have RPC methods in them by design.
-
-.. Similar to before: "Why?"
-
 Nevertheless, in some special cases the user might like to monitor and control
 a value or values at some unknown moment while the task is running.
 Say for example, that we would like to retrieve and control the ``amplitude`` value of our ``DemoTask``.
