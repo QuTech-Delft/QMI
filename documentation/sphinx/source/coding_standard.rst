@@ -123,12 +123,6 @@ However:
 * QMI classes all start with a ``QMI_`` prefix.
 * QMI exceptions must end with the word *Exception*, rather than *Error*, as prescribed by PEP-8.
 
-Often class member variables are initialized at init time, and read-only after that.  One solution to solve this is to
-make a private member variable, and provide a property to read it.  However, throughout QMI, we will simply make a
-variable name public, and explicitly document that the member is to be treated as read-only in the class documentation.
-
-.. This last part does not seem related to naming (other than not using a leading underscore).
-
 -------------------
 Specific coding conventions
 -------------------
