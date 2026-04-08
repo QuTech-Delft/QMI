@@ -1,0 +1,98 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: >-
+  QMI - Quantum Measurement Infrastructure, a Python 3
+  framework for controlling laboratory equipment
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Ingmar
+    name-particle: te
+    family-names: Raa-Derckx
+    affiliation: TU Delft
+    email: I.teRaa-Derckx@tudelft.nl
+  - given-names: Henri
+    family-names: Ervasti
+    email: H.K.Ervasti@tudelft.nl
+    affiliation: TU Delft
+    orcid: 'https://orcid.org/0009-0005-3231-5554'
+  - given-names: Pieter
+    family-names: Botma
+    email: P.J.Botma@tudelft.nl
+    affiliation: TU Delft
+  - given-names: Ludo
+    family-names: Visser
+    affiliation: TU Delft
+  - given-names: Ravi
+    family-names: Budhrani
+    affiliation: TU Delft
+  - given-names: Joris
+    name-particle: van
+    family-names: Rantwijk
+    affiliation: TU Delft
+  - given-names: Sidney
+    family-names: Cadot
+    affiliation: TU Delft
+  - given-names: Jenny
+    family-names: Vermeltfoort
+    affiliation: TU Delft
+  - given-names: Matteo
+    family-names: Pompili
+    affiliation: TU Delft
+    orcid: 'https://orcid.org/0000-0002-8360-1957'
+  - given-names: Arian
+    family-names: Stolk
+    affiliation: TU Delft
+  - given-names: Matthew
+    family-names: Weaver
+    affiliation: TU Delft
+  - given-names: Kian
+    name-particle: van der
+    family-names: Enden
+    affiliation: TU Delft
+    orcid: 'https://orcid.org/0000-0001-6874-8638'
+  - given-names: Dennis
+    name-particle: de
+    family-names: Leeuw Duarte
+    affiliation: TU Delft
+  - given-names: Marianne
+    family-names: Teng
+    affiliation: TU Delft
+  - given-names: Joris
+    name-particle: van
+    family-names: Zwieten
+    affiliation: TU Delft
+  - given-names: Fer
+    family-names: Grooteman
+    affiliation: TU Delft
+identifiers:
+  - type: url
+    value: 'https://github.com/QuTech-Delft/QMI'
+    description: Github repository
+  - type: url
+    value: >-
+      https://research.tudelft.nl/en/datasets/qmi-quantum-measurement-infrastructure/
+    description: TU Delft library archive
+  - type: doi
+    value: 10.4121/6d39c6db-2f50-4a49-ad60-5bb08f40cb52
+    description: 4TU research data archive
+repository-code: 'https://github.com/QuTech-Delft/QMI'
+abstract: >
+  QMI is a Python 3 framework for controlling laboratory
+  equipment.
+
+  It is suitable for anything ranging from one-off
+  scientific experiments to robust operational setups.
+keywords:
+  - Control
+  - Hardware
+  - Laboratory
+  - Quantum
+  - Software
+license: MIT
+version: v0.52.0-beta.0
+date-released: '2026-04-01'

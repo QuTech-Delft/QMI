@@ -130,3 +130,8 @@ dmypy.json
 
 # VS code settings
 .vscode
+
+# Jetbrains IDEs settings
+.idea/
+
+uv.lock

@@ -12,23 +12,24 @@ If you are using e.g. Git Bash on Windows, the `bump2version` command probably n
     ```shell script
     git checkout -b stable-{major}-{minor}
     ```
-2. Run `bump2version` to update the files which contain references to `main` to the new stable branch.
+2. Manually update the `date-released` field in `CITATION.cff`.
+3. Run `bump2version` to update the files which contain references to `main` to the new stable branch.
     ```shell script
     bump2version release --config-file=.bumpversion_switch.cfg --commit
     ```
-3. Run `bump2version` to create a release version and a tag:
+4. Run `bump2version` to create a release version and a tag:
     ```shell script
     bump2version release --config-file=.bumpversion_release.cfg --commit --tag
     ```
-4. Push the branch to origin and see that it passes the workflow.
+5. Push the branch to origin and see that it passes the workflow.
     ```shell script
     git push --set-upstream origin stable-<major>-<minor>
     ```
-5. Push the tag to origin:
+6. Push the tag to origin:
     ```shell script
     git push origin v{major}.{minor}.{patch} 
     ```
-6. If the tag passes the workflow, do the following:
+7. If the tag passes the workflow, do the following:
   - Find the tag in GitHub and make a release with the latest `CHANGELOG.md` entry.
   - See that the release has set as the latest package and that a new release has been uploaded to Pypi.
 7. Checkout `main` branch:
