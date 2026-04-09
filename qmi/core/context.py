@@ -1,6 +1,7 @@
 """Implementation of the QMI_Context class.
 """
 
+import atexit
 import logging
 import os
 import pathlib
@@ -11,27 +12,25 @@ import socket
 import string
 import threading
 import time
+import typing
 import warnings
-import atexit
-
 from collections.abc import Callable
-from typing import Any, NamedTuple
+from types import TracebackType
+from typing import Any, NamedTuple, Self
 
 import qmi
-
 from qmi.core.config_defs import CfgQmi, CfgContext
 from qmi.core.exceptions import QMI_UsageException, QMI_DuplicateNameException, QMI_UnknownNameException, \
-                                QMI_ConfigurationException, QMI_InvalidOperationException, QMI_WrongThreadException
-from qmi.core.messaging import MessageRouter, QMI_Message, QMI_MessageHandlerAddress, QMI_MessageHandler
-from qmi.core.rpc import QMI_RpcObject, QMI_RpcProxy, RpcObjectManager, rpc_method, RpcObjectDescriptor, \
-                         make_interface_descriptor, QMI_LockTokenDescriptor
-from qmi.core.pubsub import SignalManager, QMI_SignalReceiver
+    QMI_ConfigurationException, QMI_InvalidOperationException, QMI_WrongThreadException
 from qmi.core.instrument import QMI_Instrument
+from qmi.core.messaging import MessageRouter, QMI_Message, QMI_MessageHandlerAddress, QMI_MessageHandler
+from qmi.core.pubsub import SignalManager, QMI_SignalReceiver
+from qmi.core.rpc import QMI_RpcObject, QMI_RpcProxy, RpcObjectManager, rpc_method, RpcObjectDescriptor, \
+    make_interface_descriptor, QMI_LockTokenDescriptor
 from qmi.core.task import QMI_Task, QMI_TaskRunner
 from qmi.core.udp_responder_packets import unpack_qmi_udp_packet, QMI_UdpResponderContextInfoRequestPacket, \
-                                           QMI_UdpResponderContextInfoResponsePacket
+    QMI_UdpResponderContextInfoResponsePacket
 from qmi.core.util import is_valid_object_name, format_address_and_port, AtomicCounter
-
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
@@ -289,6 +288,39 @@ class QMI_Context:
 
         # Set object ID.
         self._oid = qmi.object_registry.register(self)
+
+    def __enter__(self) -> Self:
+        """
+        Context manager entry point.
+        Starts the context.
+
+        Returns:
+            self.
+        """
+        self.start()
+        return self
+
+    def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc_val: BaseException | None,
+            exc_tb: TracebackType | None,
+    ) -> typing.Literal[False]:
+        """
+        Context manager exit point.
+        Stops the context.
+
+        Arguments:
+            exc_type: Type of the exception that caused the context to be exited.
+            exc_val: Exception that caused the context to be exited.
+            exc_tb: Traceback of the exception that caused the context to be exited.
+
+        Returns:
+            Boolean indicating whether any exceptions that caused the context to exit should be suppressed.
+            Always returns False.
+        """
+        self.stop()
+        return False
 
     @property
     def suppress_version_mismatch_warnings(self) -> bool:
