@@ -39,7 +39,7 @@ class QMI_UdpResponderMessageTypeTag(enum.Enum):
     CONTEXT_INFO_REQUEST  = 0x201 # Broadcast or targeted.
     CONTEXT_KILL_REQUEST  = 0x202 # Broadcast or targeted.
     # Packets sent by the Contexts.
-    CONTEXT_INFO_RESPONSE = 0x101 #
+    CONTEXT_INFO_RESPONSE = 0x101
     CONTEXT_STARTUP       = 0x102 # Broadcast.
     CONTEXT_SHUTDOWN      = 0x103 # Broadcast.
 

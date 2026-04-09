@@ -2,7 +2,7 @@
 
 import usb.core
 
-from qmi.core import usbtmc as usbtmc
+from qmi.core import usbtmc
 from qmi.core.exceptions import QMI_TimeoutException
 from qmi.core.transport import QMI_UsbTmcTransport
 

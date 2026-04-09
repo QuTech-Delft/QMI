@@ -453,9 +453,8 @@ class TestHydraHarpEventFilter(unittest.TestCase):
             if evt_type == 64:
                 last_sync = evt_timestamp
                 events_expected.append((evt_type, evt_timestamp))
-            else:
-                if (last_sync >= 0) and (delta_min <= (evt_timestamp - last_sync) <= delta_max):
-                    events_expected.append((evt_type, evt_timestamp))
+            elif (last_sync >= 0) and (delta_min <= (evt_timestamp - last_sync) <= delta_max):
+                events_expected.append((evt_type, evt_timestamp))
 
         # Check events.
         self.assertTrue(np.all(events == np.array(events_expected, dtype=EventDataType)))
@@ -512,10 +511,9 @@ class TestHydraHarpEventFilter(unittest.TestCase):
                 last_is_sync = True
                 events_expected.append((evt_type, evt_timestamp))
 
-            else:
-                if (last_sync >= 0) and (delta_min <= evt_timestamp - last_sync <= delta_max):
-                    events_expected.append((evt_type, evt_timestamp))
-                    last_is_sync = False
+            elif (last_sync >= 0) and (delta_min <= evt_timestamp - last_sync <= delta_max):
+                events_expected.append((evt_type, evt_timestamp))
+                last_is_sync = False
 
         if last_is_sync:
             events_expected.pop()

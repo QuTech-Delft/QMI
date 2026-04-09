@@ -13,7 +13,6 @@ from qmi.core.rpc import rpc_method
 from qmi.core.scpi_protocol import ScpiProtocol
 from qmi.core.transport import create_transport
 
-
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
@@ -118,7 +117,6 @@ class TT_TGF_3000_4000_Series(QMI_Instrument):
         try:
             error_code = int(resp)
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unexpected response to 'EER?': {resp!r}")
 
         if error_code != 0:
@@ -354,7 +352,6 @@ class TT_TGF_3000_4000_Series(QMI_Instrument):
             # Strip "Hz" suffix and convert to floating point.
             frequency = float(resp[:-2])
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unexpected response to 'CNTRVAL?': {resp!r}")
 
         return FrequencyMeasurement(timestamp, frequency)

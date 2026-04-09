@@ -154,7 +154,7 @@ class JPE_CPSC(QMI_Instrument):
                 if not line:
                     raise QMI_InstrumentException("Unexpected end of input from helper program")
 
-                line = line.decode()
+                line = line.decode()  # noqa: PLW2901
                 s += line
 
         else:

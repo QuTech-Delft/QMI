@@ -181,8 +181,8 @@ def start_logging(
         backup_count:     Number of backup files to be used. Default is 5.
     """
 
-    global _file_handler
-    global _saved_except_hook
+    global _file_handler  # noqa: PLW0603
+    global _saved_except_hook  # noqa: PLW0603
 
     # If there is still an old file log handler, remove it.
     if _file_handler is not None:

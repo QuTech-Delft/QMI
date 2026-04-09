@@ -214,7 +214,7 @@ class QMI_Task(Generic[_SET, _STS], metaclass=_TaskMetaClass):
         # Insert these QMI_RegisteredSignal instances as attributes of the RpcObject instance.
         #
         # Note: The class attribute "_qmi_signals" will be created by the metaclass.
-        declared_signals = self._qmi_signals  # type: ignore  # pylint: disable=no-member
+        declared_signals = self._qmi_signals  # type: ignore
         for sig_desc in declared_signals:
             if sig_desc.name == "sig_settings_updated":
                 # specifically remap settings because this is only typed in the inherited task
@@ -803,7 +803,7 @@ class QMI_LoopTask(QMI_Task):
         self._policy = policy
         self._status_fifo: collections.deque = collections.deque(maxlen=1)
 
-        declared_signals = self._qmi_signals  # type: ignore  # pylint: disable=no-member
+        declared_signals = self._qmi_signals  # type: ignore
         # Create an instance of QMI_RegisteredSignal for sig_status_updated, published by this class.
         # Insert this QMI_RegisteredSignal instance as an attribute of the RpcObject instance.
         for sig_desc in declared_signals:

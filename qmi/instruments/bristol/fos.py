@@ -34,7 +34,7 @@ def _import_modules() -> None:
     This import is done in a function, instead of at the top-level, to avoid unnecessary
     dependencies for programs that do not access the instrument directly.
     """
-    global uldaq, ul, enums
+    global uldaq, ul, enums  # noqa: PLW0603
     _logger.debug("Importing %s modules", sys.platform)
     if (sys.platform.startswith("linux") or sys.platform == "darwin") and uldaq is None:
         import uldaq  # type: ignore
