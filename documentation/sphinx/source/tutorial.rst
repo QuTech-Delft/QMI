@@ -383,7 +383,6 @@ To set up a simple measurement script, create a file ``measure_demo.py`` with th
     #!/usr/bin/env python
 
     import qmi
-    from qmi.utils.context_managers import start_stop
     from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
 
     def measure_data(nsg):
@@ -406,7 +405,7 @@ Run the new script by typing the following command in a shell terminal::
 
     python measure_demo.py
 
-Note that the script uses :py:class:`qmi.utils.context_managers.start_stop` to start and stop the QMI framework.
+Note that the script uses ``with`` statement to start and stop the QMI framework automatically.
 This is just a convenient way to make sure that ``qmi.start()`` and ``qmi.stop()`` will always be called.
 Similarly, the `QMI_Instrument` objects are equipped with context managers that open and close the the instrument, calling ``nsg.open()`` and ``nsg.close()`` at the creation and destruction of the instance.
 
@@ -475,7 +474,6 @@ the task and continues to perform other activities::
 
     import time
     import qmi
-    from qmi.utils.context_managers import start_stop
     from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
     from demo_task import DemoTask
 
@@ -640,7 +638,6 @@ of the task in the script instead of inside the task. We now rewrite the script 
 
     import time
     import qmi
-    from qmi.utils.context_managers import start_stop
     from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
     from demo_task import DemoTask
 
@@ -747,7 +744,6 @@ in the current directory::
 
     import time
     import qmi
-    from qmi.utils.context_managers import start_stop
 
     def main():
         with qmi.start("proc_demo"):

@@ -249,13 +249,12 @@ Further, the proxies have the possibility of *locking* their objects to be contr
 
 QMI offers a few context managers to facilitate better control of the QMI contexts, instruments, tasks and signals.
 
-QMI contexts can be started and stopped with a `start_stop` context manager, available in ``qmi.utils.context_managers`` module.
-The following code based on the ``with`` statement::
+QMI contexts can be started and stopped automatically, through use of the ``with`` statement::
 
     with qmi.start("name"):
         custom_code_here ...
 
-has the same effect as::
+This has the same effect as::
 
     qmi.start("name")
     try:
