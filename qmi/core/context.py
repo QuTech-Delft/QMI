@@ -292,12 +292,14 @@ class QMI_Context:
     def __enter__(self) -> Self:
         """
         Context manager entry point.
-        Starts the context.
+        Starts the context if it was not already started.
 
         Returns:
             self.
         """
-        self.start()
+        if not self._used:
+            # If a context is acquired through `qmi.start()`, it will already have been started, so we skip starting.
+            self.start()
         return self
 
     def __exit__(
@@ -308,7 +310,7 @@ class QMI_Context:
     ) -> typing.Literal[False]:
         """
         Context manager exit point.
-        Stops the context.
+        Stops the context if it was not already stopped.
 
         Arguments:
             exc_type: Type of the exception that caused the context to be exited.
@@ -319,7 +321,8 @@ class QMI_Context:
             Boolean indicating whether any exceptions that caused the context to exit should be suppressed.
             Always returns False.
         """
-        self.stop()
+        if self._active:
+            self.stop()
         return False
 
     @property
