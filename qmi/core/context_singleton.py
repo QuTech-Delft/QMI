@@ -136,6 +136,7 @@ def start(
 
     # Create QMI context.
     _qmi_context = QMI_Context(context_name, config)
+    _qmi_context.register_stop_handler(_clear_global_context)
 
     if init_logging:
         _init_logging()
@@ -268,6 +269,13 @@ def stop() -> None:
         raise QMI_NoActiveContextException()
 
     _qmi_context.stop()
+
+
+def _clear_global_context() -> None:
+    """
+    Set the global context to None.
+    """
+    global _qmi_context
     _qmi_context = None
 
 
