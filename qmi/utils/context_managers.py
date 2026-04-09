@@ -1,7 +1,7 @@
 """Context managers for QMI RPC protocol contexts."""
+import warnings
 from contextlib import contextmanager
 from typing import Iterator, Protocol, TypeVar
-import warnings
 
 from qmi.core.pubsub import QMI_SignalReceiver, QMI_SignalSubscriber
 
@@ -39,6 +39,9 @@ _LU = TypeVar("_LU", bound=LockUnlockable)
 
 @contextmanager
 def start_stop(thing: _SS, *args, **kwargs) -> Iterator[_SS]:
+    warnings.warn("This context manager is deprecated.'"
+                  " Contexts can now by managed directly by their own context manager"
+                  " by calling `with qmi.start(...) as context: ...`.", DeprecationWarning, stacklevel=3)
     thing.start(*args, **kwargs)
     try:
         yield thing
