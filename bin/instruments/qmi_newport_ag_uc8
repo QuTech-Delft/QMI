@@ -54,7 +54,7 @@ def run() -> int:
     args = parser.parse_args()
 
     instr: Newport_AG_UC8
-    with start_stop(qmi, "newport_ag_uc8_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
+    with qmi.start("newport_ag_uc8_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
 
         # Parse setters
         if args.reset:

@@ -33,7 +33,7 @@ def run() -> int:
         return 0
 
     instr: Wavelength_TC_Lab
-    with start_stop(qmi, "wavelength_tclab_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
+    with qmi.start("wavelength_tclab_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
         print("IDN:", instr.get_idn(), end="\n\n")
 
         if args.power == 1:

@@ -57,7 +57,7 @@ def run() -> int:
 
 def _do_server(args: argparse.Namespace):
     instr: HighFinesse_Wlm
-    with (start_stop(qmi, "highfinesse_wlm", console_loglevel="WARNING", config_file=args.config),
+    with (qmi.start("highfinesse_wlm", console_loglevel="WARNING", config_file=args.config),
           _parse_instrument_source() as instr):
         started_server = instr.start_server()
 
@@ -73,7 +73,7 @@ def _do_server(args: argparse.Namespace):
 
 def _do_client(args: argparse.Namespace):
     instr: HighFinesse_Wlm
-    with start_stop(qmi, "highfinesse_client", config_file=args.config):
+    with qmi.start("highfinesse_client", config_file=args.config):
         qmi.context().connect_to_peer("highfinesse_wlm")
         instr = qmi.get_instrument("highfinesse_wlm.wlm")
 
@@ -82,7 +82,7 @@ def _do_client(args: argparse.Namespace):
 
 def _do_standalone(args: argparse.Namespace):
     instr: HighFinesse_Wlm
-    with (start_stop(qmi, "highfinesse_wlm", console_loglevel="INFO"),
+    with (qmi.start("highfinesse_wlm", console_loglevel="INFO"),
           _parse_instrument_source() as instr):
         started_server = instr.start_server()
 

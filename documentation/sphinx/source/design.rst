@@ -252,7 +252,7 @@ QMI offers a few context managers to facilitate better control of the QMI contex
 QMI contexts can be started and stopped with a `start_stop` context manager, available in ``qmi.utils.context_managers`` module.
 The following code based on the ``with`` statement::
 
-    with start_stop(qmi, "name"):
+    with qmi.start("name"):
         custom_code_here ...
 
 has the same effect as::

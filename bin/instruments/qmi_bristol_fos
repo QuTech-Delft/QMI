@@ -24,7 +24,7 @@ def run() -> None:
     args = parser.parse_args()
 
     instr: Bristol_Fos
-    with start_stop(qmi, "bristol_fos_client", console_loglevel="WARNING"):
+    with qmi.start("bristol_fos_client", console_loglevel="WARNING"):
         with ExitStack() as stack:
             instr = stack.enter_context(parse_source(args))
             if args.channel is None:

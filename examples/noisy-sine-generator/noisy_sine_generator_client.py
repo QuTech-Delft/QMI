@@ -5,7 +5,7 @@ import qmi
 from qmi.core.pubsub import QMI_SignalReceiver
 from qmi.utils.context_managers import start_stop
 
-with start_stop(qmi, "nsg_client", "qmi.conf"):
+with qmi.start("nsg_client", "qmi.conf"):
 
     qmi.show_contexts()
     qmi.show_rpc_objects()

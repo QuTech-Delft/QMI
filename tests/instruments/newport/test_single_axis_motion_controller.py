@@ -32,7 +32,7 @@ class TestDerivingClassCase(unittest.TestCase):
         Test SMC100PP
         """
         expected_rpc_class = "qmi.instruments.newport.smc_100pp.Newport_SMC100PP"
-        with start_stop(qmi, "TestSMC100PP", console_loglevel="CRITICAL"):
+        with qmi.start("TestSMC100PP", console_loglevel="CRITICAL"):
             # Make DUT
             self.instr: Newport_Smc100Pp = qmi.make_instrument(
                 "pp_controller", Newport_Smc100Pp, "Beverly_Hills", "FT5TMFGL", {1: UTS100PP}, 90210
@@ -45,7 +45,7 @@ class TestDerivingClassCase(unittest.TestCase):
         Test SMC100CC
         """
         expected_rpc_class = "qmi.instruments.newport.smc_100cc.Newport_SMC100CC"
-        with start_stop(qmi, "TestSMC100CC", console_loglevel="CRITICAL"):
+        with qmi.start("TestSMC100CC", console_loglevel="CRITICAL"):
             # Make DUT
             self.instr: Newport_Smc100Cc = qmi.make_instrument(
                 "sam_controller",
@@ -63,7 +63,7 @@ class TestDerivingClassCase(unittest.TestCase):
         Test Conex CC
         """
         expected_rpc_class = "qmi.instruments.newport.conex_cc.Newport_ConexCC"
-        with start_stop(qmi, "TestConexCC", console_loglevel="CRITICAL"):
+        with qmi.start("TestConexCC", console_loglevel="CRITICAL"):
             # Make DUT
             self.instr: Newport_ConexCc = qmi.make_instrument(
                 "sam_controller",

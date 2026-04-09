@@ -69,7 +69,7 @@ def run() -> int:
             return 1
 
     instr: Wieserlabs_FlexDDS_NG_Dual
-    with start_stop(qmi, "wieserlabs_flexdds_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
+    with qmi.start("wieserlabs_flexdds_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
         instr_version = instr.get_version()
         print("Version:", repr(instr_version))
         print()

@@ -29,7 +29,7 @@ def main():
 
     args = parser.parse_args()
 
-    with start_stop(qmi, "test_boostik_driver"):
+    with qmi.start("test_boostik_driver"):
         boostik_transport = boostik_transports[args.node]
         boostik = qmi.make_instrument("boostik", KoherasBoostikLaserAmplifier, boostik_transport)
         boostik.open()

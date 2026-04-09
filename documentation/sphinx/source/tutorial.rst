@@ -395,7 +395,7 @@ To set up a simple measurement script, create a file ``measure_demo.py`` with th
         print("mean sample value:", sum(samples) / len(samples))
 
     def main():
-        with start_stop(qmi, "measure_demo"):
+        with qmi.start("measure_demo"):
             with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
                 measure_data(nsg)
 
@@ -480,7 +480,7 @@ the task and continues to perform other activities::
     from demo_task import DemoTask
 
     def main():
-        with start_stop(qmi, "task_demo"):
+        with qmi.start("task_demo"):
             with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
                 task = qmi.make_task("task", DemoTask)
                 task.start()
@@ -652,7 +652,7 @@ of the task in the script instead of inside the task. We now rewrite the script 
             self.set_settings(settings)
 
     def main_2():
-        with start_stop(qmi, "task_demo"):
+        with qmi.start("task_demo"):
             with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
                 with qmi.make_task("task", DemoRpcControlTask, task_runner=CustomRpcControlTaskRunner) as task:
                     print("the task has been started")
@@ -750,7 +750,7 @@ in the current directory::
     from qmi.utils.context_managers import start_stop
 
     def main():
-        with start_stop(qmi, "proc_demo"):
+        with qmi.start("proc_demo"):
             print("just started the background process")
             while not qmi.context().shutdown_requested():
                 print("process is still running")
