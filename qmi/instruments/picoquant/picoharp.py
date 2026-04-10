@@ -104,7 +104,7 @@ class PicoQuant_PicoHarp300(_PicoquantHarp):
         This routine must be called before any of the other methods, except OpenDevice, CloseDevice,
         GetErrorString and GetLibraryVersion can be used.
 
-        Arguments:
+        Parameters:
             mode_str (str): Opening mode. Can be any of 'HIST', 'T2', 'T3'.
                             The latest driver version V3.0+ supports T2 and T3 modes.
 

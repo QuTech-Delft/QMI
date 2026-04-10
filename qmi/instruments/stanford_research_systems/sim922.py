@@ -12,7 +12,7 @@ class SIM922(QMI_Instrument):
     def __init__(self, context: QMI_Context, name: str, sim900: Sim900, port: int) -> None:
         """Initialize driver.
 
-        Arguments:
+        Parameters:
             name: Name for this instrument instance
             sim900: Instance of sim 900 module or RPC proxy of it, that hosts the amp-sim module.
             port: Port number in which the amp-sim module is located.
@@ -69,7 +69,7 @@ class SIM922(QMI_Instrument):
     def is_excited(self, channel: int) -> bool:
         """ Query the specified channel if excitation current is on.
 
-        Arguments:
+        Parameters:
             channel: Channel to query
         Returns:
             True if excitation current is on, else False.
@@ -89,7 +89,7 @@ class SIM922(QMI_Instrument):
     @rpc_method
     def set_excitation(self, channel: int, current_on: bool) -> None:
         """ Set current excitation to the specified channel to on/off.
-        Arguments:
+        Parameters:
             channel: Channel to set excitation current.
             current_on: True if current on, else False.
         """

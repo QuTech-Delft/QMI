@@ -277,7 +277,7 @@ class PicoQuant_MultiHarp150(_PicoquantHarp):
         initially initializing with internal clock source, then setting up the WR connection by means of the WR
         routines described below, then initializing again with the desired WR clock model.
 
-        Arguments:
+        Parameters:
             mode_str (str): Opening mode. Can be any of 'HIST', 'T2', 'T3'.
                             The latest driver version V3.0+ supports T2 and T3 modes.
             refsource_str (str): Reference source for time. Can be any of 'INTERNAL', 'EXTERNAL_10MHZ',
@@ -334,7 +334,7 @@ class PicoQuant_MultiHarp150(_PicoquantHarp):
     def set_sync_edge_trigger(self, level: int, edge_str: str) -> None:
         """Set SYNC trigger level and edge.
 
-        Arguments:
+        Parameters:
             level: Trigger level, in mV. A value ranging from :-1200 mV to +1200 mV.
             edge_str: Either 'RISING' or 'FALLING'.
 
@@ -350,7 +350,7 @@ class PicoQuant_MultiHarp150(_PicoquantHarp):
     def set_sync_dead_time(self, on: int, deadtime: int) -> None:
         """Set sync channel dead-time.
 
-        Arguments:
+        Parameters:
             on: 0 = set minimal dead-time, 1 = activate extended dead-time.
             deadtime: extended dead-time in ps. Valid range from `constants.EXTDEADMIN` (800 ps) to
                 `constants.EXTDEADMAX` (160000 ps).
@@ -366,7 +366,7 @@ class PicoQuant_MultiHarp150(_PicoquantHarp):
     def set_input_edge_trigger(self, channel: int, level: int, edge_str: str) -> None:
         """Set input channel trigger level and edge.
 
-        Arguments:
+        Parameters:
             channel: Channel index (range from 0 to `number_of_channels` - 1).
             level: Trigger level, in mV. A value ranging from -1200 mV to +1200 mV.
             edge_str: 'RISING' or 'FALLING'.
@@ -383,7 +383,7 @@ class PicoQuant_MultiHarp150(_PicoquantHarp):
     def set_input_channel_dead_time(self, channel: int, on: int, deadtime: int) -> None:
         """Set input channel dead-time.
 
-        Arguments:
+        Parameters:
             channel: Channel index (range from 0 to `number_of_channels` - 1).
             on: 0 = set minimal dead-time, 1 = activate extended dead-time.
             deadtime: extended dead-time in ps. Valid range from `constants.EXTDEADMIN` (800 ps) to

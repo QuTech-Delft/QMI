@@ -16,7 +16,7 @@ class Sim900(QMI_Instrument):
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize driver.
 
-        Arguments:
+        Parameters:
             name: Name for this instrument instance.
             transport: Transport descriptor to access the instrument.
         """
@@ -42,7 +42,7 @@ class Sim900(QMI_Instrument):
 
         Query bytes waiting on the input buffer of the specified port.
 
-        Arguments:
+        Parameters:
             port: port to query number of input bytes waiting.
 
         Returns:
@@ -64,7 +64,7 @@ class Sim900(QMI_Instrument):
 
         The RAWN command retrieves exactly i bytes from the specified port and return them.
 
-        Arguments:
+        Parameters:
             port: port number to retrieve from.
             num_bytes: amount of bytes to retrieve.
 
@@ -83,7 +83,7 @@ class Sim900(QMI_Instrument):
         The send terminated message transfers the message followed by the <term>
         sequence to the specified port.
 
-        Arguments:
+        Parameters:
             port: port number to send terminated message to.
             message: message to send.
         """
@@ -98,7 +98,7 @@ class Sim900(QMI_Instrument):
         This is a helper function that simulates the SCPI _ask_ functionality. It is important that this function is
         executed atomically to avoid race conditions.
 
-        Arguments:
+        Parameters:
             port: port number of module to ask for data
             message: message to send
             delay: how long the function should wait before the full response is available
@@ -120,7 +120,7 @@ class Sim900(QMI_Instrument):
 
         Checks whether the specified port number is valid for the SIM900.
 
-        Arguments:
+        Parameters:
             port: port number to validate.
 
         Raises:
