@@ -106,7 +106,7 @@ def start(
         context_cfg:      Optionally insert or override context(s) in config.contexts.
 
     Returns:
-        The global QMI_Context.
+        The global QMI_Context object.
     """
 
     global _qmi_context  # noqa: PLW0603
