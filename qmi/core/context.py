@@ -12,23 +12,26 @@ import socket
 import string
 import threading
 import time
-import typing
 import warnings
 from collections.abc import Callable
 from types import TracebackType
-from typing import Any, NamedTuple, Self
+from typing import Any, NamedTuple, Self, Literal
 
 import qmi
 from qmi.core.config_defs import CfgQmi, CfgContext
-from qmi.core.exceptions import QMI_UsageException, QMI_DuplicateNameException, QMI_UnknownNameException, \
+from qmi.core.exceptions import QMI_UsageException, QMI_DuplicateNameException, \
+    QMI_UnknownNameException, \
     QMI_ConfigurationException, QMI_InvalidOperationException, QMI_WrongThreadException
 from qmi.core.instrument import QMI_Instrument
-from qmi.core.messaging import MessageRouter, QMI_Message, QMI_MessageHandlerAddress, QMI_MessageHandler
+from qmi.core.messaging import MessageRouter, QMI_Message, QMI_MessageHandlerAddress, \
+    QMI_MessageHandler
 from qmi.core.pubsub import SignalManager, QMI_SignalReceiver
-from qmi.core.rpc import QMI_RpcObject, QMI_RpcProxy, RpcObjectManager, rpc_method, RpcObjectDescriptor, \
+from qmi.core.rpc import QMI_RpcObject, QMI_RpcProxy, RpcObjectManager, rpc_method, \
+    RpcObjectDescriptor, \
     make_interface_descriptor, QMI_LockTokenDescriptor
 from qmi.core.task import QMI_Task, QMI_TaskRunner
-from qmi.core.udp_responder_packets import unpack_qmi_udp_packet, QMI_UdpResponderContextInfoRequestPacket, \
+from qmi.core.udp_responder_packets import unpack_qmi_udp_packet, \
+    QMI_UdpResponderContextInfoRequestPacket, \
     QMI_UdpResponderContextInfoResponsePacket
 from qmi.core.util import is_valid_object_name, format_address_and_port, AtomicCounter
 
@@ -307,7 +310,7 @@ class QMI_Context:
             exc_type: type[BaseException] | None,
             exc_val: BaseException | None,
             exc_tb: TracebackType | None,
-    ) -> typing.Literal[False]:
+    ) -> Literal[False]:
         """
         Context manager exit point.
         Stops the context if it was not already stopped.
