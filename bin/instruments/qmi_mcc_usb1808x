@@ -48,7 +48,7 @@ def run() -> int:
         return 0
 
     instr: MCC_USB1808X
-    with start_stop(qmi, "mcc_usb1808x_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
+    with qmi.start("mcc_usb1808x_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
         idn = instr.get_idn()
         print("IDN:", idn)
 

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import qmi
 from qmi.utils.context_managers import start_stop
 
-with start_stop(qmi, "calibration_client", "qmi.conf"):
+with qmi.start("calibration_client", "qmi.conf"):
 
     laser = qmi.get_instrument("calibration_server.laser")
     pm    = qmi.get_instrument("calibration_server.pm")

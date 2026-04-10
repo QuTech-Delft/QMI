@@ -53,22 +53,21 @@ Install with Pip from https://pypi.org/project/qmi/: `pip install qmi`.
 
 The latest version of the documentation can be found [here](https://qmi.readthedocs.io/en/latest/).
 
-### Installing for generating documentation
+### Installation for developers
 
-To install the necessary packages to perform documentation activities for QMI do:
-
-```
-pip install -e .[rtd]
-```
-
-To build the 'readthedocs' documentation locally do:
+To install the necessary packages to develop for QMI do:
 
 ```
-cd documentation/sphinx
-./make-docs
+pip install -e .[dev]
 ```
 
-The documentation can then be found in the `build/html` directory.
+To generate the Sphinx API documentation locally do:
+
+```
+./scripts/run_docs_sphinx.sh
+```
+
+The documentation can then be found in the `documentation/sphinx/source/generated` directory.
 
 ## Contribute
 

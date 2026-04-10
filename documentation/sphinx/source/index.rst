@@ -12,6 +12,7 @@ This is the documentation for QMI, the Quantum Measurement Infrastructure framew
    installation
    tutorial
    design
+   troubleshooting
    api_reference
    coding_standard
    documenting_qmi

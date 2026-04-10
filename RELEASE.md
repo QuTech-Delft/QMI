@@ -1,8 +1,9 @@
 # Release procedure
 
-This is the release procedure of a minor release for QMI. Major release procedure TBD.
+This is the release procedure of a minor release for QMI.
+As there have been no stable major releases yet, the major release procedure is still TBD.
 
-The `<major>`, `<minor>` and `<patch>` refer to the versioning numbers of the current release to be made.
+The `<major>`, `<minor>` and `<patch>` terms refer to the versioning numbers of the current release to be made.
 
 If you are using e.g. Git Bash on Windows, the `bump-my-version` command probably needs also extension: `bump-my-version.exe`.
 
@@ -63,8 +64,9 @@ If you are using e.g. Git Bash on Windows, the `bump-my-version` command probabl
 
 The following steps assume that the patch to be applied is in a single upstream commit (either in feature branch or on
 the `main` branch) and that the `CHANGELOG.md` has been updated in that commit.
-``NOTE: if the patch involves any of the files containing version of the release, the cherry-pick might cause issues and 
-need another commit to fix the version numbering, or file-specific checkouts from main might have to be done, again with manual edits.``
+
+**NOTE:** if the patch involves any of the files containing the version of the release, the cherry-pick might cause issues and 
+need another commit to fix the version numbering, or file-specific checkouts from main might have to be done, again with manual edits.
 1. Checkout the stable branch that you want to patch:
     ```shell script
     git checkout stable-{major}-{minor}

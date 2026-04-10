@@ -77,10 +77,11 @@ We can look at the documentation of the Proxy instance:
 
 >>> help(nsg)
 
-This prints the docstring of the NoisySineGenerator class. It does also give a listing of all RPC methods, signals and class constants of the proxy instance as well.
+This prints the docstring of the NoisySineGenerator class.
+It also shows a listing of all RPC methods, signals and class constants of the proxy instance.
 
 As we can read in the help, our noisy sine generator ``nsg`` supports a bunch of methods, including the ``get_sample()`` method.
-We can retrieve that method's docstring as well by typing
+We can retrieve that method's docstring as well:
 
 >>> help(nsg.get_sample)
 
@@ -88,7 +89,10 @@ Now, let's give it a shot and see what happens:
 
 >>> nsg.get_sample()
 
-Whoops, we got an error! This is because we didn't "open" the instrument first. This is of course not necessary with a virtual instrument, but we have made it to simulate a real instrument, requiring thus "open" and "close" calls for connection.
+Whoops, we got an error! This is because we didn't "open" the instrument first.
+Opening an instrument makes a connection to the instrument, which is potentially far away.
+Closing the instrument then closes the connection again.
+Now, for a  virtual instrument this is of course not necessary, but as it simulates a real instrument, we also simulate opening and closing.
 
 >>> nsg.open()
 >>> nsg.get_sample()
@@ -196,7 +200,9 @@ However, if you find yourself in a situation in which the locking proxy was lost
 >>> nsg2.is_locked()
 False
 
-It is also possible to unlock from another instrument proxy by providing the context name as well. See the example below, how to get from another context the instrument proxy. In a new terminal window, start up Python and do the following:
+It is also possible to get an instrument proxy from another context by providing that context's name as well as the instrument name.
+We can then use that proxy to lock the instrument from a different context.
+To show this in action, start up Python in a new terminal window and do the following:
 
 >>> import qmi
 >>> qmi.start("client")
@@ -207,16 +213,18 @@ True
 
 Configuration
 -------------
-
 Many aspects of QMI are configurable via a *configuration file*.
 The syntax of this file is very similar to `JSON <https://www.json.org/>`_,
 but unlike JSON, the configuration file may contain comments starting with a ``#`` character.
 
-By default, QMI attempts to read the configuration from a file named ``qmi.conf`` in
+You can specify the configuration file as the second argument of ``qmi.start()``.
+If no ``config_file`` argument is provided to ``start`` or the argument is ``None``,
+QMI will attempt to find a configuration file.
+First, it will check if the ``QMI_CONFIG`` environment variable is set and, if so,
+it will interpret its value as a path to the configuration file to use.
+If ``QMI_CONFIG`` is not set, QMI will attempt to read the configuration from a file named ``qmi.conf`` in
 the home directory (or the user folder on Windows).
-If you want to use a different file name or location, you can specify
-the configuration file path either as the second argument of ``qmi.start()``
-or in the environment variable ``QMI_CONFIG``.
+If no such file exists, it will default to an empty configuration.
 
 Let's create a configuration file with the following contents::
 
@@ -313,7 +321,7 @@ and the answer to be sent to the second program.
 
     Sometimes the connecting to a peer context fails. One reason is that in the ``qmi.conf`` file the IP address
     or the port number is defined wrong. One way to check the available contexts to connect to is to use command
-    ``qmi.show_network_contexts()`` to list available contexts, showing their name, IP-address:port anc connection
+    ``qmi.show_network_contexts()`` to list available contexts, showing their name, IP-address:port and connection
     status:
 
     >>> name         address         connected
@@ -323,10 +331,11 @@ and the answer to be sent to the second program.
 
     If this doesn't match the IP:port configuration of your ``qmi.conf`` file, and you used "localhost" or "127.0.0.1" in your configuration,
     the reason is that the localhost address gets interpreted in the background as the IP address of the PC itself. But if you set something else and the
-    IP addresses do no match, the connection probably fails.
-    Also if the shown IP:port is not the one you defined in ``qmi.conf`` of ``instr_server``, the IP:Port you gave is not in the valid range of your system. In this case, ``qmi`` just sets other values in correct range.
-    If only the port number does not match, it might be possible the the ``qmi.conf`` was actually not read and QMI has set default (localhost) values. In that case,
-    define the config file location manually in ``qmi.start`` call.
+    IP addresses do not match, the connection probably fails.
+    Also if the shown IP:port is not the one you defined in ``qmi.conf`` of ``instr_server``, the IP:port you gave is not in the valid range of your system.
+    When this happens, ``qmi`` uses a random valid value instead.
+    If only the port number does not match, it might be possible the ``qmi.conf`` configuration file was actually not read and QMI has set default (localhost) values.
+    In that case, define the config file location manually in ``qmi.start`` call:
 
     >>> qmi.start("instr_server", config_file="<path_to_qmi.conf>")
 
@@ -336,16 +345,16 @@ and the answer to be sent to the second program.
 
     >>> qmi.context().connect_to_peer("instr_server", "145.90.38.138:0")
 
-    The IP address can be also "localhost" or "127.0.0.1" if that is used in the ``qmi.conf``.
+    The IP address can also be "localhost" or "127.0.0.1" if that is used in the ``qmi.conf``.
 
     **Windows**
 
-    If the port number is `0`, and you are on a Windows machine, trying to connect this peer will give you an error:
+    If you try to connect to port `0` on a Windows machine, you will get an error:
 
     >>> OSError: [WinError 10049] The requested address is not valid in its context
 
-    While on Linux this usually works, Windows does not allow this and you have to specify a non-zero port number for the context.
-    On most systems, port numbers up to 1023 are mostly reserved so it is best to use a port number > 1023.
+    Contrary to how Linux handles this case, Windows does not allow for usage of port zero and you have to specify a non-zero port number for the context.
+    On most systems, port numbers up to 1023 are reserved so it is best to use a port number > 1023.
 
 
 Using the 'autoconnect' option
@@ -371,7 +380,6 @@ One handy way of avoiding possible mistakes in defining the IP:port in ``qmi.con
 >>> nsg.get_sample()  # will raise an exception if "instr_server" was not found in ``contexts``
 >>> 60.1239025839
 
-
 A simple QMI measurement script
 -------------------------------
 
@@ -383,7 +391,6 @@ To set up a simple measurement script, create a file ``measure_demo.py`` with th
     #!/usr/bin/env python
 
     import qmi
-    from qmi.utils.context_managers import start_stop
     from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
 
     def measure_data(nsg):
@@ -395,7 +402,7 @@ To set up a simple measurement script, create a file ``measure_demo.py`` with th
         print("mean sample value:", sum(samples) / len(samples))
 
     def main():
-        with start_stop(qmi, "measure_demo"):
+        with qmi.start("measure_demo"):
             with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
                 measure_data(nsg)
 
@@ -406,7 +413,7 @@ Run the new script by typing the following command in a shell terminal::
 
     python measure_demo.py
 
-Note that the script uses :py:class:`qmi.utils.context_managers.start_stop` to start and stop the QMI framework.
+Note that the script uses ``with`` statement to start and stop the QMI framework automatically.
 This is just a convenient way to make sure that ``qmi.start()`` and ``qmi.stop()`` will always be called.
 Similarly, the `QMI_Instrument` objects are equipped with context managers that open and close the the instrument, calling ``nsg.open()`` and ``nsg.close()`` at the creation and destruction of the instance.
 
@@ -425,18 +432,20 @@ Making a QMI task
 In some cases, it may be necessary to perform measurements while
 simultaneously running a continuous background task.
 A good example could be a control loop, which measures a signal and
-a corresponding adjustment of a parameter at a regular interval.
+performs a corresponding adjustment of some parameter at a regular interval.
 
 A *QMI Task* is a procedure which runs independently and continuously
 in the background inside a Python program.
 The same program can perform different activities in its main control
-flow while the task continues run in a separate background thread.
+flow while the task continues to run in a separate background thread.
 
 Creating a custom task involves creating a Python class which derives
 from :py:class:`qmi.core.task.QMI_Task`.
-To ensure that the task works correctly and remains accessible by
-remote Python programs, it should be defined in a *Python module*
-instead of the top-level script file.
+While it is possible to define tasks in the top-level script file,
+we recommend creating a separate Python module for each of them instead.
+The reason for this is reusability: if you define your task in a separate module,
+it can not just be invoked through your script, but also through other tools,
+such as ``qmi_proc``, which we will cover later on.
 
 To demonstrate a custom task, create a new Python module inside
 the module path for your project. If you don't have a module path
@@ -475,12 +484,11 @@ the task and continues to perform other activities::
 
     import time
     import qmi
-    from qmi.utils.context_managers import start_stop
     from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
     from demo_task import DemoTask
 
     def main():
-        with start_stop(qmi, "task_demo"):
+        with qmi.start("task_demo"):
             with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
                 task = qmi.make_task("task", DemoTask)
                 task.start()
@@ -563,16 +571,89 @@ can be passed to `context.make_task()`. In the ``task_demo.py`` edit the ``make_
                 print("the task has been stopped")
 
 Now, the task runs at loop period of 1 us, and if executing the ``loop_iteration`` function takes longer than the ``loop_period``,
-it just skips to the next scheduled period, instead of trying to do the following period a.s.a.p. (``IMMEDIATE`` policy, which is default).
-This is probably useful in cases where we can get data at specific moments of time ONLY, but due to the high frequency of the loop period we cannot
-always do this. The third option is ``TERMINATE`` which stops the loop if a period gets overdue.
+it just skips to the next scheduled period as it uses policy ``SKIP``.
+This is probably useful in cases where we can only collect data at specific moments in time, but due to the high frequency of the loop period we might miss the next period.
+Other options for policies are the default of ``IMMEDIATE``, which tries to execute the following period as soon as possible, or ``TERMINATE`` which stops the loop if a period is overdue.
+
+**Context management**
+======================
+
+QMI offers a few context managers to facilitate better control of the QMI contexts, instruments, tasks and signals.
+
+QMI contexts can be started and stopped automatically, through use of the ``with`` statement::
+
+    with qmi.start("name"):
+        custom_code_here ...
+
+This has the same effect as::
+
+    qmi.start("name")
+    try:
+        custom_code_here ...
+    finally:
+        qmi.stop()
+
+both ensuring that ``qmi.stop()`` will be called even when an error occurs in the custom code.
+
+We can make instruments and tasks in the QMI context. For automatic opening and closing of an instrument driver instance
+based on `QMI_Instrument`, we can do::
+
+    with qmi.make_instrument("instrument_name", InstrumentClass, ...) as instr:
+        custom_code_here...
+
+which has the same effect as::
+
+    instr = qmi.make_instrument("instrument_name", InstrumentClass)
+    instr.open()
+    try:
+        custom_code_here...
+    finally:
+        instr.close()
+
+Alternatively, the `open_close` context manager,from ``qmi.utils.context_managers`` can be used, but this context manager
+will be obsoleted. That option requires making the instrument instance first and then giving it as an input to the context manager.
+
+For tasks we can use the context management protocol to automatically start the task thread when entering a task's `QMI_LoopTask` context,
+and stopping and joining to it at exit. Similar to the instrument, we can do::
+
+    with qmi.make_task("task_name", TaskClass, ...) as task:
+         task_code_here...
+
+And the task should be stopped and joined after the task is finished. In the ``qmi.utils.context_managers`` is also context manager
+`start_stop_join` to do this, but it will be obsoleted.
+
+Further context managers in ``qmi.utils.context_managers`` are `lock_unlock` and `subscribe_unsubscribe` context managers.
+The `lock_unlock` manager is meant for RPC objects that the user wants to lock while they are used by some script or task.
+Typical use::
+
+    some_instr = qmi.get_instrument(...)
+    with lock_unlock(some_instr):
+        privileged_code_here...
+
+The `lock_unlock` context manager accepts also extra input arguments, so that `timeout` and `lock_token` arguments can
+also be given for the context manager.
+
+And the final `subscribe_unsubscribe` context manager is meant to be used with signals. For example, a task has signal
+named `sig_send_data` in the task's class. And we want to subscribe to it to receive data updates. If a task is f.ex.
+obtained from another context, and we want to receive in `data_receiver`::
+
+    signal_task = qmi.get_task(...)
+    data_receiver = QMI_SignalReceiver()
+    with subscribe_unsubscribe(signal_task.sig_send_data, data_receiver):
+        data = data_receiver.get_next_signal()
+
+If the task is 'running' and publishing data, the receiver should receive the data from it and then unsubscribe from
+the signal again. Forgetting to unsubscribe from the signal could possibly lead to memory issues if the receiver is
+still present, because then the published data could keep accumulating into the receiver queue.
 
 Tasks and RPC methods
 ---------------------
 
-Tasks cannot have RPC methods in them by design choice. But, nevertheless in some special cases the user might like to monitor and control
-a value or values at some unknown moment while the task is running. For example, we would like to retrieve and control the ``amplitude`` value
-of our ``DemoTask``. To do this, first we need to make an attribute for the object by introducing it in ``__init__``::
+Tasks cannot have RPC methods in them by design.
+Nevertheless, in some special cases the user might like to monitor and control
+a value or values at some unknown moment while the task is running.
+Say for example, that we would like to retrieve and control the ``amplitude`` value of our ``DemoTask``.
+To do this, first we need to make an attribute for the object by introducing it in ``__init__``::
 
    def __init__(self, task_runner, name, amplitude_factor=1.0):
         super().__init__(task_runner, name)
@@ -640,7 +721,6 @@ of the task in the script instead of inside the task. We now rewrite the script 
 
     import time
     import qmi
-    from qmi.utils.context_managers import start_stop
     from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
     from demo_task import DemoTask
 
@@ -652,7 +732,7 @@ of the task in the script instead of inside the task. We now rewrite the script 
             self.set_settings(settings)
 
     def main_2():
-        with start_stop(qmi, "task_demo"):
+        with qmi.start("task_demo"):
             with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
                 with qmi.make_task("task", DemoRpcControlTask, task_runner=CustomRpcControlTaskRunner) as task:
                     print("the task has been started")
@@ -747,10 +827,9 @@ in the current directory::
 
     import time
     import qmi
-    from qmi.utils.context_managers import start_stop
 
     def main():
-        with start_stop(qmi, "proc_demo"):
+        with qmi.start("proc_demo"):
             print("just started the background process")
             while not qmi.context().shutdown_requested():
                 print("process is still running")
@@ -825,20 +904,20 @@ After a while, run ``qmi_proc stop proc_demo`` to stop the background process.
 Further options
 ===============
 
-The ``qmi_proc`` provides also other options to facilitate starting and stopping processes. Beyond "start" and "stop" there are:
-  - The "restart" option that simply calls first "stop" and then "start".
-  - Together with "start", "stop" or "restart" you can also add arguments:
+The ``qmi_proc`` provides also other options to facilitate starting and stopping processes. Beyond ``start`` and ``stop`` there are:
+  - The ``restart`` option that simply calls first ``stop`` and then ``start``.
+  - Together with ``start``, ``stop`` or ``restart`` you can also add arguments:
 
-    * "--all" to (re)start/stop all configured contexts in the QMI configuration file.
-    * "--locals" to (re)start/stop all configured LOCAL contexts.
-    * "--config <path_to_config_file>" to specify the configuration file to be used.
+    * ``--all`` to (re)start/stop all configured contexts in the QMI configuration file.
+    * ``--locals`` to (re)start/stop all configured LOCAL contexts.
+    * ``--config <path_to_config_file>`` to specify the configuration file to be used.
 
-Note that the "--all" and "--locals" options will work only for context in the configuration file that have
+Note that the ``--all`` and ``--locals`` options will work only for context in the configuration file that have
   - ``"enabled": true`` and
   - ``"program_module": "your.program.module"`` defined.
 
 Also, you cannot start or stop processes that are not configured in the configuration file.
-It is also possible to run the ``qmi_proc`` interactively in a "server" mode. Start it with::
+It is also possible to run the ``qmi_proc`` interactively in a ``server`` mode. Start it with::
 
   qmi_proc server <--config path/to/your.conf>
 
@@ -852,23 +931,3 @@ and then after it should be stopped::
 
 At the moment no further commands are enabled and any other command exits the server.
 This functionality might get deprecated in the future.
-
-USBTMC devices
-==============
-
-Connecting with USBTMC devices on Windows can be tricky. Make sure you have libusb1 and pyvisa installed.
-https://pypi.org/project/libusb1/ and https://pypi.org/project/PyVISA/ (and perhaps pyvisa-py).
-
-Then you'll need to have the backend set-up correctly, in case the ``libusb-1.0.dll`` is not found in your path.
-An example script to set-up and test the backend is::
-
-  import usb.core
-  from usb.backend import libusb1
-
-  backend = libusb1.get_backend(
-      find_library=lambda x: "<path_to_your_env>\\Lib\\site-packages\\usb1\\libusb-1.0.dll")
-
-  dev = list(usb.core.find(find_all=True))
-
-If you can now find devices, the backend is set correctly. There are of course other ways to set-up your backend
-as well, but as said, it can be tricky...

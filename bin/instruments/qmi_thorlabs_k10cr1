@@ -33,7 +33,7 @@ def run() -> int:
     args = parser.parse_args()
 
     instr: Thorlabs_K10CR1
-    with start_stop(qmi, "thorlabs_k10cr1_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
+    with qmi.start("thorlabs_k10cr1_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
         idn = instr.get_idn()
         print("IDN:", idn)
 

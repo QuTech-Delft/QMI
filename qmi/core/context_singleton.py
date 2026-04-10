@@ -14,20 +14,18 @@ functions directly, for example::
     qmi.stop()
 """
 
-import sys
 import logging
 import os
 import os.path
+import sys
 import time
-
 from typing import Any
 
 import qmi.core.config
 import qmi.core.logging_init
 import qmi.core.thread
-
-from qmi.core.config_struct import config_struct_from_dict
 from qmi.core.config_defs import CfgQmi, CfgContext
+from qmi.core.config_struct import config_struct_from_dict
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_UsageException, QMI_NoActiveContextException, QMI_ConfigurationException
 from qmi.core.instrument import QMI_Instrument
@@ -35,9 +33,8 @@ from qmi.core.rpc import QMI_RpcObject
 from qmi.core.task import QMI_Task, QMI_TaskRunner
 from qmi.core.util import format_address_and_port
 
-
 # Global variable holding the current QMI_Context instance.
-_qmi_context = None
+_qmi_context: QMI_Context | None = None
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
@@ -66,7 +63,7 @@ def start(
         init_logging: bool = True,
         console_loglevel: str | None = None,
         context_cfg: dict | None = None
-) -> None:
+) -> QMI_Context:
     """Create and start a global QMI_Context instance.
 
     This function should be called exactly once by the top-level code of
@@ -107,6 +104,9 @@ def start(
         init_logging:     Optional flag; set False to skip logging initialization.
         console_loglevel: Optionally override `console_loglevel` from config file.
         context_cfg:      Optionally insert or override context(s) in config.contexts.
+
+    Returns:
+        The global QMI_Context object.
     """
 
     global _qmi_context  # noqa: PLW0603
@@ -136,6 +136,7 @@ def start(
 
     # Create QMI context.
     _qmi_context = QMI_Context(context_name, config)
+    _qmi_context.register_stop_handler(_clear_global_context)
 
     if init_logging:
         _init_logging()
@@ -150,6 +151,8 @@ def start(
 
     # Connect to peer contexts.
     _connect_to_peers()
+
+    return context()
 
 
 def create_config_from_file(config_file: str | None) -> CfgQmi:
@@ -257,15 +260,19 @@ def stop() -> None:
     Raises:
         QMI_NoActiveContextException: If there is no active QMI context present.
     """
-
-    global _qmi_context  # noqa: PLW0603
-
     qmi.core.thread.check_in_main_thread()
 
     if _qmi_context is None:
         raise QMI_NoActiveContextException()
 
     _qmi_context.stop()
+
+
+def _clear_global_context() -> None:
+    """
+    Set the global context to None.
+    """
+    global _qmi_context  # noqa: PLW0603
     _qmi_context = None
 
 

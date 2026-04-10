@@ -28,7 +28,7 @@ def run() -> int:
     args = parser.parse_args()
 
     instr: SSA3000X
-    with start_stop(qmi, "siglent_ssa3000x_client", console_loglevel="WARNING"), parse_source(args) as instr:
+    with qmi.start("siglent_ssa3000x_client", console_loglevel="WARNING"), parse_source(args) as instr:
         if args.span is not None:
             instr.set_freq_span(args.span)
         if args.center is not None:

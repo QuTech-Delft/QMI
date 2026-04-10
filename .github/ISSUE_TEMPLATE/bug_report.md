@@ -19,6 +19,9 @@ A clear and concise description of what you expected to happen.
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
+**QMI version:**
+Can be obtained by executing: `python -c "import qmi; print(qmi.__version__)"`.
+
 **Operating System (please complete the following information):**
 - OS: [e.g. Linux]
 - Version [e.g. 22.04 LTS]
