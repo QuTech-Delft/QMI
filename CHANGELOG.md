@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.53.0-beta.0] - Unreleased
 
+### Added
+- Functions to `qmi.instruments.yokogawa.dlm4308` for obtaining trace data from the instrument waveform channels via Ethernet. All data formats are enabled.
+- Due to possibility of obtaining data in various data formats with Yokogawa device, and the fact that the returned data string decoding varies depending on the data format, an option for setting the `decoder` for `ScpiProtocol.ask` method was added. This enabled the trace adat acquisition in all data formats for Yokogawa.
+
+### Changed
+- Replace `pylint` linter with `ruff`.
+
 ## [0.52.0] - 2026-04-01
 
 ### Added
@@ -17,15 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dependency on `h5netcdf` package in `pyproject.toml`.
 - Base class for Thorlabs K10CRx instruments in qmi.instruments.thorlabs.k10crx module.
 - Driver for Thorlabs K10RC2 instrument. It is based on the new base class for K10CRx instruments.
-- Functions to `qmi.instruments.yokogawa.dlm4308` for obtaining trace data from the instrument waveform channels via Ethernet. All data formats are enabled.
-- Due to possibility of obtaining data in various data formats with Yokogawa device, and the fact that the returned data string decoding varies depending on the data format, an option for setting the `decoder` for `ScpiProtocol.ask` method was added. This enabled the trace adat acquisition in all data formats for Yokogawa.
 
 ### Changed
 - API changing Zurich Instruments HDAWG QMI driver refactoring to be based mainly on the zhinst.toolkit package to allow easier 4x2 and 2x4 grouping modes and use. The driver now uses also `zhinst-toolkit` package as basis.
 - DeprecationWarning on the `set|get_output_amplitude` methods in the HDAWG driver, as the new firmware points to rather using `outputs/n/gains/n`. Use `set|get_output_gain` from now on.
 - All modules in `qmi.data` were made compatible also with `h5netcdf` package. It can now be used equivalently with the `h5py`-based HDF5 data files when providing `backend="h5netcdf"` input parameter on specific class initializations and calls.
 - Changed Thorlabs K10CR1 to derive from new base class for K10CRx instruments.
-- Replace `pylint` linter with `ruff`.
 
 ### Fixed
 - Moving of `_snicaddr` in psutil package v2.7 from `_common` to `_ntuples` module, which caused an error with `qmi_proc`.
