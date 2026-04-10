@@ -134,7 +134,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
         _logger.debug(
             "[%s] Obtained values %d for query %s:CHANnel_}:%s? for channels %d.",
-            self._name, preposition, parameter, channels
+            self._name, values, preposition, parameter, channels
         )
         return values
 
