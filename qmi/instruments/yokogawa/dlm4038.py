@@ -386,7 +386,9 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Parameters:
             channel: Waveform (channel) number.
         """
-        assert channel in range(1, self.CHANNELS + 1), f"Invalid waveform channel number {channel}"
+        if channel not in range(1, self.CHANNELS + 1):
+            raise ValueError(f"Invalid waveform channel number {channel}")
+        
         self._scpi_protocol.write(f":WAVeform:TRACE {channel}")
 
     @rpc_method
@@ -423,7 +425,9 @@ class Yokogawa_DLM4038(QMI_Instrument):
             return np.array([float(x) for x in raw_data.split(',')])
 
         # Check that we have block data format, where the string must start with a hash.
-        assert raw_data.startswith('#'), f"Unexpected response {raw_data!r} for ':WAVeform:SEND?'."
+        if not raw_data.startswith('#'):
+            raise QMI_InstrumentException(f"Unexpected response {raw_data!r} for ':WAVeform:SEND?'.")
+        
         # 'N' indicates the number of succeeding data bytes (digits) in ASCII code.
         no_of_bytes = int(raw_data[1])
         # <N-digit decimal number> indicates the number of bytes of data.
@@ -432,7 +436,6 @@ class Yokogawa_DLM4038(QMI_Instrument):
         raw_data = raw_data[2+no_of_bytes:]  # slice header
         # Data is comprised of signed 8-bit values, or 16-bit 'words' in little-endian order.
         data_bytes = raw_data.encode('latin1')
-        # TODO: There might be newline character[s]. Should check and remove?
         if data_points != len(data_bytes):
             _logger.debug(
                 "[%s] Data tracing error. Expected %i data points in block, but block is of length %i. " +
@@ -461,7 +464,6 @@ class Yokogawa_DLM4038(QMI_Instrument):
             position = int(self._scpi_protocol.ask(":WAVeform:POSition?")[9:]) - 1
             # Get the data from the byte string as _signed_ integer array.
             data = np.frombuffer(data_bytes, dtype=np.int8, count=data_points)
-            print(data, position, type(position))
 
         _logger.debug(
             "[%s] Data (up to first 1000 points) before conversion is %d.", self._name, data[:1000]
@@ -590,7 +592,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
             shutil.copy(f"{self._directory_oscilloscope}{f}", destination)
 
     @rpc_method
-    def delete_file(self, name: str, select_files: str = "last", data_format: str = "binary") -> None:
+    def delete_file(self, name: str, select_files: str = "last", data_type: str = "binary") -> None:
         """Deletes files in the oscilloscope with names 'nameXXX.csv'.
         It can be chosen whether to delete the last file created with that name (higher XXX) with select_files = 'last'
         or to delete all of them with select_files = 'all'.
@@ -598,15 +600,15 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Parameters:
             name:         Preposition of file names to find.
             select_files: Optional parameter to select only the "last" file (default) or "all" the files.
-            data_format:    Specify with type: 'binary' for raw data and 'ascii' for csv data file.
+            data_type:    Specify with type: 'binary' for raw data and 'ascii' for csv data file.
         """
-        data_format = self._data_format_check(data_format)
+        data_type = self._data_type_check(data_type)
 
         # Stops in order to delete the data
         self.stop()
         file_names = self.find_file_name(name, select_files)
         for f in file_names:
-            self._scpi_protocol.write(f':FILE:DELete:{data_format}:EXECute "{f[:-4]}"')
+            self._scpi_protocol.write(f':FILE:DELete:{data_type}:EXECute "{f[:-4]}"')
 
         # Starts again, notice that at least a time of 10*time_division is needed to get a full spectrum after starting
         self.start()
