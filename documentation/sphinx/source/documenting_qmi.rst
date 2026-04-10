@@ -2,7 +2,7 @@
 Documenting QMI
 ===============
 
-This section contains links that are useful while commenting QMI.
+This section contains links that are useful while writing Sphinx documentation for QMI.
 
 `Section 7.3.6 of the Python Developers Guide <https://devguide.python.org/documenting/#sections>`_ describes heading order. In our documentation, we start with the 'sections' level.
 
@@ -69,12 +69,3 @@ The following terms are recognized by the *Napoleon* parser:
 * Warns
 * Yield (alias of Yields)
 * Yields
-
---------------------------
-Wishlist for documentation
---------------------------
-
-* Referencing to some items is quite hard to understand and get right.
-* Autosummary could help.
-* Standard exception "ValueError" is not clickable (intersphinx?)
-

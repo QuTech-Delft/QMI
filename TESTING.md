@@ -18,17 +18,17 @@ you work on the code base. The Ruff configuration is provided in `ruff.toml`. Th
 `mypy.ini`.
 
 In any case, both tools can be run from the command line:
-
+```zsh
     $ ruff check
     $ mypy qmi/
-
+```
 
 Unit tests
 ----------
 
-Unit tests are executed in the CI environment against different Python versions: 3.11, 3.12 and 3.13. Code coverage of
-the tests is computed using [Coverage.py](https://coverage.readthedocs.io/en/coverage-5.3.1/). To run the tests
-locally, use:
+Unit tests are executed in the CI environment against different Python versions: 3.11, 3.12, 3.13 and 3.14.
+Code coverage of the tests is computed using [Coverage.py](https://coverage.readthedocs.io/en/coverage-5.3.1/).
+To run the tests locally, use:
 ```zsh
 coverage run --branch -m unittest discover --start-directory=tests --pattern="test_*.py";
 ```
@@ -55,7 +55,9 @@ In the first three workflows, the following tests are performed:
 - The code quality and maintainability analyses and unit-test coverage are performed, as these metrics are considered as quality indicators for the code base (which includes
 tests).
 - Unit-tests are performed and the coverage is calculated.
-- On push to a branch, tests are executing only with Python 3.11. When changes are pushed to a pull request, the tests are rerun parallel also with Python 3.12 and 3.13. With the 3.11 version, the quality badges are created.
+- On push to a branch, tests are executing only with Python 3.11.
+  When changes are pushed to a pull request, the tests are rerun in parallel with Python 3.12, 3.13 and 3.14 as well.
+  The quality badges are based on the 3.11 results.
 
 The fourth workflow packages the source code into an installable Python package.
 

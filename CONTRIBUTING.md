@@ -42,4 +42,4 @@ during the following step, the editable installation of the pip package is not a
    mypy qmi/
    python3 -m unittest discover -s=tests -p "test_*.py"
    ```
-6. Submit a pull request using the GitHub website.
+6. Submit a pull request at https://github.com/QuTech-Delft/QMI/pulls.
