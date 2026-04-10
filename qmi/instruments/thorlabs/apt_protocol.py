@@ -50,18 +50,6 @@ class AptChannelHomeLimitSwitch(Enum):
 
 
 @dataclass
-class VelocityParams:
-    """Velocity parameters for the controller.
-
-    Attributes:
-        max_velocity:    Maximum velocity in degrees/second or mm/second.
-        acceleration:    Acceleration in degrees/second/second or mm/second/second.
-    """
-    max_velocity: float
-    acceleration: float
-
-
-@dataclass
 class HomeParams:
     """Homing parameters for the controller.
 

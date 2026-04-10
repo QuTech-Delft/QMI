@@ -4,7 +4,6 @@ Instrument driver for the Santec TSL 570 laser.
 
 import logging
 from dataclasses import dataclass
-from typing import List, Union
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
@@ -21,24 +20,24 @@ _logger = logging.getLogger(__name__)
 class _WavelengthRange:
     """Dataclass for wavelength instrument range."""
 
-    min: float
-    max: float
+    min: float = 0.0
+    max: float = 0.0
 
 
 @dataclass
 class _FrequencyRange:
     """Dataclass for frequency instrument range."""
 
-    min: float
-    max: float
+    min: float = 0.0
+    max: float = 0.0
 
 
 @dataclass
 class _PowerLevelRange:
     """Dataclass for power level instrument range."""
 
-    min: float
-    max: float
+    min: float = 0.0
+    max: float = 0.0
 
 
 class Santec_Tsl570(QMI_Instrument):
@@ -106,11 +105,11 @@ class Santec_Tsl570(QMI_Instrument):
             default_timeout=self.DEFAULT_RESPONSE_TIMEOUT,
         )
         # Instrument ranges for values
-        self._wavelength_range = _WavelengthRange
-        self._frequency_range = _FrequencyRange
-        self._power_level_range = _PowerLevelRange
+        self._wavelength_range = _WavelengthRange()
+        self._frequency_range = _FrequencyRange()
+        self._power_level_range = _PowerLevelRange()
 
-    def _check_error(self) -> List[str]:
+    def _check_error(self) -> list[str]:
         """Read the instrument error queue and raise an exception if there is an error.
 
         Returns:
@@ -219,7 +218,7 @@ class Santec_Tsl570(QMI_Instrument):
 
         Returns:
             QMI_InstrumentIdentification: Data with e.g. idn.vendor = SANTEC, idn.model = TSL-570,
-            idn.serial = 21020001, idn.version = 0001.000.0001 (firmware version).
+                                          idn.serial = 21020001, idn.version = 0001.000.0001 (firmware version).
         """
         resp = self._scpi_protocol.ask("*IDN?")
         words = resp.rstrip().split(",")
@@ -238,7 +237,8 @@ class Santec_Tsl570(QMI_Instrument):
     @rpc_method
     def clear(self) -> None:
         """Clear Status. Clears all event registers and queues and reflects the summary in the Status Byte Register.
-        Clears the following items.
+
+        Clears the following items:
         ・Status Byte Register
         ・Standard Event Status Register
         ・Error Queue
@@ -257,7 +257,7 @@ class Santec_Tsl570(QMI_Instrument):
         return response
 
     @rpc_method
-    def get_errors(self) -> List[str]:
+    def get_errors(self) -> list[str]:
         """Query all errors and alerts.
 
         Returns:
@@ -416,7 +416,7 @@ class Santec_Tsl570(QMI_Instrument):
         self._write_and_check_errors(":WAV:FIN:DIS")
 
     @rpc_method
-    def set_coherence_control_status(self, status: Union[bool, str]) -> None:
+    def set_coherence_control_status(self, status: bool | str) -> None:
         """Set the Coherence control status.
 
         Parameters:
@@ -445,7 +445,7 @@ class Santec_Tsl570(QMI_Instrument):
         return "ON" if status else "OFF"
 
     @rpc_method
-    def set_optical_output_status(self, status: Union[bool, str]) -> None:
+    def set_optical_output_status(self, status: bool | str) -> None:
         """Set the optical output status.
 
         Parameters:
@@ -607,7 +607,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Set the start frequency for a sweep.
 
         Parameters:
-            frequency: frequency in terahertz.
+            frequency: Frequency in terahertz.
         """
         unit = "THz"
         dec = 4  # 10 MHz resolution
@@ -634,7 +634,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Set the stop frequency for a sweep.
 
         Parameters:
-            frequency: frequency in terahertz.
+            frequency: Frequency in terahertz.
         """
         unit = "THz"
         dec = 4  # 10 MHz resolution
@@ -721,7 +721,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get dwell between sweep steps.
 
         Returns:
-            dwell: dwell in range [0, 1000[s.
+            dwell: Dwell in range [0, 1000[s.
         """
         return self._ask_float(":WAV:SWE:DWEL?")
 
@@ -744,7 +744,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get delay between sweeps.
 
         Returns:
-            delay: delay in range [0, 1000[s.
+            delay: Delay in range [0, 1000[s.
         """
         return self._ask_float(":WAV:SWE:DEL?")
 
@@ -869,7 +869,7 @@ class Santec_Tsl570(QMI_Instrument):
         """Get trigger output step.
 
         Returns:
-            step: step in range [0.0001, max wavelength]nm.
+            step: Step in range [0.0001, max wavelength]nm.
         """
         return self._ask_float(":TRIG:OUTP:STEP?")
 
@@ -888,7 +888,7 @@ class Santec_Tsl570(QMI_Instrument):
         return int(self._scpi_protocol.ask(":READ:POIN?"))
 
     @rpc_method
-    def readout_data(self) -> List[float]:
+    def readout_data(self) -> list[float]:
         """Read out wavelength logging data and convert it into floating point values. According to the manual
         the data points are returned in units of 0.1pm. Thus, value 0x0040F844 (little Endian order) = 4520000
         corresponds to 452.0000nm.

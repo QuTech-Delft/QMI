@@ -3,9 +3,10 @@
 import collections
 import re
 import time
-from typing import Dict, List, Match, Optional, TextIO, Tuple, Union
+from typing import Match, TextIO
 
 import numpy as np
+import h5netcdf
 import h5py
 
 
@@ -30,39 +31,40 @@ class DataSet:
         dataset.data[2, 0:5] += 1
 
     The following fields exist inside a DataSet instance. Application code may read or modify the contents of
-    these fields directly. However the shape and data type of these fields must not be changed.
+    these fields directly. However, the shape and data type of these fields must not be changed.
 
     Internal Variables:
-        ~DataSet.name:         Name of the dataset.
-        ~DataSet.data:         Numpy array containing the actual data.
-        ~DataSet.timestamp:    POSIX time stamp associated with the data.
-        axis_label:   List of strings specifying labels for the first (N-1) axes.
-        axis_unit:    List of strings specifying units for the first (N-1) axes.
-        axis_scale:   List of optional 1D Numpy arrays specifying value mappings for the first (N-1) axes.
-        column_label: List of strings specifying column labels.
-        column_unit:  List of strings specifying column units.
-        attrs:        Dictionary of application-specific attributes.
+        ~DataSet.name:      Name of the dataset.
+        ~DataSet.data:      Numpy array containing the actual data.
+        ~DataSet.timestamp: POSIX time stamp associated with the data.
+        axis_label:         List of strings specifying labels for the first (N-1) axes.
+        axis_unit:          List of strings specifying units for the first (N-1) axes.
+        axis_scale:         List of optional 1D Numpy arrays specifying value mappings for the first (N-1) axes.
+        column_label:       List of strings specifying column labels.
+        column_unit:        List of strings specifying column units.
+        attrs:              Dictionary of application-specific attributes.
 
     The entire dataset is kept in memory (RAM). This makes the dataset class unsuitable for very large amounts of data.
     """
 
-    def __init__(self,
-                 name: str,
-                 shape: Optional[Tuple[int, ...]] = None,
-                 dtype: Optional[Union[np.dtype, type]] = None,
-                 data: Optional[np.ndarray] = None
-                 ) -> None:
+    def __init__(
+        self,
+        name: str,
+        shape: tuple[int, ...] | None = None,
+        dtype: np.dtype | type | None = None,
+        data: np.ndarray | None = None
+    ) -> None:
         """Initialize a new dataset.
 
         Parameters:
-            name: Name of the dataset. This should be a short string without spaces or strange symbols,
-                suitable for use as part of a file name.
+            name:  Name of the dataset. This should be a short string without spaces or strange symbols,
+                   suitable for use as part of a file name.
             shape: Tuple of axis dimensions. Used to create a zero-initialized dataset if the actual data
-                are not yet available. The last axis dimension represents the number of columns in the dataset.
+                   are not yet available. The last axis dimension represents the number of columns in the dataset.
             dtype: Type of value in each data point. If not specified, the default is np.float64.
-            data: Optional Numpy array containing the actual data. The new dataset instance will contain a reference
-                to the specified Numpy array. Modifying the Numpy array will cause the contents of the dataset to be
-                changed as well.
+            data:  Optional Numpy array containing the actual data. The new dataset instance will contain a reference
+                   to the specified Numpy array. Modifying the Numpy array will cause the contents of the dataset
+                   to be changed as well.
         """
 
         self.name = name
@@ -71,16 +73,16 @@ class DataSet:
         if data is not None:
             # Check that the specified data is a Numpy array.
             if not isinstance(data, np.ndarray):
-                raise TypeError("Specified 'data' parameter must be a Numpy array")
+                raise TypeError("Specified 'data' parameter must be a Numpy array.")
 
             # Check shape and data type.
             if shape is not None:
                 if data.shape != tuple(shape):
-                    raise ValueError("Data does not match specified shape")
+                    raise ValueError("Data does not match specified shape.")
 
             if dtype is not None:
                 if data.dtype != dtype:
-                    raise ValueError("Data does not match specified data type")
+                    raise ValueError("Data does not match specified data type.")
 
             # Copy array reference.
             self.data = data
@@ -88,7 +90,7 @@ class DataSet:
         else:
 
             if shape is None:
-                raise TypeError("Either 'shape' or 'data' parameter must be specified")
+                raise TypeError("Either 'shape' or 'data' parameter must be specified.")
 
             if dtype is None:
                 dtype = np.float64
@@ -99,35 +101,35 @@ class DataSet:
         # Check shape.
         ndim = len(self.data.shape)
         if ndim < 2:
-            raise ValueError("Dataset must have at least 2 axes")
+            raise ValueError("Dataset must have at least 2 axes.")
         if np.min(self.data.shape) < 1:
-            raise ValueError("Zero-size or negative size axes are not allowed")
+            raise ValueError("Zero-size or negative size axes are not allowed.")
 
         # Initialize axis labels.
-        self.axis_label = [""]*(ndim - 1)
-        self.axis_unit = [""]*(ndim - 1)
-        self.axis_scale = [None]*(ndim - 1)  # type: List[Optional[np.ndarray]]
+        self.axis_label: list[str] = [""] * (ndim - 1)
+        self.axis_unit: list[str] = [""] * (ndim - 1)
+        self.axis_scale: list[np.ndarray | None] = [None] * (ndim - 1)
 
         # Initialize column labels.
         ncol = self.data.shape[-1]
-        self.column_label = ncol * [""]
-        self.column_unit = ncol * [""]
+        self.column_label: list[str] = ncol * [""]
+        self.column_unit: list[str] = ncol * [""]
 
         # Initialize empty set of attributes.
-        self.attrs = {}  # type: Dict[str, Union[str, int, float]]
+        self.attrs: dict[str, str | int | float] = {}
 
     def set_axis_label(self, axis: int, label: str) -> None:
         """Specify an axis label.
 
         Parameters:
-            axis: int - axis number (0, 1, ...)
-            label: str - label string of the axis
+            axis:  Axis number (0, 1, ...).
+            label: Label string of the axis.
         """
         if not isinstance(axis, int):
-            raise TypeError("Parameter 'axis' must be an integer")
+            raise TypeError("Parameter 'axis' must be an integer.")
 
         if axis < 0 or axis >= len(self.axis_label):
-            raise ValueError("Invalid value for parameter 'axis'")
+            raise ValueError("Invalid value for parameter 'axis'.")
 
         self.axis_label[axis] = label
 
@@ -135,14 +137,14 @@ class DataSet:
         """Specify the physical unit for an axis.
 
         Parameters:
-            axis: int - axis number (0, 1, ...)
-            unit: str - unit string of the axis
+            axis: Axis number (0, 1, ...).
+            unit: Unit string of the axis.
         """
         if not isinstance(axis, int):
-            raise TypeError("Parameter 'axis' must be an integer")
+            raise TypeError("Parameter 'axis' must be an integer.")
 
         if axis < 0 or axis >= len(self.axis_unit):
-            raise ValueError("Invalid value for parameter 'axis'")
+            raise ValueError("Invalid value for parameter 'axis'.")
 
         self.axis_unit[axis] = unit
 
@@ -150,21 +152,21 @@ class DataSet:
         """Specify a mapping from array indices to physical values along an axis.
 
         Parameters:
-            axis: Axis to which the mapping applies (the first axis has number 0).
+            axis:  Axis to which the mapping applies (the first axis has number 0).
             scale: 1D Numpy array of values along the axis. The length must match the size of the axis.
         """
         if not isinstance(axis, int):
-            raise TypeError("Parameter 'axis' must be an integer")
+            raise TypeError("Parameter 'axis' must be an integer.")
 
         if axis < 0 or axis >= len(self.data.shape) - 1:
-            raise ValueError("Invalid value for parameter 'axis'")
+            raise ValueError("Invalid value for parameter 'axis'.")
 
         v = np.array(scale)
         if v.shape != (self.data.shape[axis],):
-            raise ValueError("Invalid shape for scale array")
+            raise ValueError("Invalid shape for scale array.")
 
         if not np.all(np.isfinite(scale)):
-            raise ValueError("Only finite values allowed on the axis scale")
+            raise ValueError("Only finite values allowed on the axis scale.")
 
         self.axis_scale[axis] = scale
 
@@ -172,21 +174,23 @@ class DataSet:
         """Specify a label for a column in a multi-column data set.
 
         Parameters:
-            col: int - column number (0, 1, ...)
-            label: str - column label string
+            col:   Column number (0, 1, ...).
+            label: Column label string.
         """
         if not isinstance(col, int):
             raise TypeError("Parameter 'col' must be an integer")
+
         if col < 0 or col >= len(self.column_label):
             raise ValueError("Invalid value for parameter 'col'")
+
         self.column_label[col] = label
 
     def set_column_unit(self, col: int, unit: str) -> None:
         """Specify a physical unit for a column in a multi-column data set.
 
         Parameters:
-            col: int - column number (0, 1, ...)
-            unit: str - column unit string
+            col:  Column number (0, 1, ...).
+            unit: Column unit string.
         """
         if not isinstance(col, int):
             raise TypeError("Parameter 'col' must be an integer")
@@ -197,14 +201,14 @@ class DataSet:
         self.column_unit[col] = unit
 
 
-def _parse_attribute_value(s: str) -> Union[int, float, str]:
+def _parse_attribute_value(s: str) -> int | float | str:
     """Parse an attribute value.
 
     This function should be able to evaluate any string
     produced by repr() when acting on a string, int or float.
 
     Parameters:
-        s: str - the string to parse
+        s: The string to parse
     """
 
     def replace_esc(m: Match[str]) -> str:
@@ -234,14 +238,17 @@ def _parse_attribute_value(s: str) -> Union[int, float, str]:
         quote_char = s[0]
         if quote_char not in ('"', "'"):
             raise ValueError(f"Invalid attribute value syntax {s!r}")
+
         if not s[1:].endswith(quote_char):
             raise ValueError(f"Invalid attribute value syntax {s!r}")
+
         # Strip quotes.
         s = s[1:-1]
         # Check for non-escaped occurrences of quote symbol.
         t = re.sub("\\\\.", "", s)
         if quote_char in t:
             raise ValueError(f"Invalid attribute value syntax {s!r}")
+
         # Expand escape sequences.
         s = re.sub("\\\\(['\"abfnrtv]|\\\\|[0-7]{1,3}|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4})", replace_esc, s)
         return s
@@ -259,7 +266,7 @@ def _parse_attribute_value(s: str) -> Union[int, float, str]:
         return float(s)
 
 
-def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group) -> None:
+def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group | h5netcdf.Group) -> None:
     """Write the specified dataset to the specified HDF5 group.
 
     The dataset "name" field determines the name of the corresponding HDF5 dataset.
@@ -270,14 +277,29 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group) -> None:
     addition to the main dataset.
 
     Parameters:
-        dataset: DataSet instance to write to HDF5.
+        dataset:   DataSet instance to write to HDF5.
         hdf_group: HDF5 File or Group instance to which the dataset is written.
     """
 
     ndim = len(dataset.data.shape)
     ncol = dataset.data.shape[-1]
 
-    ds = hdf_group.create_dataset(dataset.name, data=dataset.data)
+    if isinstance(hdf_group, h5py.Group):
+        ds = hdf_group.create_dataset(dataset.name, data=dataset.data)
+
+    else:
+        dim_names = []
+        for axis in range(dataset.data.ndim):
+            try:
+                dim_names.append(dataset.axis_label[axis])
+            except IndexError:
+                dim_names.append(f"dim_{axis}")
+        
+        for axis, dim_name in enumerate(dim_names):
+            if dim_name not in hdf_group.dimensions:
+                hdf_group.dimensions[dim_name] = dataset.data.shape[axis]
+
+        ds = hdf_group.create_variable(dataset.name, dimensions=dim_names, data=dataset.data)
 
     # Special timestamp attribute.
     ds.attrs["QMI_DataSet_timestamp"] = dataset.timestamp
@@ -301,17 +323,28 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group) -> None:
 
     # Dimension scales.
     for axis in range(ndim - 1):
-        if dataset.axis_label[axis]:
+        if dataset.axis_label[axis] and isinstance(hdf_group, h5py.Group):
             ds.dims[axis].label = dataset.axis_label[axis]
 
         if dataset.axis_scale[axis] is not None:
             # Create an extra dataset to hold the dimension scale.
-            scale_name = dataset.name + f"_axis{axis}_scale"
-            ds_scale = hdf_group.create_dataset(scale_name, data=dataset.axis_scale[axis])
-            # Attach the dimension scale to the axis.
-            ds_scale.make_scale(scale_name)
-            ds.dims[axis].attach_scale(ds_scale)
+            scale_name = f"{dataset.name}_axis{axis}_scale"
+            if isinstance(hdf_group, h5py.Group):
+                ds_scale = hdf_group.create_dataset(scale_name, data=dataset.axis_scale[axis])
+                # Attach the dimension scale to the axis.
+                ds_scale.make_scale(scale_name)
+                ds.dims[axis].attach_scale(ds_scale)
 
+            else:
+                # With h5netcdf backend we cannot attach scaled data.
+                # Create a variable instead and attach it as an attribute to the dataset.
+                ds_scale = hdf_group.create_variable(
+                    scale_name,
+                    dimensions=(ds.dimensions[axis],),
+                    data=dataset.axis_scale[axis],
+                )
+                ds.attrs[scale_name] = ds_scale
+            
     # Custom attributes.
     for (name, value) in dataset.attrs.items():
         if name.startswith("QMI_DataSet") or name.startswith("DIMENSION_"):
@@ -323,14 +356,17 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group) -> None:
     ds.attrs["QMI_DataSet"] = 1
 
 
-def read_dataset_from_hdf5(ds: h5py.Dataset) -> DataSet:
+def read_dataset_from_hdf5(
+    ds: h5py.Dataset | h5netcdf.Variable, parent_group: h5netcdf.Group | None = None
+) -> DataSet:
     """Extract a DataSet instance from the specified HDF5 dataset.
 
     Note that this function may fetch additional HDF5 datasets from
     the parent HDF5 group if the dataset uses dimension scales.
 
     Parameters:
-        ds: HDF5 Dataset instance to read from.
+        ds:           HDF5 h5py.Dataset or h5netcdf.Variable instance to read from.
+        parent_group: Optional parent group parameter if the dataset is a h5netcdf.Variable instance.
 
     Returns:
         DataSet instance.
@@ -364,16 +400,30 @@ def read_dataset_from_hdf5(ds: h5py.Dataset) -> DataSet:
         dataset.column_unit[col] = ds.attrs.get(f"QMI_DataSet_column{col}_unit", "")
 
     # Read dimension scales.
-    for axis in range(ndim - 1):
-        if len(ds.dims[axis]) > 0:
-            scale = ds.dims[axis][0]
-            if scale.shape != (dataset.data.shape[axis],):
-                raise ValueError(f"Invalid shape of dimension scale for axis {axis}")
-            dataset.axis_scale[axis] = scale[:]
+    if parent_group is None:
+        for axis in range(ndim - 1):
+            if len(ds.dims[axis]) > 0:
+                scale = ds.dims[axis][0]
+                if scale.shape != (dataset.data.shape[axis],):
+                    raise ValueError(f"Invalid shape of dimension scale for axis {axis}")
+                
+                dataset.axis_scale[axis] = scale[:]
+
+    else:
+        # Read dimension scales from sibling variables.
+        for axis in range(ndim - 1):
+            scale_name = f"{dataset.name}_axis{axis}_scale"
+            if scale_name in parent_group:
+                scale = parent_group[scale_name]
+                if scale.shape != (dataset.data.shape[axis],):
+                    raise ValueError(f"Invalid shape of dimension scale for axis {axis}")
+                
+                dataset.axis_scale[axis] = scale[:]
 
     # Read custom attributes.
     for (name, value) in ds.attrs.items():
-        if (not name.startswith("QMI_DataSet")) and (not name.startswith("DIMENSION_")):
+        if not name.startswith("QMI_DataSet") and not name.startswith("DIMENSION_")\
+            and not name.startswith(f"{dataset.name}_axis"):
             dataset.attrs[name] = value
 
     return dataset
@@ -389,7 +439,7 @@ def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
 
     Parameters:
         dataset: DataSet instance to write to HDF5.
-        fh: File handle open for writing in text mode.
+        fh:      File handle open for writing in text mode.
     """
 
     ndim = len(dataset.data.shape)
@@ -412,7 +462,7 @@ def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
             special_column_unit.append(dataset.axis_unit[axis])
 
     # Prepare attributes.
-    attrs = collections.OrderedDict()  # type: Dict[str, Union[int, float, str]]
+    attrs: dict[str, int | float | str] = collections.OrderedDict()
 
     # Dataset name.
     attrs["QMI_DataSet_name"] = dataset.name
@@ -430,6 +480,7 @@ def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
         attrs[f"QMI_DataSet_axis{axis}_size"] = dataset.data.shape[axis]
         if dataset.axis_label[axis]:
             attrs[f"QMI_DataSet_axis{axis}_label"] = dataset.axis_label[axis]
+
         if dataset.axis_unit[axis]:
             attrs[f"QMI_DataSet_axis{axis}_unit"] = dataset.axis_unit[axis]
 
@@ -525,6 +576,7 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
         # Stop at separator between attributes and data.
         if line == "#":
             break
+        
         # Read attribute.
         p = line.find(":")
         if (not line.startswith("# ")) or (p < 0):
@@ -551,12 +603,14 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
     ncol = int(attrs["QMI_DataSet_ncol"])
     assert ndim >= 2
 
-    shape_list: List[int] = []
+    shape_list: list[int] = []
     for axis in range(ndim - 1):
         axis_size = attrs[f"QMI_DataSet_axis{axis}_size"]
         if not isinstance(axis_size, int):
             raise ValueError(f"Invalid value for attribute QMI_DataSet_axis{axis}_size")
+        
         shape_list.append(axis_size)
+        
     shape_list.append(ncol)
     shape = tuple(shape_list)
 

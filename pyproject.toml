@@ -14,7 +14,7 @@ version="0.52.0-beta.0"
 description="The Quantum Measurement Infrastructure framework"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {file = "LICENSE.md"}
-authors=[{name = "QuTech", email="F.J.Grooteman@tudelft.nl"}]
+authors=[{name = "QuTech", email="H.K.Ervasti@tudelft.nl"}]
 requires-python=">=3.11, <4"
 classifiers=[
     # complete classifier list: http://pypi.python.org/pypi?%3Aaction=list_classifiers
@@ -28,6 +28,7 @@ classifiers=[
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
     "Topic :: Scientific/Engineering :: Physics",
@@ -35,13 +36,10 @@ classifiers=[
 ]
 keywords=["qmi", "hardware", "software", "interface", "laboratory", "physics"]
 dependencies = [
-    # For generating an installable package and deploying
-    "setuptools",
-    "wheel",
-    "twine",
     # For scientific data processing and visualisation
     "numpy",
     "scipy",
+    "h5netcdf",
     "h5py>=3.7.0",
     # For hardware interfacing
     "pyserial",

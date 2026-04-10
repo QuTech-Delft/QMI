@@ -9,16 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `run` method in `QMI_Context` class to accommodate for `threading.Thread` changes in Python 3.14.
 - `standard-xdrlib` from "dead batteries" as a dependency to fix issues coming from removal of `xdrlib` from standard library.
+- `grouping=2` input parameter in the `ZurichInstruments_Hdawg` to enable initialization directly in wanted grouping mode.
+- Addition of new methods in Zurich Instruments HDAWG QMI driver. For example, now it is also possible to upload sequencer programs, command tables and waveforms to specific AWG channel or AWG (core) index. Also setting DIO VALID index and polarity is now possible.
+- Python 3.14 CI pipelines.
+- Dependency on `h5netcdf` package in `pyproject.toml`.
+- Base class for Thorlabs K10CRx instruments in qmi.instruments.thorlabs.k10crx module.
+- Driver for Thorlabs K10RC2 instrument. It is based on the new base class for K10CRx instruments.
 - Functions to `qmi.instruments.yokogawa.dlm4308` for obtaining trace data from the instrument waveform channels via Ethernet. All data formats are enabled.
 - Due to possibility of obtaining data in various data formats with Yokogawa device, and the fact that the returned data string decoding varies depending on the data format, an option for setting the `decoder` for `ScpiProtocol.ask` method was added. This enabled the trace adat acquisition in all data formats for Yokogawa.
 
 ### Changed
+- API changing Zurich Instruments HDAWG QMI driver refactoring to be based mainly on the zhinst.toolkit package to allow easier 4x2 and 2x4 grouping modes and use. The driver now uses also `zhinst-toolkit` package as basis.
+- DeprecationWarning on the `set|get_output_amplitude` methods in the HDAWG driver, as the new firmware points to rather using `outputs/n/gains/n`. Use `set|get_output_gain` from now on.
+- All modules in `qmi.data` were made compatible also with `h5netcdf` package. It can now be used equivalently with the `h5py`-based HDF5 data files when providing `backend="h5netcdf"` input parameter on specific class initializations and calls.
+- Changed Thorlabs K10CR1 to derive from new base class for K10CRx instruments.
 
 ### Fixed
 - Moving of `_snicaddr` in psutil package v2.7 from `_common` to `_ntuples` module, which caused an error with `qmi_proc`.
+- Process management logging path now resolves correctly also for cases where the config file path starts with the `~`, indicating home directory location.
+- Issue with Python 3.14 compatibility in `QMI_Context` class. Addition of `run` method with specific input parameter fixes the issue.
+- Instrument drivers `tsl_570.py`, `wltf_n.py` and `tfn.py` have now default values in dataclasses which are initiated in the driver class constructor. This is done to avoid Mypy error: 'Cannot access instance-only attribute "<attr>" on class object  [misc]"
 
 ### Removed
 - Removed `xdrlib-py` import for Python 3.13 version, where it was needed for python-vxi11 package.
+- Removed deprecated `get_velocity_params` function in Thorlabs K10CRx driver, and the respective `VelocityParams` dataclass in the APT protocol.
 
 ## [0.51.0] - 2025-12-09
 
