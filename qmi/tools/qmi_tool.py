@@ -86,7 +86,7 @@ def run() -> None | str:
         if arg not in ["ls", "lsqmi", "hard-kill", "hard-kill-yes-really-i-am-sure"]:
             return f"Invalid argument {arg}."
 
-        if arg == "ls" or arg == "lsqmi":
+        if arg in {"ls", "lsqmi"}:
             if len(sys.argv) == (e + 3):
                 # we have one input and need to check if it is timeout or workgroup name
                 if len(re.findall(r"[a-zA-z]+", sys.argv[e+2])) == 0:

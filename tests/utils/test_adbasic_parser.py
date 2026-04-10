@@ -120,7 +120,7 @@ class TestAdbasicParser(unittest.TestCase):
 
     def test_parse_symbols_no_dots(self):
         """Test the path is returned into a subfolder if no dots present."""
-        global TEST_PROGRAM
+        global TEST_PROGRAM  # noqa: PLW0603
         TEST_PROGRAM = TEST_PROGRAM.replace(".\\", "subfolder\\")
         write_source_files(self.tempdir_name)
         subdir = os.path.join(self.tempdir_name, "subfolder")
@@ -295,7 +295,7 @@ class TestParseAdbasicProgram(unittest.TestCase):
 class TestMain(unittest.TestCase):
 
     def setUp(self) -> None:
-        global TEST_PROGRAM
+        global TEST_PROGRAM  # noqa: PLW0603
         # Change back
         TEST_PROGRAM = TEST_PROGRAM.replace("subfolder\\", ".\\")
         self.tempdir = tempfile.TemporaryDirectory(prefix="qmitest")

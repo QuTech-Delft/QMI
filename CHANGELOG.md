@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.52.0-beta.0] - Unreleased
+## [0.53.0-beta.0] - Unreleased
+
+## [0.52.0] - 2026-04-01
 
 ### Added
 - `run` method in `QMI_Context` class to accommodate for `threading.Thread` changes in Python 3.14.
@@ -23,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DeprecationWarning on the `set|get_output_amplitude` methods in the HDAWG driver, as the new firmware points to rather using `outputs/n/gains/n`. Use `set|get_output_gain` from now on.
 - All modules in `qmi.data` were made compatible also with `h5netcdf` package. It can now be used equivalently with the `h5py`-based HDF5 data files when providing `backend="h5netcdf"` input parameter on specific class initializations and calls.
 - Changed Thorlabs K10CR1 to derive from new base class for K10CRx instruments.
+- Replace `pylint` linter with `ruff`.
 
 ### Fixed
 - Moving of `_snicaddr` in psutil package v2.7 from `_common` to `_ntuples` module, which caused an error with `qmi_proc`.

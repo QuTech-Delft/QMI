@@ -29,9 +29,9 @@ def _import_modules() -> None:
     to avoid an unnecessary dependency for programs that do not access
     the instrument directly.
     """
-    global uldaq
+    global uldaq  # noqa: PLW0603
     if uldaq is None:
-        import uldaq  # pylint: disable=W0621
+        import uldaq
 
 
 class MCC_USB1808X(QMI_Instrument):

@@ -257,7 +257,7 @@ def _parse_attribute_value(s: str) -> int | float | str:
         # Integer literal.
         return int(s)
 
-    elif (s == 'True') or (s == 'False'):
+    elif s in {'True', 'False'}:
         # Must be a boolean, one line return bool value.
         return s == 'True'
 

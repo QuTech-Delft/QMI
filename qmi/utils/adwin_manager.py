@@ -316,9 +316,9 @@ class AdwinProcess:
 
     @staticmethod
     def _get_dict_item_case_insensitive(key: str, dict_items: dict[str, Any]):
-        for dict_item_key in dict_items.keys():
+        for dict_item_key, dict_item_value in dict_items.items():
             if key.lower() == dict_item_key.lower():
-                return dict_items[dict_item_key]
+                return dict_item_value
         raise KeyError("Key not found!")
 
     def _get_par_desc(self, par_name):

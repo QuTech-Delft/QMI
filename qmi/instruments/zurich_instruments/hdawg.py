@@ -59,7 +59,7 @@ def _import_modules() -> None:
     to avoid an unnecessary dependency for programs that do not access
     the instrument directly.
     """
-    global zhinst, ziDAQServer, Waveforms, HDAWG, ZIModule
+    global zhinst, ziDAQServer, Waveforms, HDAWG, ZIModule  # noqa: PLW0603
     if zhinst is None:
         import zhinst
         import zhinst.core
@@ -198,7 +198,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         for parameter, replacement in replacements.items():
             # Convert replacements to "str".
             if isinstance(replacement, (int, float)):
-                replacement = repr(replacement)
+                replacement = repr(replacement)  # noqa: PLW2901
 
             # At this point, the replacement value should be a string.
             if not isinstance(replacement, str):
@@ -977,7 +977,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
                 waves_set = []
 
         # Send also any possible remains of the last batch (or if there were less than batch_size waveforms)
-        if len(waves_set):
+        if waves_set:
             self.daq_server.set(waves_set)
 
     @rpc_method
@@ -1637,15 +1637,14 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
             else:
                 self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/{gain_index}", value)
 
+        elif isinstance(value, list | tuple):
+            # Set one value per index
+            self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/0", value[0])
+            self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/1", value[1])
         else:
-            if isinstance(value, list | tuple):
-                # Set one value per index
-                self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/0", value[0])
-                self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/1", value[1])
-            else:
-                # Set the same gain for both indexes
-                self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/0", value)
-                self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/1", value)
+            # Set the same gain for both indexes
+            self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/0", value)
+            self._set_double(f"awgs/{awg_core}/outputs/{channel}/gains/1", value)
 
     @rpc_method
     def get_output_channel_hold(self, awg_channel: int) -> int:

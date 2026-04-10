@@ -1,6 +1,7 @@
 import qmi
 
 from qmi.core.pubsub import QMI_SignalReceiver
+import sys
 
 
 def get_signals(recv_plot_signal: QMI_SignalReceiver):
@@ -38,4 +39,4 @@ if __name__ == "__main__":
 
     finally:
         qmi.stop()
-        exit()
+        sys.exit()

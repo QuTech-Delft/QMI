@@ -6,7 +6,7 @@ import typing
 
 # Lazy import of the GPIO module. See the function _import_modules() below.
 if typing.TYPE_CHECKING:
-    import RPi.GPIO as GPIO
+    from RPi import GPIO
 else:
     GPIO = None
 
@@ -22,9 +22,9 @@ def _import_modules() -> None:
     to avoid an unnecessary dependency for programs that do not access
     the instrument directly.
     """
-    global GPIO
+    global GPIO  # noqa: PLW0603
     if GPIO is None:
-        import RPi.GPIO as GPIO  # pylint: disable=W0621
+        from RPi import GPIO
 
 # See:
 #

@@ -18,7 +18,7 @@ from qmi.core.config_defs import CfgProcessManagement
 from qmi.core.config_defs import CfgProcessHost
 from qmi.core.config_struct import config_struct_from_dict
 from qmi.core.exceptions import QMI_ApplicationException
-import qmi.tools.proc as proc
+from qmi.tools import proc
 
 from tests.patcher import PatcherQmiContext as QMI_Context
 from tests.patcher import PatcherQmiRpcProxy as QMI_RpcProxy
@@ -184,8 +184,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test ProcessManagementClient.close, happy flow."""
         with patch("qmi.tools.proc.qmi") as qmi_mock:
             _config = CfgQmi()
-            for key in CONTEXT_CFG.keys():
-                _config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG[key], CfgContext)})
+            for key, config_dict in CONTEXT_CFG.items():
+                _config.contexts.update({key: config_struct_from_dict(config_dict, CfgContext)})
 
             QMI_Context.get_config = MagicMock(return_value=_config)
             qmi_mock.context = QMI_Context
@@ -199,8 +199,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
         """Test whether ProcessManagementClient.close kills the process when a timeout happened."""
         with patch("qmi.tools.proc.qmi") as qmi_mock:
             _config = CfgQmi()
-            for key in CONTEXT_CFG.keys():
-                _config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG[key], CfgContext)})
+            for key, config_dict in CONTEXT_CFG.items():
+                _config.contexts.update({key: config_struct_from_dict(config_dict, CfgContext)})
 
             QMI_Context.get_config = MagicMock(return_value=_config)
             qmi_mock.context = QMI_Context
@@ -428,8 +428,8 @@ class QmiProcMethodsTestCase(unittest.TestCase):
         ):
             context_name = "ContextName1"
             config = CfgQmi()
-            for key in CONTEXT_CFG.keys():
-                config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG[key], CfgContext)})
+            for key, config_dict in CONTEXT_CFG.items():
+                config.contexts.update({key: config_struct_from_dict(config_dict, CfgContext)})
 
             QMI_Context.get_config = MagicMock(return_value=config)
             ctxcfg = config.contexts[context_name]
@@ -1302,8 +1302,8 @@ class QmiProcVenvTestCase(unittest.TestCase):
     def setUp(self):
         self.context_name = "ContextName"
         self._config = CfgQmi()
-        for key in CONTEXT_CFG_VENV.keys():
-            self._config.contexts.update({key: config_struct_from_dict(CONTEXT_CFG_VENV[key], CfgContext)})
+        for key, config_dict in CONTEXT_CFG_VENV.items():
+            self._config.contexts.update({key: config_struct_from_dict(config_dict, CfgContext)})
 
         QMI_Context.get_config = MagicMock(return_value=self._config)
 

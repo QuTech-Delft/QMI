@@ -121,9 +121,8 @@ class SSA3000X(QMI_Instrument):
         if self.get_freq_span() == 0:
             if not 0 <= center_freq <= 3.2e9:
                 raise ValueError(f"Device has zero span. Center frequency must be between 0 Hz and 3.2 GHz, but is {center_freq}!")
-        else:
-            if not 50 <= center_freq <= 3.19999995e9:
-                raise ValueError(f"Center frequency must be between 50 Hz and 3.199999950 GHz, but is {center_freq}!")
+        elif not 50 <= center_freq <= 3.19999995e9:
+            raise ValueError(f"Center frequency must be between 50 Hz and 3.199999950 GHz, but is {center_freq}!")
 
         self._scpi.write(f":FREQ:CENT {center_freq/1e9:1.9f} GHz")
 
