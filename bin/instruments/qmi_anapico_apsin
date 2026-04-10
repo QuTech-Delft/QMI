@@ -51,7 +51,7 @@ def run() -> int:
     args = parser.parse_args()
 
     instr: Anapico_APSIN
-    with start_stop(qmi, "apsin_anapico_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
+    with qmi.start("apsin_anapico_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
         idn = instr.get_idn()
         print("IDN:", idn)
 

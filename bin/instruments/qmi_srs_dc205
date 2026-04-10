@@ -34,7 +34,7 @@ def run() -> int:
     args = parser.parse_args()
 
     instr: SRS_DC205
-    with start_stop(qmi, "srs_dc205_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
+    with qmi.start("srs_dc205_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
         idn = instr.get_idn()
         print("IDN:", idn)
 

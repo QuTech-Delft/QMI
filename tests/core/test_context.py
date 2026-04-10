@@ -1,6 +1,6 @@
-import unittest
 import os
 import time
+import unittest
 
 from qmi.core.config_defs import CfgQmi, CfgContext
 from qmi.core.context import QMI_Context
@@ -51,6 +51,54 @@ class TestQMIContext(unittest.TestCase):
         suppress = self.c1.suppress_version_mismatch_warnings
         self.assertTrue(suppress)
         self.c1.suppress_version_mismatch_warnings = False
+
+    def test_context_manager_new_context(self) -> None:
+        """Test that the context manager starts and stops a new context."""
+        config: CfgQmi = CfgQmi()
+        context: QMI_Context = QMI_Context("TestContext", config)
+
+        self.assertFalse(context._active)
+        self.assertFalse(context._used)
+        with context:
+            self.assertTrue(context._active)
+            self.assertTrue(context._used)
+        self.assertFalse(context._active)
+        self.assertTrue(context._used)
+
+    def test_context_manager_started_context(self) -> None:
+        """Test that the context manager does not start but does stop a context that was already started."""
+        config: CfgQmi = CfgQmi()
+        context: QMI_Context = QMI_Context("TestContext", config)
+        context.start()
+
+        self.assertTrue(context._active)
+        self.assertTrue(context._used)
+        with context:
+            # It should be safe to enter a context that has already been started,
+            # as the start function should not be called.
+            self.assertTrue(context._active)
+            self.assertTrue(context._used)
+        self.assertFalse(context._active)
+        self.assertTrue(context._used)
+
+    def test_context_manager_stopped_context(self) -> None:
+        """Test that the context manager does not start and stop a context that was already started and stopped."""
+        config: CfgQmi = CfgQmi()
+        context: QMI_Context = QMI_Context("TestContext", config)
+        context.start()
+        context.stop()
+
+        self.assertFalse(context._active)
+        self.assertTrue(context._used)
+        with context:
+            # It should be safe to enter a context that has already been started,
+            # as the start function should not be called.
+            self.assertFalse(context._active)
+            self.assertTrue(context._used)
+        # It should be safe to exit a context that has already been stopped,
+        # as the stop function should not be called.
+        self.assertFalse(context._active)
+        self.assertTrue(context._used)
 
     def test_get_config(self):
         """Test that we get config object CfgQmi correctly."""

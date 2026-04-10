@@ -52,7 +52,7 @@ def run() -> int:
     args = parser.parse_args()
 
     instr: TimeBase_DIM3000
-    with start_stop(qmi, "timebase_dim3000_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
+    with qmi.start("timebase_dim3000_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
         if args.freq is not None:
             instr.set_output_frequency(args.freq)
         elif args.ampl is not None:

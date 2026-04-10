@@ -66,7 +66,7 @@ def run() -> int:
     args = parser.parse_args()
 
     try:
-        with start_stop(qmi, "quantum_composer_9530_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
+        with qmi.start("quantum_composer_9530_client", console_loglevel="WARNING"), parse_instrument_source(args) as instr:
             idn = instr.get_idn()
             print("IDN:", idn)
 

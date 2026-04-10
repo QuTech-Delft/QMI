@@ -391,7 +391,6 @@ To set up a simple measurement script, create a file ``measure_demo.py`` with th
     #!/usr/bin/env python
 
     import qmi
-    from qmi.utils.context_managers import start_stop
     from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
 
     def measure_data(nsg):
@@ -403,7 +402,7 @@ To set up a simple measurement script, create a file ``measure_demo.py`` with th
         print("mean sample value:", sum(samples) / len(samples))
 
     def main():
-        with start_stop(qmi, "measure_demo"):
+        with qmi.start("measure_demo"):
             with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
                 measure_data(nsg)
 
@@ -414,7 +413,7 @@ Run the new script by typing the following command in a shell terminal::
 
     python measure_demo.py
 
-Note that the script uses :py:class:`qmi.utils.context_managers.start_stop` to start and stop the QMI framework.
+Note that the script uses ``with`` statement to start and stop the QMI framework automatically.
 This is just a convenient way to make sure that ``qmi.start()`` and ``qmi.stop()`` will always be called.
 Similarly, the `QMI_Instrument` objects are equipped with context managers that open and close the the instrument, calling ``nsg.open()`` and ``nsg.close()`` at the creation and destruction of the instance.
 
@@ -485,12 +484,11 @@ the task and continues to perform other activities::
 
     import time
     import qmi
-    from qmi.utils.context_managers import start_stop
     from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
     from demo_task import DemoTask
 
     def main():
-        with start_stop(qmi, "task_demo"):
+        with qmi.start("task_demo"):
             with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
                 task = qmi.make_task("task", DemoTask)
                 task.start()
@@ -582,13 +580,12 @@ Other options for policies are the default of ``IMMEDIATE``, which tries to exec
 
 QMI offers a few context managers to facilitate better control of the QMI contexts, instruments, tasks and signals.
 
-QMI contexts can be started and stopped with a `start_stop` context manager, available in ``qmi.utils.context_managers`` module.
-The following code based on the ``with`` statement::
+QMI contexts can be started and stopped automatically, through use of the ``with`` statement::
 
-    with start_stop(qmi, "name"):
+    with qmi.start("name"):
         custom_code_here ...
 
-has the same effect as::
+This has the same effect as::
 
     qmi.start("name")
     try:
@@ -724,7 +721,6 @@ of the task in the script instead of inside the task. We now rewrite the script 
 
     import time
     import qmi
-    from qmi.utils.context_managers import start_stop
     from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
     from demo_task import DemoTask
 
@@ -736,7 +732,7 @@ of the task in the script instead of inside the task. We now rewrite the script 
             self.set_settings(settings)
 
     def main_2():
-        with start_stop(qmi, "task_demo"):
+        with qmi.start("task_demo"):
             with qmi.make_instrument("nsg", NoisySineGenerator) as nsg:
                 with qmi.make_task("task", DemoRpcControlTask, task_runner=CustomRpcControlTaskRunner) as task:
                     print("the task has been started")
@@ -831,10 +827,9 @@ in the current directory::
 
     import time
     import qmi
-    from qmi.utils.context_managers import start_stop
 
     def main():
-        with start_stop(qmi, "proc_demo"):
+        with qmi.start("proc_demo"):
             print("just started the background process")
             while not qmi.context().shutdown_requested():
                 print("process is still running")
