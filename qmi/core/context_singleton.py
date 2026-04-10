@@ -260,9 +260,6 @@ def stop() -> None:
     Raises:
         QMI_NoActiveContextException: If there is no active QMI context present.
     """
-
-    global _qmi_context  # noqa: PLW0603
-
     qmi.core.thread.check_in_main_thread()
 
     if _qmi_context is None:
@@ -275,7 +272,7 @@ def _clear_global_context() -> None:
     """
     Set the global context to None.
     """
-    global _qmi_context
+    global _qmi_context  # noqa: PLW0603
     _qmi_context = None
 
 
