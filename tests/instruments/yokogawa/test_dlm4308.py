@@ -7,6 +7,7 @@ from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_Vxi11Transport
 from qmi.core.instrument import QMI_InstrumentIdentification
 from qmi.instruments.yokogawa import Yokogawa_Dlm4038
+from qmi.instruments.yokogawa.dlm4038 import WaveformDataFormat
 
 from tests.patcher import PatcherQmiContext as QMI_Context
 
@@ -653,6 +654,13 @@ class TestMethodsCase(unittest.TestCase):
             self._transport_mock.write.assert_called_once_with(expected_write)
             self._transport_mock.write.reset_mock()
 
+        enum_format = WaveformDataFormat.BYTE
+        expected_write = f":WAVeform:FORMat {enum_format}\n".encode()
+        # Act
+        self.yokogawa.set_data_format(enum_format)
+        # Assert
+        self._transport_mock.write.assert_called_once_with(expected_write)
+
     def test_set_data_format_invalid(self):
         """Test setting an invalid data format with set_data_format."""
         # Arrange
@@ -667,9 +675,9 @@ class TestMethodsCase(unittest.TestCase):
     def test_get_data_format(self):
         """Test getting the current waveform data format."""
         # Arrange
-        expected_format = "BYTE"
+        expected_format = WaveformDataFormat.BYTE
         expected_write = b":WAVeform:FORMat?\n"
-        self._transport_mock.read_until.return_value = f"WAVE:FORM:{expected_format}\n".encode()
+        self._transport_mock.read_until.return_value = f"WAVE:FORM:{expected_format.value}\n".encode()
 
         # Act
         data_format = self.yokogawa.get_data_format()

@@ -15,6 +15,7 @@ import logging
 import os
 import shutil
 import time
+from enum import StrEnum
 
 import numpy as np
 from qmi.core.context import QMI_Context
@@ -26,6 +27,15 @@ from qmi.core.transport import create_transport
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
+
+
+class WaveformDataFormat(StrEnum):
+    """Waveform data formats supported by the instrument."""
+
+    ASCII = "ASCii"
+    BYTE = "BYTE"
+    RBYTE = "RBYTe"
+    WORD = "WORD"
 
 
 class Yokogawa_DLM4038(QMI_Instrument):
@@ -62,18 +72,15 @@ class Yokogawa_DLM4038(QMI_Instrument):
         return channels
 
     @staticmethod
-    def _data_format_check(data_format: str) -> str:
-        """Check the data format string and return in SCPI style."""
-        data_formats = {
-            "ascii": "ASCii",
-            "byte": "BYTE",
-            "rbyte": "RBYTe",
-            "word": "WORD"
-        }
-        if data_format.lower() not in data_formats:
-            raise QMI_InstrumentException(f"Unexpected data format, got {data_format}")
+    def _data_format_check(data_format: str | WaveformDataFormat) -> WaveformDataFormat:
+        """Check the data format and return as enum."""
+        if isinstance(data_format, WaveformDataFormat):
+            return data_format
 
-        return data_formats[data_format.lower()]
+        try:
+            return WaveformDataFormat[data_format.upper()]
+        except KeyError as exc:
+            raise QMI_InstrumentException(f"Unexpected data format, got {data_format}") from exc
 
     @staticmethod
     def _data_type_check(data_type: str) -> str:
@@ -359,7 +366,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
         return int(self._scpi_protocol.ask(":WAVeform:LENGth?")[10:])
     
     @rpc_method
-    def set_data_format(self, data_format: str) -> None:
+    def set_data_format(self, data_format: str | WaveformDataFormat) -> None:
         """Set the waveform data format to specific type.
 
         Parameters:
@@ -370,14 +377,14 @@ class Yokogawa_DLM4038(QMI_Instrument):
         self._scpi_protocol.write(f":WAVeform:FORMat {data_format}")
 
     @rpc_method
-    def get_data_format(self) -> str:
+    def get_data_format(self) -> WaveformDataFormat:
         """Get the current waveform data format.
 
         Returns:
             data_format: In which format to send the data in. Possible options:
                          'ASCii', 'BYTE', RBYTE', 'WORD'.
         """
-        return self._scpi_protocol.ask(":WAVeform:FORMat?")[10:]
+        return WaveformDataFormat(self._scpi_protocol.ask(":WAVeform:FORMat?")[10:])
 
     @rpc_method
     def set_waveform_trace_channel(self, channel: int) -> None:
@@ -392,14 +399,14 @@ class Yokogawa_DLM4038(QMI_Instrument):
         self._scpi_protocol.write(f":WAVeform:TRACE {channel}")
 
     @rpc_method
-    def get_waveform_trace_data(self, data_format: str) -> np.ndarray:
+    def get_waveform_trace_data(self, data_format: str | WaveformDataFormat) -> np.ndarray:
         """Get waveform (channel) trace data from single waveform.
 
         In ASCII format the data is in a comma-separated list of float voltage values.
 
         In any other format, the data is as block data. Block data is signed 8-bit data in 'BYTE' and 'RBYTe'
         data formats. 'RBYTe' has also reverse order of data points. In 'WORD' format the data block contains
-        signed 16-bit data in little-endiand order. The block data syntax is as follows:
+        signed 16-bit data in little-endian order. The block data syntax is as follows:
         "#N<N-digit decimal number><data byte sequence>"
 
         The block data needs to be converted into Volts. The respective conversion formula depends on the
@@ -415,10 +422,10 @@ class Yokogawa_DLM4038(QMI_Instrument):
         """
         data_format = self._data_format_check(data_format)
         # Get raw trace data
-        decoder = data_format if data_format.lower() == "ascii" else "latin1"
+        decoder = "ascii" if data_format is WaveformDataFormat.ASCII else "latin1"
         raw_data = self._scpi_protocol.ask(":WAVeform:SEND?", decoder=decoder)
         # Manipulate and return
-        if data_format == "ASCii":
+        if data_format is WaveformDataFormat.ASCII:
             _logger.debug(
                 "[%s] Raw data (up to first 1000 characters) is %s.", self._name, raw_data[:1000]
             )
@@ -449,17 +456,17 @@ class Yokogawa_DLM4038(QMI_Instrument):
         data_range = float(self._scpi_protocol.ask(":WAVeform:RANGe?")[10:])
         data_offset = float(self._scpi_protocol.ask(":WAVeform:OFFSet?")[10:])
         position = 0
-        if data_format == "WORD":
+        if data_format is WaveformDataFormat.WORD:
             division = 3200.0
             # Get the data from the byte string in little-endian byte order.
             data = np.frombuffer(data_bytes, dtype='<i2')
 
-        elif data_format == "BYTE":
+        elif data_format is WaveformDataFormat.BYTE:
             division = 12.5
             # Get the data from the byte string as _signed_ integer array.
             data = np.frombuffer(data_bytes, dtype=np.int8, count=data_points)
 
-        else:  # data_format == "RBYTe"
+        else:  # data_format is WaveformDataFormat.RBYTE
             division = 25.0
             position = int(self._scpi_protocol.ask(":WAVeform:POSition?")[9:]) - 1
             # Get the data from the byte string as _signed_ integer array.
@@ -471,7 +478,9 @@ class Yokogawa_DLM4038(QMI_Instrument):
         return data_range * (data - position) / division + data_offset
 
     @rpc_method
-    def get_waveforms_trace_data(self, channels: list[int], data_format: str = "ascii") -> np.ndarray:
+    def get_waveforms_trace_data(
+            self, channels: list[int], data_format: str | WaveformDataFormat = WaveformDataFormat.ASCII
+    ) -> np.ndarray:
         """Returns the on-screen traces from specified waveforms (channels) in the form of a 2D numpy array.
         Data is streamed via ethernet in the given format.
 

@@ -95,7 +95,7 @@ class ScpiProtocol:
             _response_terminator = self._response_terminator
 
         if not response.endswith(_response_terminator):
-            raise QMI_InstrumentException("Bad response")
+            raise QMI_InstrumentException("Response was not terminated with expected terminator.")
 
         response = response[:-len(_response_terminator)]
 
