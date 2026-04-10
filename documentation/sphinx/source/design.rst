@@ -148,16 +148,9 @@ Most of the features of QMI have been touched on above:
 Design Overview
 ---------------
 
-.. image:: images/class_diagram_main.png
+.. image:: images/class_diagram_main.drawio.svg
 
 The figure above outlines the class inheritance and ownership relations of the most important classes in QMI.
-
-The boxes in this graph denote *classes*. Classes with a red border are *active classes*, meaning they are running in a dedicated thread.
-
-Green arrows denote *inheritance*, i.e., an 'is-a' relation between classes.
-
-Blue arrows denote *ownership*. Ownerships arrows start in a named field of a class instance, and the arrow carries a label that shows how many
-instances are owned, e.g., '(one)' or '(zero or more)'.
 
 We discuss these classes below.
 
