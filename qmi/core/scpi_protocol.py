@@ -22,22 +22,23 @@ class ScpiProtocol:
         idn = self._scpi.ask("*IDN?")
     """
 
-    def __init__(self,
-                 transport: QMI_Transport,
-                 command_terminator: str = "\n",
-                 response_terminator: str = "\n",
-                 default_timeout: float | None = None
-                 ):
+    def __init__(
+        self,
+        transport: QMI_Transport,
+        command_terminator: str = "\n",
+        response_terminator: str = "\n",
+        default_timeout: float | None = None
+    ):
         """Initialize the SCPI protocol handler.
 
         Parameters:
-            transport: Instance of `QMI_Transport` to use for sending SCPI commands to the instrument.
-            command_terminator: Termination string to append when sending SCPI commands.
-                This defaults to *newline* as specified by the SCPI standard.
+            transport:           Instance of `QMI_Transport` to use for sending SCPI commands to the instrument.
+            command_terminator:  Termination string to append when sending SCPI commands.
+                                 This defaults to *newline* as specified by the SCPI standard.
             response_terminator: Termination string expected at the end of SCPI response messages.
-                This defaults to *newline* as specified by the SCPI standard.
-            default_timeout: Optional default response timeout in seconds.
-                The default is to wait indefinitely until a response is received.
+                                 This defaults to *newline* as specified by the SCPI standard.
+            default_timeout:     Optional default response timeout in seconds.
+                                 The default is to wait indefinitely until a response is received.
         """
 
         # The SCPI standard prescribes that a single newline character should work both for sending and receiving.
@@ -62,16 +63,19 @@ class ScpiProtocol:
         binary_cmd = cmd + self._command_terminator
         self._transport.write(binary_cmd)
 
-    def ask(self, cmd: str, timeout: float | None = None, discard: bool = False) -> str:
+    def ask(self, cmd: str, timeout: float | None = None, discard: bool = False, decoder: str = "ascii") -> str:
         """Send an SCPI command, then read and return the response.
 
         Parameters:
-            cmd: SCPI command string.
+            cmd:     SCPI command string.
             timeout: Optional response timeout in seconds.
             discard: Discard contents in read buffer before asking. Default is False.
+            decoder: Optional parameter to set another decoder to use for the query. Some instruments
+                     have optional data format settings which can then return data in other than 'ascii'
+                     coded format.
 
         Returns:
-            Response message with message terminator removed.
+            decoded_response: Decoded response message with message terminator removed.
         """
 
         if timeout is None:
@@ -85,26 +89,32 @@ class ScpiProtocol:
 
         # Read response.
         response = self._transport.read_until(message_terminator=self._response_terminator, timeout=timeout)
-        if not response.endswith(self._response_terminator):
+        if decoder.lower() != "ascii":
+            _response_terminator = self._response_terminator.decode("ascii").encode(decoder)
+        else:
+            _response_terminator = self._response_terminator
+
+        if not response.endswith(_response_terminator):
             raise QMI_InstrumentException("Bad response")
 
-        response = response[:-len(self._response_terminator)]
+        response = response[:-len(_response_terminator)]
 
-        decoded_response = response.decode("ascii")
+        decoded_response = response.decode(decoder)
 
         return decoded_response
 
-    def read_binary_data(self,
-                         read_terminator_flag: bool = True,
-                         timeout: float | None = None
-                         ) -> bytes:
+    def read_binary_data(
+        self,
+        read_terminator_flag: bool = True,
+        timeout: float | None = None
+    ) -> bytes:
         """Read a binary data block formatted as in SCPI *definite length arbitrary block response data*.
 
         Parameters:
             read_terminator_flag: True to expect a message terminator after the binary data.
-                This should be True (the default) if the binary data block is the last
-                or only data element in the response message.
-            timeout: Optional timeout in seconds.
+                                  This should be True (the default) if the binary data block is the last
+                                  or only data element in the response message.
+            timeout:              Optional timeout in seconds.
         """
 
         if timeout is None:

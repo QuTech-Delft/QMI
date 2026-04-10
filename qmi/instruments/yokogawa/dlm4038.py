@@ -197,9 +197,8 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Parameters:
             state: True to set High Resolution mode on, False to set it off.
         """
-        # self._scpi_protocol.write(":ACQUIRE:RESOLUTION " + str(state))
         state_str = "ON" if state else "OFF"
-        self._scpi_protocol.write(":ACQUIRE:RESOLUTION " + state_str)
+        self._scpi_protocol.write(f":ACQUIRE:RESOLUTION {state_str}")
 
     @rpc_method
     def turn_channel_on(self, channels: int | list[int] | str) -> None:
@@ -365,10 +364,20 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
         Parameters:
             data_format: In which format to send the data in. Possible options:
-                         'ASCII', 'BYTE', RBYTE', 'WORD'.
+                         'ASCii', 'BYTE', RBYTE', 'WORD'.
         """
         data_format = self._data_format_check(data_format)
-        self._scpi_protocol.write(":WAVeform:FORMat {data_format}")
+        self._scpi_protocol.write(f":WAVeform:FORMat {data_format}")
+
+    @rpc_method
+    def get_data_format(self) -> str:
+        """Get the current waveform data format.
+
+        Returns:
+            data_format: In which format to send the data in. Possible options:
+                         'ASCii', 'BYTE', RBYTE', 'WORD'.
+        """
+        return self._scpi_protocol.ask(":WAVeform:FORMat?")[10:]
 
     @rpc_method
     def set_waveform_trace_channel(self, channel: int) -> None:
@@ -396,12 +405,16 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
         NOTE: This implementation does not include the use of the <NRf> parameter.
 
+        Parameters:
+            data_format: One of the eligible formats - "ascii", "byte", "rbyte", "word".
+
         Returns:
             trace_data: The trace data formatted according to the given data format.
         """
         data_format = self._data_format_check(data_format)
         # Get raw trace data
-        raw_data = self._scpi_protocol.ask(":WAVeform:SEND?")
+        decoder = data_format if data_format.lower() == "ascii" else "latin1"
+        raw_data = self._scpi_protocol.ask(":WAVeform:SEND?", decoder=decoder)
         # Manipulate and return
         if data_format == "ASCii":
             _logger.debug(
@@ -445,9 +458,10 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
         else:  # data_format == "RBYTe"
             division = 25.0
-            position = int(self._scpi_protocol.ask(":WAVeform:POSition?")[9:])
+            position = int(self._scpi_protocol.ask(":WAVeform:POSition?")[9:]) - 1
             # Get the data from the byte string as _signed_ integer array.
             data = np.frombuffer(data_bytes, dtype=np.int8, count=data_points)
+            print(data, position, type(position))
 
         _logger.debug(
             "[%s] Data (up to first 1000 points) before conversion is %d.", self._name, data[:1000]
