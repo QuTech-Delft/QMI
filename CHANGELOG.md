@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.53.0-beta.0] - Unreleased
 
+### Added
+- Functions to `qmi.instruments.yokogawa.dlm4308` for obtaining trace data from the instrument waveform channels via Ethernet. All data formats are enabled.
+- Due to possibility of obtaining data in various data formats with Yokogawa device, and the fact that the returned data string decoding varies depending on the data format, an option for setting the `decoder` for `ScpiProtocol.ask` method was added. This enabled the trace adat acquisition in all data formats for Yokogawa.
+
 ### Changed
 - Replace `pylint` linter with `ruff`.
 - DeprecationWarning warning on the `start_stop` context manager, as `Context` objects are now their own context managers.

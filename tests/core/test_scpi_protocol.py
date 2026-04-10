@@ -59,6 +59,24 @@ class TestScpiProtocol(unittest.TestCase):
         transport_mock.read_until.assert_called_with(message_terminator=b'\n', timeout=None)
         self.assertEqual(response, "intresting result")
 
+    def test_ask_latin1_decoder(self):
+        # arrange
+        command = "test"
+        expected_call = b"test\n"
+        expected_response = "cafe\xe9"
+        transport_mock = MagicMock(spec=QMI_Transport)
+        transport_mock.read_until.return_value = b"cafe\xe9\n"
+
+        # act
+        scpi_protocol = ScpiProtocol(transport_mock)
+        response = scpi_protocol.ask(command, decoder="latin1")
+
+        # assert
+        transport_mock.write.assert_called_with(expected_call)
+        transport_mock.discard_read.assert_not_called()
+        transport_mock.read_until.assert_called_with(message_terminator=b'\n', timeout=None)
+        self.assertEqual(response, expected_response)
+
     def test_ask_discard(self):
         # arrange
         command = "test"
@@ -156,4 +174,3 @@ class TestScpiProtocol(unittest.TestCase):
         scpi_protocol = ScpiProtocol(transport_mock)
         with self.assertRaises(QMI_InstrumentException):
             scpi_protocol.read_binary_data()
-

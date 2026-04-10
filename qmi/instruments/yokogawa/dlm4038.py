@@ -15,10 +15,11 @@ import logging
 import os
 import shutil
 import time
+from enum import StrEnum
 
 import numpy as np
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
+from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException, QMI_RuntimeException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.scpi_protocol import ScpiProtocol
@@ -26,6 +27,15 @@ from qmi.core.transport import create_transport
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
+
+
+class WaveformDataFormat(StrEnum):
+    """Waveform data formats supported by the instrument."""
+
+    ASCII = "ASCii"
+    BYTE = "BYTE"
+    RBYTE = "RBYTe"
+    WORD = "WORD"
 
 
 class Yokogawa_DLM4038(QMI_Instrument):
@@ -62,6 +72,17 @@ class Yokogawa_DLM4038(QMI_Instrument):
         return channels
 
     @staticmethod
+    def _data_format_check(data_format: str | WaveformDataFormat) -> WaveformDataFormat:
+        """Check the data format and return as enum."""
+        if isinstance(data_format, WaveformDataFormat):
+            return data_format
+
+        try:
+            return WaveformDataFormat[data_format.upper()]
+        except KeyError as exc:
+            raise QMI_InstrumentException(f"Unexpected data format, got {data_format}") from exc
+
+    @staticmethod
     def _data_type_check(data_type: str) -> str:
         """Check the data type string and return in SCPI style."""
         if data_type.lower() == "binary":
@@ -70,6 +91,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
             data_type = "ASCii"
         else:
             raise QMI_InstrumentException(f"Unexpected data type, got {data_type}")
+
         return data_type
 
     def _channel_value_setter(
@@ -93,13 +115,14 @@ class Yokogawa_DLM4038(QMI_Instrument):
         elif isinstance(values, list) and isinstance(channels, list):
             # Multi-channel setter with values per channel
             if len(values) != len(channels):
+                _logger.error("[%s] Invalid number of values (%d), for %d channels", self._name, len(values), len(channels))
                 raise QMI_UsageException(f"Invalid number of values ({len(values)}) for {len(channels)} channels.")
 
             for chan, val in zip(channels, values):
                 self._scpi_protocol.write(f":CHANnel{chan}:{parameter} {val}{unit}")
 
         else:
-            _logger.error("%s {parameter} not set due to invalid parameters: %d, %d", self._name, channels, values)
+            _logger.error("[%s] %s not set due to invalid inputs: %d, %d", self._name, parameter, channels, values)
 
     def _channel_value_getter(
             self, channels: int | list[int], parameter: str, val_start: int, preposition: str = ""
@@ -116,6 +139,10 @@ class Yokogawa_DLM4038(QMI_Instrument):
             current_value = self._scpi_protocol.ask(f"{preposition}:CHANnel{chan}:{parameter}?")
             values.append(current_value[val_start:])
 
+        _logger.debug(
+            "[%s] Obtained values %d for query %s:CHANnel_}:%s? for channels %d.",
+            self._name, values, preposition, parameter, channels
+        )
         return values
 
     @rpc_method
@@ -168,7 +195,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Returns:
             time_division: The current Time/div value in seconds.
         """
-        return float(self._scpi_protocol.ask(":TIMEBASE:TDIV?")[9:])
+        return float(self._scpi_protocol.ask(":TIMebase:TDIV?")[9:])
 
     @rpc_method
     def set_high_resolution(self, state: bool) -> None:
@@ -177,9 +204,8 @@ class Yokogawa_DLM4038(QMI_Instrument):
         Parameters:
             state: True to set High Resolution mode on, False to set it off.
         """
-        # self._scpi_protocol.write(":ACQUIRE:RESOLUTION " + str(state))
         state_str = "ON" if state else "OFF"
-        self._scpi_protocol.write(":ACQUIRE:RESOLUTION " + state_str)
+        self._scpi_protocol.write(f":ACQUIRE:RESOLUTION {state_str}")
 
     @rpc_method
     def turn_channel_on(self, channels: int | list[int] | str) -> None:
@@ -271,7 +297,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
             channels: A single channel number or a list of selected channels. Use "all" for all channels.
 
         Returns:
-            v_max: An array of waveform maximum voltage values, respective to the size of given input channels.
+            v_max:    An array of waveform maximum voltage values, respective to the size of given input channels.
         """
         checked_chs = self._channels_check(channels)
         v_max = self._channel_value_getter(checked_chs, "MAXimum:VALUE", 19, "MEASure")
@@ -280,17 +306,13 @@ class Yokogawa_DLM4038(QMI_Instrument):
 
     @rpc_method
     def set_channel_position(self, channels: int | list[int] | str, position: float | list[float]) -> None:
-        """
-        Changes the position of the specified channels in volts.
-        """
+        """Changes the position of the specified channels in volts."""
         checked_chs = self._channels_check(channels)
         self._channel_value_setter(checked_chs, position, "POSition")
 
     @rpc_method
     def get_channel_position(self, channels: int | list[int] | str) -> np.ndarray:
-        """
-        Returns the current position for the specified channels in volts.
-        """
+        """Returns the current position for the specified channels in volts."""
         checked_chs = self._channels_check(channels)
         position = self._channel_value_getter(checked_chs, "POSition", 11)
 
@@ -315,22 +337,6 @@ class Yokogawa_DLM4038(QMI_Instrument):
         self._scpi_protocol.write(f":TRIGger:ATRigger:SIMPle:LEVel {voltage}V")
 
     @rpc_method
-    def set_number_data_points(self, length: int) -> None:
-        """Sets the scope acquire length.
-
-        Parameters:
-            length: The acquire length value.
-        """
-        self._scpi_protocol.write(f":ACQuire:RLENgth {length}")
-
-    @rpc_method
-    def get_number_data_points(self) -> int:
-        """
-        Gets the number of data points that will be saved.
-        """
-        return int(self._scpi_protocol.ask(":WAVeform:LENGth?")[10:])  # TODO: range 10:-1 needs to be checked with HW
-
-    @rpc_method
     def set_average(self, average: int) -> None:
         """Sets the mode to average and set the average count.
 
@@ -346,28 +352,195 @@ class Yokogawa_DLM4038(QMI_Instrument):
         self._scpi_protocol.write(":ACQUIRE:MODE NORMAL")
 
     @rpc_method
+    def set_number_data_points(self, length: int) -> None:
+        """Sets the scope acquire length.
+
+        Parameters:
+            length: The acquire length value.
+        """
+        self._scpi_protocol.write(f":ACQuire:RLENgth {length}")
+
+    @rpc_method
+    def get_number_data_points(self) -> int:
+        """Gets the number of data points that will be saved."""
+        return int(self._scpi_protocol.ask(":WAVeform:LENGth?")[10:])
+    
+    @rpc_method
+    def set_data_format(self, data_format: str | WaveformDataFormat) -> None:
+        """Set the waveform data format to specific type.
+
+        Parameters:
+            data_format: In which format to send the data in. Possible options:
+                         'ASCii', 'BYTE', RBYTE', 'WORD'.
+        """
+        data_format = self._data_format_check(data_format)
+        self._scpi_protocol.write(f":WAVeform:FORMat {data_format}")
+
+    @rpc_method
+    def get_data_format(self) -> WaveformDataFormat:
+        """Get the current waveform data format.
+
+        Returns:
+            data_format: In which format to send the data in. Possible options:
+                         'ASCii', 'BYTE', RBYTE', 'WORD'.
+        """
+        return WaveformDataFormat(self._scpi_protocol.ask(":WAVeform:FORMat?")[10:])
+
+    @rpc_method
+    def set_waveform_trace_channel(self, channel: int) -> None:
+        """Set the waveform (channel) number to obtain the waveform trace data from.
+        
+        Parameters:
+            channel: Waveform (channel) number.
+        """
+        if channel not in range(1, self.CHANNELS + 1):
+            raise ValueError(f"Invalid waveform channel number {channel}")
+        
+        self._scpi_protocol.write(f":WAVeform:TRACE {channel}")
+
+    @rpc_method
+    def get_waveform_trace_data(self, data_format: str | WaveformDataFormat) -> np.ndarray:
+        """Get waveform (channel) trace data from single waveform.
+
+        In ASCII format the data is in a comma-separated list of float voltage values.
+
+        In any other format, the data is as block data. Block data is signed 8-bit data in 'BYTE' and 'RBYTe'
+        data formats. 'RBYTe' has also reverse order of data points. In 'WORD' format the data block contains
+        signed 16-bit data in little-endian order. The block data syntax is as follows:
+        "#N<N-digit decimal number><data byte sequence>"
+
+        The block data needs to be converted into Volts. The respective conversion formula depends on the
+        data format. See the DLM4000 series user's manual for details.
+
+        NOTE: This implementation does not include the use of the <NRf> parameter.
+
+        Parameters:
+            data_format: One of the eligible formats - "ascii", "byte", "rbyte", "word".
+
+        Returns:
+            trace_data: The trace data formatted according to the given data format.
+        """
+        data_format = self._data_format_check(data_format)
+        # Get raw trace data
+        decoder = "ascii" if data_format is WaveformDataFormat.ASCII else "latin1"
+        raw_data = self._scpi_protocol.ask(":WAVeform:SEND?", decoder=decoder)
+        # Manipulate and return
+        if data_format is WaveformDataFormat.ASCII:
+            _logger.debug(
+                "[%s] Raw data (up to first 1000 characters) is %s.", self._name, raw_data[:1000]
+            )
+            return np.array([float(x) for x in raw_data.split(',')])
+
+        # Check that we have block data format, where the string must start with a hash.
+        if not raw_data.startswith('#'):
+            raise QMI_InstrumentException(f"Unexpected response {raw_data!r} for ':WAVeform:SEND?'.")
+        
+        # 'N' indicates the number of succeeding data bytes (digits) in ASCII code.
+        no_of_bytes = int(raw_data[1])
+        # <N-digit decimal number> indicates the number of bytes of data.
+        data_points = int(raw_data[2:2+no_of_bytes])
+        # <Data byte sequence> expresses the actual data.
+        raw_data = raw_data[2+no_of_bytes:]  # slice header
+        # Data is comprised of signed 8-bit values, or 16-bit 'words' in little-endian order.
+        data_bytes = raw_data.encode('latin1')
+        if data_points != len(data_bytes):
+            _logger.debug(
+                "[%s] Data tracing error. Expected %i data points in block, but block is of length %i. " +
+                "Raw data (up to first 1000 bytes) is %b.", self._name, data_points, len(data_bytes), raw_data[:1000]
+            )
+            raise QMI_RuntimeException(
+                f"Expected {data_points} data points in block, but block is of length {len(data_bytes)}."
+            )
+
+        # Obtain conversion factors. Hard-coded division values are from the manual.
+        data_range = float(self._scpi_protocol.ask(":WAVeform:RANGe?")[10:])
+        data_offset = float(self._scpi_protocol.ask(":WAVeform:OFFSet?")[10:])
+        position = 0
+        if data_format is WaveformDataFormat.WORD:
+            division = 3200.0
+            # Get the data from the byte string in little-endian byte order.
+            data = np.frombuffer(data_bytes, dtype='<i2')
+
+        elif data_format is WaveformDataFormat.BYTE:
+            division = 12.5
+            # Get the data from the byte string as _signed_ integer array.
+            data = np.frombuffer(data_bytes, dtype=np.int8, count=data_points)
+
+        else:  # data_format is WaveformDataFormat.RBYTE
+            division = 25.0
+            position = int(self._scpi_protocol.ask(":WAVeform:POSition?")[9:]) - 1
+            # Get the data from the byte string as _signed_ integer array.
+            data = np.frombuffer(data_bytes, dtype=np.int8, count=data_points)
+
+        _logger.debug(
+            "[%s] Data (up to first 1000 points) before conversion is %d.", self._name, data[:1000]
+        )
+        return data_range * (data - position) / division + data_offset
+
+    @rpc_method
+    def get_waveforms_trace_data(
+            self, channels: list[int], data_format: str | WaveformDataFormat = WaveformDataFormat.ASCII
+    ) -> np.ndarray:
+        """Returns the on-screen traces from specified waveforms (channels) in the form of a 2D numpy array.
+        Data is streamed via ethernet in the given format.
+
+        Parameters:
+            channels:    A list of the waveform numbers (waveform channels) to return data from.
+            data_format: Which format to send the data in. Possible formats are:
+                         'ascii' | 'byte' | 'rbyte' | 'word'. Default is 'ascii'.
+
+        Returns:
+            traces:      An array where each row is a channel trace.
+                         Channel order corresponds to 'channels' input parameter.
+        """
+        # Expected length of each trace
+        num_points = self.get_number_data_points()
+
+        # Initialize data array
+        traces = np.zeros((len(channels), num_points))
+
+        # Stop to acquire data
+        self.stop()
+
+        # Set data format
+        self.set_data_format(data_format)
+
+        # Get trace data from each defined channel
+        for i, waveform in enumerate(channels):
+            _logger.info("[%s] Obtaining trace data for waveform %i in format %s", self._name, waveform, data_format)
+            # Set which channel to get data from
+            self.set_waveform_trace_channel(waveform)
+            # Transfer data from the stopped acquisition
+            traces[i] = self.get_waveform_trace_data(data_format)
+
+        # Start continuous acquisition again
+        self.start()
+
+        return traces
+        
+    @rpc_method
     def save_file(self, name: str, data_type: str = "binary", waiting_time: float = 12.0) -> None:
         """Saves in the internal memory the file with a name "nameXXX.csv".
-        Here XXX labels the files that have the same name with numbers from 000 to 999.
+        Here, XXX labels the files that have the same name with numbers from 000 up to 999.
 
         Parameters:
             name:         The preposition of the file name.
-            data_type:    Specify with type: 'binary' for raw data and 'ascii' for csv data.
+            data_type:    Specify data type: 'binary' for raw data and 'ascii' for csv data.
             waiting_time: Time to wait for saving the file. In seconds.
         """
         data_type = self._data_type_check(data_type)
 
         # Stop in order to acquire the data
-        self._scpi_protocol.write(":STOP")
+        self.stop()
         # Parameters of the saved file
-        self._scpi_protocol.write(":WAV:FORM BYTE")
+        self.set_data_format("byte")
         _ = self.get_number_data_points()
         self._scpi_protocol.write(f":FILE:SAVE:NAME {name}")
         self._scpi_protocol.write(f":FILE:SAVE:{data_type}:EXECute")
         # waits until the save is completed
         time.sleep(waiting_time)
         # Starts again, notice that at least a time of 10*time_division is needed to get a full spectrum after starting
-        self._scpi_protocol.write(":START")
+        self.start()
 
     @rpc_method
     def find_file_name(self, name: str, select_files: str = "last") -> list[str]:
