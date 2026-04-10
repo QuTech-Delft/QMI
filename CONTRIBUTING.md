@@ -6,7 +6,6 @@ Contributions are welcome, and they are greatly appreciated!
 
 When [reporting a bug](https://github.com/QuTech-Delft/QMI/issues) please include:
 
-[//]: # (Bug report format does not have field for QMI version. It will show up in `pip list`, but that might not get filled in by reporter.)
 * Your operating system name and version of qmi.
 * Any details about your local setup that might be helpful in troubleshooting.
 * Detailed steps to reproduce the bug.
