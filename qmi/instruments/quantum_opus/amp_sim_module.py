@@ -33,7 +33,7 @@ class AmpSimModule(QMI_Instrument):
     def __init__(self, context: QMI_Context, name: str, sim_900: Sim900, port: int) -> None:
         """Initialize driver.
 
-        Parameters:
+        Arguments:
             name: Name for this instrument instance.
             sim_900: Instance of sim 900 module or RPC proxy of it, that hosts the amp-sim module.
             port: Port number in which the amp-sim module is located.
@@ -71,7 +71,7 @@ class AmpSimModule(QMI_Instrument):
         Set device bias current in DAC units (d = 0 ─ 65535, integer values). 0 = off, 65535 = 25μA. The bias current
         defaults to zero upon power-up.
 
-        Parameters:
+        Arguments:
             dac_units: Device bias in DAC units.
         """
         if not 0 <= dac_units <= 65535:
@@ -116,7 +116,7 @@ class AmpSimModule(QMI_Instrument):
         when a latch condition (i.e., device in non-superconducting state) is detected. The duration is calculated
         in units of 10 ms.
 
-        Parameters:
+        Arguments:
             duration: Duration in units of 10ms.
         """
         if not 0 <= duration <= 255:
@@ -145,7 +145,7 @@ class AmpSimModule(QMI_Instrument):
         superconducting, an auto-reset event will be triggered. If disabled, a latch condition will be persistent
         until manually cleared by front-panel operation or by initiating a reset event through software.
 
-        Parameters:
+        Arguments:
             enabled_flag: Boolean flag to enable or disable the auto-reset function.
         """
         enabled = int(bool(enabled_flag))
@@ -194,7 +194,7 @@ class AmpSimModule(QMI_Instrument):
         Note: The internal non-volatile memory is only guaranteed to survive for 100,000 write functions. This limit
         can be easily exceeded if an external program repeatedly calls this function.
 
-        Parameters:
+        Arguments:
             dac_current: Bias current that needs to be stored in non-volatile memory in units of 25μA.
         """
         if not 0 <= dac_current <= 65535:

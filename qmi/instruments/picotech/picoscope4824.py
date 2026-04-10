@@ -39,7 +39,7 @@ class PicoTech_PicoScope4824(PicoTech_PicoScope):
     def __init__(self, context: QMI_Context, name: str, serial_number: str) -> None:
         """Initialize the instrument driver.
 
-        Parameters:
+        Arguments:
             name: Name for this instrument instance.
             serial_number: Serial number of the Picoscope.
         """

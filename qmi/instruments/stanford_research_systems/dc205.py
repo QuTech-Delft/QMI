@@ -61,7 +61,7 @@ class SRS_DC205(QMI_Instrument):
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
         """Initialize the instrument driver.
 
-        Parameters:
+        Arguments:
             name:       Name for this instrument instance.
             transport:  QMI transport descriptor to connect to the instrument.
                             The transport descriptor will typically specify a

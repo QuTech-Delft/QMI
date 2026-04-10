@@ -31,7 +31,7 @@ _logger = logging.getLogger(__name__)
 class Yokogawa_DLM4038(QMI_Instrument):
     """Instrument driver for the Yokogawa DLM4038 Oscilloscope.
     
-    Parameters:
+    Arguments:
         CHANNELS: The number of signal channels in the device.
     """
     _rpc_constants = ["CHANNELS"]

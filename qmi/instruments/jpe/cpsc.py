@@ -52,7 +52,7 @@ class JPE_CPSC(QMI_Instrument):
     def __init__(self, context: QMI_Context, name: str, serial_number: str, cpsp_dir: str = DEFAULT_CPSC_DIR) -> None:
         """Initialize the driver.
 
-        Parameters:
+        Arguments:
             name: Name for this instrument instance.
             serial_number: Serial number of the controller.
             cpsp_dir: Path to directory where cacli.exe is installed.
@@ -100,7 +100,7 @@ class JPE_CPSC(QMI_Instrument):
     def _send_cmd(self, cmd: str, args: Optional[Iterable] = None) -> None:
         """Send command to helper program and check response.
 
-        Parameters:
+        Arguments:
             cmd: The protocol command to send (without serial number)
             args: A list of input parameters. Can be in any format that can be cast as string.
         """
@@ -166,7 +166,7 @@ class JPE_CPSC(QMI_Instrument):
     def _check_response(self, expected: str) -> None:
         """Check the obtained response against expected response.
 
-        Parameters:
+        Arguments:
              expected: The expected response string.
 
         Raises:
@@ -243,7 +243,7 @@ class JPE_CPSC(QMI_Instrument):
     def get_info_module(self, address: int) -> str:
         """Get information about given module.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
         Returns:
             info string about given module
@@ -256,7 +256,7 @@ class JPE_CPSC(QMI_Instrument):
     def request_fail_safe_state(self, address: int) -> str:
         """Reguest fail-safe state from a specific module. In practice - check for errors.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
 
         Returns:
@@ -280,7 +280,7 @@ class JPE_CPSC(QMI_Instrument):
     ) -> None:
         """Move an actuator with specific parameters
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             direction: 0 to 1. Direction of movement: set to 1 for positive movement and 0 (zero) for
                     negative movement
@@ -307,7 +307,7 @@ class JPE_CPSC(QMI_Instrument):
         """Stops movement of an actuator (MOV command), disables external input mode (EXT command) or disables
         scan mode (SDC command).
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
         """
         self._check_is_open()
@@ -318,7 +318,7 @@ class JPE_CPSC(QMI_Instrument):
     def enable_scan_mode(self, address: int, value: int) -> None:
         """Enables and sets the scan mode for CADM2.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             value: A numerical value in between 0 and 1023 (10-bit value) where zero represents ~0[V] output
          (-30[V] in respect to REF) and the maximum value represents ~150[V] output (+120[V] in respect to REF).
@@ -341,7 +341,7 @@ class JPE_CPSC(QMI_Instrument):
         """To use the CADM2 in Flexdrive mode, it is required to set the module in external (analog) input mode
         prior to using Flexdrive.
 
-        Parameters:
+        Arguments:
              address: 1 to 6. Address of module corresponding to controller slot.
              direction: 0 to 1. Direction of movement: set to 1 for positive movement and 0 (zero) for
                     negative movement
@@ -368,7 +368,7 @@ class JPE_CPSC(QMI_Instrument):
     def get_current_position(self, address: int, chan: int, stage: str = "CBS10-RLS") -> float:
         """Get current position of a Resistive Linear Sensor (RLS) connected to a specific channel [CH] of the RSM
         module.
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
             stage: stage name, e.g. "CLA2601", default "CBS10-RLS".
@@ -394,7 +394,7 @@ class JPE_CPSC(QMI_Instrument):
     def get_current_position_of_all_3_channels(self, address: int, stage: str = "CBS10-RLS") -> List[float]:
         """Get current position of all three channels of the RSM module.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             stage: stage name, e.g. "CLA2601", default "CBS10-RLS".
         Raises:
@@ -422,7 +422,7 @@ class JPE_CPSC(QMI_Instrument):
         """Set the current position of a Resistive Linear Sensor (RLS) connected to channel [CH] of the RSM to be
         the negative end-stop.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
         """
@@ -435,7 +435,7 @@ class JPE_CPSC(QMI_Instrument):
         """Set the current position of a Resistive Linear Sensor (RLS) connected to channel [CH] of the RSM to be
         the positive end-stop.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
         """
@@ -447,7 +447,7 @@ class JPE_CPSC(QMI_Instrument):
     def read_negative_end_stop(self, address: int, chan: int, stage: str = "CBS10-RLS") -> float:
         """Read the current value of the negative end-stop parameter set for a specific channel [CH] of an RSM.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
             stage: Stage name, e.g. "CLA2601", default "CBS10-RLS".
@@ -473,7 +473,7 @@ class JPE_CPSC(QMI_Instrument):
     def read_positive_end_stop(self, address: int, chan: int, stage: str = "CBS10-RLS") -> float:
         """Read the current value of the positive end-stop parameter set for a specific channel [CH] of an RSM.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
             stage: stage name, e.g. "CLA2601", default "CBS10-RLS".
@@ -500,7 +500,7 @@ class JPE_CPSC(QMI_Instrument):
         """Reset the current values of the negative and positive end-stop parameters set for a specific channel [CH]
         of an RSM.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
         """
@@ -512,7 +512,7 @@ class JPE_CPSC(QMI_Instrument):
     def set_excitation_duty_cycle(self, address: int, duty: int) -> None:
         """Set the duty cycle of the sensor excitation signal of the RSM.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             duty: Value is in [%] and can be set to 0 (zero) or from 10 to (default) 100.
         """
@@ -524,7 +524,7 @@ class JPE_CPSC(QMI_Instrument):
     def read_excitation_duty_cycle(self, address: int) -> int:
         """Read the duty cycle of the sensor excitation signal of the RSM.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
         Raises:
             QMI_InstrumentException: If the response cannot be cast into an int.
@@ -549,7 +549,7 @@ class JPE_CPSC(QMI_Instrument):
         """Store the current values of the following parameters of the RSM to the non-volatile memory of the
         controller: excitation duty cycle (EXS), negative end stop (MIS) and positive end-stop (MAS).
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
         """
         self._check_is_open()
@@ -561,7 +561,7 @@ class JPE_CPSC(QMI_Instrument):
         """Request the counter valuea of a Cryo Optical Encoder (COE) connected to a specific channel [CH] of the
         OEM2 module.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
         Raises:
@@ -587,7 +587,7 @@ class JPE_CPSC(QMI_Instrument):
         """Resets the counter (to zero) for a specific cryo optical encoder connected to a specific channel [CH] of
         the OEM2 module.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
         """
@@ -600,7 +600,7 @@ class JPE_CPSC(QMI_Instrument):
         """Request the (raw) encoder signal value of a Cryo Optical Encoder (COE) connected to a specific channel
         [CH] of the OEM2 module.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
         Raises:
@@ -627,7 +627,7 @@ class JPE_CPSC(QMI_Instrument):
         """Command to initiate an automatic calibration procedure for a specific encoder connected to channel
         [CH] of an OEM2.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
             cadm2_address: 1 to 6. Address of module corresponding to CADM2 slot.
@@ -644,7 +644,7 @@ class JPE_CPSC(QMI_Instrument):
         """Request the Detector Gain setting [GAIN], Upper Threshold value [UT] and Lower Threshold value [LT]
         set to a specific channel [CH] of the OEM2 module.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
         Raises:
@@ -671,7 +671,7 @@ class JPE_CPSC(QMI_Instrument):
     def set_detector_gain(self, address: int, chan: int, gain: int) -> None:
         """Set a Detector Gain [GAIN] for a specific channel [CH] of the OEM2 module.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
             gain: a value in between [1] and [255].
@@ -684,7 +684,7 @@ class JPE_CPSC(QMI_Instrument):
     def set_upper_threshold(self, address: int, chan: int, ut: int) -> None:
         """Set a Detector Upper Threshold value [UT] for a specific channel [CH] of the OEM2 module.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
             ut: a value in between [1] and [255]. Must be higher than Lower Threshold [LT] value.
@@ -697,7 +697,7 @@ class JPE_CPSC(QMI_Instrument):
     def set_lower_threshold(self, address: int, chan: int, lt: int) -> None:
         """Set a Detector Lower Threshold value [LT] for a specific channel [CH] of the OEM2 module.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
             chan: 1 to 3. Specific channel number.
             lt: a value in between [1] and [255]. Must be lower than Upper Threshold [UT] value.
@@ -711,7 +711,7 @@ class JPE_CPSC(QMI_Instrument):
         """Store Detector Gain [GAIN], Detector Upper Threshold value [UT] and Detector Lower Threshold value [LT]
          values in nonvolatile memory.
 
-        Parameters:
+        Arguments:
             address: 1 to 6. Address of module corresponding to controller slot.
         """
         self._check_is_open()
@@ -724,7 +724,7 @@ class JPE_CPSC(QMI_Instrument):
     ) -> None:
         """Enable servo drive control loop.
 
-        Parameters:
+        Arguments:
             stage1: Sets specific internal drive parameters for the type of actuator or system
                         attached to that particular channel of that particular module set by [ADDR] and [CH].
             freq1: 1 to 600 Step frequency input. Value is in Hertz [Hz] (numerical values only).
@@ -754,7 +754,7 @@ class JPE_CPSC(QMI_Instrument):
     def move_to_setpoint(self, sp1: float, sp2: float, sp3: float, enable_abs_pos: int) -> None:
         """Move actuators to a set point position.
 
-        Parameters:
+        Arguments:
             sp1: setpoint value in [m] for linear, in [rad] for rotational type actuators.
             sp2: setpoint value in [m] for linear, in [rad] for rotational type actuators.
             sp3: setpoint value in [m] for linear, in [rad] for rotational type actuators.

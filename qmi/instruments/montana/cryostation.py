@@ -106,7 +106,7 @@ class Montana_Cryostation(QMI_Instrument):
             This method should not be called directly by a QMI user.
             Always instantiate an instrument via a QMI_Context `make_instrument()` call.
 
-        Parameters:
+        Arguments:
             context: the QMI context
             name: the name of the instrument instance. Use the same name as the variable to which
                   the newly created instance is assigned.

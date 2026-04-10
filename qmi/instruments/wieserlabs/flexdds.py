@@ -118,7 +118,7 @@ class Wieserlabs_FlexDDS_NG_Dual(QMI_Instrument):
                  ) -> None:
         """Initialize the instrument driver.
 
-        Parameters:
+        Arguments:
             name:       Name for this instrument instance.
             transport:  QMI transport descriptor to connect to the instrument.
                         The transport descriptor will typically specify a

@@ -99,7 +99,7 @@ class Montana_CryostationS50(QMI_Instrument):
             This method should not be called directly by a QMI user.
             Always instantiate an instrument via a QMI_Context `make_instrument()` call.
 
-        Parameters:
+        Arguments:
             context:        the QMI context
             name:           the name of the instrument instance
             ipv4_address:   the IP address of the cryostation

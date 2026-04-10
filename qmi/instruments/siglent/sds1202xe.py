@@ -31,7 +31,7 @@ class CommHeader(Enum):
 class TriggerCondition(NamedTuple):
     """A NamedTuple to hold parameters returned from 'trse?' query.
 
-    Parameters:
+    Arguments:
         trig_type: Trigger Type.
         source: Trigger Source.
         hold_type: Trigger Hold type.
@@ -78,7 +78,7 @@ class SDS1202XE(QMI_Instrument):
     def __init__(self, context: QMI_Context, name: str, scpi_transport: str) -> None:
         """ Initialize the driver.
 
-        Parameters:
+        Arguments:
             name: Name for this instrument instance.
             scpi_transport: QMI transport descriptor for the SCPI channel.
         """
@@ -114,7 +114,7 @@ class SDS1202XE(QMI_Instrument):
     def set_comm_header(self, fmt: CommHeader):
         """ Set communication header format.
 
-        Parameters:
+        Arguments:
             header: Header format for communication replies.
         """
         self._scpi_protocol.write(f"chdr {fmt.value}")
@@ -123,7 +123,7 @@ class SDS1202XE(QMI_Instrument):
     def get_voltage_per_division(self, channel: int) -> float:
         """ Query voltage per division for specified channel.
 
-        Parameters:
+        Arguments:
             channel: Specified channel
 
         Returns:
@@ -141,7 +141,7 @@ class SDS1202XE(QMI_Instrument):
     def set_voltage_per_division(self, channel: int, v_div: float) -> None:
         """ Set voltage per division for specified channel.
 
-        Parameters:
+        Arguments:
             channel: Specified channel
             v_div: Voltage per division, in Volts
         """
@@ -155,7 +155,7 @@ class SDS1202XE(QMI_Instrument):
     def get_voltage_offset(self, channel: int) -> float:
         """ Query voltage offset for specified channel.
 
-        Parameters:
+        Arguments:
             channel: Specified channel
 
         Returns:
@@ -173,7 +173,7 @@ class SDS1202XE(QMI_Instrument):
     def set_voltage_offset(self, channel: int, offset: float) -> None:
         """ Set voltage offset for specified channel.
 
-        Parameters:
+        Arguments:
             channel: Specified channel
             offset: Voltage offset, in Volts
         """
@@ -201,7 +201,7 @@ class SDS1202XE(QMI_Instrument):
         2US, 5US, 10US, 20US, 50US, 100US, 200US, 500US, 1MS, 2MS, 5MS, 10MS, 20MS, 50MS, 100MS, 200MS, 500MS, 1S, 2S,
         5S, 10S, 20S, 50S, 100S].
 
-        Parameters:
+        Arguments:
             t_div: Time per division value, can be [1, 2, 5, 10, 20, 50, 100, 200, 500].
             unit: Time per division unit, can be [ns, us, ms, s].
         """
@@ -399,7 +399,7 @@ class SDS1202XE(QMI_Instrument):
         """ Saves and acquires the raw bytes of a waveform trace for a specified source from the oscilloscope
         waveform memory. This can come from analog or digital channels or from FFT waveform ("MATH").
 
-        Parameters:
+        Arguments:
             channel: Specific channel number for channels C1-C4 OR trace source from list {MATH,D0,D1,D2,...,D15}
 
         Returns:
@@ -439,7 +439,7 @@ class SDS1202XE(QMI_Instrument):
     def trace_dump(self, channel: int) -> Tuple[np.ndarray, np.ndarray]:
         """Query oscilloscope for trace dump of specified channel. See page 331 from Programming guide [PG01-E02C]
 
-        Parameters:
+        Arguments:
             channel: Channel which trace should be dumped.
 
         Returns:

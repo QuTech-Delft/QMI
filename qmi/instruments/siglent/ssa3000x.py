@@ -193,7 +193,7 @@ class SSA3000X(QMI_Instrument):
     def get_spectrum(self, channel: int) -> Tuple[np.ndarray, np.ndarray]:
         """ Retrieve spectrum data from the specified channel.
 
-        Parameters:
+        Arguments:
             Channel for which spectrum should be retreived.
 
         Returns:
