@@ -15,7 +15,6 @@ from qmi.core.rpc import rpc_method
 from qmi.core.scpi_protocol import ScpiProtocol
 from qmi.core.transport import create_transport
 
-
 # Type variable.
 _EnumTypeVar = TypeVar("_EnumTypeVar", bound=enum.Enum)
 
@@ -111,7 +110,6 @@ class Tektronix_AFG31000(QMI_Instrument):
         try:
             return int(resp)
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unexpected response to {cmd!r}: {resp!r}")
 
     def _ask_float(self, cmd: str) -> float:
@@ -121,7 +119,6 @@ class Tektronix_AFG31000(QMI_Instrument):
         try:
             return float(resp)
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unexpected response to {cmd!r}: {resp!r}")
 
     def _ask_enum(self, cmd: str, typ: Type[_EnumTypeVar]) -> _EnumTypeVar:
@@ -131,7 +128,6 @@ class Tektronix_AFG31000(QMI_Instrument):
         try:
             return typ(resp.upper())
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unexpected response to {cmd!r}: {resp!r}")
 
     @staticmethod

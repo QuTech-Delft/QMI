@@ -40,9 +40,9 @@ The following Python packages provide support for specific hardware. They are no
 
 Note that this list might not be complete, as by introduction of new hardware drivers, new packages could be added.
 
-The QMI project uses Mypy and Pylint in checking the code quality. For local checks it is useful to have:
+The QMI project uses Mypy and Ruff in checking the code quality. For local checks it is useful to have:
 
-* Packages `pylint <https://pypi.org/project/pylint/>`_ and `mypy <https://pypi.org/project/mypy/>`_ for static code checks;
+* Packages `ruff <https://docs.astral.sh/ruff/>`_ and `mypy <https://pypi.org/project/mypy/>`_ for static code checks;
 
 
 .. rubric:: Dependencies on closed-source drivers

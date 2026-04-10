@@ -94,22 +94,21 @@ class _HDF5RecorderThread(QMI_Thread):
 
                         dset[-n:] = append_dset_values
 
-                    else:
-                        # Create a new dataset and prepare for it to be extended.
-                        if self._backend == "h5py":
-                            dset = file_handle.create_dataset(dset_name, data=append_dset_values, maxshape=(None, ))
+                    # Create a new dataset and prepare for it to be extended.
+                    elif self._backend == "h5py":
+                        dset = file_handle.create_dataset(dset_name, data=append_dset_values, maxshape=(None, ))
 
-                        else:
-                            dset = file_handle.create_variable(
-                                dset_name,
-                                dimensions=(dset_name,),
-                                dtype=append_dset_values.dtype,
-                                compression="gzip",
-                                shuffle=True,
-                                chunks=(self.HDF5_CHUNK_SIZE,),
-                            )
-                            file_handle.resize_dimension(dset_name, n)
-                            dset[0:n] = append_dset_values
+                    else:
+                        dset = file_handle.create_variable(
+                            dset_name,
+                            dimensions=(dset_name,),
+                            dtype=append_dset_values.dtype,
+                            compression="gzip",
+                            shuffle=True,
+                            chunks=(self.HDF5_CHUNK_SIZE,),
+                        )
+                        file_handle.resize_dimension(dset_name, n)
+                        dset[0:n] = append_dset_values
 
                     # Write any attributes that were queued for this dataset.
                     if dset_name in pending_attributes:

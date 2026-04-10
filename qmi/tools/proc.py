@@ -922,7 +922,7 @@ def proc_start(cfg: CfgQmi, context_name: str | None, local: bool) -> int:
     print("Starting QMI processes:")
 
     # Process each applicable context.
-    for context_name in context_names:
+    for context_name in context_names:  # noqa: PLR1704
         # Show process name.
         print(f"    {context_name:30s}:", end=" ")
         sys.stdout.flush()
@@ -1005,7 +1005,7 @@ def proc_stop(cfg: CfgQmi, context_name: str | None, local: bool) -> int:
     print("Stopping QMI processes:")
 
     # Process each applicable context. Stop should happen in inverse order to start, in case of dependencies.
-    for context_name in reversed(context_names):
+    for context_name in reversed(context_names):  # noqa: PLR1704
         # Show process name.
         print(f"    {context_name:30s}:", end=" ")
         sys.stdout.flush()
@@ -1071,7 +1071,7 @@ def proc_status(cfg: CfgQmi, context_name: str | None) -> int:
     print("QMI process status:")
 
     # Process each applicable context.
-    for context_name in context_names:
+    for context_name in context_names:  # noqa: PLR1704
         print("    {:{max}s}:".format(context_name, max=max_len_context_name), end=" ")
         sys.stdout.flush()
 

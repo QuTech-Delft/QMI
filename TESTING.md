@@ -9,18 +9,18 @@ Code analysis
 
 ### Code quality
 
-Code quality is evaluated using [Pylint](https://www.pylint.org) and [Mypy](http://mypy-lang.org). Pylint primarily
+Code quality is evaluated using [Ruff](https://docs.astral.sh/ruff/) and [Mypy](http://mypy-lang.org). Ruff primarily
 checks coding style (in the broadest sense), but is also able to catch some errors (like referencing variables out of
 scope). Mypy is a static type checker. It requires the code to be annotated.
 
-It is strongly recommended to integrate Pylint and Mypy with your development environment, to catch any problems as
-you work on the code base. The Pylint configuration is provided in `pylintrc`. The Mypy configuration is provided in
+It is strongly recommended to integrate Ruff and Mypy with your development environment, to catch any problems as
+you work on the code base. The Ruff configuration is provided in `ruff.toml`. The Mypy configuration is provided in
 `mypy.ini`.
 
 In any case, both tools can be run from the command line:
 ```zsh
-pylint qmi/
-mypy qmi/
+    $ ruff check
+    $ mypy qmi/
 ```
 
 Unit tests
@@ -66,7 +66,7 @@ The fourth workflow packages the source code into an installable Python package.
 
 The following limits are defined for code quality and maintainability metrics:
 
- - Pylint score: at least 9.0
+ - Ruff: 0 errors
  - Mypy: 0 errors
  - Code coverage: at least 90%
 

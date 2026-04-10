@@ -820,8 +820,7 @@ class Instrument(object):
                     num = num - len(data)
                     if num <= 0:
                         break
-                    if num < read_len:
-                        read_len = num
+                    read_len = min(read_len, num)
         except usb.core.USBError:
             exc = sys.exc_info()[1]
             if exc.errno == 110:
@@ -920,8 +919,7 @@ class Instrument(object):
         if self.is_usb488():
             # Increment status byte request tag.
             rstb_btag = (self.last_rstb_btag % 128) + 1
-            if rstb_btag < 2:
-                rstb_btag = 2
+            rstb_btag = max(rstb_btag, 2)
             self.last_rstb_btag = rstb_btag
 
             # Request status byte.
