@@ -57,7 +57,7 @@ import os
 dll = None
 
 def LoadDLL(path):
-    global dll
+    global dll  # noqa: PLW0603
     dll = ctypes.WinDLL(path) if os.name == 'nt' else ctypes.CDLL(path)
 
 # ***********  Functions for general usage  ****************************

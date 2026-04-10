@@ -1,4 +1,4 @@
-[![pylint](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/pylint.svg)](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/pylint.svg)
+[![ruff](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/ruff.svg)](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/ruff.svg)
 [![mypy](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/mypy.svg)](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/mypy.svg)
 [![Documentation Status](https://readthedocs.org/projects/qmi/badge/?version=latest)](https://qmi.readthedocs.io/en/latest/?badge=latest)
 [![coverage](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/coverage.svg)](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/coverage.svg)
@@ -53,22 +53,21 @@ Install with Pip from https://pypi.org/project/qmi/: `pip install qmi`.
 
 The latest version of the documentation can be found [here](https://qmi.readthedocs.io/en/latest/).
 
-### Installing for generating documentation
+### Installation for developers
 
-To install the necessary packages to perform documentation activities for QMI do:
-
-```
-pip install -e .[rtd]
-```
-
-To build the 'readthedocs' documentation locally do:
+To install the necessary packages to develop for QMI do:
 
 ```
-cd documentation/sphinx
-./make-docs
+pip install -e .[dev]
 ```
 
-The documentation can then be found in the `build/html` directory.
+To generate the Sphinx API documentation locally do:
+
+```
+./scripts/run_docs_sphinx.sh
+```
+
+The documentation can then be found in the `documentation/sphinx/source/generated` directory.
 
 ## Contribute
 

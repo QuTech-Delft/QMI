@@ -67,7 +67,7 @@ class HighFinesse_Wlm(QMI_Instrument):
             QMI_InstrumentException: If the value to check is an error code, raise.
         """
         # TODO: Expand in future also for other error types, which are call dependent. Now only WlmGetErr.
-        if value > 0 or value is np.nan:
+        if value > 0 or np.isnan(value):
             return value
 
         i_val = int(value)

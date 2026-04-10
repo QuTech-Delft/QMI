@@ -9,26 +9,26 @@ Code analysis
 
 ### Code quality
 
-Code quality is evaluated using [Pylint](https://www.pylint.org) and [Mypy](http://mypy-lang.org). Pylint primarily
+Code quality is evaluated using [Ruff](https://docs.astral.sh/ruff/) and [Mypy](http://mypy-lang.org). Ruff primarily
 checks coding style (in the broadest sense), but is also able to catch some errors (like referencing variables out of
 scope). Mypy is a static type checker. It requires the code to be annotated.
 
-It is strongly recommended to integrate Pylint and Mypy with your development environment, to catch any problems as
-you work on the code base. The Pylint configuration is provided in `pylintrc`. The Mypy configuration is provided in
+It is strongly recommended to integrate Ruff and Mypy with your development environment, to catch any problems as
+you work on the code base. The Ruff configuration is provided in `ruff.toml`. The Mypy configuration is provided in
 `mypy.ini`.
 
 In any case, both tools can be run from the command line:
-
-    $ pylint qmi/
+```zsh
+    $ ruff check
     $ mypy qmi/
-
+```
 
 Unit tests
 ----------
 
-Unit tests are executed in the CI environment against different Python versions: 3.11, 3.12 and 3.13. Code coverage of
-the tests is computed using [Coverage.py](https://coverage.readthedocs.io/en/coverage-5.3.1/). To run the tests
-locally, use:
+Unit tests are executed in the CI environment against different Python versions: 3.11, 3.12, 3.13 and 3.14.
+Code coverage of the tests is computed using [Coverage.py](https://coverage.readthedocs.io/en/coverage-5.3.1/).
+To run the tests locally, use:
 ```zsh
 coverage run --branch -m unittest discover --start-directory=tests --pattern="test_*.py";
 ```
@@ -55,7 +55,9 @@ In the first three workflows, the following tests are performed:
 - The code quality and maintainability analyses and unit-test coverage are performed, as these metrics are considered as quality indicators for the code base (which includes
 tests).
 - Unit-tests are performed and the coverage is calculated.
-- On push to a branch, tests are executing only with Python 3.11. When changes are pushed to a pull request, the tests are rerun parallel also with Python 3.12 and 3.13. With the 3.11 version, the quality badges are created.
+- On push to a branch, tests are executing only with Python 3.11.
+  When changes are pushed to a pull request, the tests are rerun in parallel with Python 3.12, 3.13 and 3.14 as well.
+  The quality badges are based on the 3.11 results.
 
 The fourth workflow packages the source code into an installable Python package.
 
@@ -64,7 +66,7 @@ The fourth workflow packages the source code into an installable Python package.
 
 The following limits are defined for code quality and maintainability metrics:
 
- - Pylint score: at least 9.0
+ - Ruff: 0 errors
  - Mypy: 0 errors
  - Code coverage: at least 90%
 

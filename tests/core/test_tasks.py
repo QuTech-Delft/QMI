@@ -870,7 +870,7 @@ class TestQMITasks(unittest.TestCase):
                     time.sleep(loop_period - (time.monotonic() % loop_period))
 
                 setting = settings_receiver.get_next_signal(timeout=loop_period).args[-1]
-                if len(settings_signals_received) and setting == settings_signals_received[-1]:
+                if settings_signals_received and setting == settings_signals_received[-1]:
                     setting = settings_receiver.get_next_signal(timeout=loop_period).args[-1]
 
                 status_signals_received.append(status)

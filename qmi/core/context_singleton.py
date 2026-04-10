@@ -109,7 +109,7 @@ def start(
         The global QMI_Context.
     """
 
-    global _qmi_context
+    global _qmi_context  # noqa: PLW0603
 
     qmi.core.thread.check_in_main_thread()
 
@@ -261,7 +261,7 @@ def stop() -> None:
         QMI_NoActiveContextException: If there is no active QMI context present.
     """
 
-    global _qmi_context
+    global _qmi_context  # noqa: PLW0603
 
     qmi.core.thread.check_in_main_thread()
 

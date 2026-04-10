@@ -697,7 +697,6 @@ class QMI_RpcProxy:
 
     def __exit__(self, *args, **kwargs):
         self.__exit__()
-        return
 
     def __repr__(self) -> str:
         return f"<rpc proxy for {self._rpc_object_address} ({self._rpc_class_fqn})>"
@@ -923,7 +922,7 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
         # Insert these QMI_RegisteredSignal instances as attributes of the RpcObject instance.
         #
         # Note: The class attribute "_qmi_signals" will be created by the metaclass.
-        declared_signals = self._qmi_signals  # type: ignore  # pylint: disable=no-member
+        declared_signals = self._qmi_signals  # type: ignore
         for sig_desc in declared_signals:
             sig = QMI_RegisteredSignal(context, name, sig_desc.name, sig_desc.arg_types)
             setattr(self, sig_desc.name, sig)
@@ -1005,7 +1004,7 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
         """
 
         # Note: The class attribute "_qmi_signals" will be created by the metaclass.
-        return list(self._qmi_signals)  # type: ignore  # pylint: disable=no-member
+        return list(self._qmi_signals)  # type: ignore
 
 
 def make_interface_descriptor(rpc_object_class: Type[QMI_RpcObject],

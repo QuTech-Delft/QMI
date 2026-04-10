@@ -10,7 +10,6 @@ from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 from qmi.core.transport import create_transport
 
-
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
@@ -163,7 +162,6 @@ class QuantumComposers_PulseGenerator9530(QMI_Instrument):
         try:
             return int(response.strip())
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unexpected response {response!r} while expecting integer")
 
     @staticmethod
@@ -172,7 +170,6 @@ class QuantumComposers_PulseGenerator9530(QMI_Instrument):
         try:
             return float(response.strip())
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unexpected response {response!r} while expecting float")
 
     def _ask(self, cmd: str) -> str:
@@ -261,7 +258,6 @@ class QuantumComposers_PulseGenerator9530(QMI_Instrument):
         try:
             return RefClkSource(resp.upper())
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unsupported reference clock source {resp!r}")
 
     @rpc_method
@@ -391,7 +387,6 @@ class QuantumComposers_PulseGenerator9530(QMI_Instrument):
         try:
             return PulseMode(resp.upper())
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unsupported pulse mode {resp!r}")
 
     @rpc_method
@@ -460,7 +455,6 @@ class QuantumComposers_PulseGenerator9530(QMI_Instrument):
         try:
             return TriggerMode(resp.upper())
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unsupported trigger mode {resp!r}")
 
     @rpc_method
@@ -482,7 +476,6 @@ class QuantumComposers_PulseGenerator9530(QMI_Instrument):
         try:
             return TriggerEdge(resp.upper())
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unsupported trigger edge {resp!r}")
 
     @rpc_method
@@ -605,7 +598,6 @@ class QuantumComposers_PulseGenerator9530(QMI_Instrument):
         try:
             return PulseMode(resp.upper())
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unsupported pulse mode {resp!r}")
 
     @rpc_method
@@ -687,7 +679,6 @@ class QuantumComposers_PulseGenerator9530(QMI_Instrument):
         try:
             return OutputDriver(resp.upper())
         except ValueError:
-            # pylint: disable=raise-missing-from
             raise QMI_InstrumentException(f"Unsupported output mode {resp!r}")
 
     @rpc_method

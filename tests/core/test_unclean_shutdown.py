@@ -37,7 +37,7 @@ _global_proxies = []
 def _start_server():
     """Start a background TCP server for the instrument to connect to."""
 
-    global _server_thread
+    global _server_thread  # noqa: PLW0603
     global _server_port
 
     # Create server socket.
@@ -57,7 +57,7 @@ def _start_server():
 
 def _run_server(sock):
 
-    global _server_conn
+    global _server_conn  # noqa: PLW0603
 
     # Within background thread, wait for incoming connection.
     sock.settimeout(1.0)
