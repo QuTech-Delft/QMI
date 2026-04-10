@@ -315,7 +315,7 @@ class QMI_Context:
         Context manager exit point.
         Stops the context if it was not already stopped.
 
-        Arguments:
+        Parameters:
             exc_type: Type of the exception that caused the context to be exited.
             exc_val:  Exception that caused the context to be exited.
             exc_tb:   Traceback of the exception that caused the context to be exited.
