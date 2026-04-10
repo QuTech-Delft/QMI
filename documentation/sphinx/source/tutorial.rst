@@ -36,9 +36,6 @@ To end our time as a QMI-aware process, we should call :py:func:`qmi.stop() <qmi
 
 This allows the QMI context to stop the network connections and threads that it manages in a controlled way.
 
-.. If stopping the context is important, should we maybe be teaching our reader to use the context manager protocol instead of manually stopping and starting?
-.. That is guaranteed to stop the context on exit, exception and even on all but the most serious interpreter exits.
-
 If we don't call ``qmi.stop()`` explicitly and quit Python (or a script crashes), the orderly shutdown will still be performed
 as much as possible, while generating a warning message. However, an explicit close is preferable, so get it is a good habit to
 include it as a final statement in your QMI scripts.
@@ -383,10 +380,6 @@ One handy way of avoiding possible mistakes in defining the IP:port in ``qmi.con
 >>> nsg.get_sample()  # will raise an exception if "instr_server" was not found in ``contexts``
 >>> 60.1239025839
 
-.. I wonder if it would be better to not return a list of tuple[str, str] from `discover_peer_contexts()`, but instead return a structured datatype or even a NamedTuple instead.
-.. Currently, the caller has to remember what the fields in the tuple mean.
-.. I also wonder if this context discovery could not be done for the user instead, through a function like `find_context(name:str) -> Context | None` or similar.
-
 A simple QMI measurement script
 -------------------------------
 
@@ -424,8 +417,6 @@ Run the new script by typing the following command in a shell terminal::
 Note that the script uses :py:class:`qmi.utils.context_managers.start_stop` to start and stop the QMI framework.
 This is just a convenient way to make sure that ``qmi.start()`` and ``qmi.stop()`` will always be called.
 Similarly, the `QMI_Instrument` objects are equipped with context managers that open and close the the instrument, calling ``nsg.open()`` and ``nsg.close()`` at the creation and destruction of the instance.
-
-.. I wonder why the `Context` object is not a context manager itself, like the instruments, instead requiring this external function to perform the basic starting and stopping management?
 
 .. note::
     Some users prefer to invoke scripts from an interactive Python session,
@@ -530,8 +521,6 @@ a couple of times.
 Eventually, the main script calls the methods :py:func:`task.stop() <qmi.core.task.QMI_TaskRunner.stop>`
 to tell the task to stop, followed by :py:func:`task.join() <qmi.core.task.QMI_TaskRunner.join>`
 to wait until the task is fully stopped.
-
-.. Would it make sense to make Task objects context managers as well so that starting, stopping and joining could all be done by the context manager protocol?
 
 Run the script from the shell command line::
 
@@ -663,12 +652,6 @@ still present, because then the published data could keep accumulating into the 
 
 Tasks and RPC methods
 ---------------------
-
-.. You lost me somewhere in this section.
-.. I think what first threw me off was that this is the first mention of RPCs in this tutorial and they are not explained at all.
-.. After that, we get a lot of code with very little explanation of what or why we are doing whatever we are doing.
-.. Some of it seems like hacks to get around having proper communication channels with a task, which I would expect would be part of the API.
-.. Finally, we get this nebulous concept of task settings, which I'm still not sure why I would need to use that over the previously implemented way of doing things.
 
 Tasks cannot have RPC methods in them by design.
 Nevertheless, in some special cases the user might like to monitor and control

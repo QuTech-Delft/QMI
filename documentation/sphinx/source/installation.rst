@@ -36,7 +36,6 @@ The following Python packages provide support for specific hardware. They are no
 * Package `uldaq <https://pypi.org/project/uldaq/>`_ for supporting MCC and MCC-based instruments (Bristol FOS);
 * Package `zhinst <https://pypi.org/project/zhinst/>`_ for the Zürich Instruments AWG.
 * Package `RPi.GPIO <https://pypi.org/project/RPi.GPIO/>`_ for controlling the digital pins of the Raspberry Pi.
-.. Should the line below mention where to find a full and complete list? Potentially in the source code?
 
 Note that this list might not be complete, as by introduction of new hardware drivers, new packages could be added.
 
@@ -51,6 +50,5 @@ The QMI project uses Mypy and Ruff in checking the code quality. For local check
 * `PicoQuant <https://www.picoquant.com/>`_ `Multiharp 150 <https://www.picoquant.com/products/category/tcspc-and-time-tagging-modules/multiharp-150-high-throughput-multichannel-event-timer-tcspc-unit>`_;
 * `Jäger Computergesteuerte Messtechnik <https://www.adwin.de/index-us.html>`_: `ADwin-Pro II <https://www.adwin.de/us/produkte/proII.html>`_;
 * `Imagine Optic <https://www.imagine-optic.com/>`_ `mirao 52e <https://www.imagine-optic.com/product/mirao-52e/>`_.
-.. Should the line below mention where to find a full and complete list? Potentially in the source code?
 
 Note that this list might not be complete, as by introduction of new hardware drivers, new dependencies could be added.

@@ -182,9 +182,6 @@ We only use the "old" way of string formatting with logging, using the `%` sign.
 Exception documentation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. This section is also vague: when is a function considered to be raising an exception "itself"?
-.. I would think that a divide by zero would be an exception in the function itself, for instance.
-
 If a function includes raise statement or statements,
 the docstring should describe when the error or exception can be raised."
 

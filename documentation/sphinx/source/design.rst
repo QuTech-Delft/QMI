@@ -333,8 +333,6 @@ Actual publishing happens in **QMI_context** when the *publish_signal* method of
 Logging
 =======
 
-.. This section reads like a tutorial again.
-
 QMI makes use of Python's built-in ``logging`` module, and logs data in a log file. The default name and location is `$QMI_HOME/qmi.log`. If the
 environmental variable ``QMI_HOME`` is not set, it defaults to the user's home directory. The name of the log file can be customized by giving another name
 in ``CfgLogging.logfile`` instance of ``CfgQmi.logging`` configuration entry. If the logger is started normally (not in DEBUG mode), using ``qmi.start``
