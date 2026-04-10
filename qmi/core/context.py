@@ -317,8 +317,8 @@ class QMI_Context:
 
         Parameters:
             exc_type: Type of the exception that caused the context to be exited.
-            exc_val: Exception that caused the context to be exited.
-            exc_tb: Traceback of the exception that caused the context to be exited.
+            exc_val:  Exception that caused the context to be exited.
+            exc_tb:   Traceback of the exception that caused the context to be exited.
 
         Returns:
             Boolean indicating whether any exceptions that caused the context to exit should be suppressed.
