@@ -442,12 +442,11 @@ flow while the task continues to run in a separate background thread.
 
 Creating a custom task involves creating a Python class which derives
 from :py:class:`qmi.core.task.QMI_Task`.
-To ensure that the task works correctly and remains accessible by
-remote Python programs, it should be defined in a *Python module*
-instead of the top-level script file.
-
-.. My immediate question while reading this was: "Why?" and I did not get an answer to that.
-.. I think an explanation of why this is necessary (potentially in a "Note" or "Advanced reading" section) would help comprehension and compliance.
+While it is possible to define tasks in the top-level script file,
+we recommend creating a separate Python module for each of them instead.
+The reason for this is reusability: if you define your task in a separate module,
+it can not just be invoked through your script, but also through other tools,
+such as ``qmi_proc``, which we will cover later on.
 
 To demonstrate a custom task, create a new Python module inside
 the module path for your project. If you don't have a module path
