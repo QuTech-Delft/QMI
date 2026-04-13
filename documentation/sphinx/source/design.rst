@@ -261,18 +261,9 @@ will not result in the message being routed to the instrument.
 Messaging more in detail
 ========================
 
-.. image:: images/class_diagram_messaging.png
+.. image:: images/class_diagram_messaging.drawio.svg
 
 The figure above outlines the class inheritance, ownership, parameter type and usage relations of the QMI messaging and signalling.
-
-Green arrows denote *inheritance*, i.e., an 'is-a' relation between classes.
-
-Blue arrows denote *ownership*. Ownerships arrows start in a named field of a class instance, and the arrow carries a label that shows how many
-instances are owned, e.g., '(one)' or '(zero or more)'.
-
-Black dashed arrows with open arrow heads means that a method call's argument or arguments are of class type of target.
-
-Black arrows with full arrow heads means that a method is implemented and/or called in the target class method.
 
 The **QMI_Message** can have multiple instances with unique source and destination addresses.
 The **QMI_RequestMessage** and **QMI_ReplyMessage** classes take a *request_id*,
