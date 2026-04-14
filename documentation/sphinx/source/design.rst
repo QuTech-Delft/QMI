@@ -170,14 +170,22 @@ managed and owned by the QMI_Context; the user merely gets a handle to them. **Q
 Example usage
 ^^^^^^^^^^^^^^^^
 
-.. image:: images/example_contexts.png
+.. image:: images/example_contexts.drawio.svg
 
-We could have as an example three contexts: In context one, we have made two instances of **QMI_Instrument** (e.g. A signal generator and an oscilloscope
-on a lab PC). Then we have a second context, that runs a task, utilizing **QMI_LoopTask**, which is configured to make connection to context one, and to
-control the instruments in it. This context could reside e.g. in an office PC close to the lab. This second contexts now sends also out *settings* and
-*status* signals which can e.g. be forwarder to a database. Also on the office PC could run a third context that monitors the task status in context two
-and instrument status in context one. This context is hooked in the *status* signal and at specific signal values or circumstances could either tell
-context two to change settings or stop task, or send specific commands to the instruments in context one.
+We could have as an example three contexts:
+In context one, we have made two instances of **QMI_Instrument**
+(e.g. A signal generator and an oscilloscope on a lab PC).
+Then we have a second context, that runs a task, utilizing **QMI_LoopTask**,
+which is configured to make connection to context one, and to control the instruments in it.
+This context could reside e.g. in an office PC close to the lab.
+This second contexts now sends also out *settings* and *status* signals
+which can e.g. be forwarded to a database.
+Also on the office PC could run a third context that monitors
+the task status in context two and instrument status in context one.
+This context is hooked in the *status* signal
+and at specific signal values or circumstances could either tell
+context two to change settings or stop task,
+or send specific commands to the instruments in context one.
 
 **Threading in QMI**
 ====================
