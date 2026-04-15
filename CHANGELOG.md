@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DeprecationWarning warning on the `start_stop` context manager, as `Context` objects are now their own context managers.
   Usages of `with start_stop(qmi, ...)` can be replaced with `with qmi.start(...)` and
   `with start_stop(<Context Object>)` can be replaced with `with <Context Object>`.
+- `QMI_Context.discover_peer_contexts()` now returns `NamedTuple`s called `QMI_Context.PeerDescriptor` instead of raw tuples to make the output easier to work with.
+  All tuple-like usages of the output from `discover_peer_contexts` will still work.
 
 ## [0.52.0] - 2026-04-01
 
