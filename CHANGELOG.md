@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DeprecationWarning warning on the `start_stop` context manager, as `Context` objects are now their own context managers.
   Usages of `with start_stop(qmi, ...)` can be replaced with `with qmi.start(...)` and
   `with start_stop(<Context Object>)` can be replaced with `with <Context Object>`.
+- Specifying an explicit `None` argument for the `config_file` parameter to `qmi.start()` will now always use an empty configuration.
+  The default behavior when `config_file` is not specified has not changed.
 
 ## [0.52.0] - 2026-04-01
 
