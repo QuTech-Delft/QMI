@@ -148,16 +148,9 @@ Most of the features of QMI have been touched on above:
 Design Overview
 ---------------
 
-.. image:: images/class_diagram_main.png
+.. image:: images/class_diagram_main.drawio.svg
 
 The figure above outlines the class inheritance and ownership relations of the most important classes in QMI.
-
-The boxes in this graph denote *classes*. Classes with a red border are *active classes*, meaning they are running in a dedicated thread.
-
-Green arrows denote *inheritance*, i.e., an 'is-a' relation between classes.
-
-Blue arrows denote *ownership*. Ownerships arrows start in a named field of a class instance, and the arrow carries a label that shows how many
-instances are owned, e.g., '(one)' or '(zero or more)'.
 
 We discuss these classes below.
 
@@ -177,14 +170,22 @@ managed and owned by the QMI_Context; the user merely gets a handle to them. **Q
 Example usage
 ^^^^^^^^^^^^^^^^
 
-.. image:: images/example_contexts.png
+.. image:: images/example_contexts.drawio.svg
 
-We could have as an example three contexts: In context one, we have made two instances of **QMI_Instrument** (e.g. A signal generator and an oscilloscope
-on a lab PC). Then we have a second context, that runs a task, utilizing **QMI_LoopTask**, which is configured to make connection to context one, and to
-control the instruments in it. This context could reside e.g. in an office PC close to the lab. This second contexts now sends also out *settings* and
-*status* signals which can e.g. be forwarder to a database. Also on the office PC could run a third context that monitors the task status in context two
-and instrument status in context one. This context is hooked in the *status* signal and at specific signal values or circumstances could either tell
-context two to change settings or stop task, or send specific commands to the instruments in context one.
+We could have as an example three contexts:
+In context one, we have made two instances of **QMI_Instrument**
+(e.g. A signal generator and an oscilloscope on a lab PC).
+Then we have a second context, that runs a task, utilizing **QMI_LoopTask**,
+which is configured to make connection to context one, and to control the instruments in it.
+This context could reside e.g. in an office PC close to the lab.
+This second contexts now sends also out *settings* and *status* signals
+which can e.g. be forwarded to a database.
+Also on the office PC could run a third context that monitors
+the task status in context two and instrument status in context one.
+This context is hooked in the *status* signal
+and at specific signal values or circumstances could either tell
+context two to change settings or stop task,
+or send specific commands to the instruments in context one.
 
 **Threading in QMI**
 ====================
@@ -268,18 +269,9 @@ will not result in the message being routed to the instrument.
 Messaging more in detail
 ========================
 
-.. image:: images/class_diagram_messaging.png
+.. image:: images/class_diagram_messaging.drawio.svg
 
 The figure above outlines the class inheritance, ownership, parameter type and usage relations of the QMI messaging and signalling.
-
-Green arrows denote *inheritance*, i.e., an 'is-a' relation between classes.
-
-Blue arrows denote *ownership*. Ownerships arrows start in a named field of a class instance, and the arrow carries a label that shows how many
-instances are owned, e.g., '(one)' or '(zero or more)'.
-
-Black dashed arrows with open arrow heads means that a method call's argument or arguments are of class type of target.
-
-Black arrows with full arrow heads means that a method is implemented and/or called in the target class method.
 
 The **QMI_Message** can have multiple instances with unique source and destination addresses.
 The **QMI_RequestMessage** and **QMI_ReplyMessage** classes take a *request_id*,
@@ -307,28 +299,27 @@ the process can then be made to control the signalling (also between tasks) and 
 Signalling more in detail
 =========================
 
-.. image:: images/class_diagram_signalling.png
+.. image:: images/class_diagram_signalling.drawio.svg
 
-The figure above outlines the class inheritance, ownership, parameter type and usage relations of the QMI messaging and signalling.
+The figure above outlines the class inheritance and call relations of the QMI messaging and signalling.
 
-Green arrows denote *inheritance*, i.e., an 'is-a' relation between classes.
+From this fourth figure it can be seen how the subscribing and unsubscribing of receivers to signals
+are done via the **QMI_Context** methods, and also publishing of data is routed via it.
 
-Blue arrows denote *ownership*. Ownerships arrows start in a named field of a class instance, and the arrow carries a label that shows how many
-instances are owned, e.g., '(one)' or '(zero or more)'.
+The signals use **QMI_SignalMessage** to broadcast signals between contexts.
+Each context owns exactly one **SignalManager** instance.
+The signal subscription and unsubscribing is routed to **QMI_SignalSubscriber** class.
+The subscription of signals is done by using **QMI_SignalSubscriptionReply**
+which inherits from the **QMI_ReplyMessage**.
+Subscription and unsubscribing requires as *receiver* input parameter an instance of **QMI_SignalReceiver**,
+which contains a queue of received signals.
+When any such signal gets published,
+the published signal is automatically added to the receive queue of the **QMI_SignalReceiver**.
 
-Black dashed arrows with open arrow heads means that a method call's argument or arguments are of class type of target.
-
-Black dashed arrows with full arrow heads means that a method is used and/or implemented in the target class method.
-
-From this fourth figure it can be seen how the subscribing and unsubscribing of receivers to signals are done via the **QMI_Context** methods, and also publishing of
-data is routed via it. This way the QMI context can keep an object registry of which broadcasts it should listen to and which data to publish.
-The signals use **QMI_SignalMessage** to broadcast signals between contexts. Each context owns exactly one **SignalManager** instance. The signal subscription and
-unsubscribing is routed to **QMI_SignalSubscriber** class. The subscription of signals is done by using **QMI_SignalSubscriptionReply** which inherits from the **QMI_ReplyMessage**.
-Subscription and unsubscribing requires as *receiver* input parameter an instance of **QMI_SignalReceiver**, which contains a queue of received signals.
-When any such signal gets published, the published signal is automatically added to the receive queue of the **QMI_SignalReceiver**.
-
-Publishing of a signal is implemented in **QMI_RegisteredSignal.publish** which is an implementation of the abstract base class **QMI_Signal**.
-Actual publishing happens in **QMI_context** when the *publish_signal* method of the context is called. After that it is available for any receivers.
+Publishing of a signal is implemented in **QMI_RegisteredSignal.publish**
+which is an implementation of the abstract base class **QMI_Signal**.
+Actual publishing happens in **QMI_context** when the *publish_signal* method of the context is called.
+After that it is available for any receivers.
 
 Logging
 =======
