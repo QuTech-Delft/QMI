@@ -1,10 +1,10 @@
 """Module that defines packet formats for the UDP Responder.
 """
 
-import enum
 import ctypes
+import enum
 import logging
-from typing import ClassVar
+from typing import ClassVar, Final
 
 from qmi.core.exceptions import QMI_RuntimeException
 
@@ -12,7 +12,6 @@ _logger = logging.getLogger(__name__)
 
 # The magic number to recognize QMI UDP packets.
 MAGIC = 0x00494d51  # Magic value. This is stored little endian, and then reads 'QMI\0' in ASCII.
-
 
 class QMI_LittleEndianStructure(ctypes.LittleEndianStructure):
     """The standard ctypes LittleEndianStructure, with a proper repr() function."""
@@ -54,12 +53,15 @@ class QMI_UdpResponderPacketHeader(QMI_LittleEndianStructure):
     ]
 
 class QMI_UdpResponderContextDescriptor(QMI_LittleEndianStructure):
+    UNBOUND_TCP_PORT: Final[int] = -1
+    """Default value for unbound TCP ports."""
+
     _pack_ = 1
     _fields_ = [
         ('pid'           , ctypes.c_int32    ),  # PID of the process that owns the QMI_Context.
         ('name'          , ctypes.c_char * 64),  # Name of the context
         ('workgroup_name', ctypes.c_char * 64),
-        ('port'          , ctypes.c_int32    )   # Listening TCP port of the context. (-1) means: no port.
+        ('port'          , ctypes.c_int32    )   # Listening TCP port of the context. UNBOUND_TCP_PORT means: no port.
     ]
 
 # Concrete packets follow below:
