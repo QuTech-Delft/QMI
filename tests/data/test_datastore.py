@@ -220,8 +220,8 @@ class TestDataFolder(unittest.TestCase):
     def test_09_make_hdf5_file(self):
         """Make a hdf5 file."""
         # Arrange
-        name = "expected"
-        expected_file = os.path.join(os.getcwd(), name + ".hdf5")
+        name = "expected" + ".hdf5"
+        expected_file = os.path.join(os.getcwd(), name)
         # Act
         try:
             with self.datafolder.make_hdf5file(name) as hdf5_file:
@@ -234,8 +234,8 @@ class TestDataFolder(unittest.TestCase):
     def test_09b_make_hdf5_file_h5netcdf_backend(self):
         """Make a hdf5 file with h5netcdf backend."""
         # Arrange
-        name = "expected"
-        expected_file = os.path.join(os.getcwd(), name + ".hdf5")
+        name = "expected" + ".hdf5"
+        expected_file = os.path.join(os.getcwd(), name)
         # Act
         try:
             with self.datafolder.make_hdf5file(name, backend="h5netcdf") as hdf5_file:
@@ -256,8 +256,8 @@ class TestDataFolder(unittest.TestCase):
     def test_10b_make_hdf5_file_raises_exception_if_h5_file_exists(self):
         """Making a HDF5 file fails when a matching .h5 file already exists."""
         # Arrange
-        name = "existing_h5"
-        existing_file = os.path.join(os.getcwd(), name + ".h5")
+        name = "existing_h5" + ".h5"
+        existing_file = os.path.join(os.getcwd(), name)
         try:
             with File(existing_file, "x"):
                 pass
@@ -272,8 +272,8 @@ class TestDataFolder(unittest.TestCase):
     def test_10c_make_hdf5_file_raises_exception_if_hdf5_file_exists(self):
         """Making a HDF5 file fails when a matching .hdf5 file already exists."""
         # Arrange
-        name = "existing_hdf5"
-        existing_file = os.path.join(os.getcwd(), name + ".hdf5")
+        name = "existing_hdf5" + ".hdf5"
+        existing_file = os.path.join(os.getcwd(), name)
         try:
             with File(existing_file, "x"):
                 pass
@@ -288,8 +288,8 @@ class TestDataFolder(unittest.TestCase):
     def test_11_open_hdf5_file(self):
         """Open a hdf5 file."""
         # Arrange
-        name = "expected"
-        expected_file = os.path.join(os.getcwd(), name + ".hdf5")
+        name = "expected" + ".hdf5"
+        expected_file = os.path.join(os.getcwd(), name)
         # Act and Assert
         try:
             with self.datafolder.make_hdf5file(name):
@@ -304,8 +304,8 @@ class TestDataFolder(unittest.TestCase):
     def test_11b_open_hdf5_file_h5netcdf_backend(self):
         """Open a hdf5 file with h5netcdf backend."""
         # Arrange
-        name = "expected"
-        expected_file = os.path.join(os.getcwd(), name + ".hdf5")
+        name = "expected" + ".hdf5"
+        expected_file = os.path.join(os.getcwd(), name)
         # Act and Assert
         try:
             with self.datafolder.make_hdf5file(name, backend="h5netcdf"):
@@ -328,7 +328,7 @@ class TestDataFolder(unittest.TestCase):
     def test_12b_open_hdf5_file_raises_exception_if_file_does_not_exist(self):
         """Opening a HDF5 file fails when no matching file exists."""
         # Arrange
-        name = "missing_file"
+        name = "missing_file.h5"
         # Act and Assert
         with self.assertRaises(FileNotFoundError):
             self.datafolder.open_hdf5file(name)
@@ -336,8 +336,8 @@ class TestDataFolder(unittest.TestCase):
     def test_12c_open_hdf5_file_finds_h5_extension(self):
         """Opening a HDF5 file also resolves files stored with the .h5 extension."""
         # Arrange
-        name = "expected_h5"
-        expected_file = os.path.join(os.getcwd(), name + ".h5")
+        name = "expected_h5" + ".h5"
+        expected_file = os.path.join(os.getcwd(), name)
         try:
             with File(expected_file, "x"):
                 pass
