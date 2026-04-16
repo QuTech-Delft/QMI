@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Change reported port number in response to a QMI discovery broadcast message for unbound TCP listeners to `-1`.
 - `QMI_Context.discover_peer_contexts()` now returns `NamedTuple`s called `QMI_Context.PeerDescriptor` instead of raw tuples to make the output easier to work with.
   All tuple-like usages of the output from `discover_peer_contexts` will still work.
+- Specifying an explicit `None` argument for the `config_file` parameter to `qmi.start()` will now always use an empty configuration.
+  The default behavior when `config_file` is not specified has not changed.
 
 ## [0.52.0] - 2026-04-01
 

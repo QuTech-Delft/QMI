@@ -27,7 +27,8 @@ import qmi.core.thread
 from qmi.core.config_defs import CfgQmi, CfgContext
 from qmi.core.config_struct import config_struct_from_dict
 from qmi.core.context import QMI_Context
-from qmi.core.exceptions import QMI_UsageException, QMI_NoActiveContextException, QMI_ConfigurationException
+from qmi.core.exceptions import QMI_UsageException, QMI_NoActiveContextException, \
+    QMI_ConfigurationException
 from qmi.core.instrument import QMI_Instrument
 from qmi.core.rpc import QMI_RpcObject
 from qmi.core.task import QMI_Task, QMI_TaskRunner
@@ -59,7 +60,7 @@ def context() -> QMI_Context:
 
 def start(
         context_name: str,
-        config_file: str | None = None,
+        config_file: str | None = "",
         init_logging: bool = True,
         console_loglevel: str | None = None,
         context_cfg: dict | None = None
@@ -88,10 +89,11 @@ def start(
     If `config_file` is provided, it should be a path to a valid QMI
     configuration file. The referenced file will be used to load the
     configuration from.
-    If `config_file` is ``None`` and the environment variable `QMI_CONFIG` is
+    If `config_file` is an empty string and the environment variable `QMI_CONFIG` is
     set, the configuration will be loaded from the file that the environment
-    variable points to. If `QMI_CONFIG` is not set, an empty configuration is
-    used.
+    variable points to.
+    If `config_file` is `None` or if it is an empty string and `QMI_CONFIG` is not set,
+    an empty configuration is used.
 
     The configuration created can be edited by providing a dictionary as an
     optional input. See config_defs.CfgContext class for possible dict keys
@@ -165,15 +167,16 @@ def create_config_from_file(config_file: str | None) -> CfgQmi:
         Top-level QMI configuration structure.
     """
     # Try first to see if input is given or QMI_CONFIG is set
-    config_file = config_file if config_file is not None else QMI_CONFIG
+    if config_file == "":
+        config_file = QMI_CONFIG
+
     if config_file is None:
         # Failing that, use the default class
         return CfgQmi()
 
-    else:
-        _logger.debug("Reading QMI configuration file %s", config_file)
-        cfgdict = qmi.core.config.load_config_file(config_file)
-        cfgdict["config_file"] = os.path.abspath(config_file)
+    _logger.debug("Reading QMI configuration file %s", config_file)
+    cfgdict = qmi.core.config.load_config_file(config_file)
+    cfgdict["config_file"] = os.path.abspath(config_file)
 
     return config_struct_from_dict(cfgdict, CfgQmi)
 
