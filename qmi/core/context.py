@@ -690,11 +690,14 @@ class QMI_Context:
         return peer_context_name in context_names
 
     class PeerDescriptor(NamedTuple):
-        """Descriptor of a peer returned by `discover_peer_contexts`."""
+        """Descriptor of a peer returned by `discover_peer_contexts`.
+
+        Attributes:
+            name: The name of the peer context.
+            address_port: The location to find the peer, in the format of "address:port".
+        """
         name: str
-        """The name of the peer context."""
         address_port: str
-        """The location to find the peer, in the format of "address:port"."""
 
     def discover_peer_contexts(
         self,
