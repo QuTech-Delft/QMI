@@ -176,15 +176,16 @@ class DataFolder:
                     # Add QMI version to file
                     f.attrs["QMI_version"] = qmi.__version__
                     f.attrs[QMI_DATASET.format(ds_count=0)] = ds.name
-                    qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+                    grp = f.create_group(ds.name)
+                    qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
 
             elif backend == "h5netcdf":
                 with h5netcdf.File(file_path, "w" if overwrite else "x", decode_vlen_strings=False) as f:
                     # Add QMI version to file
                     f.attrs["QMI_version"] = qmi.__version__
                     f.attrs[QMI_DATASET.format(ds_count=0)] = ds.name
-                    f.dimensions[ds.name] = None
-                    qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+                    grp = f.create_group(ds.name)
+                    qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
 
             else:
                 raise ValueError(f"Invalid backend type {backend}.")
@@ -236,14 +237,14 @@ class DataFolder:
                         if name not in f:
                             raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
 
-                        return qmi.data.dataset.read_dataset_from_hdf5(f[name], None)
+                        return qmi.data.dataset.read_dataset_from_hdf5(f[name])
 
                 elif backend == "h5netcdf":
                     with h5netcdf.File(file_path, "r", decode_vlen_strings=False) as f:
                         if name not in f:
                             raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
 
-                        return qmi.data.dataset.read_dataset_from_hdf5(f[name], f)
+                        return qmi.data.dataset.read_dataset_from_hdf5(f[name])
 
                 else:
                     raise ValueError(f"Invalid backend type {backend}.")

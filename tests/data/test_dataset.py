@@ -278,8 +278,7 @@ class TestDataSet(unittest.TestCase):
                 self.assertEqual(ds.column_label[e], f[ds_name].attrs[f"QMI_DataSet_column{e}_label"])
                 self.assertEqual(ds.column_unit[e], f[ds_name].attrs[f"QMI_DataSet_column{e}_unit"],)
 
-            ds.column_label.sort()
-            self.assertListEqual(list(f[ds_name].keys()), ds.axis_label + ds.column_label)
+            self.assertCountEqual(list(f[ds_name].keys()), ds.axis_label + ds.column_label)
             self.assertEqual(f[ds_name].attrs["QMI_DataSet_axis0_label"], "X axis")
             self.assertEqual(f[ds_name].attrs["QMI_DataSet_axis0_unit"], "mm")
 
@@ -291,50 +290,48 @@ class TestDataSet(unittest.TestCase):
     def test_41_write_read_hdf5(self):
         """Writing and reading various datasets as HDF5 with h5py backend."""
 
-        f = h5py.File("test.h5", "w", driver="core", backing_store=False)
         datasets = []
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            # Create datasets and write to file.
+            for (name, shape, dtype) in [
+                    ("t1", (4, 4), np.float64),
+                    ("t2", (4, 4), np.float64),
+                    ("t3", (3, 3, 3, 3), np.float64),
+                    ("t4", (4, 4, 1), np.int32)]:
+                ds = _internal_create_dataset(name,
+                                            shape,
+                                            dtype,
+                                            add_labels=True,
+                                            add_scale=True,
+                                            add_attributes=True)
+                datasets.append(ds)
+                grp = f.create_group(name)
+                qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
 
-        # Create datasets and write to file.
-        for (name, shape, dtype) in [
-                ("t1", (4, 4), np.float64),
-                ("t2", (4, 4), np.float64),
-                ("t3", (3, 3, 3, 3), np.float64),
-                ("t4", (4, 4, 1), np.int32)]:
-            ds = _internal_create_dataset(name,
-                                          shape,
-                                          dtype,
-                                          add_labels=True,
-                                          add_scale=True,
-                                          add_attributes=True)
-            datasets.append(ds)
-            grp = f.create_group(name)
-            qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
+            # Read back from file and verify.
+            for ds in datasets:
+                ds2 = qmi.data.dataset.read_dataset_from_hdf5(f[ds.name])
+                self.assertEqual(ds2.name, ds.name)
+                self.assertIsInstance(ds2.data, np.ndarray)
+                self.assertEqual(ds.data.shape, ds2.data.shape)
+                self.assertEqual(ds.data.dtype, ds2.data.dtype)
+                self.assertTrue(np.all(ds2.data == ds.data))
+                self.assertEqual(ds.column_label, ds2.column_label)
+                self.assertEqual(ds.column_unit, ds2.column_unit)
+                # All ds attributes should be in ds2.
+                for attr in ds.attrs:
+                    self.assertIn(attr, ds2.attrs)
 
-        # Read back from file and verify.
-        for ds in datasets:
-            ds2 = qmi.data.dataset.read_dataset_from_hdf5(f[ds.name])
-            self.assertEqual(ds2.name, ds.name)
-            # for e, label in enumerate(ds.column_label):
-            #     col = ds2)
-            self.assertIsInstance(ds2.data, np.ndarray)
-            self.assertEqual(ds.data.shape, ds2.data.shape)
-            self.assertEqual(ds.data.dtype, ds2.data.dtype)
-            self.assertTrue(np.all(ds2.data == ds.data))
-            self.assertEqual(ds.column_label, ds2.column_label)
-            self.assertEqual(ds.column_unit, ds2.column_unit)
-            self.assertEqual(ds.attrs, ds2.attrs)
+                self.assertEqual(len(ds.axis_scale), len(ds2.axis_scale))
+                for e, label in enumerate(ds.axis_label):
+                    self.assertEqual(ds2.axis_label[e], label)
+                    self.assertEqual(ds2.axis_unit[e], ds.axis_unit[e])
 
-            for e, label in enumerate(ds.axis_label):
-                self.assertEqual(ds2.axis_label, ds.axis_label)
-                self.assertEqual(ds2.axis_unit, ds.axis_unit)
-                self.assertEqual(len(ds2.axis_scale), len(ds.axis_scale))
                 for axis in range(len(ds.axis_scale)):
                     if ds.axis_scale[axis] is None:
                         self.assertIsNone(ds2.axis_scale[axis])
                     else:
                         self.assertTrue(np.all(ds2.axis_scale[axis] == ds.axis_scale[axis]))
-
-        f.close()
 
     def test_42_write_hdf5_raises_exception_on_invalid_attrs_name(self):
         """If attrs name is equal or starting with 'QMI_DataSet' or 'DIMENSION_', an exception is raised."""
@@ -370,7 +367,6 @@ class TestDataSet(unittest.TestCase):
     def test_43_write_hdf5_simple(self):
         """Writing a simple dataset as HDF5 with h5netcdf backend."""
         ds_name = "my_dataset"
-        ds_scale_name = ds_name + "_axis0_scale"
         data = 1.4142 * (np.arange(24).reshape(8, 3) - 1)
         ds = DataSet(ds_name, data=data)
         ds.axis_label[0] = "X axis"
@@ -382,43 +378,39 @@ class TestDataSet(unittest.TestCase):
         ds.attrs["hello"] = "world"
         ds.attrs["number"] = 2.71
 
-        f = h5netcdf.File("test.h5", "w", driver="core", backing_store=False, decode_vlen_strings=False)
-        qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+        with h5netcdf.File("test.h5", "w", driver="core", backing_store=False, decode_vlen_strings=False) as f:
+            grp = f.create_group(ds.name)
+            qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
+            self.assertListEqual([ds_name], list(f.keys()))
+            for e, col in enumerate(ds.column_label):
+                self.assertEqual((8,), f[ds_name][col].shape)
+                self.assertEqual(np.float64, f[ds_name][col].dtype)
+                self.assertTrue(np.all(data[:, e] == f[ds_name][col]))
+                self.assertEqual(ds.column_label[e], f[ds_name].attrs[f"QMI_DataSet_column{e}_label"])
+                self.assertEqual(ds.column_unit[e], f[ds_name].attrs[f"QMI_DataSet_column{e}_unit"],)
 
-        self.assertEqual(set(f.keys()), {ds_name, ds_scale_name})
-        self.assertEqual(f[ds_name].shape, (8, 3))
-        self.assertEqual(f[ds_name].dtype, np.float64)
-        self.assertTrue(np.all(data == f[ds_name]))
+            self.assertCountEqual(list(f[ds_name].keys()), ds.axis_label + ds.column_label)
+            self.assertEqual(f[ds_name].attrs["QMI_DataSet_axis0_label"], "X axis")
+            self.assertEqual(f[ds_name].attrs["QMI_DataSet_axis0_unit"], "mm")
 
-        self.assertEqual(f[ds_name].attrs["QMI_DataSet_axis0_label"], "X axis")
-        self.assertEqual(f[ds_name].attrs["QMI_DataSet_axis0_unit"], "mm")
-        self.assertEqual(f[ds_name].attrs["QMI_DataSet_column1_label"], "green")
-        self.assertEqual(f[ds_name].attrs["QMI_DataSet_column1_unit"], "nm")
+            self.assertTrue(np.all(scale_data == np.array(f[ds_name]["X axis"])))
 
-        self.assertEqual(f[ds_name].dimensions[0], "X axis")
-        self.assertTrue(np.all(scale_data == f[ds_name].attrs.get(ds_scale_name)))
-
-        self.assertEqual(f[ds_name].attrs["hello"], "world")
-        self.assertEqual(f[ds_name].attrs["number"], 2.71)
-
-        f.close()
+            self.assertEqual(f[ds_name].attrs["hello"], "world")
+            self.assertEqual(f[ds_name].attrs["number"], 2.71)
 
     def test_44_write_read_hdf5(self):
-        """Writing and reading various datasets as HDF5."""
+        """Writing and reading various datasets as HDF5 with h5netcdf backend."""
 
         datasets = []
-
-        # Create datasets and write to file.
-        for (name, shape, dtype) in [
-                ("t1", (4, 4), np.float64),
-                ("t2", (4, 4), np.float64),
-                ("t3", (3, 3, 3, 3), np.float64),
-                ("t4", (4, 4, 1), np.int32)
-            ]:
-            # h5netcdf does not clear the dataset from the backend. Thus we need to open-close the file on each test 
-            with h5netcdf.File(
-                "test.h5", "w", driver="core", backing_store=False, decode_vlen_strings=False
-            ) as f:
+        # h5netcdf does not clear the dataset from the backend. Thus we need to open-close the file on each test 
+        with h5netcdf.File("test.h5", "w", driver="core", backing_store=False, decode_vlen_strings=False) as f:
+            # Create datasets and write to file.
+            for (name, shape, dtype) in [
+                    ("t1", (4, 4), np.float64),
+                    ("t2", (4, 4), np.float64),
+                    ("t3", (3, 3, 3, 3), np.float64),
+                    ("t4", (4, 4, 1), np.int32)
+                ]:
                 ds = _internal_create_dataset(
                     name,
                     shape,
@@ -428,30 +420,38 @@ class TestDataSet(unittest.TestCase):
                     add_attributes=True
                 )
                 datasets.append(ds)
-                qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+                grp = f.create_group(name)
+                qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
 
-                # Read back from file and verify.
-                ds2 = qmi.data.dataset.read_dataset_from_hdf5(f[ds.name], f)
+            # Read back from file and verify.
+            for ds in datasets:
+                ds2 = qmi.data.dataset.read_dataset_from_hdf5(f[ds.name])
                 self.assertEqual(ds2.name, ds.name)
                 self.assertIsInstance(ds2.data, np.ndarray)
-                self.assertEqual(ds2.data.shape, ds.data.shape)
-                self.assertEqual(ds2.data.dtype, ds.data.dtype)
+                self.assertEqual(ds.data.shape, ds2.data.shape)
+                self.assertEqual(ds.data.dtype, ds2.data.dtype)
                 self.assertTrue(np.all(ds2.data == ds.data))
-                self.assertEqual(ds2.axis_label, ds.axis_label)
-                self.assertEqual(ds2.axis_unit, ds.axis_unit)
-                self.assertEqual(len(ds2.axis_scale), len(ds.axis_scale))
+                self.assertEqual(ds.column_label, ds2.column_label)
+                self.assertEqual(ds.column_unit, ds2.column_unit)
+                # All ds attributes should be in ds2.
+                for attr in ds.attrs:
+                    self.assertIn(attr, ds2.attrs)
+
+                self.assertEqual(len(ds.axis_scale), len(ds2.axis_scale))
+                for e, label in enumerate(ds.axis_label):
+                    self.assertEqual(ds2.axis_label[e], label)
+                    self.assertEqual(ds2.axis_unit[e], ds.axis_unit[e])
+
                 for axis in range(len(ds.axis_scale)):
                     if ds.axis_scale[axis] is None:
                         self.assertIsNone(ds2.axis_scale[axis])
                     else:
                         self.assertTrue(np.all(ds2.axis_scale[axis] == ds.axis_scale[axis]))
 
-                self.assertEqual(ds2.column_label, ds.column_label)
-                self.assertEqual(ds2.column_unit, ds.column_unit)
-                self.assertEqual(ds2.attrs, ds.attrs)
-
     def test_45_write_hdf5_raises_exception_on_invalid_attrs_name(self):
-        """If attrs name is equal or starting with 'QMI_DataSet' or 'DIMENSION_', and exception is raised"""
+        """If attrs name is equal or starting with 'QMI_DataSet' or 'DIMENSION_', and exception is raised.
+        This is done now with h5netcdf backend.
+        """
         ds_name = "my_dataset"
         data = 1.4142 * (np.arange(24).reshape(8, 3) - 1)
         ds = DataSet(ds_name, data=data)
