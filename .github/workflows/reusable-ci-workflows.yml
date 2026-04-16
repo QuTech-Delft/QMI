@@ -22,12 +22,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref }}
 
       - name: Set up Python ${{ inputs.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.python-version }}
 
@@ -42,7 +42,7 @@ jobs:
         run: |
           ruff check --output-file "ruff-results-${{ inputs.python-version }}.log" --output-format pylint
       - name: Upload ruff results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ruff-results-${{ inputs.python-version }}
           path: ruff-results-${{ inputs.python-version }}.log
@@ -55,7 +55,7 @@ jobs:
           echo "Mypy result: $RESULT"
           exit $([[ "$RESULT" == "pass" ]] && echo 0 || echo 1)
       - name: Upload mypy results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mypy-results-${{ inputs.python-version }}
           path: mypy-${{ inputs.python-version }}.log
@@ -68,7 +68,7 @@ jobs:
           echo "Coverage: $COVERAGE_PERC%"
           exit $(echo "$COVERAGE_PERC < $COVERAGE_MIN_PERC" | bc)
       - name: Upload coverage results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-results-${{ inputs.python-version }}
           path: coverage-${{ inputs.python-version }}.log
