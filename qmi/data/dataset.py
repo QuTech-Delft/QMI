@@ -98,15 +98,15 @@ class DataSet:
             self.data = np.zeros(tuple(shape), dtype=dtype)
 
         # Check shape.
-        ndim = len(self.data.shape) - 1
-        ncol = self.data.shape[-1] if ndim > 0 else 0
+        self.__ndim = len(self.data.shape) - 1
+        ncol = self.data.shape[-1] if self.__ndim > 0 else 0
         if np.min(self.data.shape) < 1:
             raise ValueError("Zero-size or negative size axes are not allowed.")
 
         # Initialize axis labels.
-        self.axis_label: list[str] = [""] * ndim
-        self.axis_unit: list[str] = [""] * ndim
-        self.axis_scale: list[np.ndarray | None] = [None] * ndim
+        self.axis_label: list[str] = [""] * self.__ndim if self.__ndim > 0 else [""]
+        self.axis_unit: list[str] = [""] * self.__ndim if self.__ndim > 0 else [""]
+        self.axis_scale: list[np.ndarray | None] = [None] * self.__ndim
 
         # Initialize column labels.
         self.column_label: list[str] = ncol * [""]
@@ -116,6 +116,30 @@ class DataSet:
         # Initialize empty set of attributes.
         self.attrs: dict[str, str | int | float] = {}
 
+    @property
+    def _ndim(self) -> int:
+        return self.__ndim
+
+    def _check_axis_number(self, axis: int) -> None:
+        """Check that an axis number is valid.
+
+        Parameters:
+            axis:  Axis number (0, 1, ...).
+
+        Raises:
+            TypeError:  If axis parameter is not an integer.
+            ValueError: If the axis value is not valid, e.g. larger than defined axes at dataset initialization.
+        """
+        if not isinstance(axis, int):
+            raise TypeError("Parameter 'axis' must be an integer.")
+        
+        if axis == 0:
+            # Zero axis should always be fine.
+            return None
+
+        if axis < 0 or axis >= self._ndim:
+            raise ValueError("Invalid value for parameter 'axis'.")
+
     def set_axis_label(self, axis: int, label: str) -> None:
         """Specify an axis label.
 
@@ -123,12 +147,7 @@ class DataSet:
             axis:  Axis number (0, 1, ...).
             label: Label string of the axis.
         """
-        if not isinstance(axis, int):
-            raise TypeError("Parameter 'axis' must be an integer.")
-
-        if axis < 0 or axis >= len(self.axis_label):
-            raise ValueError("Invalid value for parameter 'axis'.")
-
+        self._check_axis_number(axis)
         self.axis_label[axis] = label
 
     def set_axis_unit(self, axis: int, unit: str) -> None:
@@ -138,12 +157,7 @@ class DataSet:
             axis: Axis number (0, 1, ...).
             unit: Unit string of the axis.
         """
-        if not isinstance(axis, int):
-            raise TypeError("Parameter 'axis' must be an integer.")
-
-        if axis < 0 or axis >= len(self.axis_unit):
-            raise ValueError("Invalid value for parameter 'axis'.")
-
+        self._check_axis_number(axis)
         self.axis_unit[axis] = unit
 
     def set_axis_scale(self, axis: int, scale: np.ndarray) -> None:
@@ -153,12 +167,7 @@ class DataSet:
             axis:  Axis to which the mapping applies (the first axis has number 0).
             scale: 1D Numpy array of values along the axis. The length must match the size of the axis.
         """
-        if not isinstance(axis, int):
-            raise TypeError("Parameter 'axis' must be an integer.")
-
-        if axis < 0 or axis >= len(self.data.shape) - 1:
-            raise ValueError("Invalid value for parameter 'axis'.")
-
+        self._check_axis_number(axis)
         v = np.array(scale)
         if v.shape != (self.data.shape[axis],):
             raise ValueError("Invalid shape for scale array.")
