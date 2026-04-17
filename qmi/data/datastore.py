@@ -175,6 +175,7 @@ class DataFolder:
                 with h5py.File(file_path, "w" if overwrite else "x") as f:
                     # Add QMI version to file
                     f.attrs["QMI_version"] = qmi.__version__
+                    f.attrs["QMI_Dataset"] = 1
                     f.attrs[QMI_DATASET.format(ds_count=0)] = ds.name
                     grp = f.create_group(ds.name) if ds._ndim > 0 else f
                     qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
@@ -183,6 +184,7 @@ class DataFolder:
                 with h5netcdf.File(file_path, "w" if overwrite else "x", decode_vlen_strings=False) as f:
                     # Add QMI version to file
                     f.attrs["QMI_version"] = qmi.__version__
+                    f.attrs["QMI_Dataset"] = 1
                     f.attrs[QMI_DATASET.format(ds_count=0)] = ds.name
                     grp = f.create_group(ds.name) if ds._ndim > 0 else f
                     qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
@@ -267,6 +269,7 @@ class DataFolder:
         hdf5_file = self._hdf5_file(name, "x", backend)
         # Add QMI version to file
         hdf5_file.attrs["QMI_version"] = qmi.__version__
+        hdf5_file.attrs["QMI_Dataset"] = 1
 
         return hdf5_file
 
@@ -291,8 +294,8 @@ class DataFolder:
         ds: DataSet,
         root_attrs: dict[
             str, str | int | float | complex | str | np.ndarray | np.integer | list[
-                int | float | complex | str
-            ] | tuple[int | float | complex | str, ...]
+                int, float, complex, str
+            ] | tuple[int, float, complex, str]
         ] | None = None
     ) -> None:
         """Add a dataset, and optional file attributes to an existing HDF5 file.

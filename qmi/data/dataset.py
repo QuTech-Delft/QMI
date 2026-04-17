@@ -106,6 +106,7 @@ class DataSet:
         # Initialize axis labels.
         self.axis_label: list[str] = [""] * self.__ndim if self.__ndim > 0 else [""]
         self.axis_unit: list[str] = [""] * self.__ndim if self.__ndim > 0 else [""]
+        self.axis_name: list[str] = [""] * self.__ndim if self.__ndim > 0 else [""]
         self.axis_scale: list[np.ndarray | None] = [None] * self.__ndim
 
         # Initialize column labels.
@@ -113,8 +114,8 @@ class DataSet:
         self.column_unit: list[str] = ncol * [""]
         self.column_name: list[str] = ncol * [""]
 
-        # Initialize empty set of attributes.
-        self.attrs: dict[str, str | int | float] = {}
+        # Initialize set of attributes.
+        self.attrs: dict[str, str | int | float] = {"QMI_Dataset": 1}
 
     @property
     def _ndim(self) -> int:
@@ -159,6 +160,16 @@ class DataSet:
         """
         self._check_axis_number(axis)
         self.axis_unit[axis] = unit
+
+    def set_axis_name(self, axis: int, name: str) -> None:
+        """Specify an axis 'long' name.
+
+        Parameters:
+            axis: Axis number (0, 1, ...).
+            name: 'Long' name string of the axis.
+        """
+        self._check_axis_number(axis)
+        self.axis_name[axis] = name
 
     def set_axis_scale(self, axis: int, scale: np.ndarray) -> None:
         """Specify a mapping from array indices to physical values along an axis.
@@ -307,16 +318,19 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group | h5netcdf.Gro
     ncol = dataset.data.shape[-1] if ndim > 0 else 0
 
     # Special timestamp attribute.
-    hdf_group.attrs["QMI_DataSet_timestamp"] = dataset.timestamp
-    hdf_group.attrs["QMI_DataSet_time_str"] = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(dataset.timestamp))
+    hdf_group.attrs[f"{hdf_group.name}_timestamp"] = dataset.timestamp
+    hdf_group.attrs[f"{hdf_group.name}_time_str"] = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(dataset.timestamp))
 
     # Special attributes for axis labels / units.
     for axis in range(ndim):
         if dataset.axis_label[axis]:
-            hdf_group.attrs[f"QMI_DataSet_axis{axis}_label"] = dataset.axis_label[axis]
+            hdf_group.attrs[f"{hdf_group.name}_axis{axis}_label"] = dataset.axis_label[axis]
 
         if dataset.axis_unit[axis]:
-            hdf_group.attrs[f"QMI_DataSet_axis{axis}_unit"] = dataset.axis_unit[axis]
+            hdf_group.attrs[f"{hdf_group.name}_axis{axis}_unit"] = dataset.axis_unit[axis]
+
+        if dataset.axis_name[axis]:
+            hdf_group.attrs[f"{hdf_group.name}_axis{axis}_name"] = dataset.axis_name[axis]
 
     if not ncol:
         # We have only one single array of data.
@@ -332,6 +346,7 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group | h5netcdf.Gro
 
         ds.attrs["unit"] = dataset.axis_label[0]
         ds.attrs["name"] = dataset.axis_unit[0]
+        ds.attrs["long_name"] = dataset.axis_name[0]
 
     for col in range(ncol):
         if isinstance(hdf_group, h5py.Group):
@@ -352,15 +367,15 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group | h5netcdf.Gro
 
         # Special attributes for column labels / units.
         if dataset.column_label[col]:
-            hdf_group.attrs[f"QMI_DataSet_column{col}_label"] = dataset.column_label[col]
+            hdf_group.attrs[f"{hdf_group.name}_column{col}_label"] = dataset.column_label[col]
             ds.attrs["name"] = dataset.column_label[col]
 
         if dataset.column_unit[col]:
-            hdf_group.attrs[f"QMI_DataSet_column{col}_unit"] = dataset.column_unit[col]
+            hdf_group.attrs[f"{hdf_group.name}_column{col}_unit"] = dataset.column_unit[col]
             ds.attrs["unit"] = dataset.column_unit[col]
 
         if dataset.column_name[col]:
-            hdf_group.attrs[f"QMI_DataSet_column{col}_name"] = dataset.column_name[col]
+            hdf_group.attrs[f"{hdf_group.name}_column{col}_name"] = dataset.column_name[col]
             ds.attrs["long_name"] = dataset.column_name[col]
 
         # Dimension scales for scale axis.
@@ -377,6 +392,7 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group | h5netcdf.Gro
                     ds_scale = hdf_group.create_dataset(scale_name, data=dataset.axis_scale[axis])
                     ds_scale.attrs["unit"] = dataset.axis_unit[axis]
                     ds_scale.attrs["name"] = dataset.axis_label[axis]
+                    ds_scale.attrs["long_name"] = dataset.axis_name[axis]
                     # Attach the dimension scale to the axis.
                     ds_scale.make_scale(scale_name)
                     ds.dims[axis].attach_scale(ds_scale)
@@ -391,16 +407,14 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group | h5netcdf.Gro
                     )
                     ds_scale.attrs["unit"] = dataset.axis_unit[axis]
                     ds_scale.attrs["name"] = dataset.axis_label[axis]
+                    ds_scale.attrs["long_name"] = dataset.axis_name[axis]
 
     # Custom attributes.
     for (name, value) in dataset.attrs.items():
-        if name.startswith("QMI_DataSet") or name.startswith("DIMENSION_"):
+        if name.startswith(f"{hdf_group.name}") or name.startswith("DIMENSION_"):
             raise ValueError(f"Invalid use of special attribute name {name!r}")
 
         hdf_group.attrs[name] = value
-
-    # Special attribute to recognize format.
-    hdf_group.attrs["QMI_DataSet"] = 1
 
 
 def read_dataset_from_hdf5(
@@ -424,8 +438,8 @@ def read_dataset_from_hdf5(
         parent = container
 
     # Check that the HDF5 dataset was created by this Python module.
-    if parent.attrs.get("QMI_DataSet") != 1:
-        raise ValueError("HDF5 dataset not in expected format")
+    if source.attrs.get("QMI_DataSet", 0) != 1 and parent.attrs.get("QMI_DataSet", 0) != 1:
+        return convert_to_qmi_dataset(source)
 
     # Create DataSet instance and read actual data.
     name = source.name.split("/")[-1] if container is not None else parent.name.split("/")[-1]
@@ -433,9 +447,9 @@ def read_dataset_from_hdf5(
     ncol = 0
     column_labels: list[str] = []
     for attr in parent.attrs:
-        if attr.startswith("QMI_DataSet_axis") and attr.endswith("_label"):
+        if attr.startswith(f"{source.name}_axis") and attr.endswith("_label"):
             ndim += 1
-        if attr.startswith("QMI_DataSet_column") and attr.endswith("_label"):
+        if attr.startswith(f"{source.name}_column") and attr.endswith("_label"):
             ncol += 1
             column_labels.append(parent.attrs[attr])
 
@@ -453,17 +467,18 @@ def read_dataset_from_hdf5(
         dataset = DataSet(name=name, data=np.asarray(source))
 
     # Read timestamp.
-    dataset.timestamp = parent.attrs["QMI_DataSet_timestamp"]
+    dataset.timestamp = parent.attrs[f"{source.name}_timestamp"]
 
     # Read special attributes for labels.
     for axis in range(ndim):
-        dataset.axis_label[axis] = parent.attrs.get(f"QMI_DataSet_axis{axis}_label", "")
-        dataset.axis_unit[axis] = parent.attrs.get(f"QMI_DataSet_axis{axis}_unit", "")
+        dataset.axis_label[axis] = parent.attrs.get(f"{source.name}_axis{axis}_label", "")
+        dataset.axis_unit[axis] = parent.attrs.get(f"{source.name}_axis{axis}_unit", "")
+        dataset.axis_name[axis] = parent.attrs.get(f"{source.name}_axis{axis}_name", "")
 
     for col in range(ncol):
-        dataset.column_label[col] = parent.attrs.get(f"QMI_DataSet_column{col}_label", "")
-        dataset.column_unit[col] = parent.attrs.get(f"QMI_DataSet_column{col}_unit", "")
-        dataset.column_name[col] = parent.attrs.get(f"QMI_DataSet_column{col}_name", "")
+        dataset.column_label[col] = parent.attrs.get(f"{source.name}_column{col}_label", "")
+        dataset.column_unit[col] = parent.attrs.get(f"{source.name}_column{col}_unit", "")
+        dataset.column_name[col] = parent.attrs.get(f"{source.name}_column{col}_name", "")
 
     for axis in range(ndim):
         scale_name = dataset.axis_label[axis]
@@ -476,10 +491,124 @@ def read_dataset_from_hdf5(
 
     # Read custom attributes.
     for name, value in parent.attrs.items():
-        if not name.startswith("QMI_DataSet") and not name.startswith("DIMENSION_"):
+        if not name.startswith(f"{source.name}") and not name.startswith("DIMENSION_"):
             dataset.attrs[name] = value
 
     return dataset
+
+
+def convert_to_qmi_dataset(parent: h5py.File | h5netcdf.File | h5py.Group | h5netcdf.Group | h5py.Dataset | h5netcdf.Variable) -> DataSet:
+    """A function to convert a HDF5 dataset, or a group, or file to a QMI dataset.
+
+    If the input is a h5py.Dataset | h5netcdf.Variable,  the dataset can have one or more dimensions.
+
+    If the input is s h5py.Group | h5netcdf.Group, and the group has multiple datasets, the dataset attributes
+    are looked into if we can determine a scaled axis or column or columns, and data axis | axes. If so,
+    it will be converted into single QMI dataset with (multiple) ax[i|e]s and column[s]. Single dataset will be
+    converted as a 1D dataset
+
+    If the input is a h5py.File | h5netcdf.File, and there are no groups, the handling is the same as for the group.
+    If there is a single group present, that will be taken and handled like a group. For multiple groups,
+    and error will be thrown.
+    """
+    group: h5py.Group | h5netcdf.Group | None = None
+    axes: dict[str, h5py.Dataset | h5netcdf.Variable] = dict()
+    columns: dict[str, h5py.Dataset | h5netcdf.Variable] = dict()
+    if isinstance(parent, h5py.File | h5netcdf.File):
+        items_found = dict(parent)
+        # See if they are groups or datasets
+        for item, hdf5_obj in items_found.items():
+            if isinstance(hdf5_obj, h5py.Group | h5netcdf.Group):
+                if group is not None:
+                    raise RuntimeError("Cannot convert multiple groups from a HDF5 file.")
+                
+                group = hdf5_obj
+
+            elif isinstance(hdf5_obj, h5py.Dataset | h5netcdf.Variable):
+                label = hdf5_obj.attrs.get("label", hdf5_obj.attrs.get("name", item))
+                if (isinstance(hdf5_obj, h5py.Dataset) and not hdf5_obj.is_scale) or (
+                    isinstance(hdf5_obj, h5netcdf.Variable) and item not in hdf5_obj.dimensions
+                ):
+                    columns[label] = hdf5_obj
+                
+                else:
+                    axes[label] = hdf5_obj
+
+    elif isinstance(parent, h5py.Group | h5netcdf.Group):
+        group = parent
+
+    elif isinstance(parent, h5py.Dataset | h5netcdf.Variable):
+        axes.append(parent)
+
+    if group is not None and len(datasets):
+        raise RuntimeError("Cannot convert a group AND dataset[s] from a HDF5 file.")
+
+    elif group is not None:
+        items_found = dict(group)
+        # See if there are datasets
+        for item, hdf5_obj in items_found.items():
+            label = hdf5_obj.attrs.get("label", (hdf5_obj.attrs.get("name"), item))
+            if not hdf5_obj.is_scale:
+                columns[label] = hdf5_obj
+            
+            else:
+                axes[label] = hdf5_obj
+
+    if not len(columns) and not len(axes):
+        raise RuntimeError("No datasets found to convert from the HDF5 file.")
+
+    # Create DataSet instance and read actual data.
+    name = parent.name.split("/")[-1]
+    if not name:
+        name = parent.attrs["name"] if "name" in parent.attrs else "dataset"
+
+    if (not len(columns) and len(axes) == 1) or (not len(axes) and len(columns) == 1):
+        # We have only one dataset axis | column. Create the QMI dataset with it and return it.
+        datasets = columns + axes 
+        ds_name = datasets[0].attrs.get("long_name", datasets[0].attrs.get("name", name))
+        qmi_dataset = DataSet(name=ds_name, data=datasets[0][:])
+        qmi_dataset.axis_label[0] = datasets[0].attrs.get("label", datasets[0].attrs.get("name", name))
+        qmi_dataset.axis_unit[0] = datasets[0].attrs.get("units", datasets[0].attrs.get("unit", ""))
+        qmi_dataset.axis_name[0] = datasets[0].attrs.get("long_name", "")
+        # Read custom attributes.
+        for name, value in parent.attrs.items():
+            if not name.startswith("_") and not name.startswith("DIMENSION_"):
+                qmi_dataset.attrs[name] = value
+
+        return qmi_dataset
+
+    # Otherwise, there should be at least one "column" dataset present
+    column_arrays = [np.asarray(ds) for ds in columns.values()]
+    base_shape = column_arrays[0].shape
+    for arr in column_arrays[1:]:
+        if arr.shape != base_shape:
+            raise ValueError("Column datasets do not have matching shapes")
+        
+    # Create QMI dataset
+    data = np.stack(column_arrays, axis=-1)
+    qmi_dataset = DataSet(name=name, data=data)
+    for axis, (label, hdf5_obj) in enumerate(axes.items()):
+        qmi_dataset.set_axis_label(axis, label)
+        qmi_dataset.set_axis_unit(axis, str(hdf5_obj.attrs.get("units", hdf5_obj.attrs.get("unit", ""))))
+        qmi_dataset.set_axis_name(axis, str(hdf5_obj.attrs.get("long_name", "")))
+        hdf5_obj_values = np.asarray(hdf5_obj)
+        if (
+            np.issubdtype(hdf5_obj_values.dtype, np.number)
+            and np.all(np.isfinite(hdf5_obj_values))
+        ):
+            qmi_dataset.set_axis_scale(axis, hdf5_obj_values)
+
+    for e, label in enumerate(columns.keys()):
+        qmi_dataset.set_column_label(e, label)
+        qmi_dataset.set_column_unit(e, columns[label].attrs.get("units", columns[label].attrs.get("unit", "")))
+        qmi_dataset.set_column_name(e, columns[label].attrs.get("long_name", ""))
+
+    # Read custom attributes.
+    for name, value in parent.attrs.items():
+        if not name.startswith("_") and not name.startswith("DIMENSION_"):
+            qmi_dataset.attrs[name] = value
+
+    return qmi_dataset
 
 
 def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
