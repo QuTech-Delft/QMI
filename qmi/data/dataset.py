@@ -570,7 +570,7 @@ def convert_to_qmi_dataset(parent: h5py.File | h5netcdf.File | h5py.Group | h5ne
         # We have only one dataset axis | column. Create the QMI dataset with it and return it.
         datasets = columns | axes
         ds_name = datasets["long_name"] if "long_name" in datasets else datasets["name"]
-        qmi_dataset = DataSet(name=ds_name, data=datasets[:])
+        qmi_dataset = DataSet(name=ds_name, data=next(iter(datasets.values())))
         qmi_dataset.axis_label[0] = datasets["label"] if "label" in datasets else ""
         if not qmi_dataset.axis_label[0]:
             qmi_dataset.axis_label[0] = datasets["name"] if "name" in datasets else name

@@ -294,8 +294,8 @@ class DataFolder:
         ds: DataSet,
         root_attrs: dict[
             str, str | int | float | complex | str | np.ndarray | np.integer | list[
-                int, float, complex, str
-            ] | tuple[int, float, complex, str]
+                int | float | complex | str
+            ] | tuple[int | float | complex | str ,...]
         ] | None = None
     ) -> None:
         """Add a dataset, and optional file attributes to an existing HDF5 file.
