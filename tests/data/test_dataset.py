@@ -82,23 +82,24 @@ class TestDataSet(unittest.TestCase):
 
     def test_10_create_empty_dataset(self):
         """Create a simple, empty DataSet instance."""
-
+        # Arrange
+        expected_root_attrs = {"QMI_Dataset": 1}
         ds_name = "empty_dataset"
         ds_shape = (8, 3)
+        # Act
         ds = DataSet(ds_name, shape=ds_shape)
-
+        # Assert
         self.assertEqual(ds_name, ds.name)
         self.assertIsInstance(ds.data, np.ndarray)
         self.assertEqual(ds_shape, ds.data.shape)
         self.assertEqual(np.float64, ds.data.dtype)
         self.assertTrue(np.all(ds.data == 0))
-
         self.assertListEqual([""], ds.axis_label)
         self.assertListEqual([""], ds.axis_unit)
         self.assertListEqual([None], ds.axis_scale)
         self.assertListEqual(["", "", ""], ds.column_label)
         self.assertListEqual(["", "", ""], ds.column_unit)
-        self.assertDictEqual({}, ds.attrs)
+        self.assertDictEqual(expected_root_attrs, ds.attrs)
 
     def test_11_create_initialized_dataset(self):
         """Create a simple dataset from existing Numpy data."""
@@ -233,15 +234,17 @@ class TestDataSet(unittest.TestCase):
 
     def test_30_dataset_1col(self):
         """Create a 3-dimensional, 1-column dataset and setting labels."""
-
+        # Arrange
+        expected_root_attrs = {"QMI_Dataset": 1}
         ds_name = "my_dataset"
         ds_shape = (2, 5, 1)
         data = np.arange(10).reshape(*ds_shape)
+        # Act
         ds = DataSet(ds_name, data=data)
         ds.set_axis_label(0, "X")
         ds.set_axis_label(1, "Y")
         ds.set_column_label(0, "Z")
-
+        # Assert
         self.assertEqual(ds_name, ds.name)
         self.assertEqual(ds_shape, ds.data.shape)
         self.assertEqual(ds.axis_label, ["X", "Y"])
@@ -249,7 +252,7 @@ class TestDataSet(unittest.TestCase):
         self.assertEqual(ds.axis_scale, [None, None])
         self.assertEqual(ds.column_label, ["Z"])
         self.assertEqual(ds.column_unit, [""])
-        self.assertEqual(ds.attrs, {})
+        self.assertEqual(expected_root_attrs, ds.attrs)
 
     def test_40_write_hdf5_simple(self):
         """Writing a simple dataset as HDF5 with h5py backend."""
@@ -275,12 +278,12 @@ class TestDataSet(unittest.TestCase):
                 self.assertEqual((8,), f[ds_name][col].shape)
                 self.assertEqual(np.float64, f[ds_name][col].dtype)
                 self.assertTrue(np.all(data[:, e] == f[ds_name][col]))
-                self.assertEqual(ds.column_label[e], f[ds_name].attrs[f"QMI_DataSet_column{e}_label"])
-                self.assertEqual(ds.column_unit[e], f[ds_name].attrs[f"QMI_DataSet_column{e}_unit"],)
+                self.assertEqual(ds.column_label[e], f[ds_name].attrs[f"{ds_name}_column{e}_label"])
+                self.assertEqual(ds.column_unit[e], f[ds_name].attrs[f"{ds_name}_column{e}_unit"],)
 
             self.assertCountEqual(list(f[ds_name].keys()), ds.axis_label + ds.column_label)
-            self.assertEqual(f[ds_name].attrs["QMI_DataSet_axis0_label"], "X axis")
-            self.assertEqual(f[ds_name].attrs["QMI_DataSet_axis0_unit"], "mm")
+            self.assertEqual(f[ds_name].attrs[f"{ds_name}_axis0_label"], "X axis")
+            self.assertEqual(f[ds_name].attrs[f"{ds_name}_axis0_unit"], "mm")
 
             self.assertTrue(np.all(scale_data == np.array(f[ds_name]["X axis"])))
 
@@ -298,18 +301,20 @@ class TestDataSet(unittest.TestCase):
                     ("t2", (4, 4), np.float64),
                     ("t3", (3, 3, 3, 3), np.float64),
                     ("t4", (4, 4, 1), np.int32)]:
-                ds = _internal_create_dataset(name,
-                                            shape,
-                                            dtype,
-                                            add_labels=True,
-                                            add_scale=True,
-                                            add_attributes=True)
+                ds = _internal_create_dataset(
+                    name,
+                    shape,
+                    dtype,
+                    add_labels=True,
+                    add_scale=True,
+                    add_attributes=True
+                )
                 datasets.append(ds)
                 grp = f.create_group(name)
                 qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
 
             # Read back from file and verify.
-            for ds in datasets:
+            for d, ds in enumerate(datasets):
                 ds2 = qmi.data.dataset.read_dataset_from_hdf5(f[ds.name])
                 self.assertEqual(ds2.name, ds.name)
                 self.assertIsInstance(ds2.data, np.ndarray)
@@ -386,12 +391,12 @@ class TestDataSet(unittest.TestCase):
                 self.assertEqual((8,), f[ds_name][col].shape)
                 self.assertEqual(np.float64, f[ds_name][col].dtype)
                 self.assertTrue(np.all(data[:, e] == f[ds_name][col]))
-                self.assertEqual(ds.column_label[e], f[ds_name].attrs[f"QMI_DataSet_column{e}_label"])
-                self.assertEqual(ds.column_unit[e], f[ds_name].attrs[f"QMI_DataSet_column{e}_unit"],)
+                self.assertEqual(ds.column_label[e], f[ds_name].attrs[f"{ds_name}_column{e}_label"])
+                self.assertEqual(ds.column_unit[e], f[ds_name].attrs[f"{ds_name}_column{e}_unit"],)
 
             self.assertCountEqual(list(f[ds_name].keys()), ds.axis_label + ds.column_label)
-            self.assertEqual(f[ds_name].attrs["QMI_DataSet_axis0_label"], "X axis")
-            self.assertEqual(f[ds_name].attrs["QMI_DataSet_axis0_unit"], "mm")
+            self.assertEqual(f[ds_name].attrs[f"{ds_name}_axis0_label"], "X axis")
+            self.assertEqual(f[ds_name].attrs[f"{ds_name}_axis0_unit"], "mm")
 
             self.assertTrue(np.all(scale_data == np.array(f[ds_name]["X axis"])))
 

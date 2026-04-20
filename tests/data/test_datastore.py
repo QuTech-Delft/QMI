@@ -138,7 +138,30 @@ class TestDataFolder(unittest.TestCase):
     def test_06_read_dataset_in_hdf5(self):
         """See that we can read in a data set in HDF5 format."""
         # Arrange
-        expected_dataset = _create_dataset()
+        expected_timestamp = 1776671773.6601706
+        # expected_time_str = "2026-04-20T07:56:13"
+        with unittest.mock.patch("qmi.data.dataset.time") as time_patch:
+            time_patch.time = unittest.mock.Mock(return_value=expected_timestamp)
+            expected_dataset = _create_dataset()
+
+        # ds_name = expected_dataset.name
+        # expected_attrs = expected_dataset.attrs.copy()
+        # expected_attrs.update(
+        #     {
+        #         f"{ds_name}_axis0_label": "X",
+        #         f"{ds_name}_axis0_unit": "um",
+        #         f"{ds_name}_axis1_label": "Z",
+        #         f"{ds_name}_axis1_unit": "mm",
+        #         f"{ds_name}_column0_label": "power",
+        #         f"{ds_name}_column0_unit": "mW",
+        #         f"{ds_name}_column1_label": "countrate",
+        #         f"{ds_name}_column1_unit": "kHz",
+        #         f"{ds_name}_column2_label": "temperature",
+        #         f"{ds_name}_column2_unit": "K",
+        #         f"{ds_name}_time_str": expected_time_str,
+        #         f"{ds_name}_timestamp": expected_timestamp,
+        #     }
+        # )
         expected_file = os.path.join(os.getcwd(), expected_dataset.name + ".hdf5")
         try:
             self.datafolder.write_dataset(expected_dataset)
@@ -163,8 +186,31 @@ class TestDataFolder(unittest.TestCase):
     def test_06b_read_dataset_in_hdf5_h5netcdf_backend(self):
         """See that we can read in a data set in HDF5 format with h5netcdf backend."""
         # Arrange
-        expected_dataset = _create_dataset()
+        expected_timestamp = 1776671773.6601706
+        # expected_time_str = "2026-04-20T07:56:13"
+        with unittest.mock.patch("qmi.data.dataset.time") as time_patch:
+            time_patch.time = unittest.mock.Mock(return_value=expected_timestamp)
+            expected_dataset = _create_dataset()
+
         expected_file = os.path.join(os.getcwd(), expected_dataset.name + ".hdf5")
+        # ds_name = expected_dataset.name
+        # expected_attrs = expected_dataset.attrs.copy()
+        # expected_attrs.update(
+        #     {
+        #         f"{ds_name}_axis0_label": "X",
+        #         f"{ds_name}_axis0_unit": "um",
+        #         f"{ds_name}_axis1_label": "Z",
+        #         f"{ds_name}_axis1_unit": "mm",
+        #         f"{ds_name}_column0_label": "power",
+        #         f"{ds_name}_column0_unit": "mW",
+        #         f"{ds_name}_column1_label": "countrate",
+        #         f"{ds_name}_column1_unit": "kHz",
+        #         f"{ds_name}_column2_label": "temperature",
+        #         f"{ds_name}_column2_unit": "K",
+        #         f"{ds_name}_time_str": expected_time_str,
+        #         f"{ds_name}_timestamp": expected_timestamp,
+        #     }
+        # )
         try:
             self.datafolder.write_dataset(expected_dataset, backend="h5netcdf")
             # Act
