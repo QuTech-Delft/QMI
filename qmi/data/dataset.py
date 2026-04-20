@@ -540,9 +540,9 @@ def convert_to_qmi_dataset(parent: h5py.File | h5netcdf.File | h5py.Group | h5ne
         group = parent
 
     elif isinstance(parent, h5py.Dataset | h5netcdf.Variable):
-        axes.append(parent)
+        axes[parent.name.split("/")] = parent
 
-    if group is not None and (len(columns) or len(axes)):
+    if group is not None and (columns or axes):
         raise RuntimeError("Cannot convert a group AND dataset[s] from a HDF5 file.")
 
     elif group is not None:
@@ -558,7 +558,7 @@ def convert_to_qmi_dataset(parent: h5py.File | h5netcdf.File | h5py.Group | h5ne
             else:
                 axes[label] = hdf5_obj
 
-    if not len(columns) and not len(axes):
+    if not columns and not axes:
         raise RuntimeError("No datasets found to convert from the HDF5 file.")
 
     # Create DataSet instance and read actual data.
@@ -566,14 +566,21 @@ def convert_to_qmi_dataset(parent: h5py.File | h5netcdf.File | h5py.Group | h5ne
     if not name:
         name = parent.attrs["name"] if "name" in parent.attrs else "dataset"
 
-    if (not len(columns) and len(axes) == 1) or (not len(axes) and len(columns) == 1):
+    if (not columns and len(axes) == 1) or (not axes and len(columns) == 1):
         # We have only one dataset axis | column. Create the QMI dataset with it and return it.
-        datasets = columns + axes 
-        ds_name = datasets[0].attrs.get("long_name", datasets[0].attrs.get("name", name))
-        qmi_dataset = DataSet(name=ds_name, data=datasets[0][:])
-        qmi_dataset.axis_label[0] = datasets[0].attrs.get("label", datasets[0].attrs.get("name", name))
-        qmi_dataset.axis_unit[0] = datasets[0].attrs.get("units", datasets[0].attrs.get("unit", ""))
-        qmi_dataset.axis_name[0] = datasets[0].attrs.get("long_name", "")
+        datasets = columns | axes
+        ds_name = datasets["long_name"] if "long_name" in datasets else datasets["name"]
+        qmi_dataset = DataSet(name=ds_name, data=datasets[:])
+        qmi_dataset.axis_label[0] = datasets["label"] if "label" in datasets else ""
+        if not qmi_dataset.axis_label[0]:
+            qmi_dataset.axis_label[0] = datasets["name"] if "name" in datasets else name
+        
+        qmi_dataset.axis_unit[0] = datasets["units"] if "units" in datasets else ""
+        if not qmi_dataset.axis_unit[0]:
+            # Try alternative name
+            qmi_dataset.axis_unit[0] = datasets["unit"] if "unit" in datasets else ""
+
+        qmi_dataset.axis_name[0] = datasets["long_name"] if "long_name" in datasets else ""
         # Read custom attributes.
         for name, value in parent.attrs.items():
             if not name.startswith("_") and not name.startswith("DIMENSION_"):
