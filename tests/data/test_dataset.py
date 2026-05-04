@@ -85,7 +85,7 @@ class TestDataSet(unittest.TestCase):
         # Arrange
         expected_root_attrs = {"QMI_Dataset": 1}
         ds_name = "empty_dataset"
-        ds_shape = (8, 3)
+        ds_shape = (3, 8, 1)
         # Act
         ds = DataSet(ds_name, shape=ds_shape)
         # Assert
@@ -107,6 +107,20 @@ class TestDataSet(unittest.TestCase):
         ds_name = "my_dataset"
         ds_shape = (5, 2)
         data = np.sqrt(np.arange(10)).reshape(ds_shape[0], ds_shape[1])
+        ds = DataSet(ds_name, data=data)
+
+        self.assertEqual(ds_name, ds.name)
+        self.assertIsInstance(ds.data, np.ndarray)
+        self.assertEqual(ds_shape, ds.data.shape)
+        self.assertEqual(np.float64, ds.data.dtype)
+        self.assertTrue(np.all(ds.data == data))
+
+    def test_12_create_initialized_3d_dataset(self):
+        """Create a 3d dataset from existing Numpy data."""
+
+        ds_name = "my_3d_dataset"
+        ds_shape = (3, 5, 2)
+        data = np.sqrt(np.arange(30)).reshape(ds_shape[0], ds_shape[1], ds_shape[2])
         ds = DataSet(ds_name, data=data)
 
         self.assertEqual(ds_name, ds.name)
@@ -258,7 +272,7 @@ class TestDataSet(unittest.TestCase):
         """Writing a simple dataset as HDF5 with h5py backend."""
 
         ds_name = "my_dataset"
-        data = 1.4142 * (np.arange(24).reshape(8, 3) - 1)
+        data = 1.4142 * (np.arange(24).reshape(1, 8, 3) - 1)
         ds = DataSet(ds_name, data=data)
         ds.axis_label[0] = "X axis"
         ds.axis_unit[0] = "mm"
@@ -275,7 +289,7 @@ class TestDataSet(unittest.TestCase):
 
             self.assertListEqual([ds_name], list(f.keys()))
             for e, col in enumerate(ds.column_label):
-                self.assertEqual((8,), f[ds_name][col].shape)
+                self.assertEqual((8, 3), f[ds_name][col].shape)
                 self.assertEqual(np.float64, f[ds_name][col].dtype)
                 self.assertTrue(np.all(data[:, e] == f[ds_name][col]))
                 self.assertEqual(ds.column_label[e], f[ds_name].attrs[f"{ds_name}_column{e}_label"])

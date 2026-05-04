@@ -98,7 +98,8 @@ class DataSet:
             self.data = np.zeros(tuple(shape), dtype=dtype)
 
         # Check shape.
-        self.__ndim = len(self.data.shape) - 1
+        # self.__ndim = len(self.data.shape) - 1
+        self.__ndim = self.data.shape[0]
         ncol = self.data.shape[-1] if self.__ndim > 0 else 0
         if np.min(self.data.shape) < 1:
             raise ValueError("Zero-size or negative size axes are not allowed.")
