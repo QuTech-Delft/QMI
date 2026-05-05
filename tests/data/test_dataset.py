@@ -83,9 +83,9 @@ class TestDataSet(unittest.TestCase):
     def test_10_create_empty_dataset(self):
         """Create a simple, empty DataSet instance."""
         # Arrange
-        expected_root_attrs = {"QMI_Dataset": 1}
+        expected_root_attrs = {}
         ds_name = "empty_dataset"
-        ds_shape = (3, 8, 1)
+        ds_shape = (8, 3)
         # Act
         ds = DataSet(ds_name, shape=ds_shape)
         # Assert
@@ -249,7 +249,7 @@ class TestDataSet(unittest.TestCase):
     def test_30_dataset_1col(self):
         """Create a 3-dimensional, 1-column dataset and setting labels."""
         # Arrange
-        expected_root_attrs = {"QMI_Dataset": 1}
+        expected_root_attrs = {}
         ds_name = "my_dataset"
         ds_shape = (2, 5, 1)
         data = np.arange(10).reshape(*ds_shape)
@@ -272,7 +272,7 @@ class TestDataSet(unittest.TestCase):
         """Writing a simple dataset as HDF5 with h5py backend."""
 
         ds_name = "my_dataset"
-        data = 1.4142 * (np.arange(24).reshape(1, 8, 3) - 1)
+        data = 1.4142 * (np.arange(24).reshape(8, 3) - 1)
         ds = DataSet(ds_name, data=data)
         ds.axis_label[0] = "X axis"
         ds.axis_unit[0] = "mm"
@@ -289,7 +289,7 @@ class TestDataSet(unittest.TestCase):
 
             self.assertListEqual([ds_name], list(f.keys()))
             for e, col in enumerate(ds.column_label):
-                self.assertEqual((8, 3), f[ds_name][col].shape)
+                self.assertEqual((8,), f[ds_name][col].shape)
                 self.assertEqual(np.float64, f[ds_name][col].dtype)
                 self.assertTrue(np.all(data[:, e] == f[ds_name][col]))
                 self.assertEqual(ds.column_label[e], f[ds_name].attrs[f"{ds_name}_column{e}_label"])
@@ -363,25 +363,25 @@ class TestDataSet(unittest.TestCase):
         ds.column_unit = ["MHz", "nm", "K"]
         scale_data = 0.1 * np.arange(8)
         ds.set_axis_scale(0, scale_data)
-        ds.attrs["QMI_DataSet"] = "Hello"  # <-- Error
+        ds.attrs["QMI_Dataset"] = "Hello"  # <-- Error
         ds.attrs["number"] = 2.71
 
-        f = h5py.File("test.h5", "w", driver="core", backing_store=False)
-        with self.assertRaises(ValueError):
-            qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            with self.assertRaises(ValueError):
+                qmi.data.dataset.write_dataset_to_hdf5(ds, f)
 
-        ds2 = DataSet(ds_name, data=data)
-        ds2.axis_label[0] = "X axis"
-        ds2.axis_unit[0] = "mm"
-        ds2.column_label = ["red", "green", "blue"]
-        ds2.column_unit = ["MHz", "nm", "K"]
-        scale_data = 0.1 * np.arange(8)
-        ds2.set_axis_scale(0, scale_data)
-        ds2.attrs["DIMENSION_"] = "Hello"  # <-- Error
-        ds2.attrs["number"] = 2.71
+            ds2 = DataSet(ds_name, data=data)
+            ds2.axis_label[0] = "X axis"
+            ds2.axis_unit[0] = "mm"
+            ds2.column_label = ["red", "green", "blue"]
+            ds2.column_unit = ["MHz", "nm", "K"]
+            scale_data = 0.1 * np.arange(8)
+            ds2.set_axis_scale(0, scale_data)
+            ds2.attrs["DIMENSION_"] = "Hello"  # <-- Error
+            ds2.attrs["number"] = 2.71
 
-        with self.assertRaises(ValueError):
-            qmi.data.dataset.write_dataset_to_hdf5(ds2, f)
+            with self.assertRaises(ValueError):
+                qmi.data.dataset.write_dataset_to_hdf5(ds2, f)
 
     def test_43_write_hdf5_simple(self):
         """Writing a simple dataset as HDF5 with h5netcdf backend."""
@@ -480,12 +480,12 @@ class TestDataSet(unittest.TestCase):
         ds.column_unit = ["MHz", "nm", "K"]
         scale_data = 0.1 * np.arange(8)
         ds.set_axis_scale(0, scale_data)
-        ds.attrs["QMI_DataSet"] = "Hello"  # <-- Error
+        ds.attrs["QMI_Dataset"] = "Hello"  # <-- Error
         ds.attrs["number"] = 2.71
 
-        f = h5netcdf.File("test.h5", "w", driver="core", backing_store=False, decode_vlen_strings=False)
-        with self.assertRaises(ValueError):
-            qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+        with h5netcdf.File("test.h5", "w", driver="core", backing_store=False, decode_vlen_strings=False) as f:
+            with self.assertRaises(ValueError):
+                qmi.data.dataset.write_dataset_to_hdf5(ds, f)
 
         ds2 = DataSet(ds_name, data=data)
         ds2.axis_label[0] = "X axis"
@@ -547,12 +547,12 @@ class TestDataSet(unittest.TestCase):
         self.assertEqual(rawdata.shape, (8, 4))
         self.assertTrue(np.all(rawdata == np.column_stack([scale_data, data])))
 
-        self.assertEqual(attrs["QMI_DataSet_name"], repr(ds_name))
-        self.assertEqual(attrs["QMI_DataSet_axis0_label"], repr("X axis"))
-        self.assertEqual(attrs["QMI_DataSet_axis0_unit"], repr("mm"))
-        self.assertEqual(attrs["QMI_DataSet_column1_label"], repr("red"))
-        self.assertEqual(attrs["QMI_DataSet_column2_label"], repr("green"))
-        self.assertEqual(attrs["QMI_DataSet_column2_unit"], repr("nm"))
+        self.assertEqual(attrs["QMI_Dataset_name"], repr(ds_name))
+        self.assertEqual(attrs["QMI_Dataset_axis0_label"], repr("X axis"))
+        self.assertEqual(attrs["QMI_Dataset_axis0_unit"], repr("mm"))
+        self.assertEqual(attrs["QMI_Dataset_column1_label"], repr("red"))
+        self.assertEqual(attrs["QMI_Dataset_column2_label"], repr("green"))
+        self.assertEqual(attrs["QMI_Dataset_column2_unit"], repr("nm"))
         self.assertEqual(attrs["hello"], repr("world"))
         self.assertEqual(attrs["number"], repr(2.71))
 
@@ -603,7 +603,7 @@ class TestDataSet(unittest.TestCase):
         ds.column_unit = ["MHz", "nm", "K"]
         scale_data = 0.1 * np.arange(8)
         ds.set_axis_scale(0, scale_data)
-        ds.attrs["QMI_DataSet"] = "Hello"  # <-- Error
+        ds.attrs["QMI_Dataset"] = "Hello"  # <-- Error
         ds.attrs["number"] = 2.71
 
         with self.assertRaises(ValueError), io.StringIO() as f:

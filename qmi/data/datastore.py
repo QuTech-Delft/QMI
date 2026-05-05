@@ -1,24 +1,25 @@
 """Routines for data storage."""
 
+import json
 import os
 import os.path
 import re
+import shutil
 import time
 from typing import Any
 
-import json
 import h5netcdf
 import h5py
 import numpy as np
-import shutil
 
-from qmi.core.exceptions import QMI_UsageException
+import qmi
 import qmi.data.dataset
-from qmi.data.dataset import DataSet
 from qmi.core.config_struct import config_struct_to_dict
+from qmi.core.exceptions import QMI_UsageException
+from qmi.data.dataset import DataSet
 
-# Global string definition
-QMI_DATASET = "QMI_Dataset_{ds_count}"
+QMI_DATASET = "QMI_Dataset_name_{ds_count}"
+
 
 def _relative_folder_path(date_str: str, time_str: str, label: str) -> str:
     """Internal function to determine the relative path to a DataFolder."""
@@ -52,7 +53,6 @@ class DataFolder:
         Raises:
             FileNotFoundError: If the specified DataFolder does not exist.
         """
-
         self.folder_path = folder_path
         self.label = label
         self.date_str = date_str
@@ -94,18 +94,16 @@ class DataFolder:
             file_found = os.path.isfile(file_path)
             if mode == "x" and file_found:
                 raise IOError(f"The file {filename} already exists and not allowed to overwrite.")
-
             if mode in ["r+", "r"] and not file_found:
                 raise FileNotFoundError(f"Could not find HDF5 file with name {filename}.")
 
         if backend == "h5py":
             return h5py.File(file_path, mode=mode)
-
-        elif backend == "h5netcdf":
+        
+        if backend == "h5netcdf":
             return h5netcdf.File(file_path, mode=mode, decode_vlen_strings=False)
-
-        else:
-            raise ValueError(f"Invalid backend type {backend}")
+        
+        raise ValueError(f"Invalid backend type {backend}")
 
     def write_config(self, config: Any) -> None:
         """Write QMI configuration to a file in the data folder."""
@@ -124,9 +122,7 @@ class DataFolder:
             config_fn = "config"
 
         full_path_fn = os.path.join(self.folder_path, config_fn + ".json")
-
         config_dict = config_struct_to_dict(config)
-
         with open(full_path_fn, "w") as output:
             json.dump(config_dict, output, indent=4, sort_keys=True)
 
@@ -172,25 +168,37 @@ class DataFolder:
             filename = ds.name + ".hdf5"
             file_path = os.path.join(self.folder_path, filename)
             if backend == "h5py":
-                with h5py.File(file_path, "w" if overwrite else "x") as f:
-                    # Add QMI version to file
-                    f.attrs["QMI_version"] = qmi.__version__
-                    f.attrs["QMI_Dataset"] = 1
-                    f.attrs[QMI_DATASET.format(ds_count=0)] = ds.name
-                    grp = f.create_group(ds.name) if ds._ndim > 0 else f
-                    qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
+                f = h5py.File(file_path, "w" if overwrite else "x")
 
             elif backend == "h5netcdf":
-                with h5netcdf.File(file_path, "w" if overwrite else "x", decode_vlen_strings=False) as f:
-                    # Add QMI version to file
-                    f.attrs["QMI_version"] = qmi.__version__
-                    f.attrs["QMI_Dataset"] = 1
-                    f.attrs[QMI_DATASET.format(ds_count=0)] = ds.name
-                    grp = f.create_group(ds.name) if ds._ndim > 0 else f
-                    qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
+                f = h5netcdf.File(file_path, "w" if overwrite else "x", decode_vlen_strings=False)
 
             else:
                 raise ValueError(f"Invalid backend type {backend}.")
+
+            try:
+                ds_count = 0
+                # Check for existing datasets
+                while True:
+                    check_name = QMI_DATASET.format(ds_count=ds_count)
+                    if not check_name in f.attrs:
+                        break
+
+                    if check_name == ds.name and overwrite:
+                        break
+
+                    if check_name == ds.name and not overwrite:
+                        raise QMI_UsageException(f"Dataset {ds.name} already exists and not allowed to overwrite.")
+
+                # Add QMI version to file
+                f.attrs["QMI_version"] = qmi.__version__
+                f.attrs["QMI_Dataset"] = 1
+                f.attrs[QMI_DATASET.format(ds_count=ds_count)] = ds.name
+                target = f if ds.is_raw else f.create_group(ds.name)
+                qmi.data.dataset.write_dataset_to_hdf5(ds, target)
+
+            finally:
+                f.close()
 
         elif file_format == "text":
             filename = ds.name + ".dat"
@@ -230,8 +238,7 @@ class DataFolder:
                 return qmi.data.dataset.read_dataset_from_text(f)
 
         # Look for a HDF5 file with matching name.
-        extensions = [".hdf5", ".h5"]
-        for ext in extensions:
+        for ext in [".hdf5", ".h5"]:
             file_path = os.path.join(self.folder_path, name + ext)
             if os.path.isfile(file_path):
                 if backend == "h5py":
@@ -287,16 +294,17 @@ class DataFolder:
         """
         mode = "r+" if write_mode else "r"
         return self._hdf5_file(name, mode, backend)
-    
+
     def add_dataset_to_file(
         self,
         hdf5_file: h5py.File | h5netcdf.File,
         ds: DataSet,
         root_attrs: dict[
-            str, str | int | float | complex | str | np.ndarray | np.integer | list[
-                int | float | complex | str
-            ] | tuple[int | float | complex | str ,...]
-        ] | None = None
+            str,
+            str | int | float | complex | str | np.ndarray | np.integer | list[int | float | complex | str] | tuple[
+                int | float | complex | str, ...
+            ],
+        ] | None = None,
     ) -> None:
         """Add a dataset, and optional file attributes to an existing HDF5 file.
 
@@ -308,7 +316,7 @@ class DataFolder:
         Raises:
             QMI_UsageException: If an attribute with the dataset name already exists in the file.
         """
-        if hasattr(hdf5_file, ds.name):
+        if ds.name in hdf5_file:
             raise QMI_UsageException(f"Data file already has an attribute named {ds.name}")
 
         if isinstance(hdf5_file, h5netcdf.File):
@@ -325,9 +333,8 @@ class DataFolder:
         hdf5_file.attrs[QMI_DATASET.format(ds_count=ds_count)] = ds.name
         dataset_group = hdf5_file.create_group(ds.name)
         qmi.data.dataset.write_dataset_to_hdf5(ds, dataset_group)
-        # Add optional file root attrbutes
-        root_attrs = root_attrs or {}
-        for attr, val in root_attrs.items():
+        # Add root attributes
+        for attr, val in (root_attrs or {}).items():
             hdf5_file.attrs[attr] = val
 
 
@@ -396,18 +403,16 @@ class DataStore:
         Raises:
             FileExistsError: If the DataFolder already exists.
         """
-
         # Determine date_str and time_str.
         if (date_str is None) or (time_str is None):
             if (date_str is not None) or (time_str is not None):
                 raise ValueError("Specify both date_str and time_str or neither.")
+
             # Generate date_str and time_str from timestamp.
             if timestamp is None:
                 timestamp = time.time()
-            if self.USE_LOCAL_TIME:
-                tm = time.localtime(timestamp)
-            else:
-                tm = time.gmtime(timestamp)
+
+            tm = time.localtime(timestamp) if self.USE_LOCAL_TIME else time.gmtime(timestamp)
             date_str = time.strftime("%Y%m%d", tm)
             time_str = time.strftime("%H%M%S", tm)
 
@@ -443,7 +448,6 @@ class DataStore:
             raise FileExistsError(f"Directory {full_path!r} already exists.")
 
         os.mkdir(full_path)
-
         return DataFolder(full_path, label, date_str, time_str)
 
     def get_folder(self, label: str, date_str: str, time_str: str) -> DataFolder:
@@ -500,9 +504,7 @@ class DataStore:
         Returns:
             ret: List of matching DataFolder items.
         """
-
         ret = []
-
         date_dirs = os.listdir(self.basedir)
         date_dirs.sort()
         for dd in date_dirs:
