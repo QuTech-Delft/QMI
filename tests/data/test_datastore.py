@@ -194,24 +194,6 @@ class TestDataFolder(unittest.TestCase):
             expected_dataset = _create_dataset()
 
         expected_file = os.path.join(os.getcwd(), expected_dataset.name + ".hdf5")
-        # ds_name = expected_dataset.name
-        # expected_attrs = expected_dataset.attrs.copy()
-        # expected_attrs.update(
-        #     {
-        #         f"{ds_name}_axis0_label": "X",
-        #         f"{ds_name}_axis0_unit": "um",
-        #         f"{ds_name}_axis1_label": "Z",
-        #         f"{ds_name}_axis1_unit": "mm",
-        #         f"{ds_name}_column0_label": "power",
-        #         f"{ds_name}_column0_unit": "mW",
-        #         f"{ds_name}_column1_label": "countrate",
-        #         f"{ds_name}_column1_unit": "kHz",
-        #         f"{ds_name}_column2_label": "temperature",
-        #         f"{ds_name}_column2_unit": "K",
-        #         f"{ds_name}_time_str": expected_time_str,
-        #         f"{ds_name}_timestamp": expected_timestamp,
-        #     }
-        # )
         try:
             self.datafolder.write_dataset(expected_dataset, backend="h5netcdf")
             # Act

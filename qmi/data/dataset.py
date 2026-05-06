@@ -161,12 +161,11 @@ class DataSet:
     def is_raw(self) -> bool:
         return self.__raw_mode
 
-    def _activate_axis_mode(self, axis: int) -> None:
+    def _activate_axis_mode(self) -> None:
         """If two-dimensional data has an axis, create it here.
         
         This won't have any effect on three-dimensional data.
         """
-        # TODO: Where do we need input parameter `axis`?
         if self.data.ndim == 2 and self.__raw_mode:
             self.__raw_mode = False
             self.__axis_ndim = 1
@@ -200,7 +199,7 @@ class DataSet:
             label: Label string of the axis.
         """
         self._check_axis_number(axis)
-        self._activate_axis_mode(axis)
+        self._activate_axis_mode()
         self.axis_label[axis] = label
 
     def set_axis_unit(self, axis: int, unit: str) -> None:
@@ -211,7 +210,7 @@ class DataSet:
             unit: Unit string of the axis.
         """
         self._check_axis_number(axis)
-        self._activate_axis_mode(axis)
+        self._activate_axis_mode()
         self.axis_unit[axis] = unit
 
     def set_axis_name(self, axis: int, name: str) -> None:
@@ -222,7 +221,7 @@ class DataSet:
             name: 'Long' name string of the axis.
         """
         self._check_axis_number(axis)
-        self._activate_axis_mode(axis)
+        self._activate_axis_mode()
         self.axis_name[axis] = name
 
     def set_axis_scale(self, axis: int, scale: np.ndarray) -> None:
@@ -233,7 +232,7 @@ class DataSet:
             scale: 1D Numpy array of values along the axis. The length must match the size of the axis.
         """
         self._check_axis_number(axis)
-        self._activate_axis_mode(axis)
+        self._activate_axis_mode()
         v = np.array(scale)
         if v.shape != (self.data.shape[axis],):
             raise ValueError("Invalid shape for scale array.")
@@ -486,7 +485,7 @@ def _read_qmi_dataset(container: h5py.Group | h5netcdf.Group | h5py.File | h5net
     dataset.timestamp = float(attrs[f"{group_name}_timestamp"])
 
     if layout == "axis" and n_axes > 0 and dataset.is_raw:
-        dataset._activate_axis_mode(0)
+        dataset._activate_axis_mode()
         dataset.__axis_ndim = n_axes
         dataset.__raw_mode = False
 
@@ -817,13 +816,15 @@ def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
     if extra_columns:
         rawdata = np.column_stack(extra_columns + [rawdata])
 
+    # Write marker line.
     fh.write("# QMI_DataSet\n")
     fh.write("#\n")
-
+    # Write attributes.
     for (name, value) in attrs.items():
         fh.write(f"# {name}: {value!r}\n")
 
     fh.write("#\n")
+    # Write actual data.
     np.savetxt(fh, rawdata)
 
 
@@ -836,7 +837,7 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
     Returns:
         DataSet instance.
     """
-
+    # Check marker line.
     line = fh.readline().strip()
     if line != "# QMI_DataSet":
         raise ValueError(f"Invalid file format; expecting marker but got {line!r}")
@@ -845,12 +846,15 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
     if line != "#":
         raise ValueError(f"Invalid file format; expecting separator but got {line!r}")
 
+    # Read attributes.
     attrs = {}
     while True:
         line = fh.readline().strip()
         if line == "#":
+            # Stop at separator between attributes and data.
             break
 
+        # Read attribute.
         p = line.find(":")
         if (not line.startswith("# ")) or (p < 0):
             raise ValueError(f"Invalid file format; expecting attribute but got {line!r}")
@@ -862,35 +866,40 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
 
         attrs[name] = _parse_attribute_value(value)
 
+    # Read raw data.
     rawdata = np.loadtxt(fh, ndmin=2)
     (nrow, total_columns) = rawdata.shape
-
+    # Determine dataset name.
     dataset_name = attrs.get(QMI_DATASET_NAME)
     if not isinstance(dataset_name, str):
         raise ValueError("Missing required attribute QMI_DataSet_name")
 
+    # Determine dataset shape
     data_ndim = int(attrs[QMI_DATASET_DATA_NDIM])
     n_axes = int(attrs.get(QMI_DATASET_N_AXES, 0))
     ncol = int(attrs[QMI_DATASET_NCOL])
     shape = tuple(int(attrs[f"QMI_Dataset_dim{dim_index}_size"]) for dim_index in range(data_ndim))
-
+    # Verify data dimensions.
     if total_columns < ncol:
         raise ValueError(f"Expecting at least {ncol} columns but got {total_columns} columns")
+    
     num_special_columns = total_columns - ncol
-
     if data_ndim == 1:
         data = rawdata[:, num_special_columns]
+
     else:
         expect_rows = np.prod(shape[:-1]) if len(shape) > 1 else shape[0]
         if nrow != expect_rows:
             raise ValueError(f"Expecting {expect_rows} rows but got {nrow} rows")
+        
         data = rawdata[:, num_special_columns:].reshape(shape)
 
+    # Create dataset instance.
     dataset = DataSet(name=dataset_name, data=data)
     dataset.timestamp = float(attrs[QMI_DATASET_TIMESTAMP])
 
     if n_axes > 0 and dataset.is_raw:
-        dataset._activate_axis_mode(0)
+        dataset._activate_axis_mode()
         dataset.__axis_ndim = n_axes
         dataset.__raw_mode = False
 
@@ -924,6 +933,7 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
             inner_rows = int(np.prod(dataset.data.shape[axis+1:-1], dtype=np.int32))
             if dataset.n_axes == 1:
                 inner_rows = 1
+                
             scale = rawdata[0:n*inner_rows:inner_rows, col]
             scale_raw = np.tile(np.repeat(scale, inner_rows), outer_rows)
             if not np.all(rawdata[:, col] == scale_raw):

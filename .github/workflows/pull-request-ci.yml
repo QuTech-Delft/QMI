@@ -37,25 +37,19 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch_depth: 0
 
-      - name: Get ruff log file from Python 3.11 build
+      - name: Get ruff log file from Python 3.14 build
         uses: actions/download-artifact@v4
         with:
-          name: ruff-results-3.11
+          name: ruff-results-3.14
           path: .
 
-      - name: Get mypy log file from Python 3.11 build
+      - name: Get mypy log file from Python 3.14 build
         uses: actions/download-artifact@v4
         with:
-          name: mypy-results-3.11
+          name: mypy-results-3.14
           path: .
 
-      - name: Get coverage log file from Python 3.11 build
-        uses: actions/download-artifact@v4
-        with:
-          name: coverage-results-3.11
-          path: .
-
-      - name: Get coverage log file from Python latest build
+      - name: Get coverage log file from Python 3.14 build
         uses: actions/download-artifact@v4
         with:
           name: coverage-results-3.14

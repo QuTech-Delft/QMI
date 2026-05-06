@@ -157,9 +157,10 @@ class DataFolder:
             backend:     Select backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".`
 
         Raises:
-            ValueError: Dataset name is invalid.
-            ValueError: Invalid HDF5 file backend.
-            OSError:    If the data folder already contains a file with the same name.
+            ValueError:         Dataset name is invalid.
+            ValueError:         Invalid HDF5 file backend.
+            OSError:            If the data folder already contains a file with the same name.
+            QMI_UsageException: Dataset name already exists and overwrite not allowed.
         """
         if not re.match(r"^[-_a-zA-Z0-9(),]+$", ds.name):
             raise ValueError(f"Invalid DataSet name {ds.name!r}")
