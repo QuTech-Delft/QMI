@@ -317,6 +317,29 @@ class TestDataSet(unittest.TestCase):
         with self.assertRaises(ValueError):
             ds.set_column_name(-1, "X")
 
+    def test_34_internal_properties_and_unusual_axis_activation(self):
+        """Cover internal dimension state and axis activation list initialization."""
+        ds = DataSet("typed_dataset", shape=(4,), dtype=np.int32)
+
+        self.assertEqual(0, ds._ndim)
+        self.assertEqual(np.int32, ds.data.dtype)
+
+        with self.assertRaises(ValueError):
+            DataSet("scalar_dataset", data=np.array(1.0))
+
+        ds2 = DataSet("manual_axis_dataset", shape=(3, 2))
+        ds2.axis_label = []
+        ds2.axis_unit = []
+        ds2.axis_name = []
+        ds2.axis_scale = []
+        ds2.set_axis_label(0, "row")
+
+        self.assertFalse(ds2.is_raw)
+        self.assertListEqual(["row"], ds2.axis_label)
+        self.assertListEqual([""], ds2.axis_unit)
+        self.assertListEqual([""], ds2.axis_name)
+        self.assertListEqual([None], ds2.axis_scale)
+
     def test_40_write_hdf5_simple(self):
         """Writing a simple dataset as HDF5 with h5py backend."""
 
@@ -618,6 +641,217 @@ class TestDataSet(unittest.TestCase):
         self.assertEqual("calibration", ds.attrs["experiment"])
         self.assertTrue(np.all(ds.data == data))
 
+    def test_49_write_read_hdf5_raw_1d_dataset(self):
+        """Writing and reading a raw 1D dataset as HDF5."""
+        data = np.arange(5, dtype=np.float64)
+        ds = DataSet("raw_signal", data=data)
+        ds.set_column_label(0, "signal")
+        ds.set_column_unit(0, "V")
+        ds.set_column_name(0, "Input signal")
+
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+
+            self.assertIn("raw_signal_column0_key", f.attrs)
+            self.assertEqual("signal", f["signal"].attrs["name"])
+            self.assertEqual("V", f["signal"].attrs["unit"])
+            self.assertEqual("Input signal", f["signal"].attrs["long_name"])
+            ds2 = qmi.data.dataset.read_dataset_from_hdf5(f)
+
+        self.assertTrue(ds2.is_raw)
+        self.assertTrue(np.all(ds2.data == data))
+        self.assertListEqual(ds.column_label, ds2.column_label)
+        self.assertListEqual(ds.column_unit, ds2.column_unit)
+        self.assertListEqual(ds.column_name, ds2.column_name)
+
+    def test_49b_write_hdf5_raw_2d_dataset(self):
+        """Writing a raw 2D dataset as HDF5 creates one dataset per column."""
+        data = np.arange(12, dtype=np.float64).reshape(4, 3)
+        ds = DataSet("raw_table", data=data)
+        ds.set_column_label(0, "x")
+        ds.set_column_unit(0, "mm")
+        ds.set_column_name(0, "X position")
+        ds.set_column_label(1, "y")
+        ds.set_column_unit(1, "mm")
+        ds.set_column_name(1, "Y position")
+        ds.set_column_name(2, "Signal")
+
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+
+            self.assertCountEqual(["x", "y", "column_2"], list(f.keys()))
+            self.assertEqual("x", f["x"].attrs["name"])
+            self.assertEqual("mm", f["x"].attrs["unit"])
+            self.assertEqual("X position", f["x"].attrs["long_name"])
+            self.assertEqual("Signal", f["column_2"].attrs["long_name"])
+
+    def test_49c_write_hdf5_duplicate_axis_labels_get_unique_scale_keys(self):
+        """Duplicate axis labels are stored under unique HDF5 scale keys."""
+        data = np.arange(12, dtype=np.float64).reshape(2, 3, 2)
+        ds = DataSet("duplicate_axes", data=data)
+        ds.set_axis_label(0, "axis")
+        ds.set_axis_unit(0, "s")
+        ds.set_axis_name(0, "First axis")
+        ds.set_axis_scale(0, np.array([1.0, 2.0]))
+        ds.set_axis_label(1, "axis")
+        ds.set_axis_unit(1, "m")
+        ds.set_axis_name(1, "Second axis")
+        ds.set_axis_scale(1, np.array([3.0, 4.0, 5.0]))
+        ds.set_column_label(0, "a")
+        ds.set_column_label(1, "b")
+
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            grp = f.create_group(ds.name)
+            qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
+
+            self.assertIn("axis", grp)
+            self.assertIn("axis_1", grp)
+            self.assertEqual("First axis", grp["axis"].attrs["long_name"])
+            self.assertEqual("Second axis", grp["axis_1"].attrs["long_name"])
+            self.assertEqual("axis_1", grp.attrs["duplicate_axes_axis1_key"])
+
+    def test_49d_read_hdf5_rejects_mismatched_column_shapes(self):
+        """Reading QMI HDF5 metadata rejects columns with mismatched shapes."""
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            f.attrs["QMI_Dataset"] = 1
+            f.attrs["QMI_Dataset_name"] = "bad_columns"
+            f.attrs["QMI_Dataset_layout"] = "raw"
+            f.attrs["bad_columns_timestamp"] = 1.0
+            f.attrs["bad_columns_data_ndim"] = 2
+            f.attrs["bad_columns_n_axes"] = 0
+            f.attrs["bad_columns_ncol"] = 2
+            f.attrs["bad_columns_dim0_size"] = 2
+            f.attrs["bad_columns_dim1_size"] = 2
+            f.attrs["bad_columns_column0_key"] = "a"
+            f.attrs["bad_columns_column1_key"] = "b"
+            f.create_dataset("a", data=np.arange(2))
+            f.create_dataset("b", data=np.arange(3))
+
+            with self.assertRaises(ValueError) as exc:
+                qmi.data.dataset.read_dataset_from_hdf5(f)
+
+        self.assertIn("matching shapes", str(exc.exception))
+
+    def test_49e_read_hdf5_rejects_invalid_axis_scale_shape(self):
+        """Reading QMI HDF5 metadata rejects invalid axis scale shapes."""
+        ds = DataSet("bad_scale", data=np.arange(6, dtype=np.float64).reshape(3, 2))
+        ds.set_axis_label(0, "time")
+        ds.set_column_label(0, "a")
+        ds.set_column_label(1, "b")
+
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+            f.attrs["bad_scale_axis0_key"] = "bad_time"
+            f.create_dataset("bad_time", data=np.arange(2))
+
+            with self.assertRaises(ValueError) as exc:
+                qmi.data.dataset.read_dataset_from_hdf5(f)
+
+        self.assertIn("Invalid shape of dimension scale", str(exc.exception))
+
+    def test_49f_convert_plain_hdf5_group_with_axes_and_columns(self):
+        """Convert a plain HDF5 group with dimension scales and columns."""
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            grp = f.create_group("plain_group")
+            x = grp.create_dataset("x", data=np.array([0.0, 0.5]))
+            x.attrs["name"] = "x"
+            x.attrs["unit"] = "mm"
+            x.attrs["long_name"] = "X position"
+            x.make_scale("x")
+            y = grp.create_dataset("y", data=np.array([1.0, 2.0, 3.0]))
+            y.attrs["name"] = "y"
+            y.attrs["units"] = "s"
+            y.attrs["long_name"] = "Y delay"
+            y.make_scale("y")
+            signal = grp.create_dataset("signal", data=np.arange(6, dtype=np.float64).reshape(2, 3))
+            signal.attrs["name"] = "counts"
+            signal.attrs["unit"] = "Hz"
+            signal.attrs["long_name"] = "Photon counts"
+            background = grp.create_dataset("background", data=np.ones((2, 3)))
+            background.attrs["label"] = "bg"
+            grp.attrs["experiment"] = "scan"
+
+            ds = qmi.data.dataset.convert_to_qmi_dataset(grp)
+
+        self.assertEqual("plain_group", ds.name)
+        self.assertFalse(ds.is_raw)
+        self.assertListEqual(["x", "y"], ds.axis_label)
+        self.assertListEqual(["mm", "s"], ds.axis_unit)
+        self.assertListEqual(["X position", "Y delay"], ds.axis_name)
+        self.assertTrue(np.all(ds.axis_scale[0] == np.array([0.0, 0.5])))
+        self.assertCountEqual(["counts", "bg"], ds.column_label)
+        counts_index = ds.column_label.index("counts")
+        self.assertEqual("Hz", ds.column_unit[counts_index])
+        self.assertEqual("Photon counts", ds.column_name[counts_index])
+        self.assertEqual("scan", ds.attrs["experiment"])
+        self.assertEqual((2, 3, 2), ds.data.shape)
+
+    def test_49g_convert_plain_hdf5_file_with_single_group(self):
+        """Convert a plain HDF5 file containing one group."""
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            grp = f.create_group("single")
+            grp.create_dataset("signal", data=np.array([1.0, 2.0]))
+
+            ds = qmi.data.dataset.convert_to_qmi_dataset(f)
+
+        self.assertEqual("single", ds.name)
+        self.assertListEqual(["signal"], ds.column_label)
+        self.assertTrue(np.all(ds.data == np.array([1.0, 2.0])))
+
+    def test_49h_convert_plain_hdf5_file_with_root_datasets(self):
+        """Convert a plain HDF5 file with root datasets and a root name attribute."""
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            f.attrs["name"] = "root_dataset"
+            f.create_dataset("signal", data=np.array([1.0, 2.0]))
+
+            ds = qmi.data.dataset.convert_to_qmi_dataset(f)
+
+        self.assertEqual("root_dataset", ds.name)
+        self.assertListEqual(["signal"], ds.column_label)
+
+    def test_49i_convert_plain_hdf5_axis_only_group(self):
+        """Convert a plain HDF5 group that only contains an axis scale dataset."""
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            grp = f.create_group("axis_only")
+            axis = grp.create_dataset("time", data=np.array([1.0, 2.0, 3.0]))
+            axis.attrs["name"] = "time"
+            axis.attrs["unit"] = "s"
+            axis.attrs["long_name"] = "Elapsed time"
+            axis.make_scale("time")
+
+            ds = qmi.data.dataset.convert_to_qmi_dataset(grp)
+
+        self.assertTrue(ds.is_raw)
+        self.assertListEqual(["time"], ds.column_label)
+        self.assertListEqual(["s"], ds.column_unit)
+        self.assertListEqual(["Elapsed time"], ds.column_name)
+        self.assertTrue(np.all(ds.data == np.array([1.0, 2.0, 3.0])))
+
+    def test_49j_convert_plain_hdf5_group_error_cases(self):
+        """Converting plain HDF5 groups rejects ambiguous or invalid inputs."""
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            f.create_group("one")
+            f.create_group("two")
+            with self.assertRaises(RuntimeError):
+                qmi.data.dataset.convert_to_qmi_dataset(f)
+
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            grp = f.create_group("nested")
+            grp.create_group("inner")
+            with self.assertRaises(RuntimeError):
+                qmi.data.dataset.convert_to_qmi_dataset(grp)
+
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            with self.assertRaises(RuntimeError):
+                qmi.data.dataset.convert_to_qmi_dataset(f)
+
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            grp = f.create_group("mismatch")
+            grp.create_dataset("a", data=np.arange(2))
+            grp.create_dataset("b", data=np.arange(3))
+            with self.assertRaises(ValueError):
+                qmi.data.dataset.convert_to_qmi_dataset(grp)
+
     def test_50_write_text_simple(self):
         """Writing a simple dataset as text."""
         ds_name = "my_dataset"
@@ -811,6 +1045,114 @@ class TestDataSet(unittest.TestCase):
 
         self.assertIn("expecting marker", str(exc.exception))
 
+    def test_61b_parse_attribute_value_edge_cases(self):
+        """Parsing text attributes handles booleans, octal escapes and invalid syntax."""
+        self.assertTrue(qmi.data.dataset._parse_attribute_value("True"))
+        self.assertFalse(qmi.data.dataset._parse_attribute_value("False"))
+        self.assertEqual("S", qmi.data.dataset._parse_attribute_value("'\\123'"))
+
+        for invalid_value in ["x'abc'", "'abc", "'a'b'"]:
+            with self.assertRaises(ValueError):
+                qmi.data.dataset._parse_attribute_value(invalid_value)
+
+    def test_61c_read_text_rejects_invalid_separator(self):
+        """Reading text data rejects an invalid separator after the marker."""
+        with self.assertRaises(ValueError) as exc, io.StringIO("# QMI_DataSet\n# not empty\n") as f:
+            qmi.data.dataset.read_dataset_from_text(f)
+
+        self.assertIn("expecting separator", str(exc.exception))
+
+    def test_61d_read_text_rejects_invalid_attribute_lines(self):
+        """Reading text data rejects malformed attribute lines."""
+        texts = [
+            "# QMI_DataSet\n#\nnot an attribute\n",
+            "# QMI_DataSet\n#\n# : 1\n",
+        ]
+        for text in texts:
+            with self.assertRaises(ValueError), io.StringIO(text) as f:
+                qmi.data.dataset.read_dataset_from_text(f)
+
+    def test_61e_read_text_rejects_missing_dataset_name(self):
+        """Reading text data rejects files without a string dataset name."""
+        text = "\n".join([
+            "# QMI_DataSet",
+            "#",
+            "# QMI_Dataset_name: 123",
+            "# QMI_Dataset_timestamp: 1.0",
+            "# QMI_Dataset_data_ndim: 1",
+            "# QMI_Dataset_ncol: 1",
+            "# QMI_Dataset_dim0_size: 1",
+            "#",
+            "1.0",
+        ])
+
+        with self.assertRaises(ValueError) as exc, io.StringIO(text) as f:
+            qmi.data.dataset.read_dataset_from_text(f)
+
+        self.assertIn("Missing required attribute", str(exc.exception))
+
+    def test_61f_read_text_rejects_too_few_columns(self):
+        """Reading text data rejects files with fewer data columns than metadata declares."""
+        text = "\n".join([
+            "# QMI_DataSet",
+            "#",
+            "# QMI_Dataset_name: 'few_columns'",
+            "# QMI_Dataset_timestamp: 1.0",
+            "# QMI_Dataset_data_ndim: 1",
+            "# QMI_Dataset_ncol: 2",
+            "# QMI_Dataset_dim0_size: 1",
+            "#",
+            "1.0",
+        ])
+
+        with self.assertRaises(ValueError) as exc, io.StringIO(text) as f:
+            qmi.data.dataset.read_dataset_from_text(f)
+
+        self.assertIn("Expecting at least 2 columns", str(exc.exception))
+
+    def test_61g_read_text_rejects_wrong_number_of_rows(self):
+        """Reading text data rejects files with the wrong number of rows."""
+        text = "\n".join([
+            "# QMI_DataSet",
+            "#",
+            "# QMI_Dataset_name: 'wrong_rows'",
+            "# QMI_Dataset_timestamp: 1.0",
+            "# QMI_Dataset_data_ndim: 2",
+            "# QMI_Dataset_ncol: 1",
+            "# QMI_Dataset_dim0_size: 3",
+            "# QMI_Dataset_dim1_size: 1",
+            "#",
+            "1.0",
+            "2.0",
+        ])
+
+        with self.assertRaises(ValueError) as exc, io.StringIO(text) as f:
+            qmi.data.dataset.read_dataset_from_text(f)
+
+        self.assertIn("Expecting 3 rows", str(exc.exception))
+
+    def test_61h_read_text_rejects_missing_special_column_label(self):
+        """Reading text data rejects special columns without a label."""
+        text = "\n".join([
+            "# QMI_DataSet",
+            "#",
+            "# QMI_Dataset_name: 'missing_special_label'",
+            "# QMI_Dataset_timestamp: 1.0",
+            "# QMI_Dataset_data_ndim: 2",
+            "# QMI_Dataset_n_axes: 1",
+            "# QMI_Dataset_ncol: 1",
+            "# QMI_Dataset_dim0_size: 2",
+            "# QMI_Dataset_dim1_size: 1",
+            "#",
+            "0.0 1.0",
+            "1.0 2.0",
+        ])
+
+        with self.assertRaises(ValueError) as exc, io.StringIO(text) as f:
+            qmi.data.dataset.read_dataset_from_text(f)
+
+        self.assertIn("Missing label for special column", str(exc.exception))
+
     def test_62_read_text_rejects_inconsistent_axis_index_data(self):
         """Reading text data rejects inconsistent special axis index columns."""
         ds = DataSet("indexed_dataset", data=np.arange(12, dtype=np.float64).reshape(2, 3, 2))
@@ -832,6 +1174,33 @@ class TestDataSet(unittest.TestCase):
             qmi.data.dataset.read_dataset_from_text(f)
 
         self.assertIn("Inconsistent index data", str(exc.exception))
+
+    def test_63_read_text_rejects_inconsistent_axis_scale_data(self):
+        """Reading text data rejects inconsistent special axis scale columns."""
+        ds = DataSet("scaled_dataset", data=np.arange(6, dtype=np.float64).reshape(2, 3, 1))
+        ds.set_axis_label(0, "x")
+        ds.set_axis_label(1, "y")
+        ds.set_axis_scale(0, np.array([1.0, 2.0]))
+
+        with io.StringIO() as f:
+            qmi.data.dataset.write_dataset_to_text(ds, f)
+            lines = f.getvalue().splitlines()
+
+        data_line_count = 0
+        for line_index, line in enumerate(lines):
+            if line and not line.startswith("#"):
+                data_line_count += 1
+                if data_line_count == 1:
+                    continue
+                words = line.split()
+                words[2] = "99"
+                lines[line_index] = " ".join(words)
+                break
+
+        with self.assertRaises(ValueError) as exc, io.StringIO("\n".join(lines)) as f:
+            qmi.data.dataset.read_dataset_from_text(f)
+
+        self.assertIn("Inconsistent scale data", str(exc.exception))
 
 
 if __name__ == "__main__":

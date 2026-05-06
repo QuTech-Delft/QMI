@@ -468,6 +468,107 @@ class TestDataFolder(unittest.TestCase):
         finally:
             os.remove(expected_file)
 
+    def test_20_repr(self):
+        """DataFolder repr includes its folder path."""
+        self.assertEqual("DataFolder({!r})".format(os.getcwd()), repr(self.datafolder))
+
+    def test_21_create_config_json_file_with_full_name(self):
+        """Create a JSON file with label, date and time in the file name."""
+        datafolder = DataFolder(os.getcwd(), "test", "20200102", "030405")
+        expected_file = os.path.join(os.getcwd(), "test-20200102-030405.json")
+        try:
+            datafolder.write_config(CfgLogging())
+            self.assertTrue(os.path.isfile(expected_file))
+
+        finally:
+            os.remove(expected_file)
+
+    def test_22_write_dataset_invalid_name_raises_exception(self):
+        """Writing a dataset with an invalid name raises an exception."""
+        dataset = _create_dataset()
+        dataset.name = "wrong name"
+
+        with self.assertRaises(ValueError):
+            self.datafolder.write_dataset(dataset)
+
+    def test_23_write_dataset_invalid_backend_raises_exception(self):
+        """Writing a HDF5 dataset with an invalid backend raises an exception."""
+        dataset = _create_dataset()
+
+        with self.assertRaises(ValueError):
+            self.datafolder.write_dataset(dataset, backend="boh")
+
+    def test_24_read_hdf5_file_without_named_dataset_raises_exception(self):
+        """Reading HDF5 files rejects files that do not contain the named dataset."""
+        name = "missing_in_file"
+        expected_file = os.path.join(os.getcwd(), name + ".hdf5")
+        try:
+            with File(expected_file, "x") as hdf5_file:
+                hdf5_file.create_group("other")
+
+            with self.assertRaises(FileNotFoundError):
+                self.datafolder.read_dataset(name)
+
+        finally:
+            os.remove(expected_file)
+
+    def test_25_read_hdf5_file_without_named_dataset_h5netcdf_raises_exception(self):
+        """Reading h5netcdf files rejects files that do not contain the named dataset."""
+        name = "missing_in_netcdf_file"
+        expected_file = os.path.join(os.getcwd(), name + ".hdf5")
+        try:
+            with NetCdfFile(expected_file, "x", decode_vlen_strings=False) as hdf5_file:
+                hdf5_file.create_group("other")
+
+            with self.assertRaises(FileNotFoundError):
+                self.datafolder.read_dataset(name, backend="h5netcdf")
+
+        finally:
+            os.remove(expected_file)
+
+    def test_26_read_dataset_invalid_backend_raises_exception(self):
+        """Reading an existing HDF5 dataset with an invalid backend raises an exception."""
+        dataset = _create_dataset()
+        expected_file = os.path.join(os.getcwd(), dataset.name + ".hdf5")
+        try:
+            self.datafolder.write_dataset(dataset)
+
+            with self.assertRaises(ValueError):
+                self.datafolder.read_dataset(dataset.name, backend="boh")
+
+        finally:
+            os.remove(expected_file)
+
+    def test_27_add_dataset_to_file_duplicate_name_raises_exception(self):
+        """Adding a dataset to a file fails if a matching group already exists."""
+        name = "duplicate_add" + ".hdf5"
+        expected_file = os.path.join(os.getcwd(), name)
+        dataset = _create_dataset()
+        try:
+            with self.datafolder.make_hdf5file(name) as hdf5_file:
+                hdf5_file.create_group(dataset.name)
+
+                with self.assertRaises(qmi.core.exceptions.QMI_UsageException):
+                    self.datafolder.add_dataset_to_file(hdf5_file, dataset)
+
+        finally:
+            os.remove(expected_file)
+
+    def test_28_add_dataset_to_file_uses_next_dataset_counter(self):
+        """Adding a dataset uses the next free QMI dataset counter attribute."""
+        name = "counter_add" + ".hdf5"
+        expected_file = os.path.join(os.getcwd(), name)
+        dataset = _create_dataset()
+        try:
+            with self.datafolder.make_hdf5file(name) as hdf5_file:
+                hdf5_file.attrs["QMI_Dataset_name_0"] = "existing"
+                self.datafolder.add_dataset_to_file(hdf5_file, dataset)
+
+                self.assertEqual(dataset.name, hdf5_file.attrs["QMI_Dataset_name_1"])
+
+        finally:
+            os.remove(expected_file)
+
 
 class TestDataFolderNoLabel(unittest.TestCase):
 
@@ -862,6 +963,84 @@ class TestDataStore(unittest.TestCase):
     def test_18_find_latest_folder_returns_none_without_match(self):
         """Finding the latest folder returns None if no matching folder exists."""
         self.assertIsNone(self.datastore.find_latest_folder("missing_label"))
+
+    def test_19_repr(self):
+        """DataStore repr includes its base directory."""
+        self.assertEqual("DataStore({!r})".format(os.getcwd()), repr(self.datastore))
+
+    def test_20_create_datastore_with_missing_base_directory_raises_exception(self):
+        """Creating a datastore fails if the base directory does not exist."""
+        missing_basedir = os.path.join(os.getcwd(), "missing_datastore_base")
+
+        with self.assertRaises(FileNotFoundError):
+            DataStore(missing_basedir)
+
+    def test_21_make_folder_with_timestamp_and_date_time_raises_exception(self):
+        """Making a folder rejects timestamp together with date and time strings."""
+        with self.assertRaises(ValueError):
+            self.datastore.make_folder("temp", timestamp=1.0, date_str="20200102", time_str="030405")
+
+    def test_22_make_folder_uses_utc_when_local_time_is_disabled(self):
+        """Make a datastore folder using UTC time when configured."""
+        name = "utc"
+        timestamp = 0.0
+        date_str = "19700101"
+        time_str = "000000"
+        expected_folder = os.path.join(os.getcwd(), date_str, "{}_{}".format(time_str, name))
+        old_use_local_time = DataStore.USE_LOCAL_TIME
+        DataStore.USE_LOCAL_TIME = False
+        try:
+            datafolder = self.datastore.make_folder(name, timestamp=timestamp)
+
+            self.assertEqual(type(datafolder), DataFolder)
+            self.assertTrue(os.path.isdir(expected_folder))
+
+        finally:
+            DataStore.USE_LOCAL_TIME = old_use_local_time
+            os.removedirs(expected_folder)
+
+    def test_23_get_folder_from_path_relative_to_base_directory(self):
+        """Get a folder from a relative path that is resolved against the datastore base directory."""
+        base_dir = os.path.join(os.getcwd(), "tmp_datastore_base")
+        name = "temp"
+        date_str = "20200104"
+        time_str = "050607"
+        relative_path = os.path.join(date_str, "{}_{}".format(time_str, name))
+        expected_folder = os.path.join(base_dir, relative_path)
+        os.mkdir(base_dir)
+        datastore = DataStore(base_dir)
+        try:
+            datastore.make_folder(name, date_str=date_str, time_str=time_str)
+
+            datafolder = datastore.get_folder_from_path(relative_path)
+
+            self.assertEqual(os.path.abspath(expected_folder), os.path.abspath(datafolder.folder_path))
+
+        finally:
+            os.removedirs(expected_folder)
+
+    def test_24_list_folders_ignores_non_matching_entries(self):
+        """Listing folders ignores non-date directories, files and malformed folder names."""
+        date_str = "20200105"
+        name = "wanted"
+        time_str = "060708"
+        day_folder = os.path.join(os.getcwd(), date_str)
+        wanted_folder = os.path.join(day_folder, "{}_{}".format(time_str, name))
+        malformed_folder = os.path.join(day_folder, "not_a_measurement")
+        non_date_folder = os.path.join(os.getcwd(), "notadate")
+        self.datastore.make_folder(name, date_str=date_str, time_str=time_str)
+        os.mkdir(malformed_folder)
+        os.mkdir(non_date_folder)
+        try:
+            data_folders = self.datastore.list_folders(name)
+
+            self.assertEqual(1, len(data_folders))
+            self.assertEqual(wanted_folder, data_folders[0].folder_path)
+
+        finally:
+            os.rmdir(malformed_folder)
+            os.rmdir(non_date_folder)
+            os.removedirs(wanted_folder)
 
 
 if __name__ == "__main__":
