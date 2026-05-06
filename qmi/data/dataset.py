@@ -487,8 +487,8 @@ def _read_qmi_dataset(container: h5py.Group | h5netcdf.Group | h5py.File | h5net
 
     if layout == "axis" and n_axes > 0 and dataset.is_raw:
         dataset._activate_axis_mode(0)
-        dataset._DataSet__axis_ndim = n_axes
-        dataset._DataSet__raw_mode = False
+        dataset.__axis_ndim = n_axes
+        dataset.__raw_mode = False
 
     for axis in range(n_axes):
         dataset.axis_label[axis] = str(attrs.get(f"{group_name}_axis{axis}_label", ""))
@@ -891,8 +891,8 @@ def read_dataset_from_text(fh: TextIO) -> DataSet:
 
     if n_axes > 0 and dataset.is_raw:
         dataset._activate_axis_mode(0)
-        dataset._DataSet__axis_ndim = n_axes
-        dataset._DataSet__raw_mode = False
+        dataset.__axis_ndim = n_axes
+        dataset.__raw_mode = False
 
     for axis in range(n_axes):
         dataset.axis_label[axis] = str(attrs.get(f"QMI_Dataset_axis{axis}_label", ""))

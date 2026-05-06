@@ -268,6 +268,55 @@ class TestDataSet(unittest.TestCase):
         self.assertEqual(ds.column_unit, [""])
         self.assertEqual(expected_root_attrs, ds.attrs)
 
+    def test_31_create_raw_1d_dataset(self):
+        """Create a 1-dimensional raw dataset."""
+        # Arrange
+        ds_name = "raw_trace"
+        data = np.arange(5, dtype=np.int16)
+        # Act
+        ds = DataSet(ds_name, data=data)
+        ds.set_column_label(0, "signal")
+        ds.set_column_unit(0, "V")
+        ds.set_column_name(0, "Measured signal")
+        # Assert
+        self.assertEqual(ds_name, ds.name)
+        self.assertTrue(ds.is_raw)
+        self.assertEqual(0, ds.n_axes)
+        self.assertEqual(1, ds.ncol)
+        self.assertListEqual([], ds.axis_label)
+        self.assertListEqual(["signal"], ds.column_label)
+        self.assertListEqual(["V"], ds.column_unit)
+        self.assertListEqual(["Measured signal"], ds.column_name)
+        self.assertTrue(np.all(ds.data == data))
+
+    def test_32_axis_mode_is_activated_for_2d_axis_metadata(self):
+        """Setting 2D axis metadata changes a raw tabular dataset into an axis dataset."""
+        # Arrange
+        ds = DataSet("axis_trace", shape=(4, 2))
+        axis_scale = 0.5 * np.arange(4)
+        # Act
+        ds.set_axis_label(0, "time")
+        ds.set_axis_unit(0, "s")
+        ds.set_axis_name(0, "Elapsed time")
+        ds.set_axis_scale(0, axis_scale)
+        # Assert
+        self.assertFalse(ds.is_raw)
+        self.assertEqual(1, ds.n_axes)
+        self.assertListEqual(["time"], ds.axis_label)
+        self.assertListEqual(["s"], ds.axis_unit)
+        self.assertListEqual(["Elapsed time"], ds.axis_name)
+        self.assertTrue(np.all(ds.axis_scale[0] == axis_scale))
+
+    def test_33_invalid_column_name(self):
+        """Setting invalid column names raises exception."""
+        ds = DataSet("my_dataset", shape=(2, 8, 3))
+
+        with self.assertRaises(TypeError):
+            ds.set_column_name("0", "X")
+
+        with self.assertRaises(ValueError):
+            ds.set_column_name(-1, "X")
+
     def test_40_write_hdf5_simple(self):
         """Writing a simple dataset as HDF5 with h5py backend."""
 
@@ -500,6 +549,75 @@ class TestDataSet(unittest.TestCase):
         with self.assertRaises(ValueError):
             qmi.data.dataset.write_dataset_to_hdf5(ds2, f)
 
+    def test_46_write_read_hdf5_axis_and_column_names(self):
+        """Writing and reading long axis and column names as HDF5."""
+        ds_name = "named_dataset"
+        data = np.arange(12, dtype=np.float64).reshape(3, 2, 2)
+        ds = DataSet(ds_name, data=data)
+        ds.set_axis_label(0, "x")
+        ds.set_axis_unit(0, "mm")
+        ds.set_axis_name(0, "Sample x position")
+        ds.set_axis_label(1, "y")
+        ds.set_axis_unit(1, "mm")
+        ds.set_axis_name(1, "Sample y position")
+        ds.set_column_label(0, "red")
+        ds.set_column_unit(0, "counts")
+        ds.set_column_name(0, "Red detector counts")
+        ds.set_column_label(1, "blue")
+        ds.set_column_unit(1, "counts")
+        ds.set_column_name(1, "Blue detector counts")
+
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            grp = f.create_group(ds.name)
+            qmi.data.dataset.write_dataset_to_hdf5(ds, grp)
+
+            ds2 = qmi.data.dataset.read_dataset_from_hdf5(f[ds.name])
+
+        self.assertListEqual(ds.axis_name, ds2.axis_name)
+        self.assertListEqual(ds.column_name, ds2.column_name)
+        self.assertListEqual(ds.axis_label, ds2.axis_label)
+        self.assertListEqual(ds.column_label, ds2.column_label)
+        self.assertTrue(np.all(ds2.data == ds.data))
+
+    def test_47_write_hdf5_duplicate_column_labels_get_unique_keys(self):
+        """Duplicate column labels are stored under unique HDF5 keys."""
+        ds_name = "duplicate_columns"
+        data = np.arange(12, dtype=np.float64).reshape(4, 3)
+        ds = DataSet(ds_name, data=data)
+        ds.set_column_label(0, "signal")
+        ds.set_column_label(1, "signal")
+        ds.set_column_label(2, "signal")
+
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+
+            self.assertCountEqual(["signal", "signal_1", "signal_2"], list(f.keys()))
+            ds2 = qmi.data.dataset.read_dataset_from_hdf5(f)
+
+        self.assertListEqual(ds.column_label, ds2.column_label)
+        self.assertTrue(np.all(ds2.data == ds.data))
+
+    def test_48_convert_plain_hdf5_dataset_to_qmi_dataset(self):
+        """Convert a plain HDF5 dataset with common metadata attributes."""
+        data = np.array([1.0, 2.5, 4.0])
+
+        with h5py.File("test.h5", "w", driver="core", backing_store=False) as f:
+            hdf_ds = f.create_dataset("trace", data=data)
+            hdf_ds.attrs["name"] = "Signal"
+            hdf_ds.attrs["unit"] = "V"
+            hdf_ds.attrs["long_name"] = "Input signal"
+            hdf_ds.attrs["experiment"] = "calibration"
+
+            ds = qmi.data.dataset.read_dataset_from_hdf5(hdf_ds)
+
+        self.assertEqual("trace", ds.name)
+        self.assertTrue(ds.is_raw)
+        self.assertListEqual(["Signal"], ds.column_label)
+        self.assertListEqual(["V"], ds.column_unit)
+        self.assertListEqual(["Input signal"], ds.column_name)
+        self.assertEqual("calibration", ds.attrs["experiment"])
+        self.assertTrue(np.all(ds.data == data))
+
     def test_50_write_text_simple(self):
         """Writing a simple dataset as text."""
         ds_name = "my_dataset"
@@ -685,6 +803,35 @@ class TestDataSet(unittest.TestCase):
                 self.assertTrue(np.isnan(w))
             else:
                 self.assertEqual(w, v)
+
+    def test_61_read_text_rejects_invalid_marker(self):
+        """Reading text data rejects files without a QMI dataset marker."""
+        with self.assertRaises(ValueError) as exc, io.StringIO("# Not_QMI_DataSet\n#\n") as f:
+            qmi.data.dataset.read_dataset_from_text(f)
+
+        self.assertIn("expecting marker", str(exc.exception))
+
+    def test_62_read_text_rejects_inconsistent_axis_index_data(self):
+        """Reading text data rejects inconsistent special axis index columns."""
+        ds = DataSet("indexed_dataset", data=np.arange(12, dtype=np.float64).reshape(2, 3, 2))
+        ds.set_axis_label(0, "x")
+        ds.set_axis_label(1, "y")
+
+        with io.StringIO() as f:
+            qmi.data.dataset.write_dataset_to_text(ds, f)
+            lines = f.getvalue().splitlines()
+
+        for line_index, line in enumerate(lines):
+            if line and not line.startswith("#"):
+                words = line.split()
+                words[0] = "99"
+                lines[line_index] = " ".join(words)
+                break
+
+        with self.assertRaises(ValueError) as exc, io.StringIO("\n".join(lines)) as f:
+            qmi.data.dataset.read_dataset_from_text(f)
+
+        self.assertIn("Inconsistent index data", str(exc.exception))
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 """Test datastore module."""
 
 import unittest
+import unittest.mock
 
 import os
 import inspect
@@ -424,6 +425,67 @@ class TestDataFolder(unittest.TestCase):
         finally:
             os.remove(expected_file)
 
+    def test_15_make_hdf5_file_wrong_extension_raises_exception(self):
+        """Making a HDF5 file fails with an unsupported file extension."""
+        with self.assertRaises(qmi.core.exceptions.QMI_UsageException):
+            self.datafolder.make_hdf5file("wrong_extension.txt")
+
+    def test_16_make_hdf5_file_invalid_backend_raises_exception(self):
+        """Making a HDF5 file fails with an unsupported backend."""
+        with self.assertRaises(ValueError):
+            self.datafolder.make_hdf5file("invalid_backend.hdf5", backend="boh")
+
+    def test_17_open_hdf5_file_in_write_mode(self):
+        """Open an existing hdf5 file in read/write mode."""
+        # Arrange
+        name = "write_mode" + ".hdf5"
+        expected_file = os.path.join(os.getcwd(), name)
+        # Act and Assert
+        try:
+            with self.datafolder.make_hdf5file(name):
+                self.assertTrue(os.path.isfile(expected_file))
+
+            with self.datafolder.open_hdf5file(name, write_mode=True) as hdf5_file:
+                hdf5_file.attrs["extra"] = "value"
+
+            with self.datafolder.open_hdf5file(name) as hdf5_file:
+                self.assertEqual("value", hdf5_file.attrs["extra"])
+
+        finally:
+            os.remove(expected_file)
+
+    def test_18_read_dataset_with_path_name_raises_exception(self):
+        """Reading a dataset rejects names that contain a path component."""
+        with self.assertRaises(ValueError):
+            self.datafolder.read_dataset(os.path.join("subfolder", "dataset"))
+
+    def test_19_add_dataset_to_hdf5_file(self):
+        """Add a dataset and root attributes to an existing HDF5 file."""
+        # Arrange
+        name = "combined" + ".hdf5"
+        expected_file = os.path.join(os.getcwd(), name)
+        dataset = _create_dataset()
+        root_attrs = {"operator": "QMI", "run": 7}
+        # Act and Assert
+        try:
+            with self.datafolder.make_hdf5file(name) as hdf5_file:
+                self.datafolder.add_dataset_to_file(hdf5_file, dataset, root_attrs=root_attrs)
+                self.assertIn(dataset.name, hdf5_file)
+                self.assertEqual(dataset.name, hdf5_file.attrs["QMI_Dataset_name_0"])
+                self.assertEqual("QMI", hdf5_file.attrs["operator"])
+                self.assertEqual(7, hdf5_file.attrs["run"])
+
+            with self.datafolder.open_hdf5file(name) as hdf5_file:
+                read_dataset = qmi.data.dataset.read_dataset_from_hdf5(hdf5_file[dataset.name])
+
+            self.assertEqual(dataset.name, read_dataset.name)
+            self.assertListEqual(dataset.axis_label, read_dataset.axis_label)
+            self.assertListEqual(dataset.column_label, read_dataset.column_label)
+            self.assertEqual(dataset.data.shape, read_dataset.data.shape)
+
+        finally:
+            os.remove(expected_file)
+
 
 class TestDataFolderNoLabel(unittest.TestCase):
 
@@ -772,6 +834,52 @@ class TestDataStore(unittest.TestCase):
                     day_folder = os.path.join(os.getcwd(), date_str)
                     time_folder = os.path.join(day_folder, "{}_{}".format(time_str, name))
                     os.removedirs(time_folder)
+
+    def test_16_get_folder_from_relative_datastore_path(self):
+        """Get a datastore folder from a path relative to the datastore base directory."""
+        # Arrange
+        name = "temp"
+        date_str = "20200102"
+        time_str = "030405"
+        relative_path = os.path.join(date_str, "{}_{}".format(time_str, name))
+        expected_folder = os.path.join(os.getcwd(), relative_path)
+        self.datastore.make_folder(name, date_str=date_str, time_str=time_str)
+        try:
+            # Act
+            datafolder = self.datastore.get_folder_from_path(relative_path)
+            # Assert
+            self.assertEqual(type(datafolder), DataFolder)
+            self.assertEqual(os.path.abspath(expected_folder), os.path.abspath(datafolder.folder_path))
+
+        finally:
+            os.removedirs(expected_folder)
+
+    def test_17_list_folders_without_label_returns_all_labels(self):
+        """List data folders across labels when no label filter is given."""
+        # Arrange
+        date_str = "20200103"
+        time_str = "040506"
+        labels = ["alpha", "beta"]
+        for label in labels:
+            self.datastore.make_folder(label, date_str=date_str, time_str=time_str)
+
+        # Act
+        try:
+            data_folders = self.datastore.list_folders()
+            folder_names = [os.path.split(data_folder.folder_path)[-1] for data_folder in data_folders]
+            # Assert
+            for label in labels:
+                self.assertIn("{}_{}".format(time_str, label), folder_names)
+
+        finally:
+            for label in labels:
+                day_folder = os.path.join(os.getcwd(), date_str)
+                time_folder = os.path.join(day_folder, "{}_{}".format(time_str, label))
+                os.removedirs(time_folder)
+
+    def test_18_find_latest_folder_returns_none_without_match(self):
+        """Finding the latest folder returns None if no matching folder exists."""
+        self.assertIsNone(self.datastore.find_latest_folder("missing_label"))
 
 
 if __name__ == "__main__":
