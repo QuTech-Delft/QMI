@@ -666,11 +666,12 @@ def convert_to_qmi_dataset(
                 axes.append((label, hdf5_obj))
             else:
                 columns.append((label, hdf5_obj))
+
+        elif item in hdf5_obj.dimensions:
+            axes.append((label, hdf5_obj))
+            
         else:
-            if item in hdf5_obj.dimensions:
-                axes.append((label, hdf5_obj))
-            else:
-                columns.append((label, hdf5_obj))
+            columns.append((label, hdf5_obj))
 
     if not columns and not axes:
         raise RuntimeError("No datasets found to convert from the HDF5 file.")
