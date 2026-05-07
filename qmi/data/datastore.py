@@ -178,24 +178,30 @@ class DataFolder:
                 raise ValueError(f"Invalid backend type {backend}.")
 
             try:
-                ds_count = 0
-                # Check for existing datasets
-                while True:
-                    check_name = QMI_DATASET.format(ds_count=ds_count)
-                    if not check_name in f.attrs:
-                        break
+                if ds.is_raw:
+                    target = f
+                    f.attrs[QMI_DATASET.format(ds_count="").rstrip("_")] = ds.name
 
-                    if check_name == ds.name and overwrite:
-                        break
+                else:
+                    target = f.create_group(ds.name)
+                    ds_count = 0
+                    # Check for existing datasets
+                    while True:
+                        check_name = QMI_DATASET.format(ds_count=ds_count)
+                        if not check_name in f.attrs:
+                            break
 
-                    if check_name == ds.name and not overwrite:
-                        raise QMI_UsageException(f"Dataset {ds.name} already exists and not allowed to overwrite.")
+                        if check_name == ds.name and overwrite:
+                            break
+
+                        if check_name == ds.name and not overwrite:
+                            raise QMI_UsageException(f"Dataset {ds.name} already exists and not allowed to overwrite.")
+
+                    f.attrs[QMI_DATASET.format(ds_count=ds_count)] = ds.name
 
                 # Add QMI version to file
                 f.attrs["QMI_version"] = qmi.__version__
                 f.attrs["QMI_Dataset"] = 1
-                f.attrs[QMI_DATASET.format(ds_count=ds_count)] = ds.name
-                target = f if ds.is_raw else f.create_group(ds.name)
                 qmi.data.dataset.write_dataset_to_hdf5(ds, target)
 
             finally:

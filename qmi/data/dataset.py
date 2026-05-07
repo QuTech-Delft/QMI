@@ -530,7 +530,7 @@ def write_dataset_to_hdf5(dataset: DataSet, hdf_group: h5py.Group | h5netcdf.Gro
     group_name, column_keys, axis_scale_keys = _write_common_metadata(hdf_group, dataset)
 
     if dataset.data.ndim == 1:
-        column_ds = _create_dataset_node(hdf_group, column_keys[0], dataset.data, ("row",))
+        column_ds = _create_dataset_node(hdf_group, column_keys[0], dataset.data, (group_name,))
         if dataset.column_label[0]:
             column_ds.attrs["name"] = dataset.column_label[0]
         if dataset.column_unit[0]:
