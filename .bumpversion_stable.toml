@@ -33,9 +33,9 @@ replace = "[{new_version}] - Unreleased"
 [[tool.bumpversion.files]]
 filename = "README.md"
 search = "v{current_version}"
-replace = "main"
+replace = "stable-0-53"
 
 [[tool.bumpversion.files]]
 filename = "pyproject.toml"
 search = "v{current_version}"
-replace = "main"
+replace = "stable-0-53"

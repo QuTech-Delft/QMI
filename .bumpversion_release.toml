@@ -32,7 +32,7 @@ replace = "[{new_version}] - {now:%Y-%m-%d}"
 
 [[tool.bumpversion.files]]
 filename = "README.md"
-search = "main"
+search = "stable-0-53"
 replace = "v{new_version}"
 
 [[tool.bumpversion.files]]
