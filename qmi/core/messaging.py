@@ -4,7 +4,6 @@ The classes defined in this module are for the most part used internally by QMI.
 Application programs should typically not interact with these classes directly.
 """
 
-import sys
 import asyncio
 import copy
 import fnmatch
@@ -14,29 +13,27 @@ import os
 import pickle
 import random
 import socket
+import sys
 import threading
 import time
 from collections.abc import Callable
 from typing import Generic, NamedTuple, TypeVar
 
 import qmi
-
-from qmi.core.thread import QMI_Thread
 from qmi.core.exceptions import (
     QMI_Exception, QMI_RuntimeException, QMI_TimeoutException, QMI_InvalidOperationException,
     QMI_MessageDeliveryException, QMI_UsageException,
     QMI_DuplicateNameException, QMI_UnknownNameException
-    )
-
+)
+from qmi.core.thread import QMI_Thread
 from qmi.core.udp_responder_packets import (
-        unpack_qmi_udp_packet,
-        QMI_UdpResponderContextInfoRequestPacket,
-        QMI_UdpResponderContextInfoResponsePacket,
-        QMI_UdpResponderKillRequestPacket,
-    )
-
+    unpack_qmi_udp_packet,
+    QMI_UdpResponderContextInfoRequestPacket,
+    QMI_UdpResponderContextInfoResponsePacket,
+    QMI_UdpResponderKillRequestPacket,
+    QMI_UdpResponderContextDescriptor,
+)
 from qmi.core.util import format_address_and_port, parse_address_and_port
-
 
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
@@ -1191,7 +1188,7 @@ class MessageRouter:
     def __init__(self, context_name: str, workgroup_name: str) -> None:
         self.context_name = context_name
         self.workgroup_name = workgroup_name
-        self.tcp_server_port = 0
+        self.tcp_server_port = QMI_UdpResponderContextDescriptor.UNBOUND_TCP_PORT
         self._thread = None  # type: _EventDrivenThread | None
         self._socket_manager = None  # type: _SocketManager | None
         self._address_to_messagehandler_map = {}  # type: dict[str, QMI_MessageHandler]
@@ -1295,7 +1292,7 @@ class MessageRouter:
 
         assert self._thread is not None
         assert self._socket_manager is not None
-        assert self.tcp_server_port == 0
+        assert self.tcp_server_port == QMI_UdpResponderContextDescriptor.UNBOUND_TCP_PORT
 
         _logger.info("Starting TCP server on port %d ...", tcp_server_port)
 
