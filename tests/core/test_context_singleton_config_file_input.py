@@ -4,8 +4,11 @@
 """
 import logging
 import os
-from shutil import rmtree
 import unittest
+from shutil import rmtree
+
+from qmi.core.config_defs import CfgQmi
+from qmi.core.context import QMI_Context
 
 ORIGINAL_QMI_CONFIG = os.getenv("QMI_CONFIG")
 qmi_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qmi.conf")
@@ -174,6 +177,14 @@ class TestContextConfigFileInputs(unittest.TestCase):
         qmi.core.context_singleton.QMI_CONFIG = None
         with self.assertRaises(qmi.core.exceptions.QMI_ConfigurationException):
             qmi.start(self.ctx_name, console_loglevel=loglevel)
+
+    def test_07_explicit_none_config_file(self) -> None:
+        # Check that providing an explicit None argument for the config_file parameter
+        # results in no config file being used even if one is available in the environment.
+        qmi.start(self.ctx_name, config_file=None)
+        context: QMI_Context = qmi.context()
+
+        self.assertEqual(context._config, CfgQmi())
 
 
 class TestContextOptionalConfigInputs(unittest.TestCase):

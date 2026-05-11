@@ -689,11 +689,21 @@ class QMI_Context:
         context_names = self._message_router.get_peer_context_names()
         return peer_context_name in context_names
 
+    class PeerDescriptor(NamedTuple):
+        """Descriptor of a peer returned by `discover_peer_contexts`.
+
+        Attributes:
+            name: The name of the peer context.
+            address_port: The location to find the peer, in the format of "address:port".
+        """
+        name: str
+        address_port: str
+
     def discover_peer_contexts(
         self,
         workgroup_name_filter: str | None = None,
         context_name_filter: str = "*"
-    ) -> list[tuple[str, str]]:
+    ) -> list[PeerDescriptor]:
         """Discover QMI contexts on the network.
 
         You can filter on workgroup name and/or context name via the optional arguments. Use a "*" to match any
@@ -705,7 +715,7 @@ class QMI_Context:
             context_name_filter:   Filter on context name (default: "*").
 
         Returns:
-             contexts: A list of (context_name, address:port)-pairs that can be passed to `connect_to_peer`.
+             contexts: A list of PeerDescriptors that can be passed to `connect_to_peer`.
         """
         if workgroup_name_filter is None:
             workgroup_name_filter = self._config.workgroup
@@ -714,14 +724,14 @@ class QMI_Context:
             workgroup_name_filter=workgroup_name_filter,
             context_name_filter=context_name_filter
         )
-        contexts: list[tuple[str, str]] = []
+        contexts: list[QMI_Context.PeerDescriptor] = []
         for resp in responses:
             address = resp.incoming_address[0]
             port = resp.response_packet.context.port
             context_name = resp.response_packet.context.name.decode()
 
             if context_name != self.name:
-                contexts.append((context_name, f"{address}:{port}"))
+                contexts.append(QMI_Context.PeerDescriptor(context_name, f"{address}:{port}"))
 
         return contexts
 
