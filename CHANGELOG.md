@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.53.0-beta.0] - Unreleased
+## [0.53.0] - 2026-05-11
 
 ### Added
 - Functions to `qmi.instruments.yokogawa.dlm4308` for obtaining trace data from the instrument waveform channels via Ethernet. All data formats are enabled.
