@@ -9,12 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Functions to `qmi.instruments.yokogawa.dlm4308` for obtaining trace data from the instrument waveform channels via Ethernet. All data formats are enabled.
 - Due to possibility of obtaining data in various data formats with Yokogawa device, and the fact that the returned data string decoding varies depending on the data format, an option for setting the `decoder` for `ScpiProtocol.ask` method was added. This enabled the trace adat acquisition in all data formats for Yokogawa.
+- Added a HDF5 file-to-QMI `DataSet` conversion function in `qmi.data.dataset`. 
+- Added a possibility to add QMI `DataSet` into an existing HDF5 file.
 
 ### Changed
 - Replace `pylint` linter with `ruff`.
 - DeprecationWarning warning on the `start_stop` context manager, as `Context` objects are now their own context managers.
   Usages of `with start_stop(qmi, ...)` can be replaced with `with qmi.start(...)` and
   `with start_stop(<Context Object>)` can be replaced with `with <Context Object>`.
+- Refactoring of QMI `DataSet` class so that it allows also raw (single) dataset column(s) without axis | axes definition. 
+- QMI datasets has now clear `QMI_Dataset: 1` attribute in dataset root.
+- `qmi.data.datastore` module to work with changes in `QMI_DataSet` class.
 
 ## [0.52.0] - 2026-04-01
 
