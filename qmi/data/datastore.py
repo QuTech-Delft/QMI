@@ -1,20 +1,24 @@
 """Routines for data storage."""
 
+import json
 import os
 import os.path
 import re
+import shutil
 import time
 from typing import Any
 
-import json
 import h5netcdf
 import h5py
-import shutil
+import numpy as np
 
-from qmi.core.exceptions import QMI_UsageException
+import qmi
 import qmi.data.dataset
-from qmi.data.dataset import DataSet
 from qmi.core.config_struct import config_struct_to_dict
+from qmi.core.exceptions import QMI_UsageException
+from qmi.data.dataset import DataSet
+
+QMI_DATASET = "QMI_Dataset_name_{ds_count}"
 
 
 def _relative_folder_path(date_str: str, time_str: str, label: str) -> str:
@@ -49,7 +53,6 @@ class DataFolder:
         Raises:
             FileNotFoundError: If the specified DataFolder does not exist.
         """
-
         self.folder_path = folder_path
         self.label = label
         self.date_str = date_str
@@ -61,49 +64,46 @@ class DataFolder:
     def __repr__(self) -> str:
         return f"DataFolder({self.folder_path!r})"
 
-    def _hdf5_file(self, name: str, mode: str, backend: str) -> h5py.File | h5netcdf.File:
+    def _hdf5_file(self, filename: str, mode: str, backend: str) -> h5py.File | h5netcdf.File:
         """Create a new, or open, HDF5 file in the data folder.
 
         Parameters:
-            name:    Base name of the HDF5 file, without the extension ".h5" or ".hdf5".
-            mode:    File mode.
-            backend: Backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
+            filename: Base name of the HDF5 file, with the extension ".h5" or ".hdf5".
+            mode:     File mode.
+            backend:  Backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
 
         Returns:
             A `File` object representing the HDF5 file.
 
         Raises:
-            ValueError:        If the `name` has non-latin character(s).
-            IOError:           If the file is already present and file mode does not allow truncation.
-            FileNotFoundError: If the file mode is set to read a file and the file was not found.
-            ValueError:        Invalid HDF5 file backend.
+            ValueError:         If the `name` has non-latin character(s).
+            QMI_UsageException: Only '.h5' and '.hdf5' file name extensions are allowed.
+            IOError:            If the file is already present and file mode does not allow truncation.
+            FileNotFoundError:  If the file mode is set to read a file and the file was not found.
+            ValueError:         Invalid HDF5 file backend.
         """
-        if not re.match(r"^[-_a-zA-Z0-9(),]+$", name):
-            raise ValueError(f"Invalid name {name!r}")
+        if not re.match(r"^[-_a-zA-Z0-9(),]+$", os.path.splitext(filename)[0]):
+            raise ValueError(f"Invalid name {filename!r}")
 
+        if not filename.endswith((".h5", ".hdf5", ".H5", ".HDF5")):
+            raise QMI_UsageException("Invalid HDF5 file extension, only '.h5' and '.hdf5' extensions are allowed.")
+
+        file_path = os.path.join(self.folder_path, filename)
         if mode in ["r+", "r", "x"]:
-            for ext in [".h5", ".hdf5"]:
-                filename = name + ext
-                # Let's check the file exists.
-                file_path = os.path.join(self.folder_path, filename)
-                file_found = os.path.isfile(file_path)
-                if file_found:
-                    break
-
+            # Let's check the file exists.
+            file_found = os.path.isfile(file_path)
             if mode == "x" and file_found:
                 raise IOError(f"The file {filename} already exists and not allowed to overwrite.")
-
             if mode in ["r+", "r"] and not file_found:
-                raise FileNotFoundError(f"Could not find HDF5 file with name {name}.")
+                raise FileNotFoundError(f"Could not find HDF5 file with name {filename}.")
 
         if backend == "h5py":
             return h5py.File(file_path, mode=mode)
-
-        elif backend == "h5netcdf":
+        
+        if backend == "h5netcdf":
             return h5netcdf.File(file_path, mode=mode, decode_vlen_strings=False)
-
-        else:
-            raise ValueError(f"Invalid backend type {backend}")
+        
+        raise ValueError(f"Invalid backend type {backend}")
 
     def write_config(self, config: Any) -> None:
         """Write QMI configuration to a file in the data folder."""
@@ -122,9 +122,7 @@ class DataFolder:
             config_fn = "config"
 
         full_path_fn = os.path.join(self.folder_path, config_fn + ".json")
-
         config_dict = config_struct_to_dict(config)
-
         with open(full_path_fn, "w") as output:
             json.dump(config_dict, output, indent=4, sort_keys=True)
 
@@ -140,7 +138,11 @@ class DataFolder:
         shutil.copy2(filename, self.folder_path)
 
     def write_dataset(
-        self, ds: DataSet, file_format: str = "hdf5", overwrite: bool = False, backend: str = "h5py"
+        self,
+        ds: DataSet,
+        file_format: str = "hdf5",
+        overwrite: bool = False,
+        backend: str = "h5py",
     ) -> None:
         """Write the specified DataSet to a new or existing file in the data folder.
 
@@ -149,15 +151,16 @@ class DataFolder:
         Parameters:
             ds:          DataSet instance to write.
             file_format: File format specification.
-                "hdf5"     - selects HDF5 format with (default)
-                "text"     - selects a space-separated text format
+                         - "hdf5". Selects HDF5 format with (default);
+                         - "text". Selects a space-separated text format.
             overwrite:   Allow user to overwrite an existing dataset. Default is False.
-            backend:     Select backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
+            backend:     Select backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".`
 
         Raises:
-            ValueError: Dataset name is invalid.
-            ValueError: Invalid HDF5 file backend.
-            OSError:    If the data folder already contains a file with the same name.
+            ValueError:         Dataset name is invalid.
+            ValueError:         Invalid HDF5 file backend.
+            OSError:            If the data folder already contains a file with the same name.
+            QMI_UsageException: Dataset name already exists and overwrite not allowed.
         """
         if not re.match(r"^[-_a-zA-Z0-9(),]+$", ds.name):
             raise ValueError(f"Invalid DataSet name {ds.name!r}")
@@ -166,15 +169,43 @@ class DataFolder:
             filename = ds.name + ".hdf5"
             file_path = os.path.join(self.folder_path, filename)
             if backend == "h5py":
-                with h5py.File(file_path, "w" if overwrite else "x") as f:
-                    qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+                f = h5py.File(file_path, "w" if overwrite else "x")
 
             elif backend == "h5netcdf":
-                with h5netcdf.File(file_path, "w" if overwrite else "x", decode_vlen_strings=False) as f:
-                    qmi.data.dataset.write_dataset_to_hdf5(ds, f)
+                f = h5netcdf.File(file_path, "w" if overwrite else "x", decode_vlen_strings=False)
 
             else:
                 raise ValueError(f"Invalid backend type {backend}.")
+
+            try:
+                if ds.is_raw:
+                    target = f
+                    f.attrs[QMI_DATASET.format(ds_count="").rstrip("_")] = ds.name
+
+                else:
+                    target = f.create_group(ds.name)
+                    ds_count = 0
+                    # Check for existing datasets
+                    while True:
+                        check_name = QMI_DATASET.format(ds_count=ds_count)
+                        if not check_name in f.attrs:
+                            break
+
+                        if check_name == ds.name and overwrite:
+                            break
+
+                        if check_name == ds.name and not overwrite:
+                            raise QMI_UsageException(f"Dataset {ds.name} already exists and not allowed to overwrite.")
+
+                    f.attrs[QMI_DATASET.format(ds_count=ds_count)] = ds.name
+
+                # Add QMI version to file
+                f.attrs["QMI_version"] = qmi.__version__
+                f.attrs["QMI_Dataset"] = 1
+                qmi.data.dataset.write_dataset_to_hdf5(ds, target)
+
+            finally:
+                f.close()
 
         elif file_format == "text":
             filename = ds.name + ".dat"
@@ -214,8 +245,7 @@ class DataFolder:
                 return qmi.data.dataset.read_dataset_from_text(f)
 
         # Look for a HDF5 file with matching name.
-        extensions = [".hdf5", ".h5"]
-        for ext in extensions:
+        for ext in [".hdf5", ".h5"]:
             file_path = os.path.join(self.folder_path, name + ext)
             if os.path.isfile(file_path):
                 if backend == "h5py":
@@ -230,7 +260,7 @@ class DataFolder:
                         if name not in f:
                             raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
 
-                        return qmi.data.dataset.read_dataset_from_hdf5(f[name], f)
+                        return qmi.data.dataset.read_dataset_from_hdf5(f[name])
 
                 else:
                     raise ValueError(f"Invalid backend type {backend}.")
@@ -244,14 +274,18 @@ class DataFolder:
         An error occurs if the specified file already exists.
 
         Parameters:
-            name:    Base name of the HDF5 file, without the extension ".h5" or ".hdf5".
-            backend: Select backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
+            name:       Base name of the HDF5 file, without the extension ".h5" or ".hdf5".
+            backend:    Select backend for HDF5 file format. Options are "hdf5" (default) and "h5netcdf".
 
         Returns:
-            A `File` object representing the HDF5 file.
-            See http://docs.h5py.org/ for information on how to use this object.
+            hdf5_file: A file object representing a HDF5 file.
         """
-        return self._hdf5_file(name, "x", backend)
+        hdf5_file = self._hdf5_file(name, "x", backend)
+        # Add QMI version to file
+        hdf5_file.attrs["QMI_version"] = qmi.__version__
+        hdf5_file.attrs["QMI_Dataset"] = 1
+
+        return hdf5_file
 
     def open_hdf5file(self, name: str, write_mode: bool = False, backend: str = "h5py") -> h5py.File | h5netcdf.File:
         """Open an existing HDF5 file in the data folder.
@@ -267,7 +301,49 @@ class DataFolder:
         """
         mode = "r+" if write_mode else "r"
         return self._hdf5_file(name, mode, backend)
-    
+
+    def add_dataset_to_file(
+        self,
+        hdf5_file: h5py.File | h5netcdf.File,
+        ds: DataSet,
+        root_attrs: dict[
+            str,
+            str | int | float | complex | str | np.ndarray | np.integer | list[int | float | complex | str] | tuple[
+                int | float | complex | str, ...
+            ],
+        ] | None = None,
+    ) -> None:
+        """Add a dataset, and optional file attributes to an existing HDF5 file.
+
+        Parameters:
+            hdf5_file:  The file instance to add the dataset in.
+            ds:         A QMI dataset instance that is to be added.
+            root_attrs: A dictionary of attributes that should be written in the file root. Default is `None`.
+
+        Raises:
+            QMI_UsageException: If an attribute with the dataset name already exists in the file.
+        """
+        if ds.name in hdf5_file:
+            raise QMI_UsageException(f"Data file already has an attribute named {ds.name}")
+
+        if isinstance(hdf5_file, h5netcdf.File):
+            hdf5_file.dimensions[ds.column_label] = None
+
+        keys = list(dict(hdf5_file.attrs).keys())
+        ds_count = 0
+        while True:
+            if not QMI_DATASET.format(ds_count=ds_count) in keys:
+                break
+
+            ds_count += 1
+
+        hdf5_file.attrs[QMI_DATASET.format(ds_count=ds_count)] = ds.name
+        dataset_group = hdf5_file.create_group(ds.name)
+        qmi.data.dataset.write_dataset_to_hdf5(ds, dataset_group)
+        # Add root attributes
+        for attr, val in (root_attrs or {}).items():
+            hdf5_file.attrs[attr] = val
+
 
 class DataStore:
     """A DataStore represents a collection of stored data.
@@ -334,18 +410,16 @@ class DataStore:
         Raises:
             FileExistsError: If the DataFolder already exists.
         """
-
         # Determine date_str and time_str.
         if (date_str is None) or (time_str is None):
             if (date_str is not None) or (time_str is not None):
                 raise ValueError("Specify both date_str and time_str or neither.")
+
             # Generate date_str and time_str from timestamp.
             if timestamp is None:
                 timestamp = time.time()
-            if self.USE_LOCAL_TIME:
-                tm = time.localtime(timestamp)
-            else:
-                tm = time.gmtime(timestamp)
+
+            tm = time.localtime(timestamp) if self.USE_LOCAL_TIME else time.gmtime(timestamp)
             date_str = time.strftime("%Y%m%d", tm)
             time_str = time.strftime("%H%M%S", tm)
 
@@ -379,8 +453,8 @@ class DataStore:
         full_path = os.path.join(self.basedir, rel_path)
         if os.path.exists(full_path):
             raise FileExistsError(f"Directory {full_path!r} already exists.")
-        os.mkdir(full_path)
 
+        os.mkdir(full_path)
         return DataFolder(full_path, label, date_str, time_str)
 
     def get_folder(self, label: str, date_str: str, time_str: str) -> DataFolder:
@@ -437,9 +511,7 @@ class DataStore:
         Returns:
             ret: List of matching DataFolder items.
         """
-
         ret = []
-
         date_dirs = os.listdir(self.basedir)
         date_dirs.sort()
         for dd in date_dirs:
