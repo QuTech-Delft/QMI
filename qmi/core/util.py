@@ -2,6 +2,7 @@
 
 import re
 import threading
+from typing import Any
 
 
 def is_valid_object_name(name: str) -> bool:
@@ -80,6 +81,69 @@ def parse_address_and_port(address: str) -> tuple[str, int]:
     port = int(port_str)
 
     return (host, port)
+
+
+def check_value_structures_equal(value1: Any, value2: Any) -> bool:
+    """Check if two values have matching types and container structure.
+
+    Scalar values must have exactly the same type. Lists, tuples and sets must
+    have the same container type, length, and compatible element types.
+    Dictionaries must have the same keys and compatible value types.
+    """
+
+    if type(value1) is not type(value2):  # noqa: E721
+        return False
+
+    if isinstance(value1, dict):
+        if len(value1) != len(value2):
+            return False
+        if set(value1) != set(value2):
+            return False
+        return all(check_value_structures_equal(value1[key], value2[key]) for key in value1)
+
+    if isinstance(value1, (list, tuple)):
+        if len(value1) != len(value2):
+            return False
+        return all(
+            check_value_structures_equal(item1, item2)
+            for item1, item2 in zip(value1, value2, strict=True)
+        )
+
+    if isinstance(value1, set):
+        if len(value1) != len(value2):
+            return False
+        value2_signatures = [_make_value_structure_signature(item) for item in value2]
+        for item in value1:
+            signature = _make_value_structure_signature(item)
+            try:
+                value2_signatures.remove(signature)
+            except ValueError:
+                return False
+        return True
+
+    return True
+
+
+def _make_value_structure_signature(value: Any) -> Any:
+    """Return a hashable signature for set element structure comparisons."""
+
+    if isinstance(value, dict):
+        return (
+            dict,
+            tuple(
+                sorted(
+                    ((key, _make_value_structure_signature(sub_value)) for key, sub_value in value.items()),
+                    key=repr
+                )
+            )
+        )
+    if isinstance(value, list):
+        return (list, tuple(_make_value_structure_signature(item) for item in value))
+    if isinstance(value, tuple):
+        return (tuple, tuple(_make_value_structure_signature(item) for item in value))
+    if isinstance(value, set):
+        return (set, tuple(sorted((_make_value_structure_signature(item) for item in value), key=repr)))
+    return type(value)
 
 
 class AtomicCounter:

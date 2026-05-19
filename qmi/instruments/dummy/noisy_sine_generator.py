@@ -10,7 +10,20 @@ from qmi.core.rpc import rpc_method
 
 
 class NoisySineGenerator(QMI_Instrument):
-    """Simulated instrument, useful for testing."""
+    """Simulated instrument, useful for testing.
+    
+    Attributes:
+        max_frequency: Maximum allowed frequency that can be set.
+        max_amplitude: Maximum allowed amplitude that can be set.
+        max_wait:      Maximum wait time duration.
+    """
+
+    _rpc_constants = ["max_frequency", "max_amplitude", "max_wait"]
+
+    max_frequency: float = 1e6
+    max_amplitude: float = 1e3
+    max_wait: float = 10.0
+    max_noise: float = max_amplitude
 
     def __init__(self, context: QMI_Context, name: str) -> None:
         super().__init__(context, name)
@@ -26,9 +39,10 @@ class NoisySineGenerator(QMI_Instrument):
             value: The frequency value (unitless).
         """
         self._check_is_open()
-        valid = isinstance(value, float) and math.isfinite(value) and value >= 0.0
+        valid = isinstance(value, float) and math.isfinite(value) and 0.0 < value < self.max_frequency
         if not valid:
             raise ValueError("Bad value for frequency: {!r}".format(value))
+        
         self.frequency = value
 
     @rpc_method
@@ -49,7 +63,7 @@ class NoisySineGenerator(QMI_Instrument):
             value: The new amplitude (unitless).
         """
         self._check_is_open()
-        valid = isinstance(value, float) and math.isfinite(value) and value >= 0.0
+        valid = isinstance(value, float) and math.isfinite(value) and 0.0 < value < self.max_amplitude
         if not valid:
             raise ValueError("Bad value for amplitude: {!r}".format(value))
 
@@ -73,9 +87,10 @@ class NoisySineGenerator(QMI_Instrument):
             value: The new noise level (unitless).
         """
         self._check_is_open()
-        valid = isinstance(value, float) and math.isfinite(value) and value >= 0.0
+        valid = isinstance(value, float) and math.isfinite(value) and 0.0 < value < self.max_noise
         if not valid:
             raise ValueError("Bad value for noise: {!r}".format(value))
+
         self.noise = value
 
     @rpc_method
@@ -96,8 +111,8 @@ class NoisySineGenerator(QMI_Instrument):
             duration: The wait duration in seconds.
         """
         self._check_is_open()
-        if duration < 0.0:
-            raise ValueError("Bad value for duration: {!r}".format(duration))
+        if not 0.0 < duration < self.max_wait:
+            raise ValueError("Bad value for wait duration: {!r}".format(duration))
 
         time.sleep(duration)
 
