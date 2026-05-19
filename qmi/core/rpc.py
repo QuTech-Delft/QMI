@@ -1340,7 +1340,7 @@ class _RpcThread(QMI_Thread):
         if self._locking_token is None or self._locking_token == request.lock_token:
             # Invoke the method; this can raise an exception or return a result.
             try:
-                method = self._check_and_get_method(request)
+                method: Callable = self._check_and_get_method(request)
                 result_type = QMI_RpcFutureState.RESULT_IS_VALUE
                 result = method(*request.method_args, **request.method_kwargs)
 
@@ -1363,7 +1363,7 @@ class _RpcThread(QMI_Thread):
         )
         return reply
 
-    def _check_and_get_method(self, request: QMI_MethodRpcRequestMessage) -> _T:
+    def _check_and_get_method(self, request: QMI_MethodRpcRequestMessage) -> Callable:
         """Check if the object has the method requested and is RPC callable; if so, return it."""
         assert self._rpc_object is not None
 
@@ -1519,7 +1519,10 @@ class _RpcThread(QMI_Thread):
 
         _logger.debug("Stopping RPC thread")
 
-    def push_rpc_request(self, rpc_request: QMI_MethodRpcRequestMessage | QMI_LockRpcRequestMessage  | None) -> None:
+    def push_rpc_request(
+        self,
+        rpc_request: QMI_MethodRpcRequestMessage | QMI_ConstantRpcRequestMessage | QMI_LockRpcRequestMessage | None
+    ) -> None:
         """Push an RPC request into the request queue and notify the thread."""
         with self._cv:
             self._fifo.append(rpc_request)
