@@ -16,7 +16,7 @@ _logger = logging.getLogger(__name__)
 class Cobolt_Laser_06_01(QMI_Instrument):
     """Instrument driver for the Cobolt 06-01 series diode laser."""
 
-    _rpc_constants = ["FAULT_CODES", "OPERATING_MODES"]
+    _rpc_constants = ["RESPONSE_TIMEOUT"]
 
     # Fault codes returned by get_operating_fault().
     FAULT_CODES = {

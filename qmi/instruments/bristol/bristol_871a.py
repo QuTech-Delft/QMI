@@ -148,7 +148,7 @@ class Bristol_871A(QMI_Instrument):
         STATUS_GOOD:        Status value of a wavelength measurement without any issues.
     """
 
-    _rpc_constants = ["CONDITION_BITS", "STATUS_BITS", "STATUS_MASK", "STATUS_GOOD"]
+    _rpc_constants = ["RESPONSE_TIMEOUT", "STATUS_MASK", "STATUS_GOOD"]
 
     # Condition codes returned by get_condition(), by bit index.
     CONDITION_BITS = {
@@ -209,11 +209,13 @@ class Bristol_871A(QMI_Instrument):
         """Initialize the instrument driver.
 
         Parameters:
+            context:          The parent QMI context.
             name:             Name for this instrument instance.
             scpi_transport:   QMI transport descriptor for the SCPI channel.
                               If not specified, the SCPI channel will not be opened.
             serial_transport: QMI transport descriptor for the serial output channel.
                               If not specified, the serial channel will not be opened.
+            queue_size:       Optional 'deque' queue size parameter. Default is 10000 measurements.
 
         Raises:
             QMI_UsageException: At least one of scpi_transport or serial_transport must be specified.

@@ -384,14 +384,14 @@ class TestRPC(unittest.TestCase):
         proxy2 = self.c2.get_rpc_object_by_name("c1.tc1")
 
         # Check that constants are accessible via both proxies.
-        self.assertEqual(proxy1.CONSTANT_NUMBER, 42)
-        self.assertEqual(proxy1.CONSTANT_STRING, "testing")
-        self.assertEqual(proxy2.CONSTANT_NUMBER, 42)
-        self.assertEqual(proxy2.CONSTANT_STRING, "testing")
+        self.assertEqual(proxy1.CONSTANT_NUMBER(), 42)
+        self.assertEqual(proxy1.CONSTANT_STRING(), "testing")
+        self.assertEqual(proxy2.CONSTANT_NUMBER(), 42)
+        self.assertEqual(proxy2.CONSTANT_STRING(), "testing")
 
         # Check that non-exported constants are not accessible.
         with self.assertRaises(AttributeError):
-            print(proxy1.CONSTANT_FLOAT)
+            proxy1.CONSTANT_FLOAT()
 
     def test_call_to_disconnected(self):
 

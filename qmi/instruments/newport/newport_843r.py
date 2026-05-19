@@ -29,7 +29,7 @@ _logger = logging.getLogger(__name__)
 class Newport_843R(QMI_Instrument):
     """Instrument driver for the Newport 843-R optical power meter."""
 
-    _rpc_constants = ["SENSOR_TYPES"]
+    _rpc_constants = ["COMMAND_DELAY"]
 
     # Meaning of sensor type codes returned by the instrument.
     SENSOR_TYPES = {

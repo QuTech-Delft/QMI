@@ -1324,6 +1324,9 @@ class _RpcThread(QMI_Thread):
             )
 
         constant = getattr(self._rpc_object, request.constant_name)
+        if request.constant_value is None:
+            return constant
+        
         if not check_value_structures_equal(constant, request.constant_value):
             raise QMI_UnknownRpcException("New RPC constant value is of different type or size than original.")
 
