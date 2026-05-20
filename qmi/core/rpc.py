@@ -330,16 +330,17 @@ class QMI_LockRpcReplyMessage(QMI_ReplyMessage):
 
 
 class QMI_ConstantRpcRequestMessage(QMI_RequestMessage):
-    """Message sent by an RPC client to change a RPC constant value of a remote object.
+    """Message sent by an RPC client to get or change a RPC constant value of a remote object.
 
     See `QMI_ConstantRpcReplyMessage` for how to interpret the reply to a request.
 
     Attributes:
-        constant_name:  The constant name.
-        constant_value: The value or values of the constants.
-        lock_token:     The unique token to use for the lock.
+        constant_name:         The constant name.
+        constant_value:        The new constant value.
+        set_constant_value:    True to set the constant, False to get the current value.
+        lock_token:            The unique token to use for the lock.
     """
-    __slots__ = ("constant_name", "constant_value", "lock_token")
+    __slots__ = ("constant_name", "constant_value", "set_constant_value", "lock_token")
 
     def __init__(
         self,
@@ -347,11 +348,13 @@ class QMI_ConstantRpcRequestMessage(QMI_RequestMessage):
         destination_address: QMI_MessageHandlerAddress,
         constant_name: str,
         constant_value: Any,
+        set_constant_value: bool,
         lock_token: QMI_LockTokenDescriptor | None = None
     ) -> None:
         super().__init__(source_address, destination_address)
         self.constant_name = constant_name
         self.constant_value = constant_value
+        self.set_constant_value = set_constant_value
         self.lock_token = lock_token
 
 
@@ -490,19 +493,22 @@ class QMI_RpcFuture(QMI_MessageHandler):
     def send_constant_rpc_request_message(
         self,
         rpc_constant_name: str,
-        rpc_constant_value: Any
+        rpc_constant_value: Any,
+        set_constant_value: bool
     ) -> None:
-        """Send a request message to the RPC object to modify the specified constant.
+        """Send a request message to the RPC object to get or modify the specified constant.
 
         Parameters:
             rpc_constant_name:  Name of the constant to modify.
             rpc_constant_value: The new constant value.
+            set_constant_value: True to modify the constant, False to get its current value.
         """
         request = QMI_ConstantRpcRequestMessage(
             self.address,
             self.rpc_object_address,
             rpc_constant_name,
             rpc_constant_value,
+            set_constant_value,
             self.lock_token
         )
 
@@ -627,11 +633,13 @@ def rpc_constant_call(
     rpc_object_address: QMI_MessageHandlerAddress,
     constant_name: str,
     rpc_lock_token: QMI_LockTokenDescriptor | None,
-    constant_value: Any
+    constant_value: Any = None,
+    *,
+    set_constant_value: bool = False
 ) -> Any:
-    """Helper function that performs a call to change a specific constant of the target RPC object."""
+    """Helper function that performs a call to get or change a specific constant of the target RPC object."""
     future = QMI_RpcFuture(context, rpc_object_address, rpc_lock_token)
-    future.send_constant_rpc_request_message(constant_name, constant_value)
+    future.send_constant_rpc_request_message(constant_name, constant_value, set_constant_value)
     return future.wait()
 
 
@@ -738,14 +746,9 @@ class QMI_RpcProxy:
         self._rpc_object_address = descriptor.address
         self._rpc_class_fqn = ".".join((descriptor.interface.rpc_class_module, descriptor.interface.rpc_class_name))
         self._lock_token: QMI_LockTokenDescriptor | None = None
-
-        def make_rpc_constant_forward_function(constant_name: str):
-            """Helper function used to create a new scope such that each constant in the loop below is assigned to
-            correct constant name."""
-            return lambda self, constant_value: \
-                rpc_constant_call(
-                    self._context, self._rpc_object_address, constant_name, self._lock_token, constant_value
-                )
+        self._rpc_constant_names = frozenset(
+            constant_descriptor.name for constant_descriptor in descriptor.interface.constants
+        )
         
         def make_rpc_method_forward_function(method_name: str):
             """Helper function used to create a new scope such that each method created in the loop below uses the
@@ -757,11 +760,6 @@ class QMI_RpcProxy:
 
         # Set docstring.
         setattr(self, "__doc__", descriptor.interface.rpc_class_docstring)
-
-        # Add constants.
-        for constant_descriptor in descriptor.interface.constants:
-            constant = make_rpc_constant_forward_function(constant_descriptor.name)
-            setattr(self, constant_descriptor.name, constant.__get__(self))
 
         # Add methods.
         for method_descriptor in descriptor.interface.methods:
@@ -794,8 +792,48 @@ class QMI_RpcProxy:
             )
             setattr(self, signal_descriptor.name, subscriber)
 
-        # Add non-blocking proxy.
+        # Add non-blocking proxy. Must be added last in __init__.
         self.rpc_nonblocking = QMI_RpcNonBlockingProxy(context, descriptor)
+
+    def __getattribute__(self, name: str) -> Any:
+        rpc_constant_names = object.__getattribute__(self, "_rpc_constant_names")
+        if name in rpc_constant_names:
+            return rpc_constant_call(
+                object.__getattribute__(self, "_context"),
+                object.__getattribute__(self, "_rpc_object_address"),
+                name,
+                object.__getattribute__(self, "_lock_token")
+            )
+
+        return object.__getattribute__(self, name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        try:
+            initialized = object.__getattribute__(self, "rpc_nonblocking")
+        except AttributeError:
+            initialized = False
+
+        if initialized:
+            rpc_constant_names = object.__getattribute__(self, "_rpc_constant_names")
+            if name in rpc_constant_names:
+                rpc_constant_call(
+                    object.__getattribute__(self, "_context"),
+                    object.__getattribute__(self, "_rpc_object_address"),
+                    name,
+                    object.__getattribute__(self, "_lock_token"),
+                    value,
+                    set_constant_value=True
+                )
+                return
+            
+            elif name == "_lock_token":
+                # Lock token should always be allowed to be set
+                object.__setattr__(self, name, value)
+
+            else:
+                raise AttributeError("Not allowed to set new attributes on a proxy class.")
+
+        object.__setattr__(self, name, value)
 
     def __enter__(self) -> "QMI_RpcProxy":
         """The context manager definition is needed for the proxy as it will always be returned from QMI contexts,
@@ -1324,15 +1362,15 @@ class _RpcThread(QMI_Thread):
             )
 
         constant = getattr(self._rpc_object, request.constant_name)
-        if request.constant_value is None:
+        if not request.set_constant_value:
             return constant
-        
+
         if not check_value_structures_equal(constant, request.constant_value):
             raise QMI_UnknownRpcException("New RPC constant value is of different type or size than original.")
 
         setattr(self._rpc_object, request.constant_name, request.constant_value)
-        
-        return constant
+
+        return getattr(self._rpc_object, request.constant_name)
 
     def _handle_method_rpc_request(self, request: QMI_MethodRpcRequestMessage) -> QMI_MethodRpcReplyMessage:
         """Handle RPC method request."""

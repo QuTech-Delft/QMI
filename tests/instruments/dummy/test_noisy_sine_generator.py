@@ -89,7 +89,7 @@ class TestNsgFunctions(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.nsg.set_frequency(invalid_freq)
 
-        self.nsg.max_frequency(new_max)
+        self.nsg.max_frequency = new_max
         self.nsg.set_frequency(invalid_freq)
         new_freq = self.nsg.get_frequency()
 
@@ -122,7 +122,7 @@ class TestNsgFunctions(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.nsg.set_amplitude(invalid_amp)
 
-        self.nsg.max_amplitude(new_max)
+        self.nsg.max_amplitude = new_max
         self.nsg.set_amplitude(invalid_amp)
         new_amp = self.nsg.get_amplitude()
 
@@ -150,7 +150,7 @@ class TestNsgFunctions(unittest.TestCase):
     def test_max_noise_not_modifiable(self):
         """Test that 'max_noise' cannot be changed as it is not in _rpc_constants."""
         with self.assertRaises(AttributeError):
-            self.nsg.max_noise(1.0)
+            self.nsg.max_noise = NSG.max_noise + 2.0
 
     def test_wait_setting(self):
         """Test that wait waits."""
@@ -177,7 +177,7 @@ class TestNsgFunctions(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.nsg.wait(invalid_wait)
 
-        self.nsg.max_wait(new_max)
+        self.nsg.max_wait = new_max
         self.nsg.wait(invalid_wait)
 
     def test_get_sample(self):

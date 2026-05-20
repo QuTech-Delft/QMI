@@ -7,7 +7,7 @@ import sys
 
 import qmi
 from qmi.instruments.newport.ag_uc8 import Newport_AG_UC8, AxisStatus
-from qmi.utils.context_managers import start_stop, open_close
+from qmi.utils.context_managers import open_close
 
 
 CHANNELS = [1, 2, 3, 4]

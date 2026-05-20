@@ -16,6 +16,7 @@ class NoisySineGenerator(QMI_Instrument):
         max_frequency: Maximum allowed frequency that can be set.
         max_amplitude: Maximum allowed amplitude that can be set.
         max_wait:      Maximum wait time duration.
+        max_noise:     Maximum noise level that can be set. By default the same as max amplitude.
     """
 
     _rpc_constants = ["max_frequency", "max_amplitude", "max_wait"]
@@ -39,7 +40,7 @@ class NoisySineGenerator(QMI_Instrument):
             value: The frequency value (unitless).
         """
         self._check_is_open()
-        valid = isinstance(value, float) and math.isfinite(value) and 0.0 < value < self.max_frequency
+        valid = isinstance(value, float) and math.isfinite(value) and 0.0 < value <= self.max_frequency
         if not valid:
             raise ValueError("Bad value for frequency: {!r}".format(value))
         
@@ -63,7 +64,7 @@ class NoisySineGenerator(QMI_Instrument):
             value: The new amplitude (unitless).
         """
         self._check_is_open()
-        valid = isinstance(value, float) and math.isfinite(value) and 0.0 < value < self.max_amplitude
+        valid = isinstance(value, float) and math.isfinite(value) and 0.0 < value <= self.max_amplitude
         if not valid:
             raise ValueError("Bad value for amplitude: {!r}".format(value))
 
@@ -87,7 +88,7 @@ class NoisySineGenerator(QMI_Instrument):
             value: The new noise level (unitless).
         """
         self._check_is_open()
-        valid = isinstance(value, float) and math.isfinite(value) and 0.0 < value < self.max_noise
+        valid = isinstance(value, float) and math.isfinite(value) and 0.0 < value <= self.max_noise
         if not valid:
             raise ValueError("Bad value for noise: {!r}".format(value))
 
@@ -111,7 +112,7 @@ class NoisySineGenerator(QMI_Instrument):
             duration: The wait duration in seconds.
         """
         self._check_is_open()
-        if not 0.0 < duration < self.max_wait:
+        if not 0.0 < duration <= self.max_wait:
             raise ValueError("Bad value for wait duration: {!r}".format(duration))
 
         time.sleep(duration)

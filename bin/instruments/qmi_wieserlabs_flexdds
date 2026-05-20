@@ -7,7 +7,7 @@ import sys
 
 import qmi
 from qmi.instruments.wieserlabs.flexdds import Wieserlabs_FlexDDS_NG_Dual, OutputChannel
-from qmi.utils.context_managers import start_stop, open_close
+from qmi.utils.context_managers import open_close
 
 
 def run() -> int:

@@ -10,7 +10,7 @@ from qmi.core.exceptions import QMI_ApplicationException
 from qmi.instruments.quantum_composers.pulse_generator9530 import (
     RefClkSource, PulseMode, TriggerMode, TriggerEdge, OutputDriver,
     QuantumComposers_PulseGenerator9530)
-from qmi.utils.context_managers import start_stop, open_close
+from qmi.utils.context_managers import open_close
 
 
 def run() -> int:
