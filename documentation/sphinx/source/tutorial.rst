@@ -128,14 +128,14 @@ So, using the usual way of adjusting class variables, the three attributes can g
     500.0
 
 Note that to change the value, *the same value type must be used*. Trying to set the `max_amplitude` with an integer value (like `500`) will lead to an exception.
-Also, trying to adjust `max_noise` will lead to an error:
+Also, trying to adjust `max_noise`, not included in RPC constants, will lead to an error:
 
 >>> nsg.max_noise = 20.0
     Traceback (most recent call last):
     File "<stdin>", line 1, in <module>
         nsg.max_noise = 20.0
         ^^^^^^^^^^^^^
-    File "C:\Users\heevasti\source\github\QMI\qmi\core\rpc.py", line 834, in __setattr__
+    File ".\qmi\core\rpc.py", line 834, in __setattr__
         raise AttributeError("Not allowed to set new attributes on a proxy class.")
     AttributeError: Not allowed to set new attributes on a proxy class.
 
@@ -166,7 +166,7 @@ Now, let's give it a shot and see what happens:
 Whoops, we got an error! This is because we didn't "open" the instrument first.
 Opening an instrument makes a connection to the instrument, which is potentially far away.
 Closing the instrument then closes the connection again.
-Now, for a  virtual instrument this is of course not necessary, but as it simulates a real instrument, we also simulate opening and closing.
+Now, for a virtual instrument this is of course not necessary, but as it simulates a real instrument, we also simulate opening and closing.
 
 >>> nsg.open()
 >>> nsg.get_sample()
@@ -190,7 +190,8 @@ When done, close the instrument and exit your Python interpreter:
 >>> nsg.close()
 >>> qmi.stop()
 
-From now on, we will no longer tell you to execute ``qmi.stop()``, but don't forget to do it.
+From now on, we will no longer tell you to execute ``qmi.stop()``, but don't forget to do it, or use a context manager.
+
 
 Locking an instrument
 ---------------------
@@ -240,11 +241,11 @@ The first proxy can interact with the instrument, but the second one cannot, bec
 2021-11-30 14:50:55.786 | ERROR    | qmi.core.rpc           | nsg locked, method request without lock token is denied
 Traceback (most recent call last):
   File "<stdin>", line 1, in <module>
-  File "/Users/qutech/Development/qmi/qmi/qmi/core/rpc.py", line 566, in <lambda>
+  File "./qmi/core/rpc.py", line 566, in <lambda>
     blocking_rpc_method_call(self._context, self._rpc_object_address, method_name, self._lock_token,
-  File "/Users/qutech/Development/qmi/qmi/qmi/core/rpc.py", line 505, in blocking_rpc_method_call
+  File "./qmi/core/rpc.py", line 505, in blocking_rpc_method_call
     return future.wait(rpc_timeout)
-  File "/Users/qutech/Development/qmi/qmi/qmi/core/rpc.py", line 458, in wait
+  File "./qmi/core/rpc.py", line 458, in wait
     raise QMI_RuntimeException("The object is locked by another proxy")
 qmi.core.exceptions.QMI_RuntimeException: The object is locked by another proxy
 
