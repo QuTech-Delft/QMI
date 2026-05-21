@@ -109,9 +109,9 @@ It also shows a listing of all RPC methods, signals and class constants of the p
         QMI signals:                                                                                         
 
         RPC constants:
-        - max_frequency=1000000.0
-        - max_amplitude=1000.0
-        - max_wait=10.0
+        - max_frequency: float = 1000000.0
+        - max_amplitude: float = 1000.0
+        - max_wait: = 10.0
 
 
 Using RPC constants

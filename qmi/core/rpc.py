@@ -1217,7 +1217,7 @@ def make_interface_descriptor(
         constant_value = getattr(rpc_object_class, constant_name)
         assert not inspect.isfunction(constant_value)
         constants.append(RpcConstantDescriptor(constant_name, constant_value))
-        doc += f"  - {constant_name}={constant_value}\n"
+        doc += f"  - {constant_name}: {type(constant_value).__name__} = {constant_value}\n"
 
     # Create interface descriptor.
     return RpcInterfaceDescriptor(
