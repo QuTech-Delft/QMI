@@ -3,6 +3,7 @@
 [![Documentation Status](https://readthedocs.org/projects/qmi/badge/?version=latest)](https://qmi.readthedocs.io/en/latest/?badge=latest)
 [![coverage](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/coverage.svg)](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/coverage.svg)
 [![tests](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/tests.svg)](https://github.com/QuTech-Delft/QMI/blob/main/.github/badges/tests.svg)
+[![FAIR checklist badge](https://fairsoftwarechecklist.net/badge.svg)](https://fairsoftwarechecklist.net/v0.2?f=31&a=32113&i=22100&r=133)
 
 # Quantum Measurement Infrastructure
 
