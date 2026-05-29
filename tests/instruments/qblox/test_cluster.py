@@ -2,7 +2,7 @@ import copy
 import json
 import logging
 import unittest
-from unittest.mock import patch, create_autospec
+from unittest.mock import call, patch, create_autospec
 
 # from qblox_instruments.native.cluster import IpTransport
 # from qblox_instruments.qcodes_drivers.cluster import Cluster as QcodesCluster
@@ -114,17 +114,50 @@ def make_flexible_mock(return_for_getpeername):
 
 
 class TypeHandle_QbloxModule(_QbloxModule):
-    """Extended class for more complex module function"""
+    """Extended class for more complex module function handles.
+    
+    Made compatible for both Native and QCodes cluster versions.
+    """
 
     class InstrumentType:
-        def __init__(self, instr_type: str, is_rf: bool):
+        def __init__(self, instr_type: str) -> None:
             self.value = instr_type
 
-    def __init__(self, module: str, is_rf: bool):
-        self.instrument_type = self.InstrumentType(module, is_rf)
+    class ModuleType:
+        def __init__(self, module_type: str) -> None:
+            self.value = module_type
+
+    class InstrumentClass:
+        def __init__(self, instr_type: str) -> None:
+            self.value = "Cluster" if "MM" in instr_type else "Module"
+
+    def __init__(self, module: str, is_rf: bool, slot: str) -> None:
+        self.instrument_type = self.InstrumentType(module)
+        self.module_type = self.ModuleType(module)
+        self.instrument_class = self.InstrumentClass(module)
         self.is_rf_type = is_rf
+        self.slot_idx = int(slot)
         super().__init__(module, {})
 
+    def present(self) -> bool:
+        return True
+    
+    def _get_sequencer_config(self, slot: int, sequencer: int) -> dict:
+        if self.module_type.value.startswith("QCM"):
+            return QCM_SEQUENCER_CONFIG
+        if self.module_type.value.startswith("QRM"):
+            return QRM_SEQUENCER_CONFIG
+        return {}  # MM
+
+    def _get_io_channel_config(self, slot: int, sequencer: int) -> dict:
+        return IO_CHANNEL_CONFIG
+
+    def _get_sequencer_channel_map(self, slot: int, sequencer: int) -> tuple:
+        return ([0, 2], [1, 3])
+    
+    def _get_sequencer_acq_channel_map(self, slot: int, sequencer: int) -> tuple:
+        return ([0], [1])
+    
 
 class ScpiClusterStub:
     """Mock the ScpiCluster class"""
@@ -177,7 +210,7 @@ class CreateClusterTestCase(unittest.TestCase):
         for slot, module in modules.items():
             module_name = module["model"][8:]
             is_rf = module["is_rf"]
-            self._mod_handles[slot] = {"type_handle": TypeHandle_QbloxModule(module_name, is_rf)}
+            self._mod_handles[slot] = {"type_handle": TypeHandle_QbloxModule(module_name, is_rf, slot)}
 
     def tearDown(self) -> None:
         # self._read_bin_patch.stop()
@@ -203,24 +236,34 @@ class CreateClusterTestCase(unittest.TestCase):
         self.assertEqual(name, cluster._name)
         self.assertEqual("MM", cluster._instrument_type)
         cluster.close()
+        cluster_patch.assert_has_calls([
+            call(identifier=ip, port=None, debug=None, dummy_cfg=None),
+            call()._get_idn(),
+            call().stop_sequencer(),
+            call().clear_sequencer_flags()
+        ])
 
     def test_create_qcodes_cluster(self):
         # Arrange
         status = unittest.mock.Mock()
         status.status = "OKAY;NO;PROBLEMS"
-        with patch("qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read") as read_patch, patch(
-                "qblox_instruments.scpi.layers.cluster_mm_legacy.Cluster.get_json_description") as json_patch, patch(
-                # "qblox_instruments.scpi.cluster.Cluster.get_json_description") as json_patch, patch(
-                "qblox_instruments.scpi.scpi.Scpi.check_error_queue", autospec=True) as err_patch, patch(
-                # "qblox_instruments.scpi.cluster.Cluster.check_error_queue", autospec=True) as err_patch, patch(
-                "qblox_instruments.native.cluster.Cluster.get_system_status", return_value=status):
+        # with patch("qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read") as read_patch, patch(
+        #         "qblox_instruments.scpi.layers.cluster_mm_legacy.Cluster.get_json_description") as json_patch, patch(
+        #         # "qblox_instruments.scpi.cluster.Cluster.get_json_description") as json_patch, patch(
+        #         "qblox_instruments.scpi.scpi.Scpi.check_error_queue", autospec=True) as err_patch, patch(
+        #         # "qblox_instruments.scpi.cluster.Cluster.check_error_queue", autospec=True) as err_patch, patch(
+        #         "qblox_instruments.native.cluster.Cluster.get_system_status", return_value=status):
+        with patch("qmi.instruments.qblox.cluster.Cluster") as cluster_patch:
             # side_effect = ["qblox,Cluster MM,b,", "OKAY;NO;PROBLEMS"] + list(map(str, range(20)))
-            side_effect = ["qblox,Cluster MM,b,", "0", "0"] + list(map(str, range(20)))
-            read_patch.side_effect = side_effect
+            # side_effect = ["qblox,Cluster MM,b,", "0", "0"] + list(map(str, range(20)))
+            # cluster_patch.side_effect = side_effect
+            cluster_patch().instrument_type = self._mod_handles["0"]["type_handle"].instrument_type
+            cluster_patch()._type_handle = self._mod_handles["0"]["type_handle"]
+            cluster_patch().modules = [v["type_handle"] for _, v in self._mod_handles.items()]
             # json_patch.side_effect = [JSON_DESCR_MODULES]
-            json_patch.side_effect = [mock_cluster_layout, "0", "0", JSON_DESCR_MODULES]
-            err_patch.return_value = mock_cluster_layout
-            name, ip = "native", "123.45.67.89"
+            # json_patch.side_effect = [mock_cluster_layout, "0", "0", JSON_DESCR_MODULES]
+            # err_patch.return_value = mock_cluster_layout
+            name, ip = "qcoodes", "123.45.67.89"
             # Act
             cluster = Qblox_QcodesCluster(self._ctx, name, ip)
             cluster.open()
@@ -229,36 +272,73 @@ class CreateClusterTestCase(unittest.TestCase):
         self.assertEqual(name, cluster._name)
         self.assertEqual("MM", cluster._instrument_type)
         cluster.close()
+        cluster_patch.assert_has_calls([
+            call(name=name, identifier=ip, port=None, debug=None, dummy_cfg=None),
+            call().stop_sequencer(),
+            call().clear_sequencer_flags()
+        ])
 
 
 class NativeClusterTestCase(unittest.TestCase):
     """Test native cluster instance methods."""
+    EXTRA_ATTRS = ["_get_sequencer_config"]
 
     def setUp(self) -> None:
-        self._read_bin_patch = patch("qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read_bin")
-        self._read_bin_patch.start()
-        with patch("qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read") as self.read_patch:
+        _mod_handles = {}
+        for slot, module in modules.items():
+            module_name = module["model"][8:]
+            is_rf = module["is_rf"]
+            _mod_handles[slot] = {
+                "type_handle": TypeHandle_QbloxModule(module_name, is_rf, slot),
+                "_get_sequencer_channel_map": TypeHandle_QbloxModule._get_sequencer_channel_map
+            }
+
+        self._qblox_instruments_patch = patch("qmi.instruments.qblox.cluster.qblox_instruments", unittest.mock.Mock())
+        self._qblox_instruments_patch.start()
+        self.addCleanup(self._qblox_instruments_patch.stop)
+        # self._read_bin_patch = patch("qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read_bin")
+        # self._read_bin_patch.start()
+        # with patch("qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read") as self.read_patch:
+        self._scpi_cluster_patch = patch("qmi.instruments.qblox.cluster.ScpiCluster", ScpiClusterStub)
+        self._scpi_cluster_patch.start()
+        self.addCleanup(self._scpi_cluster_patch.stop)
+        self._attr_names_patch = patch("qmi.instruments.qblox.cluster._get_required_qrm_qcm_attr_names", return_value=self.EXTRA_ATTRS)
+        self._qtm_attr_names_patch = patch("qmi.instruments.qblox.cluster._get_required_qtm_attr_names", return_value=self.EXTRA_ATTRS)
+        self._attr_names_patch.start()
+        self._qtm_attr_names_patch.start()
+        self.addCleanup(self._attr_names_patch.stop)
+        self.addCleanup(self._qtm_attr_names_patch.stop)
+        with patch("qmi.instruments.qblox.cluster.NativeCluster") as cluster_patch:
+            cluster_patch._get_sequencer_config = TypeHandle_QbloxModule._get_sequencer_config
+            cluster_patch._get_io_channel_config = TypeHandle_QbloxModule._get_io_channel_config
+            cluster_patch._get_sequencer_channel_map = TypeHandle_QbloxModule._get_sequencer_channel_map
+            cluster_patch._get_sequencer_acq_channel_map = TypeHandle_QbloxModule._get_sequencer_acq_channel_map
             side_effect = ["qblox,Cluster_MM,b," + BUILD_INFO] * 2
-            side_effect.extend(["0", "0"])
-            self.read_patch.side_effect = side_effect
-            setattr(self._read_bin_patch.target._read_bin, "__name__", "_read_bin")
-            self._read_bin_patch.target._read_bin.side_effect = (
-                [JSON_DESCR_MODULES]
-                + [json.dumps(QCM_SEQUENCER_CONFIG).encode("utf-8"), b"[[0, 2], [1, 3]]"] * 12
-                + [json.dumps(QRM_SEQUENCER_CONFIG).encode("utf-8"), b"[[0], [1]]", b"[[0], [1]]"] * 12
-                + [json.dumps(QTM_SEQUENCER_CONFIG).encode("utf-8"), json.dumps(IO_CHANNEL_CONFIG).encode("utf-8")] * 8
-            )
+            cluster_patch().instrument_type = _mod_handles["0"]["type_handle"].instrument_type
+            cluster_patch().instrument_class = _mod_handles["0"]["type_handle"].instrument_class
+            cluster_patch()._get_idn = unittest.mock.Mock(side_effect=side_effect)
+            cluster_patch()._mod_handles = _mod_handles
+            cluster_patch()._type_handle = _mod_handles["0"]["type_handle"]
+            # side_effect.extend(["0", "0"])
+            # self.read_patch.side_effect = side_effect
+            # setattr(self._read_bin_patch.target._read_bin, "__name__", "_read_bin")
+            # self._read_bin_patch.target._read_bin.side_effect = (
+            #     [JSON_DESCR_MODULES]
+            #     + [json.dumps(QCM_SEQUENCER_CONFIG).encode("utf-8"), b"[[0, 2], [1, 3]]"] * 12
+            #     + [json.dumps(QRM_SEQUENCER_CONFIG).encode("utf-8"), b"[[0], [1]]", b"[[0], [1]]"] * 12
+            #     + [json.dumps(QTM_SEQUENCER_CONFIG).encode("utf-8"), json.dumps(IO_CHANNEL_CONFIG).encode("utf-8")] * 8
+            # )
             name, ip = "native", "123.45.67.89"
             qmi.instruments.qblox.cluster.DEBUG_LEVEL = 2  # Set to 2 to avoid useless error checks
-            _scpi_transport = make_flexible_mock(("123.45.67.89", "5901"))
-            with patch("qblox_instruments.native.cluster.IpTransport", return_value=_scpi_transport) as self._scpi_transport:
+            # _scpi_transport = make_flexible_mock(("123.45.67.89", "5901"))
+            # with patch("qblox_instruments.native.cluster.IpTransport", return_value=_scpi_transport) as self._scpi_transport:
             # with patch("qblox_instruments.native.cluster.IpTransport", spec=IpTransport) as self._scpi_transport:
-                _ctx = QMI_Context("cluster_test")
-                self.cluster = Qblox_NativeCluster(_ctx, name, ip)
-                self.cluster.open()
+            _ctx = QMI_Context("cluster_test")
+            self.cluster = Qblox_NativeCluster(_ctx, name, ip)
+            self.cluster.open()
 
     def tearDown(self) -> None:
-        self._read_bin_patch.stop()
+        # self._read_bin_patch.stop()
         self.cluster.close()
 
     def test_get_module(self):
