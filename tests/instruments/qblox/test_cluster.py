@@ -2,12 +2,7 @@ import copy
 import json
 import logging
 import unittest
-from unittest.mock import call, patch, create_autospec
-
-# from qblox_instruments.native.cluster import IpTransport
-# from qblox_instruments.qcodes_drivers.cluster import Cluster as QcodesCluster
-# from qblox_instruments.qcodes_drivers.module import Module
-# from qblox_instruments.types import TypeHandle, InstrumentType
+from unittest.mock import call, patch
 
 import qmi.instruments.qblox.cluster
 from qmi.instruments.qblox import (
@@ -101,18 +96,6 @@ IO_CHANNEL_CONFIG = {
 }
 
 
-def make_flexible_mock(return_for_getpeername):
-    class FlexibleMock(unittest.mock.MagicMock):
-        def __getattr__(self, name):
-            if name == "getpeername":
-                m = unittest.mock.MagicMock()
-                m.return_value = return_for_getpeername
-                return m
-            return super().__getattr__(name)
-
-    return FlexibleMock("qblox_instruments.native.cluster.IpTransport")
-
-
 class TypeHandle_QbloxModule(_QbloxModule):
     """Extended class for more complex module function handles.
     
@@ -143,16 +126,21 @@ class TypeHandle_QbloxModule(_QbloxModule):
         return True
     
     def _get_sequencer_config(self, slot: int, sequencer: int) -> dict:
-        if self.module_type.value.startswith("QCM"):
+        if "QCM" in modules[str(slot)]["model"]:
             return QCM_SEQUENCER_CONFIG
-        if self.module_type.value.startswith("QRM"):
+        if "QRM" in modules[str(slot)]["model"]:
             return QRM_SEQUENCER_CONFIG
+        if "QTM" in modules[str(slot)]["model"]:
+            return QTM_SEQUENCER_CONFIG
         return {}  # MM
 
-    def _get_io_channel_config(self, slot: int, sequencer: int) -> dict:
+    def _get_io_channel_config(self) -> dict:
         return IO_CHANNEL_CONFIG
 
     def _get_sequencer_channel_map(self, slot: int, sequencer: int) -> tuple:
+        if "QRM" in modules[str(slot)]["model"]:
+            return ([0], [1])
+        
         return ([0, 2], [1, 3])
     
     def _get_sequencer_acq_channel_map(self, slot: int, sequencer: int) -> tuple:
@@ -165,6 +153,9 @@ class ScpiClusterStub:
     def _arm_sequencer(self): ...
     def _start_sequencer(self): ...
     def _stop_sequencer(self): ...
+    def _write(self, arg): ...
+    def _read_bin(self): ...
+    def _flush_line_end(self): ...
 
 
 class CreateClusterTestCase(unittest.TestCase):
@@ -174,16 +165,6 @@ class CreateClusterTestCase(unittest.TestCase):
         types = ["mm", "qcm", "qrm", "qtm", "rf"]
         for mod_type in types:
             setattr(mod, f"is_{mod_type}_type", lambda: mod_type.upper() in mod_e)
-        #     if "QCM" in mod_e and not "RF" in mod_e:
-        #         func_refs.QCM[f"is_{mod_type}_type"] = lambda: mod_type.upper() in mod_e
-        #     elif "QRM" in mod_e and not "RF" in mod_e:
-        #         func_refs.QRM[f"is_{mod_type}_type"] = lambda: mod_type.upper() in mod_e
-        #     elif "QTM" in mod_e:
-        #         func_refs.QTM[f"is_{mod_type}_type"] = lambda: mod_type.upper() in mod_e
-        #     elif "QCM" in mod_e and "RF" in mod_e:
-        #         func_refs.QCM_RF[f"is_{mod_type}_type"] = lambda: mod_type.upper() in mod_e
-        #     elif "QRM" in mod_e and "RF" in mod_e:
-        #         func_refs.QRM_RF[f"is_{mod_type}_type"] = lambda: mod_type.upper() in mod_e
 
         return mod
 
@@ -192,11 +173,6 @@ class CreateClusterTestCase(unittest.TestCase):
         self._qblox_instruments_patch = patch("qmi.instruments.qblox.cluster.qblox_instruments", unittest.mock.Mock())
         self._qblox_instruments_patch.start()
         self.addCleanup(self._qblox_instruments_patch.stop)
-        # _scpi_transport = make_flexible_mock(("123.45.67.89", "5901"))
-        # self._scpi_transport = patch("qmi.instruments.qblox.cluster.qblox_instruments.native.cluster.IpTransport", return_value=_scpi_transport)
-        # self._read_bin_patch = patch("qmi.instruments.qblox.cluster.qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read_bin")
-        # self._scpi_transport.start()
-        # self._read_bin_patch.start()
         self._scpi_cluster_patch = patch("qmi.instruments.qblox.cluster.ScpiCluster", ScpiClusterStub)
         self._scpi_cluster_patch.start()
         self.addCleanup(self._scpi_cluster_patch.stop)
@@ -212,23 +188,13 @@ class CreateClusterTestCase(unittest.TestCase):
             is_rf = module["is_rf"]
             self._mod_handles[slot] = {"type_handle": TypeHandle_QbloxModule(module_name, is_rf, slot)}
 
-    def tearDown(self) -> None:
-        # self._read_bin_patch.stop()
-        # self._scpi_transport.stop()
-        pass
-
     def test_create_native_cluster(self):
-        # with patch("qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read") as read_patch:
         with patch("qmi.instruments.qblox.cluster.NativeCluster") as cluster_patch:
             side_effect = ["qblox,Cluster_MM,b," + BUILD_INFO, "0"]
             cluster_patch().instrument_type = self._mod_handles["0"]["type_handle"].instrument_type
             cluster_patch()._get_idn = unittest.mock.Mock(side_effect=side_effect)
             cluster_patch()._mod_handles = self._mod_handles
             cluster_patch()._type_handle = self._mod_handles["0"]["type_handle"]
-            # side_effect.extend(["0"] * 2 + ["a,Cluster_MM,b," + BUILD_INFO] + ["0"] * 2)
-            # read_patch.side_effect = side_effect
-            # setattr(self._read_bin_patch.target._read_bin, "__name__", "_read_bin")
-            # self._read_bin_patch.target._read_bin.side_effect = [MOCK_CLUSTER_LAYOUT] + 2 * [b"0"]
             name, ip = "native", "123.45.67.89"
             cluster = Qblox_NativeCluster(self._ctx, name, ip)
             cluster.open()
@@ -247,22 +213,10 @@ class CreateClusterTestCase(unittest.TestCase):
         # Arrange
         status = unittest.mock.Mock()
         status.status = "OKAY;NO;PROBLEMS"
-        # with patch("qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read") as read_patch, patch(
-        #         "qblox_instruments.scpi.layers.cluster_mm_legacy.Cluster.get_json_description") as json_patch, patch(
-        #         # "qblox_instruments.scpi.cluster.Cluster.get_json_description") as json_patch, patch(
-        #         "qblox_instruments.scpi.scpi.Scpi.check_error_queue", autospec=True) as err_patch, patch(
-        #         # "qblox_instruments.scpi.cluster.Cluster.check_error_queue", autospec=True) as err_patch, patch(
-        #         "qblox_instruments.native.cluster.Cluster.get_system_status", return_value=status):
         with patch("qmi.instruments.qblox.cluster.Cluster") as cluster_patch:
-            # side_effect = ["qblox,Cluster MM,b,", "OKAY;NO;PROBLEMS"] + list(map(str, range(20)))
-            # side_effect = ["qblox,Cluster MM,b,", "0", "0"] + list(map(str, range(20)))
-            # cluster_patch.side_effect = side_effect
             cluster_patch().instrument_type = self._mod_handles["0"]["type_handle"].instrument_type
             cluster_patch()._type_handle = self._mod_handles["0"]["type_handle"]
             cluster_patch().modules = [v["type_handle"] for _, v in self._mod_handles.items()]
-            # json_patch.side_effect = [JSON_DESCR_MODULES]
-            # json_patch.side_effect = [mock_cluster_layout, "0", "0", JSON_DESCR_MODULES]
-            # err_patch.return_value = mock_cluster_layout
             name, ip = "qcoodes", "123.45.67.89"
             # Act
             cluster = Qblox_QcodesCluster(self._ctx, name, ip)
@@ -290,15 +244,13 @@ class NativeClusterTestCase(unittest.TestCase):
             is_rf = module["is_rf"]
             _mod_handles[slot] = {
                 "type_handle": TypeHandle_QbloxModule(module_name, is_rf, slot),
-                "_get_sequencer_channel_map": TypeHandle_QbloxModule._get_sequencer_channel_map
+                "_get_sequencer_channel_map": TypeHandle_QbloxModule._get_sequencer_channel_map,
+                "_get_io_channel_config": TypeHandle_QbloxModule._get_io_channel_config
             }
 
         self._qblox_instruments_patch = patch("qmi.instruments.qblox.cluster.qblox_instruments", unittest.mock.Mock())
         self._qblox_instruments_patch.start()
         self.addCleanup(self._qblox_instruments_patch.stop)
-        # self._read_bin_patch = patch("qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read_bin")
-        # self._read_bin_patch.start()
-        # with patch("qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read") as self.read_patch:
         self._scpi_cluster_patch = patch("qmi.instruments.qblox.cluster.ScpiCluster", ScpiClusterStub)
         self._scpi_cluster_patch.start()
         self.addCleanup(self._scpi_cluster_patch.stop)
@@ -319,26 +271,13 @@ class NativeClusterTestCase(unittest.TestCase):
             cluster_patch()._get_idn = unittest.mock.Mock(side_effect=side_effect)
             cluster_patch()._mod_handles = _mod_handles
             cluster_patch()._type_handle = _mod_handles["0"]["type_handle"]
-            # side_effect.extend(["0", "0"])
-            # self.read_patch.side_effect = side_effect
-            # setattr(self._read_bin_patch.target._read_bin, "__name__", "_read_bin")
-            # self._read_bin_patch.target._read_bin.side_effect = (
-            #     [JSON_DESCR_MODULES]
-            #     + [json.dumps(QCM_SEQUENCER_CONFIG).encode("utf-8"), b"[[0, 2], [1, 3]]"] * 12
-            #     + [json.dumps(QRM_SEQUENCER_CONFIG).encode("utf-8"), b"[[0], [1]]", b"[[0], [1]]"] * 12
-            #     + [json.dumps(QTM_SEQUENCER_CONFIG).encode("utf-8"), json.dumps(IO_CHANNEL_CONFIG).encode("utf-8")] * 8
-            # )
             name, ip = "native", "123.45.67.89"
             qmi.instruments.qblox.cluster.DEBUG_LEVEL = 2  # Set to 2 to avoid useless error checks
-            # _scpi_transport = make_flexible_mock(("123.45.67.89", "5901"))
-            # with patch("qblox_instruments.native.cluster.IpTransport", return_value=_scpi_transport) as self._scpi_transport:
-            # with patch("qblox_instruments.native.cluster.IpTransport", spec=IpTransport) as self._scpi_transport:
             _ctx = QMI_Context("cluster_test")
             self.cluster = Qblox_NativeCluster(_ctx, name, ip)
             self.cluster.open()
 
     def tearDown(self) -> None:
-        # self._read_bin_patch.stop()
         self.cluster.close()
 
     def test_get_module(self):
@@ -412,12 +351,6 @@ class ValString(str):
         return str(self)
 
 
-# class TypeHandleWithSetter(TypeHandle):
-# 
-#     def __setattr__(self, par, val):
-#         self.__dict__[f"{par}"] = val
-
-
 class QcodesClusterTestCase(unittest.TestCase):
     """Test SCPI cluster instance methods."""
 
@@ -429,70 +362,45 @@ class QcodesClusterTestCase(unittest.TestCase):
         return mod
 
     def setUp(self) -> None:
-        _scpi_transport = make_flexible_mock(("123.45.67.89", "5901"))
-        self._scpi_transport = patch("qblox_instruments.native.cluster.IpTransport", return_value=_scpi_transport)
-        self._scpi_transport.start()
-        self._read_bin_patch = patch("qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read_bin")
-        self._read_bin_patch.start()
-        setattr(self._read_bin_patch.target._read_bin, "__name__", "_read_bin")
-        self._read_bin_patch.target._read_bin.side_effect = (
-            [MOCK_CLUSTER_LAYOUT] + [JSON_DESCR_MODULES]
-            + [json.dumps(QCM_SEQUENCER_CONFIG).encode("utf-8"), b"[[0, 2], [1, 3]]"] * 12
-            + [json.dumps(QRM_SEQUENCER_CONFIG).encode("utf-8"), b"[[0], [1]]", b"[[0], [1]]"] * 12
-            + [json.dumps(QTM_SEQUENCER_CONFIG).encode("utf-8"), json.dumps(IO_CHANNEL_CONFIG).encode("utf-8")] * 8
-        )
-        with patch("qblox_instruments.ieee488_2.ieee488_2.Ieee488_2._read") as read_patch, patch(
-                "qblox_instruments.scpi.layers.cluster_mm_1_0.Cluster.get_json_description") as json_patch, patch(
-                "qblox_instruments.scpi.layers.cluster_mm_1_0.Cluster.check_error_queue", autospec=True
-        ):
-            side_effect = ["a,Cluster MM,b,", "OKAY;NO;PROBLEMS"] + list(map(str, range(20)))
-            read_patch.side_effect = side_effect
-            json_patch.return_value = mock_cluster_layout  # , b"0", b"0", JSON_DESCR_MODULES]
+        self._qblox_instruments_patch = patch("qmi.instruments.qblox.cluster.qblox_instruments", unittest.mock.Mock())
+        self._qblox_instruments_patch.start()
+        self.addCleanup(self._qblox_instruments_patch.stop)
+        self._scpi_cluster_patch = patch("qmi.instruments.qblox.cluster.ScpiCluster", ScpiClusterStub)
+        self._scpi_cluster_patch.start()
+        self.addCleanup(self._scpi_cluster_patch.stop)
+        with patch("qmi.instruments.qblox.cluster.Cluster") as cluster_patch:
             name, ip = "skippy", "123.45.67.89"
             qmi.instruments.qblox.cluster.DEBUG_LEVEL = 2  # Set to 2 to avoid useless error checks
             _ctx = QMI_Context("cluster_test")
-            with patch("qblox_instruments.native.cluster.Cluster._present_at_init") as present_patch, patch(
-                "qmi.instruments.qblox.cluster.Cluster") as qcodes_patch:
-                modules = ["QCM", "QCM-RF", "QRM", "QRM-RF", "QTM"]
-                # module_handles = [
-                    # TypeHandle(f"CLUSTER_{module}") for module in modules
-                # ]
-                module_handles = [
-                    _QbloxModule(f"CLUSTER_{module}") for module in modules
-                ]
-                # present_patch.side_effect = [module_handles + [TypeHandle("CLUSTER_QDM")] * 14] * 5
-                present_patch.side_effect = [module_handles + [_QbloxModule("CLUSTER_QDM", {})] * 14] * 5
-                # attr_patch.return_value = [
-                #     "is_qrm_type", "is_qtm_type", "is_rf_type", "is_qrc_type", "is_qcm_type"
-                # ]
-                # retval = create_autospec(QcodesCluster, instance=False)
-                # retval.instrument_type = InstrumentType("MM")
-                retval = unittest.mock.MagicMock()
-                retval.instrument_type = _QbloxModule("MM", {})
-                # retval._type_handle = self._add_is_functions_to_module(TypeHandleWithSetter("Cluster_MM"), "MM")
-                retval._type_handle = self._add_is_functions_to_module(unittest.mock.MagicMock("Cluster_MM"), "MM")
-                retval.modules = []
-                for e, mod in enumerate(modules):
-                    # inst_mod = create_autospec(Module)(None, modules[e], e + 1)
-                    inst_mod = create_autospec(_QbloxModule)(modules[e], {})
-                    inst_mod.present = lambda : True
-                    inst_mod.module_type = ValString(modules[e])
-                    inst_mod.slot_idx = e + 1
-                    inst_mod.name = mod
-                    inst_mod.is_mm_type = lambda : False
-                    inst_mod.is_qcm_type = lambda : mod == "QCM"
-                    inst_mod.is_qrm_type = lambda : mod == "QRM"
-                    inst_mod.is_qtm_type = lambda : mod == "QTM"
-                    inst_mod.is_rf_type = lambda : "RF" in mod
-                    retval.modules.append(inst_mod)
+            modules = ["QCM", "QCM-RF", "QRM", "QRM-RF", "QTM"]
+            retval = unittest.mock.MagicMock()
+            retval.instrument_type = TypeHandle_QbloxModule("MM", False, 0).instrument_type
+            retval._type_handle = self._add_is_functions_to_module(unittest.mock.MagicMock("Cluster_MM"), "MM")
+            retval.modules = []
+            for e, mod in enumerate(modules):
+                is_rf = True if "RF" in mod else False
+                inst_mod = TypeHandle_QbloxModule(mod, is_rf, e)
+                inst_mod.present = lambda : True
+                inst_mod.module_type = ValString(modules[e])
+                inst_mod.slot_idx = e + 1
+                inst_mod.name = mod
+                # inst_mod.is_mm_type = lambda : False
+                # inst_mod.is_qcm_type = lambda : mod == "QCM"
+                # inst_mod.is_qrm_type = lambda : mod == "QRM"
+                # inst_mod.is_qtm_type = lambda : mod == "QTM"
+                # inst_mod.is_rf_type = lambda : "RF" in mod
+                inst_mod.is_mm_type = False
+                inst_mod.is_qcm_type = "QCM" in mod
+                inst_mod.is_qrm_type = "QRM" in mod
+                inst_mod.is_qtm_type = mod == "QTM"
+                # inst_mod.is_rf_type = "RF" in mod
+                retval.modules.append(inst_mod)
 
-                qcodes_patch.return_value = retval
-                self.cluster = Qblox_QcodesCluster(_ctx, name, ip)
-                self.cluster.open()
+            cluster_patch.return_value = retval
+            self.cluster = Qblox_QcodesCluster(_ctx, name, ip)
+            self.cluster.open()
 
     def tearDown(self) -> None:
-        self._read_bin_patch.stop()
-        self._scpi_transport.stop()
         self.cluster.close()
 
     def test_get_module(self):
@@ -504,69 +412,69 @@ class QcodesClusterTestCase(unittest.TestCase):
         qcm = self.cluster.get_module("QCM")
         self.assertEqual("QCM", qcm.name)
         self.assertTrue(qcm.is_qcm_type)
-        # self.assertFalse(qcm.is_qrm_type)
-        # self.assertFalse(qcm.is_qtm_type)
-        # self.assertFalse(qcm.is_rf_type)
+        self.assertFalse(qcm.is_qrm_type)
+        self.assertFalse(qcm.is_qtm_type)
+        self.assertFalse(qcm.is_rf_type)
 
         qcm_rf = self.cluster.get_module("QCM-RF")
         self.assertEqual("QCM-RF", qcm_rf.name)
         self.assertTrue(qcm_rf.is_qcm_type)
-        # self.assertFalse(qcm_rf.is_qrm_type)
-        # self.assertFalse(qcm_rf.is_qtm_type)
+        self.assertFalse(qcm_rf.is_qrm_type)
+        self.assertFalse(qcm_rf.is_qtm_type)
         self.assertTrue(qcm_rf.is_rf_type)
 
         qrm = self.cluster.get_module("QRM")
         self.assertEqual("QRM", qrm.name)
-        # self.assertFalse(qrm.is_qcm_type)
+        self.assertFalse(qrm.is_qcm_type)
         self.assertTrue(qrm.is_qrm_type)
-        # self.assertFalse(qrm.is_qtm_type)
-        # self.assertFalse(qrm.is_rf_type)
+        self.assertFalse(qrm.is_qtm_type)
+        self.assertFalse(qrm.is_rf_type)
 
         qrm_rf = self.cluster.get_module("QRM-RF")
         self.assertEqual("QRM-RF", qrm_rf.name)
-        # self.assertFalse(qrm_rf.is_qcm_type)
+        self.assertFalse(qrm_rf.is_qcm_type)
         self.assertTrue(qrm_rf.is_qrm_type)
-        # self.assertFalse(qrm_rf.is_qtm_type)
+        self.assertFalse(qrm_rf.is_qtm_type)
         self.assertTrue(qrm_rf.is_rf_type)
 
         qtm = self.cluster.get_module("QTM")
         self.assertEqual("QTM", qtm.name)
-        # self.assertFalse(qtm.is_qcm_type)
-        # self.assertFalse(qtm.is_qrm_type)
+        self.assertFalse(qtm.is_qcm_type)
+        self.assertFalse(qtm.is_qrm_type)
         self.assertTrue(qtm.is_qtm_type)
-        # self.assertFalse(qtm.is_rf_type)
+        self.assertFalse(qtm.is_rf_type)
 
     def test_get_module_func_refs(self):
         # TODO: These tests do not run properly. Try to fix!
         qcm = self.cluster.get_module_func_refs("QCM")
         self.assertTrue(qcm["is_qcm_type"]())
-        # self.assertFalse(qcm["is_qrm_type"]())
-        # self.assertFalse(qcm["is_qtm_type"]())
-        # self.assertFalse(qcm["is_rf_type"]())
+        self.assertFalse(qcm["is_qrm_type"]())
+        self.assertFalse(qcm["is_qtm_type"]())
+        self.assertFalse(qcm["is_rf_type"]())
 
         qcm_rf = self.cluster.get_module_func_refs("QCM-RF")
         self.assertTrue(qcm_rf["is_qcm_type"]())
-        # self.assertFalse(qcm_rf["is_qrm_type"]())
-        # self.assertFalse(qcm_rf["is_qtm_type"]())
+        self.assertFalse(qcm_rf["is_qrm_type"]())
+        self.assertFalse(qcm_rf["is_qtm_type"]())
         self.assertTrue(qcm_rf["is_rf_type"]())
 
         qrm = self.cluster.get_module_func_refs("QRM")
-        # self.assertFalse(qrm["is_qcm_type"]())
+        self.assertFalse(qrm["is_qcm_type"]())
         self.assertTrue(qrm["is_qrm_type"]())
-        # self.assertFalse(qrm["is_qtm_type"]())
-        # self.assertFalse(qrm["is_rf_type"]())
+        self.assertFalse(qrm["is_qtm_type"]())
+        self.assertFalse(qrm["is_rf_type"]())
 
         qrm_rf = self.cluster.get_module_func_refs("QRM-RF")
-        # self.assertFalse(qrm_rf["is_qcm_type"]())
+        self.assertFalse(qrm_rf["is_qcm_type"]())
         self.assertTrue(qrm_rf["is_qrm_type"]())
-        # self.assertFalse(qrm_rf["is_qtm_type"]())
+        self.assertFalse(qrm_rf["is_qtm_type"]())
         self.assertTrue(qrm_rf["is_rf_type"]())
 
         qtm = self.cluster.get_module_func_refs("QTM")
-        # self.assertFalse(qtm["is_qcm_type"]())
-        # self.assertFalse(qtm["is_qrm_type"]())
+        self.assertFalse(qtm["is_qcm_type"]())
+        self.assertFalse(qtm["is_qrm_type"]())
         self.assertTrue(qtm["is_qtm_type"]())
-        # self.assertFalse(qtm["is_rf_type"]())
+        self.assertFalse(qtm["is_rf_type"]())
 
     def test_get_channels(self):
         """Test getting all channels and sequencers out from the modules"""
@@ -583,9 +491,6 @@ class QcodesClusterTestCase(unittest.TestCase):
                     + DIGITAL_MARKERS_IN_MODULE[module]
                     + AI_IN_MODULE[module]
                 ) * SEQUENCERS_IN_MODULE[module]
-            # if "RF" in module:  # The RF modules are created using the regular non-RF channel map, giving double AIO
-            #     expected_channels += 2 * SEQUENCERS_IN_MODULE[module]
-            #
             if module == "QTM":  # The QTM module has 8 "generic" IO channels in output
                 expected_channels = SEQUENCERS_IN_MODULE[module]
 
@@ -595,7 +500,7 @@ class QcodesClusterTestCase(unittest.TestCase):
             module_mock.io_channels = [f"IO{i}" for i in range(num_seq)] if module == "QTM" else []
             sequencers_mock = unittest.mock.Mock()
             sequencers_mock._get_sequencer_config = unittest.mock.Mock(return_value=SequencerObject)
-            for s in range(num_seq):
+            for _ in range(num_seq):
                 module_mock.sequencers.append(sequencers_mock)
 
             side_effects = []

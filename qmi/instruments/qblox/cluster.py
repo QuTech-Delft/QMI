@@ -722,9 +722,9 @@ class Qblox_QcodesCluster(Qblox_ClusterBase):
                     setattr(module, attr_name, getattr(ScpiCluster, attr_name))
 
         # Reassign 'arm_sequencer', 'start_sequencer' and 'stop_sequencer' directly to SCPI write calls
-        setattr(module, "arm_sequencer", partial(getattr(ScpiCluster, "_write"), self.cluster))
-        setattr(module, "start_sequencer", partial(getattr(ScpiCluster, "_write"), self.cluster))
-        setattr(module, "stop_sequencer", partial(getattr(ScpiCluster, "_write"), self.cluster))
+        setattr(module, "arm_sequencer", partial(getattr(ScpiCluster, "_arm_sequencer"), self.cluster))
+        setattr(module, "start_sequencer", partial(getattr(ScpiCluster, "_start_sequencer"), self.cluster))
+        setattr(module, "stop_sequencer", partial(getattr(ScpiCluster, "_stop_sequencer"), self.cluster))
 
         return module
 
