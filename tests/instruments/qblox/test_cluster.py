@@ -107,7 +107,7 @@ class TypeHandle_QbloxModule(_QbloxModule):
             self.value = instr_type
 
     class ModuleType:
-        def __init__(self, module_type: str) -> None:
+        def __init__(self, module_type: str, is_rf: bool) -> None:
             self.value = module_type
 
     class InstrumentClass:
@@ -115,15 +115,16 @@ class TypeHandle_QbloxModule(_QbloxModule):
             self.value = "Cluster" if "MM" in instr_type else "Module"
 
     def __init__(self, module: str, is_rf: bool, slot: str) -> None:
+        self.name = module  # Qcodes only
         self.instrument_type = self.InstrumentType(module)
-        self.module_type = self.ModuleType(module)
+        self.module_type = self.ModuleType(module, is_rf)
         self.instrument_class = self.InstrumentClass(module)
         self.is_rf_type = is_rf
-        self.slot_idx = int(slot)
+        self.slot_idx = int(slot)  # Qcodes only
         super().__init__(module, {})
 
     def present(self) -> bool:
-        return True
+        return True  # Qcodes only
     
     def _get_sequencer_config(self, slot: int, sequencer: int) -> dict:
         if "QCM" in modules[str(slot)]["model"]:
@@ -186,7 +187,8 @@ class CreateClusterTestCase(unittest.TestCase):
         for slot, module in modules.items():
             module_name = module["model"][8:]
             is_rf = module["is_rf"]
-            self._mod_handles[slot] = {"type_handle": TypeHandle_QbloxModule(module_name, is_rf, slot)}
+            type_handle = TypeHandle_QbloxModule(module_name, is_rf, slot)
+            self._mod_handles[slot] = {"type_handle": type_handle}
 
     def test_create_native_cluster(self):
         with patch("qmi.instruments.qblox.cluster.NativeCluster") as cluster_patch:
@@ -232,6 +234,42 @@ class CreateClusterTestCase(unittest.TestCase):
             call().clear_sequencer_flags()
         ])
 
+    def test_base_cluster_helpers(self):
+        cluster = qmi.instruments.qblox.cluster.Qblox_ClusterBase(
+            self._ctx, "base", "123.45.67.89", port=5025, dummy_cfg={"1": "QCM"}
+        )
+        cluster._cluster = unittest.mock.Mock()
+        cluster.cluster_funcs["do_work"] = unittest.mock.Mock()
+        status = unittest.mock.Mock()
+        status.status.name = "OKAY"
+        cluster.cluster.get_system_status.return_value = status
+        cluster.cluster.get_trigger_monitor_count.return_value = 7
+        cluster.cluster.get_trigger_monitor_latest.return_value = 3
+
+        self.assertEqual("base", cluster.get_name())
+        self.assertIs(cluster.cluster_funcs, cluster.get_funcs())
+        self.assertEqual("OKAY", cluster.get_system_state())
+        cluster.reset_cluster()
+        cluster.cluster._reset.assert_called_once_with()
+        cluster.reset_trigger_monitor_count(1)
+        cluster.cluster.reset_trigger_monitor_count.assert_called_once_with(1)
+        self.assertEqual(7, cluster.get_trigger_monitor_count(2))
+        cluster.cluster.get_trigger_monitor_count.assert_called_once_with(2)
+        self.assertEqual(3, cluster.get_trigger_monitor_latest())
+
+        with self.assertRaises(ValueError):
+            cluster.reset_trigger_monitor_count(0)
+        with self.assertRaises(ValueError):
+            cluster.get_trigger_monitor_count(16)
+        with self.assertRaises(NotImplementedError):
+            cluster.reset_module(1)
+        with self.assertRaises(NotImplementedError):
+            cluster.get_module("QCM")
+        with self.assertRaises(NotImplementedError):
+            cluster.get_module_func_refs("QCM")
+        with self.assertRaises(NotImplementedError):
+            cluster.get_module_channels("QCM")
+
 
 class NativeClusterTestCase(unittest.TestCase):
     """Test native cluster instance methods."""
@@ -242,8 +280,14 @@ class NativeClusterTestCase(unittest.TestCase):
         for slot, module in modules.items():
             module_name = module["model"][8:]
             is_rf = module["is_rf"]
+            type_handle = TypeHandle_QbloxModule(module_name, is_rf, slot)
+            type_handle._is_mm_type = "MM" in module_name
+            type_handle._is_qcm_type = "QCM" in module_name
+            type_handle._is_qrm_type = "QRM" in module_name
+            type_handle._is_qtm_type = "QTM" in module_name
+            type_handle._is_rf_type = is_rf
             _mod_handles[slot] = {
-                "type_handle": TypeHandle_QbloxModule(module_name, is_rf, slot),
+                "type_handle": type_handle,
                 "_get_sequencer_channel_map": TypeHandle_QbloxModule._get_sequencer_channel_map,
                 "_get_io_channel_config": TypeHandle_QbloxModule._get_io_channel_config
             }
@@ -320,6 +364,86 @@ class NativeClusterTestCase(unittest.TestCase):
         self.assertTrue(qtm.is_qtm_type())
         self.assertFalse(qtm.is_rf_type())
 
+    def test_get_module_func_refs(self):
+        qcm = self.cluster.get_module_func_refs("QCM")
+        self.assertTrue(qcm["is_qcm_type"]())
+        self.assertFalse(qcm["is_qrm_type"]())
+        self.assertFalse(qcm["is_qtm_type"]())
+        self.assertFalse(qcm["is_rf_type"]())
+
+        qcm_rf = self.cluster.get_module_func_refs("QCM-RF")
+        self.assertTrue(qcm_rf["is_qcm_type"]())
+        self.assertFalse(qcm_rf["is_qrm_type"]())
+        self.assertFalse(qcm_rf["is_qtm_type"]())
+        self.assertTrue(qcm_rf["is_rf_type"]())
+
+        qrm = self.cluster.get_module_func_refs("QRM")
+        self.assertFalse(qrm["is_qcm_type"]())
+        self.assertTrue(qrm["is_qrm_type"]())
+        self.assertFalse(qrm["is_qtm_type"]())
+        self.assertFalse(qrm["is_rf_type"]())
+
+        qrm_rf = self.cluster.get_module_func_refs("QRM-RF")
+        self.assertFalse(qrm_rf["is_qcm_type"]())
+        self.assertTrue(qrm_rf["is_qrm_type"]())
+        self.assertFalse(qrm_rf["is_qtm_type"]())
+        self.assertTrue(qrm_rf["is_rf_type"]())
+
+        qtm = self.cluster.get_module_func_refs("QTM")
+        self.assertFalse(qtm["is_qcm_type"]())
+        self.assertFalse(qtm["is_qrm_type"]())
+        self.assertTrue(qtm["is_qtm_type"]())
+        self.assertFalse(qtm["is_rf_type"]())
+
+    def test_get_module_with_slot_and_errors(self):
+        self.assertIs(self.cluster.cluster, self.cluster.get_module("MM", slot_no=0))
+        self.assertEqual("QCM", str(self.cluster.get_module("QCM", slot_no=1)))
+        self.assertEqual("QRM-RF", str(self.cluster.get_module("QRM-RF", slot_no=4)))
+
+        with self.assertRaisesRegex(ValueError, "management module"):
+            self.cluster.get_module("MM", slot_no=1)
+        with self.assertRaisesRegex(ValueError, "slot position 2"):
+            self.cluster.get_module("QCM", slot_no=2)
+        with self.assertRaisesRegex(ValueError, "Module QRC not found"):
+            self.cluster.get_module("QRC")
+
+    def test_get_module_func_refs_for_cluster_and_slot(self):
+        cluster_funcs = self.cluster.get_module_func_refs("MM")
+        self.assertIn("get_trigger_monitor_count", cluster_funcs)
+        self.assertTrue(cluster_funcs["is_mm_type"]())
+
+        qcm_refs = self.cluster.get_module_func_refs("QCM", slot_no=1)
+        self.assertTrue(qcm_refs["is_qcm_type"]())
+        self.assertIn("_get_sequencer_config", qcm_refs)
+
+    def test_native_channel_filters_and_channel_map_cache(self):
+        adc_channels, sequencers = self.cluster.get_module_channels("QRM", slot_no=3, channel_type=1)
+        self.assertEqual(2 * SEQUENCERS_IN_MODULE["QRM"], len(adc_channels))
+        self.assertEqual(SEQUENCERS_IN_MODULE["QRM"], len(sequencers))
+        self.assertTrue(all(name.startswith("adc") for name in adc_channels))
+
+        dac_channels, _ = self.cluster.get_module_channels("QCM", slot_no=1, channel_type=2)
+        self.assertEqual(4 * SEQUENCERS_IN_MODULE["QCM"], len(dac_channels))
+        self.assertTrue(all(name.startswith("dac") for name in dac_channels))
+
+        marker_channels, _ = self.cluster.get_module_channels("QCM", slot_no=1, channel_type=3)
+        self.assertEqual(DIGITAL_MARKERS_IN_MODULE["QCM"] * SEQUENCERS_IN_MODULE["QCM"], len(marker_channels))
+        self.assertTrue(all(name.startswith("DO") for name in marker_channels))
+
+        io_channels, _ = self.cluster.get_module_channels("QTM", slot_no=5, channel_type=4)
+        self.assertEqual(SEQUENCERS_IN_MODULE["QTM"], len(io_channels))
+        self.assertTrue(all(name.startswith("IO") for name in io_channels))
+
+        with patch("qmi.instruments.qblox.cluster.ChannelMapCache", return_value="cache") as cache_patch:
+            cache = self.cluster.get_module_channel_map_cache("QCM", slot_no=1)
+
+        self.assertEqual("cache", cache)
+        cache_patch.assert_called_once()
+
+    def test_reset_module_calls_native_slot_reset(self):
+        self.cluster.reset_module(1)
+        self.cluster.cluster._slot_reset.assert_called_once_with()
+
     def test_get_channels(self):
         """Test getting all channels and sequencers out from the modules"""
         for module in ["MM", "QCM", "QCM-RF", "QRM", "QRM-RF", "QTM"]:
@@ -372,30 +496,23 @@ class QcodesClusterTestCase(unittest.TestCase):
             name, ip = "skippy", "123.45.67.89"
             qmi.instruments.qblox.cluster.DEBUG_LEVEL = 2  # Set to 2 to avoid useless error checks
             _ctx = QMI_Context("cluster_test")
-            modules = ["QCM", "QCM-RF", "QRM", "QRM-RF", "QTM"]
             retval = unittest.mock.MagicMock()
             retval.instrument_type = TypeHandle_QbloxModule("MM", False, 0).instrument_type
             retval._type_handle = self._add_is_functions_to_module(unittest.mock.MagicMock("Cluster_MM"), "MM")
-            retval.modules = []
-            for e, mod in enumerate(modules):
-                is_rf = True if "RF" in mod else False
-                inst_mod = TypeHandle_QbloxModule(mod, is_rf, e)
+            retval_modules = []
+            for e, mod in modules.items():
+                model = mod["model"][8:] + "-RF" if mod["is_rf"] else mod["model"][8:]
+                is_rf = True if "RF" in model else False
+                inst_mod = TypeHandle_QbloxModule(model, is_rf, e)
                 inst_mod.present = lambda : True
-                inst_mod.module_type = ValString(modules[e])
-                inst_mod.slot_idx = e + 1
-                inst_mod.name = mod
-                # inst_mod.is_mm_type = lambda : False
-                # inst_mod.is_qcm_type = lambda : mod == "QCM"
-                # inst_mod.is_qrm_type = lambda : mod == "QRM"
-                # inst_mod.is_qtm_type = lambda : mod == "QTM"
-                # inst_mod.is_rf_type = lambda : "RF" in mod
-                inst_mod.is_mm_type = False
-                inst_mod.is_qcm_type = "QCM" in mod
-                inst_mod.is_qrm_type = "QRM" in mod
-                inst_mod.is_qtm_type = mod == "QTM"
-                # inst_mod.is_rf_type = "RF" in mod
-                retval.modules.append(inst_mod)
+                inst_mod.module_type = ValString(model)
+                inst_mod.is_mm_type = "MM" in model
+                inst_mod.is_qcm_type = "QCM" in model
+                inst_mod.is_qrm_type = "QRM" in model
+                inst_mod.is_qtm_type = model == "QTM"
+                retval_modules.append(inst_mod)
 
+            retval.modules = retval_modules[1:] + [retval_modules.pop(0)]
             cluster_patch.return_value = retval
             self.cluster = Qblox_QcodesCluster(_ctx, name, ip)
             self.cluster.open()
@@ -404,10 +521,12 @@ class QcodesClusterTestCase(unittest.TestCase):
         self.cluster.close()
 
     def test_get_module(self):
-        # TODO: These tests do not run properly. Try to fix!
         mm = self.cluster.get_module("MM")
-        # self.assertEqual("MM", mm.name)
         self.assertTrue(mm.is_mm_type)
+        self.assertFalse(mm.is_qcm_type)
+        self.assertFalse(mm.is_qrm_type)
+        self.assertFalse(mm.is_qtm_type)
+        self.assertFalse(mm.is_rf_type)
 
         qcm = self.cluster.get_module("QCM")
         self.assertEqual("QCM", qcm.name)
@@ -445,7 +564,6 @@ class QcodesClusterTestCase(unittest.TestCase):
         self.assertFalse(qtm.is_rf_type)
 
     def test_get_module_func_refs(self):
-        # TODO: These tests do not run properly. Try to fix!
         qcm = self.cluster.get_module_func_refs("QCM")
         self.assertTrue(qcm["is_qcm_type"]())
         self.assertFalse(qcm["is_qrm_type"]())
@@ -475,6 +593,98 @@ class QcodesClusterTestCase(unittest.TestCase):
         self.assertFalse(qtm["is_qrm_type"]())
         self.assertTrue(qtm["is_qtm_type"]())
         self.assertFalse(qtm["is_rf_type"]())
+
+    def test_get_module_with_slot_and_errors(self):
+        self.assertTrue(self.cluster.get_module("MM", slot_no=0).is_mm_type)
+        self.assertEqual("QCM", self.cluster.get_module("QCM", slot_no=1).name)
+        self.assertEqual("QRM-RF", self.cluster.get_module("QRM-RF", slot_no=4).name)
+
+        with self.assertRaisesRegex(ValueError, "management module"):
+            self.cluster.get_module("MM", slot_no=1)
+        with self.assertRaisesRegex(ValueError, "Module QRC not found"):
+            self.cluster.get_module("QRC")
+        with self.assertRaisesRegex(ValueError, "slot position 2"):
+            self.cluster.get_module_channels("QCM", slot_no=2)
+        with self.assertRaisesRegex(ValueError, "not found on cluster"):
+            self.cluster.get_module_channels("QRC")
+        with self.assertRaisesRegex(ValueError, "slot 0"):
+            self.cluster.get_module_channels("QCM", slot_no=0)
+
+    def test_get_module_func_refs_does_not_mutate_module_type_flags(self):
+        module = self.cluster.get_module("QCM")
+        self.assertIs(module.is_qrm_type, False)
+
+        refs = self.cluster.get_module_func_refs("QCM")
+
+        self.assertIs(module.is_qrm_type, False)
+        self.assertIs(refs["is_qrm_type"](), False)
+        self.assertTrue(callable(refs["is_qrm_type"]))
+
+    def test_get_module_func_refs_for_mm_and_slot(self):
+        with self.assertRaises(AttributeError):
+            self.cluster.get_module_func_refs("MM")
+
+        qrm_rf_refs = self.cluster.get_module_func_refs("QRM-RF", slot_no=4)
+        self.assertTrue(qrm_rf_refs["is_qrm_type"]())
+        self.assertTrue(qrm_rf_refs["is_rf_type"]())
+        self.assertIn("_check_error_queue", qrm_rf_refs)
+
+    def test_check_error_queue_no_errors_and_raises(self):
+        self.cluster.cluster._debug.value = 1
+        self.cluster.cluster._read.side_effect = ["0"]
+        self.cluster._check_error_queue()
+        self.cluster.cluster._read.assert_called_once_with("SYSTem:ERRor:COUNt?")
+
+        self.cluster.cluster._read.reset_mock()
+        self.cluster.cluster._read.side_effect = ["1", "100,first error", "0"]
+        with self.assertRaisesRegex(RuntimeError, "first error"):
+            self.cluster._check_error_queue()
+
+        self.cluster.cluster._read.reset_mock()
+        self.cluster.cluster._read.side_effect = ["0"]
+        with self.assertRaisesRegex(ValueError, "bad value"):
+            self.cluster._check_error_queue(ValueError("bad value"))
+
+    def test_qcodes_channel_filters_and_runtime_fallback(self):
+        qcm = self.cluster._modules["1"]["QCM"]
+        qcm.sequencers = [unittest.mock.Mock(parameters=IO_CHANNEL_CONFIG, sync_en=False) for _ in range(2)]
+        for sequencer in qcm.sequencers:
+            sequencer._get_sequencer_config.return_value = SequencerObject
+        qcm._iter_connections = unittest.mock.Mock(return_value=[
+            [0, "I", "dac0"],
+            [0, "Q", "dac1"],
+            [1, "I", "dac2"],
+            [1, "Q", "dac3"],
+        ])
+
+        dac_channels, sequencers = self.cluster.get_module_channels("QCM", slot_no=1, channel_type=2)
+        self.assertEqual(["dac0_I0", "dac1_Q0", "dac2_I1", "dac3_Q1"], list(dac_channels))
+        self.assertEqual(["sequencer0", "sequencer1"], list(sequencers))
+
+        marker_channels, _ = self.cluster.get_module_channels("QCM", slot_no=1, channel_type=3)
+        self.assertEqual(["DO0_0", "DO1_0", "DO2_1", "DO3_1"], list(marker_channels))
+
+        qtm = self.cluster._modules["5"]["QTM"]
+        qtm.io_channels = []
+        qtm._iter_connections = unittest.mock.Mock(side_effect=RuntimeError("no seq chan"))
+
+        class SequencerStub:
+            sync_en = True
+
+            def _get_sequencer_config(self):
+                return SequencerObject
+
+            def __getattr__(self, name):
+                if name.endswith("_count_threshold"):
+                    return 12
+                if name.endswith("_threshold_invert"):
+                    return False
+                raise AttributeError(name)
+
+        qtm.sequencers = [SequencerStub(), SequencerStub()]
+        fallback_channels, fallback_sequencers = self.cluster.get_module_channels("QTM", slot_no=5, channel_type=3)
+        self.assertEqual(8, len(fallback_channels))
+        self.assertEqual(["sequencer0", "sequencer1"], list(fallback_sequencers))
 
     def test_get_channels(self):
         """Test getting all channels and sequencers out from the modules"""

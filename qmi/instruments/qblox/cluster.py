@@ -729,7 +729,7 @@ class Qblox_QcodesCluster(Qblox_ClusterBase):
         return module
 
     def _make_func_refs_from_module(self, module: Any, slot: int) -> dict[str, Callable]:
-        module_func_refs = module.__dict__
+        module_func_refs = module.__dict__.copy()
         for attr_name in ["_bin_block_write", "_write_bin", "_read", "_check_in_type"]:
             if hasattr(ScpiCluster, attr_name):
                 partial_attr = partial(getattr(ScpiCluster, attr_name), module_func_refs)
