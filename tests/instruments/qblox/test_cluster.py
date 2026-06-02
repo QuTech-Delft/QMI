@@ -270,6 +270,33 @@ class CreateClusterTestCase(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             cluster.get_module_channels("QCM")
 
+    def test_test_helpers_cover_default_paths(self):
+        mm_handle = TypeHandle_QbloxModule("MM", False, 0)
+        qcm_handle = TypeHandle_QbloxModule("QCM", False, 1)
+        qrm_handle = TypeHandle_QbloxModule("QRM", False, 3)
+
+        self.assertTrue(mm_handle.present())
+        self.assertEqual({}, mm_handle._get_sequencer_config(0, 0))
+        self.assertIs(qcm_handle._get_io_channel_config(), IO_CHANNEL_CONFIG)
+        self.assertIs(qcm_handle._get_sequencer_config(1, 0), QCM_SEQUENCER_CONFIG)
+        self.assertIs(qrm_handle._get_sequencer_config(3, 0), QRM_SEQUENCER_CONFIG)
+        self.assertEqual(([0, 2], [1, 3]), qcm_handle._get_sequencer_channel_map(1, 0))
+        self.assertEqual(([0], [1]), qrm_handle._get_sequencer_channel_map(3, 0))
+        self.assertEqual(([0], [1]), qcm_handle._get_sequencer_acq_channel_map(1, 0))
+
+        scpi_stub = ScpiClusterStub()
+        self.assertIsNone(scpi_stub._arm_sequencer())
+        self.assertIsNone(scpi_stub._start_sequencer())
+        self.assertIsNone(scpi_stub._stop_sequencer())
+        self.assertIsNone(scpi_stub._write("cmd"))
+        self.assertIsNone(scpi_stub._read_bin())
+        self.assertIsNone(scpi_stub._flush_line_end())
+
+        module = unittest.mock.Mock()
+        returned_module = self._add_is_functions_to_module(module, "QCM-RF")
+        self.assertIs(returned_module, module)
+        self.assertTrue(hasattr(module, "is_qcm_type"))
+
 
 class NativeClusterTestCase(unittest.TestCase):
     """Test native cluster instance methods."""

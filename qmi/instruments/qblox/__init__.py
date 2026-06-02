@@ -1,3 +1,16 @@
+"""
+Qblox B.V.; Cluster series.
+
+The qmi.instruments.qblox package provides support for:
+- Qblox cluster series with modules::
+  - [C]MM
+  - QCM
+  - QRM
+  - QCM-RF
+  - QRM-RF
+  - QTM
+"""
+
 from qmi.instruments.qblox.cluster import Qblox_NativeCluster as Qblox_NativeCluster
 from qmi.instruments.qblox.cluster import Qblox_QcodesCluster as Qblox_QcodesCluster
 from qmi.instruments.qblox.cluster import SEQUENCERS_IN_MODULE as SEQUENCERS_IN_MODULE
