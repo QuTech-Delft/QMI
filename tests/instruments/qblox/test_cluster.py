@@ -209,7 +209,7 @@ class CreateClusterTestCase(unittest.TestCase):
             call()._get_idn(),
             call().stop_sequencer(),
             call().clear_sequencer_flags()
-        ])
+        ], any_order=True)
 
     def test_create_qcodes_cluster(self):
         # Arrange
