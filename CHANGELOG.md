@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.54.0-beta.0] - Unreleased
 
+### Added
+- QMI driver for Qblox cluster series device, with support for QCM[-RF], QRM[-RF] and QTM modules.
+
 ## [0.53.0] - 2026-05-11
 
 ### Added
