@@ -82,6 +82,7 @@ def _import_modules() -> None:
         from qblox_instruments.scpi.layers.cluster_mm_1_0 import Cluster as ScpiCluster
         from qblox_instruments.types import DebugLevel
 
+        assert qblox_instruments is not None
         if tuple(map(int, qblox_instruments.__version__.split("."))) < tuple(map(int, "0.17.0".split("."))):
             raise RuntimeError("qblox_instruments version 0.17.0 or newer is needed.")
 
@@ -228,7 +229,7 @@ class Qblox_ClusterBase(QMI_Instrument):
         try:
             self.cluster.stop_sequencer()
         except RuntimeError:
-            _logger.exception("[%s] Got an error while stopping all sequencers: ", self.name)
+            _logger.exception("[%s] Got an error while stopping all sequencers: ", self._name)
 
         self.cluster.clear_sequencer_flags()
         super().close()
