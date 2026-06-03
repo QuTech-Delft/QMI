@@ -138,6 +138,11 @@ def _mock_channels(module_type, channel_type, fill_in=False):
     return channels
 
 
+class ChannelTypeStub:
+    ACQ = 1
+    AWG = 0
+
+
 class QbloxNativeManagerClassTestCase(unittest.TestCase):
     """Test 'base', a.k.a. 'cluster', class manager creation."""
 
@@ -310,9 +315,11 @@ class QbloxNativeQrmManagerClassTestCase(unittest.TestCase):
         qrm_manager.module_func_refs["is_qtm_type"] = lambda: False
         expected_call = [unittest.mock.call(channel, {"awg": {}, "acq": {}})]
         # Act
-        adc_channel = qrm_manager.get_adc_channel(channel)
-        dac_channel = qrm_manager.get_dac_channel(channel)
-        mrk_channel = qrm_manager.get_marker_channel(channel)
+        with unittest.mock.patch("qmi.utils.qblox_manager.ChannelType", ChannelTypeStub):
+            adc_channel = qrm_manager.get_adc_channel(channel)
+            dac_channel = qrm_manager.get_dac_channel(channel)
+            mrk_channel = qrm_manager.get_marker_channel(channel)
+
         # Assert
         self.assertIsInstance(adc_channel, _QbloxAdcChannel)
         self.assertIsInstance(dac_channel, _QbloxDacChannel)
@@ -343,6 +350,7 @@ class QbloxQcmDacMarkerClassTestCase(unittest.TestCase):
     def _sequencer_config_val_getter(self, s, d):
         return self.sequencers[f"sequencer{s}"][d[0]][0][d[1]][d[2]]
 
+    @unittest.mock.patch("qmi.utils.qblox_manager.ChannelType", ChannelTypeStub)
     def setUp(self) -> None:
         self.module = "QCM"
         self.slot = 1
@@ -354,10 +362,6 @@ class QbloxQcmDacMarkerClassTestCase(unittest.TestCase):
         }
         # Make more realistic function references and module type check responses
         func_refs = _QbloxModule(self.module, {})
-        # setattr(func_refs, "is_qcm_type", unittest.mock.Mock(return_value=self.module == "QCM"))
-        # setattr(func_refs, "is_qrm_type", unittest.mock.Mock(return_value=self.module == "QRM"))
-        # setattr(func_refs, "is_qtm_type", unittest.mock.Mock(return_value=self.module == "QTM"))
-        # setattr(func_refs, "is_rf_type", unittest.mock.Mock(return_value="-RF" in self.module))
         func_refs.QCM["is_qcm_type"] = lambda: "QCM" in self.module
         func_refs.QCM["is_qrm_type"] = lambda: "QRM" in self.module
         func_refs.QCM["is_qtm_type"] = lambda: "QTM" in self.module
@@ -402,7 +406,6 @@ class QbloxQcmDacMarkerClassTestCase(unittest.TestCase):
             QMI_Context("qcm_test"), "qcm_manager", qblox_cluster, self.module, self.slot
         )
         # Mock-up sequencer calls and get channels
-        # self.qcm_manager.managed_module._get_sequencer_channel_map = unittest.mock.Mock(return_value=channel_map)
         self.dac_channel = self.qcm_manager.get_dac_channel(self.channel)
         self.dac_channel._is_rf_type = False
         self.mrk_channel = self.qcm_manager.get_marker_channel(self.channel)
@@ -461,7 +464,6 @@ class QbloxQcmDacMarkerClassTestCase(unittest.TestCase):
         self.assertFalse(self.dac_channel.is_set())
 
         # Set voltage and test
-        # Set voltage and test
         self.dac_channel.set_offset(new_voltage)
         dict_awg_after = self.dac_channel.get_channel_config()["awg"][0]
         self.assertEqual(new_voltage, dict_awg_after["offs_path"][self.dac_channel._channel % 2])
@@ -484,8 +486,6 @@ class QbloxQcmDacMarkerClassTestCase(unittest.TestCase):
 
         # Set voltage and test
         self.dac_channel.set_output_channel_level(new_level)
-        # dict_awg = self.dac_channel.get_channel_config()["awg"][0]
-        # new_output = dict_awg["offs_path"][self.dac_channel._channel % 2]
         new_output = self.dac_channel._set_output_voltage
 
         self.assertEqual(new_voltage, new_output)
@@ -615,6 +615,7 @@ class QbloxQcmRfDacClassTestCase(unittest.TestCase):
     def _set_output(self, val):
         self.output = val
 
+    @unittest.mock.patch("qmi.utils.qblox_manager.ChannelType", ChannelTypeStub)
     def setUp(self) -> None:
         module = "QCM-RF"
         slot = 2
@@ -663,10 +664,6 @@ class QbloxQcmRfDacClassTestCase(unittest.TestCase):
         func_refs.QCM_RF.update({"_set_sequencer_config_val": lambda s, d, v: self._sequencer_config_val_setter(s, d, v)})
         func_refs.QCM_RF.update({"_get_sequencer_connect_out": unittest.mock.Mock(side_effect=["IQ"] * 4)})
         func_refs.QCM_RF.update({"_set_sequencer_connect_out": lambda _, __, ___: None})
-        # setattr(func_refs, "_get_sequencer_channel_map", unittest.mock.Mock(return_value=channel_map))
-        # setattr(func_refs, "_set_sequencer_channel_map", lambda _, __: None)
-        # setattr(func_refs, "_get_sequencer_config", lambda _: sequencers[f"sequencer{channel}"])
-        # setattr(func_refs, "_set_sequencer_config", lambda _, __: None)
         # Create mock channel dicts
         channels = {}
         channels.update(_mock_channels(module, "adc"))
@@ -679,7 +676,6 @@ class QbloxQcmRfDacClassTestCase(unittest.TestCase):
         # Create manager
         self.rf_manager = QbloxIOManager(QMI_Context("qcm-rf"), "rf_mgr", qblox_cluster, module, slot)
         # Mock-up sequencer calls and get channels
-        # self.rf_manager.module_func_refs["_get_sequencer_channel_map"] = unittest.mock.Mock(return_value=channel_map)
         self.dac_channel = self.rf_manager.get_dac_channel(channel)
 
     def tearDown(self) -> None:
@@ -778,8 +774,6 @@ class QbloxQcmRfDacClassTestCase(unittest.TestCase):
 
         # Set voltage and test
         self.dac_channel.set_output_channel_level(new_level)
-        # dict_awg = self.dac_channel.get_channel_config()["awg"][0]
-        # new_offset = dict_awg["offs_path"][self.dac_channel._channel % 2]
         new_output = self.dac_channel._set_output_voltage
 
         self.assertAlmostEqual(new_voltage, new_output, 4)
@@ -850,6 +844,7 @@ class QbloxQrmAdcClassTestCase(unittest.TestCase):
     def _mrk_inv_en(self, en):
         self._inv_en = en
 
+    @unittest.mock.patch("qmi.utils.qblox_manager.ChannelType", ChannelTypeStub)
     def setUp(self) -> None:
         self.channel = 1
         self.module = "QRM"
@@ -966,7 +961,6 @@ class QbloxQrmAdcClassTestCase(unittest.TestCase):
         self.assertEqual(default_gain, self.adc_channel.get_input_path_gains()[input_channel])
         self.assertEqual(default_threshold, dict_acq["ttl"]["threshold"])
         self.assertEqual(default_bin_range_adj, dict_acq["ttl"]["auto_bin_incr_en"])
-        # self._amp_in_gain.return_value = expected_gain
         self.adc_channel.configure(expected_threshold, expected_bin_range_adj, expected_demod, expected_gain)
 
         # Check values changes after configuring
