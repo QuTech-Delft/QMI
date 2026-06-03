@@ -974,19 +974,42 @@ class QbloxQrmAdcClassTestCase(unittest.TestCase):
         """Test prepare_acquisition_sequence command.
         Basically this just calls (ATM!) to delete existing acquisition data.
         """
+        delete_acquisition_data = unittest.mock.Mock()
+        self.adc_channel._module_func_refs["delete_acquisition_data"] = delete_acquisition_data
+
         self.adc_channel.prepare_acquisition_sequence()
         # With name "all" all acquisition data should be erased
         self.adc_channel.prepare_acquisition_sequence("all")
-        # TODO: Figure out how to test this. Now just makes a 'happy flow'
+
+        delete_acquisition_data.assert_has_calls([
+            unittest.mock.call(self.adc_channel._sequencer, "", False),
+            unittest.mock.call(self.adc_channel._sequencer, "all", True),
+        ])
+        self.assertEqual("", self.adc_channel.acq_name)
+
+        delete_acquisition_data.reset_mock(side_effect=True)
+        delete_acquisition_data.side_effect = RuntimeError("Unknown acquisition")
+        self.adc_channel.prepare_acquisition_sequence("new_data")
+        delete_acquisition_data.assert_called_once_with(self.adc_channel._sequencer, "new_data", False)
+        self.assertEqual("new_data", self.adc_channel.acq_name)
+
+        delete_acquisition_data.side_effect = RuntimeError("Hardware error")
+        with self.assertRaises(RuntimeError):
+            self.adc_channel.prepare_acquisition_sequence("bad_data")
 
     def test_get_acquisition_status(self):
         """Test getting acquisition status."""
+        get_acquisition_status = unittest.mock.Mock(side_effect=[False, True])
+        self.adc_channel._module_func_refs["get_acquisition_status"] = get_acquisition_status
+
         status = self.adc_channel.get_acquisition_completed(timeout=0)
-        self.assertTrue(status)  # based on flag being set-up as "ACQ_BINNING_DONE"
-        # TODO: would like to test also 'False', but it looks like the lambda can be set in setUp only
-        # self.io_channel._module_func_refs._funcs["_get_sequencer_state"] = lambda _: "OKAY;IDLE;DISARMED,;;;;"
-        # status = self.io_channel.get_acquisition_status(timeout=0)
-        # self.assertTrue(status)  # based on state being set-up as "IDLE"
+        self.assertFalse(status)
+        status = self.adc_channel.get_acquisition_completed(timeout=0)
+        self.assertTrue(status)
+        get_acquisition_status.assert_has_calls([
+            unittest.mock.call(self.adc_channel._sequencer, 0, 0.001),
+            unittest.mock.call(self.adc_channel._sequencer, 0, 0.001),
+        ])
 
     def test_run_acquisition_sequence(self):
         """Test running acquisition sequences."""
@@ -1175,12 +1198,17 @@ class QbloxQtmIOClassTestCase(unittest.TestCase):
 
     def test_get_acquisition_completed(self):
         """Test getting acquisition status."""
+        get_acquisition_status = unittest.mock.Mock(side_effect=[False, True])
+        self.io_channel._module_func_refs["get_acquisition_status"] = get_acquisition_status
+
         status = self.io_channel.get_acquisition_completed(timeout=0)
-        self.assertTrue(status)  # based on flag being set-up as "ACQ_BINNING_DONE"
-        # TODO: would like to test also 'False', but it looks like the lambda can be set in setUp only
-        # self.io_channel._module_func_refs._funcs["_get_sequencer_state"] = lambda _: "OKAY;IDLE;DISARMED,;;;;"
-        # status = self.io_channel.get_acquisition_status(timeout=0)
-        # self.assertTrue(status)  # based on state being set-up as "IDLE"
+        self.assertFalse(status)
+        status = self.io_channel.get_acquisition_completed(timeout=0)
+        self.assertTrue(status)
+        get_acquisition_status.assert_has_calls([
+            unittest.mock.call(self.io_channel._channel, 0, 0.001),
+            unittest.mock.call(self.io_channel._channel, 0, 0.001),
+        ])
 
     def test_get_acquisitions(self):
         """Test getting acquisition data."""
