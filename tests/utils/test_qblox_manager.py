@@ -13,7 +13,7 @@ from qmi.instruments.qblox.cluster import (
     NativeCluster,
     ScpiCluster,
     Qblox_NativeCluster,
-    # Qblox_QcodesCluster    
+    Qblox_QcodesCluster,
 )
 from qmi.utils.qblox_manager import (
     QbloxIOManager,
@@ -141,6 +141,28 @@ class ChannelTypeStub:
     AWG = 0
 
 
+class ChannelMapCacheStub:
+    """Minimal ChannelMapCache replacement for manager-channel connection tests."""
+
+    def __init__(self):
+        self.connected = set()
+        self.disconnect = unittest.mock.Mock(side_effect=self._disconnect)
+        self.connect = unittest.mock.Mock(side_effect=self._connect)
+        self.flush = unittest.mock.Mock()
+
+    def _disconnect(self, direction, sequencer, path, channel):
+        self.connected.discard((direction, sequencer, path, channel))
+
+    def _connect(self, direction, sequencer, path, channel, enabled):
+        if enabled:
+            self.connected.add((direction, sequencer, path, channel))
+        else:
+            self.connected.discard((direction, sequencer, path, channel))
+
+    def is_connected(self, direction, sequencer, path, channel):
+        return (direction, sequencer, path, channel) in self.connected
+
+
 class QbloxNativeManagerClassTestCase(unittest.TestCase):
     """Test 'base', a.k.a. 'cluster', class manager creation."""
 
@@ -170,19 +192,43 @@ class QbloxNativeManagerClassTestCase(unittest.TestCase):
         self.qblox_cluster.get_module_channels.assert_not_called()
 
 
+class QbloxQcodesManagerClassTestCase(unittest.TestCase):
+    """Test 'base', a.k.a. 'cluster', class manager creation with a QCoDeS cluster."""
+
+    def setUp(self) -> None:
+        self.qblox_cluster = unittest.mock.Mock(spec=Qblox_QcodesCluster)
+        self.qblox_cluster.AO_IN_MODULE = AO_IN_MODULE
+        self.qblox_cluster.AI_IN_MODULE = AI_IN_MODULE
+        self.qblox_cluster.SEQUENCERS_IN_MODULE = SEQUENCERS_IN_MODULE
+        self.qblox_cluster.DIGITAL_MARKERS_IN_MODULE = DIGITAL_MARKERS_IN_MODULE
+        self.qblox_cluster.get_module_channels = unittest.mock.Mock(return_value=({}, {}))
+        self._ctx = QMI_Context("qcodes_manager_class_test")
+
+    def test_qblox_manager_init(self):
+        """Test initialization and basic method calls."""
+        name_cluster_module = "MM"
+        slot_cluster_module = 0
+
+        cluster_manager = QbloxManager(self._ctx, name_cluster_module, self.qblox_cluster, "MM", 0)
+
+        self.assertEqual(name_cluster_module, cluster_manager.managed_module)
+        self.assertEqual(slot_cluster_module, cluster_manager.managed_slot)
+        self.assertDictEqual({}, cluster_manager._module_channels)
+        self.assertDictEqual({}, cluster_manager._module_sequencers)
+        self.qblox_cluster.get_module_func_refs.assert_called_once_with(name_cluster_module, slot_cluster_module)
+        self.qblox_cluster.get_module_channels.assert_not_called()
+
+
 class QbloxNativeManagerMethodTestCase(unittest.TestCase):
     """Test 'base', a.k.a. 'cluster', class manager methods."""
 
     def setUp(self) -> None:
-        # self.qblox_cluster = unittest.mock.Mock(spec=Qblox_NativeCluster)
         self.qblox_cluster = create_autospec(spec=Qblox_NativeCluster, instance=True)
         self.qblox_cluster.AO_IN_MODULE = AO_IN_MODULE
         self.qblox_cluster.AI_IN_MODULE = AI_IN_MODULE
         self.qblox_cluster.SEQUENCERS_IN_MODULE = SEQUENCERS_IN_MODULE
         self.qblox_cluster.DIGITAL_MARKERS_IN_MODULE = DIGITAL_MARKERS_IN_MODULE
         # Cluster module has no channels nor sequencers
-        # self.qblox_cluster.get_module_channels = unittest.mock.Mock(return_value=({}, {}))
-        # self.qblox_cluster.get_module_func_refs = unittest.mock.Mock(return_value={})
         self.cluster_manager = QbloxManager(QMI_Context("native"), "cluster", self.qblox_cluster, "MM", 0)
 
     def test_cluster_manager_get_sequencer(self):
@@ -238,6 +284,66 @@ class QbloxNativeManagerMethodTestCase(unittest.TestCase):
         # Act 2
         self.cluster_manager.stop_sequencers(stop_all=True)
         # Assert 2
+        self.qblox_cluster.get_module_func_refs("MM").__getitem__().assert_called_with(expected_call_stop_all_sequencers)
+
+
+class QbloxQcodesManagerMethodTestCase(unittest.TestCase):
+    """Test 'base', a.k.a. 'cluster', class manager methods with a QCoDeS cluster."""
+
+    def setUp(self) -> None:
+        self.qblox_cluster = create_autospec(spec=Qblox_QcodesCluster, instance=True)
+        self.qblox_cluster.AO_IN_MODULE = AO_IN_MODULE
+        self.qblox_cluster.AI_IN_MODULE = AI_IN_MODULE
+        self.qblox_cluster.SEQUENCERS_IN_MODULE = SEQUENCERS_IN_MODULE
+        self.qblox_cluster.DIGITAL_MARKERS_IN_MODULE = DIGITAL_MARKERS_IN_MODULE
+        self.cluster_manager = QbloxManager(QMI_Context("qcodes"), "cluster", self.qblox_cluster, "MM", 0)
+
+    def test_cluster_manager_get_sequencer(self):
+        """Test get_sequencer call. Should fail as no sequencers present at 'MM' module."""
+        with self.assertRaises(KeyError):
+            self.cluster_manager.get_sequencer(0)
+
+    def test_cluster_manager_get_adc_channel(self):
+        """Test get_adc_channel call. Should fail as no channels present at 'MM' module."""
+        with self.assertRaises(NotImplementedError):
+            self.cluster_manager.get_adc_channel(0)
+
+    def test_cluster_manager_get_dac_channel(self):
+        """Test get_dac_channel call. Should fail as no channels present at 'MM' module."""
+        with self.assertRaises(NotImplementedError):
+            self.cluster_manager.get_dac_channel(0)
+
+    def test_cluster_manager_get_marker_channel(self):
+        """Test get_marker_channel call. Should fail as no channels present at 'MM' module."""
+        with self.assertRaises(NotImplementedError):
+            self.cluster_manager.get_marker_channel(0)
+
+    def test_start_sequencers(self):
+        """Test start_sequencers call."""
+        expected_call_start_module_sequencers = "SLOT0:SEQuencer"
+        expected_call_start_all_sequencers = "SLOT:SEQuencer"
+        self.qblox_cluster.reset_mock()
+
+        self.cluster_manager.start_sequencers()
+        self.qblox_cluster.get_module_func_refs("MM").__getitem__().assert_called_with(
+            expected_call_start_module_sequencers
+        )
+
+        self.cluster_manager.start_sequencers(start_all=True)
+        self.qblox_cluster.get_module_func_refs("MM").__getitem__().assert_called_with(
+            expected_call_start_all_sequencers
+        )
+
+    def test_stop_sequencers(self):
+        """Test stop_sequencers call."""
+        expected_call_stop_module_sequencers = "SLOT0:SEQuencer"
+        expected_call_stop_all_sequencers = "SLOT:SEQuencer"
+        self.qblox_cluster.reset_mock()
+
+        self.cluster_manager.stop_sequencers()
+        self.qblox_cluster.get_module_func_refs("MM").__getitem__().assert_called_with(expected_call_stop_module_sequencers)
+
+        self.cluster_manager.stop_sequencers(stop_all=True)
         self.qblox_cluster.get_module_func_refs("MM").__getitem__().assert_called_with(expected_call_stop_all_sequencers)
 
 
@@ -326,6 +432,185 @@ class QbloxNativeQrmManagerClassTestCase(unittest.TestCase):
         self.qblox_cluster.get_module_channels.assert_called_once_with(self.module, self.slot)
         qrm_manager.module_func_refs["_set_io_channel_config"].assert_not_called()
         qrm_manager.module_func_refs["_set_sequencer_config"].assert_has_calls(expected_call)
+
+
+class QbloxQcodesQrmManagerClassTestCase(unittest.TestCase):
+    """Test I/O class manager creation with QRM module through a QCoDeS cluster."""
+
+    def setUp(self) -> None:
+        self.module = "QRM"
+        self.slot = 2
+        self.qblox_cluster = unittest.mock.Mock(spec=Qblox_QcodesCluster)
+        self.qblox_cluster.AI_IN_MODULE = AI_IN_MODULE
+        self.qblox_cluster.AO_IN_MODULE = AO_IN_MODULE
+        self.qblox_cluster.SEQUENCERS_IN_MODULE = SEQUENCERS_IN_MODULE
+        self.qblox_cluster.DIGITAL_MARKERS_IN_MODULE = DIGITAL_MARKERS_IN_MODULE
+        self.channel_map_cache = ChannelMapCacheStub()
+        self.qblox_cluster.get_module_channel_map_cache = unittest.mock.Mock(return_value=self.channel_map_cache)
+
+        self.sequencers = {
+            f"sequencer{k}": {"awg": {}, "acq": {}} for k in range(SEQUENCERS_IN_MODULE[self.module])
+        }
+        channels = {}
+        channels.update(_mock_channels(self.module, "adc"))
+        channels.update(_mock_channels(self.module, "dac"))
+        channels.update(_mock_channels(self.module, "marker"))
+        self.qblox_cluster.get_module_channels = unittest.mock.Mock(return_value=(channels, self.sequencers))
+
+    def test_qblox_io_manager_init(self):
+        """Test initialization and basic method calls."""
+        sequencers_in_mod = SEQUENCERS_IN_MODULE[self.module]
+        ai_channels_in_mod = AI_IN_MODULE[self.module]
+        ao_channels_in_mod = AO_IN_MODULE[self.module]
+        mrk_channels_in_mod = DIGITAL_MARKERS_IN_MODULE[self.module]
+        expected_sequencers = {f"sequencer{i}": {"awg": {}, "acq": {}} for i in range(sequencers_in_mod)}
+        exp_no_of_adc_channels = sequencers_in_mod * ai_channels_in_mod
+        exp_no_of_dac_channels = sequencers_in_mod * ao_channels_in_mod
+        exp_no_of_mrk_channels = sequencers_in_mod * mrk_channels_in_mod
+        exp_no_of_io_channels = 0
+        exp_total_no_of_channels = (
+            exp_no_of_io_channels + exp_no_of_mrk_channels + exp_no_of_dac_channels + exp_no_of_adc_channels
+        )
+
+        qrm_manager = QbloxIOManager(QMI_Context("qcodes_qrm_test"), "qrm_manager", self.qblox_cluster, self.module, self.slot)
+
+        self.assertEqual(self.module, qrm_manager.managed_module)
+        self.assertEqual(self.slot, qrm_manager.managed_slot)
+        self.assertEqual(exp_total_no_of_channels, len(qrm_manager._module_channels))
+        self.assertEqual(exp_no_of_adc_channels, len(qrm_manager._adc_channels))
+        self.assertEqual(exp_no_of_dac_channels, len(qrm_manager._dac_channels))
+        self.assertEqual(exp_no_of_mrk_channels, len(qrm_manager._do_channels))
+        self.assertEqual(exp_no_of_io_channels, len(qrm_manager._io_channels))
+        self.assertDictEqual(expected_sequencers, qrm_manager._module_sequencers)
+        self.assertIs(self.channel_map_cache, qrm_manager.channel_map)
+        self.qblox_cluster.get_module_func_refs.assert_called_once_with(self.module, self.slot)
+        self.qblox_cluster.get_module_channels.assert_called_once_with(self.module, self.slot)
+        self.qblox_cluster.get_module_channel_map_cache.assert_called_once_with(self.module, self.slot)
+
+    def test_qblox_io_manager_get_channels(self):
+        """Test that QCoDeS-backed manager creates the same channel objects as Native-backed manager."""
+        channel = 0
+        qrm_manager = QbloxIOManager(QMI_Context("qcodes_qrm_test"), "qrm_manager", self.qblox_cluster, self.module, self.slot)
+        qrm_manager.module_func_refs = {}
+        qrm_manager.module_func_refs["_set_io_channel_config"] = unittest.mock.Mock()
+        qrm_manager.module_func_refs["_set_sequencer_config"] = unittest.mock.Mock()
+        qrm_manager.module_func_refs["is_qcm_type"] = lambda: False
+        qrm_manager.module_func_refs["is_qrm_type"] = lambda: True
+        qrm_manager.module_func_refs["is_rf_type"] = lambda: False
+        qrm_manager.module_func_refs["is_qtm_type"] = lambda: False
+        expected_call = [unittest.mock.call(channel, {"awg": {}, "acq": {}})]
+
+        with unittest.mock.patch("qmi.utils.qblox_manager.ChannelType", ChannelTypeStub):
+            adc_channel = qrm_manager.get_adc_channel(channel)
+            dac_channel = qrm_manager.get_dac_channel(channel)
+            mrk_channel = qrm_manager.get_marker_channel(channel)
+
+        self.assertIsInstance(adc_channel, QbloxAdcChannel)
+        self.assertIsInstance(dac_channel, QbloxDacChannel)
+        self.assertIsInstance(mrk_channel, QbloxMarkerChannel)
+        self.assertTrue(self.channel_map_cache.is_connected(ChannelTypeStub.ACQ, channel, channel % 2, channel))
+        self.assertTrue(self.channel_map_cache.is_connected(ChannelTypeStub.AWG, channel, channel % 2, channel))
+        self.assertEqual(2, self.channel_map_cache.flush.call_count)
+        qrm_manager.module_func_refs["_set_io_channel_config"].assert_not_called()
+        qrm_manager.module_func_refs["_set_sequencer_config"].assert_has_calls(expected_call)
+
+
+class QbloxNativeQtmManagerClassTestCase(unittest.TestCase):
+    """Test I/O class manager creation with QTM module through a QCoDeS cluster."""
+
+    def setUp(self) -> None:
+        self.module = "QTM"
+        self.slot = 5
+        self.channel = 7
+        self.qblox_cluster = unittest.mock.Mock(spec=Qblox_NativeCluster)
+        self.qblox_cluster.AI_IN_MODULE = AI_IN_MODULE
+        self.qblox_cluster.AO_IN_MODULE = AO_IN_MODULE
+        self.qblox_cluster.SEQUENCERS_IN_MODULE = SEQUENCERS_IN_MODULE
+        self.qblox_cluster.DIGITAL_MARKERS_IN_MODULE = DIGITAL_MARKERS_IN_MODULE
+        self.qblox_cluster.get_module_channel_map_cache = unittest.mock.Mock(return_value=ChannelMapCacheStub())
+        self.io_channels = {
+            f"IO{k}": deepcopy(IO_CHANNEL) for k in range(SEQUENCERS_IN_MODULE[self.module])
+        }
+        self.sequencers = {
+            f"sequencer{k}": {"seq_proc": deepcopy(SEQ_PROC)} for k in range(SEQUENCERS_IN_MODULE[self.module])
+        }
+        channels = {}
+        channels.update(_mock_channels(self.module, "marker"))
+        channels.update(self.io_channels)
+        self.qblox_cluster.get_module_channels = unittest.mock.Mock(return_value=(channels, self.sequencers))
+
+    def test_qblox_io_manager_get_io_channel(self):
+        """Test that QCoDeS-backed manager creates QTM IO channels like Native-backed manager."""
+        qtm_manager = QbloxIOManager(QMI_Context("qcodes_qtm_test"), "qtm_manager", self.qblox_cluster, self.module, self.slot)
+        qtm_manager.module_func_refs = {}
+        qtm_manager.module_func_refs["_set_io_channel_config"] = unittest.mock.Mock()
+        qtm_manager.module_func_refs["_set_sequencer_config"] = unittest.mock.Mock()
+        qtm_manager.module_func_refs["is_qcm_type"] = lambda: False
+        qtm_manager.module_func_refs["is_qrm_type"] = lambda: False
+        qtm_manager.module_func_refs["is_rf_type"] = lambda: False
+        qtm_manager.module_func_refs["is_qtm_type"] = lambda: True
+
+        io_channel = qtm_manager.get_io_channel(self.channel)
+
+        self.assertIsInstance(io_channel, QbloxIOChannel)
+        self.assertEqual(self.channel, io_channel.channel)
+        self.assertEqual(self.channel, io_channel.sequencer)
+        self.assertListEqual(QbloxIOChannel.OUTPUT_VOLTAGE_RANGE[self.module], io_channel.voltage_range)
+        qtm_manager.module_func_refs["_set_io_channel_config"].assert_called_once_with(
+            self.channel, self.io_channels[f"IO{self.channel}"]
+        )
+        qtm_manager.module_func_refs["_set_sequencer_config"].assert_called_once_with(
+            self.channel, self.sequencers[f"sequencer{self.channel}"]
+        )
+
+
+class QbloxQcodesQtmManagerClassTestCase(unittest.TestCase):
+    """Test I/O class manager creation with QTM module through a QCoDeS cluster."""
+
+    def setUp(self) -> None:
+        self.module = "QTM"
+        self.slot = 5
+        self.channel = 7
+        self.qblox_cluster = unittest.mock.Mock(spec=Qblox_QcodesCluster)
+        self.qblox_cluster.AI_IN_MODULE = AI_IN_MODULE
+        self.qblox_cluster.AO_IN_MODULE = AO_IN_MODULE
+        self.qblox_cluster.SEQUENCERS_IN_MODULE = SEQUENCERS_IN_MODULE
+        self.qblox_cluster.DIGITAL_MARKERS_IN_MODULE = DIGITAL_MARKERS_IN_MODULE
+        self.qblox_cluster.get_module_channel_map_cache = unittest.mock.Mock(return_value=ChannelMapCacheStub())
+        self.io_channels = {
+            f"IO{k}": deepcopy(IO_CHANNEL) for k in range(SEQUENCERS_IN_MODULE[self.module])
+        }
+        self.sequencers = {
+            f"sequencer{k}": {"seq_proc": deepcopy(SEQ_PROC)} for k in range(SEQUENCERS_IN_MODULE[self.module])
+        }
+        channels = {}
+        channels.update(_mock_channels(self.module, "marker"))
+        channels.update(self.io_channels)
+        self.qblox_cluster.get_module_channels = unittest.mock.Mock(return_value=(channels, self.sequencers))
+
+    def test_qblox_io_manager_get_io_channel(self):
+        """Test that QCoDeS-backed manager creates QTM IO channels like Native-backed manager."""
+        qtm_manager = QbloxIOManager(QMI_Context("qcodes_qtm_test"), "qtm_manager", self.qblox_cluster, self.module, self.slot)
+        qtm_manager.module_func_refs = {}
+        qtm_manager.module_func_refs["_set_io_channel_config"] = unittest.mock.Mock()
+        qtm_manager.module_func_refs["_set_sequencer_config"] = unittest.mock.Mock()
+        qtm_manager.module_func_refs["is_qcm_type"] = lambda: False
+        qtm_manager.module_func_refs["is_qrm_type"] = lambda: False
+        qtm_manager.module_func_refs["is_rf_type"] = lambda: False
+        qtm_manager.module_func_refs["is_qtm_type"] = lambda: True
+
+        io_channel = qtm_manager.get_io_channel(self.channel)
+
+        self.assertIsInstance(io_channel, QbloxIOChannel)
+        self.assertEqual(self.channel, io_channel.channel)
+        self.assertEqual(self.channel, io_channel.sequencer)
+        self.assertListEqual(QbloxIOChannel.OUTPUT_VOLTAGE_RANGE[self.module], io_channel.voltage_range)
+        qtm_manager.module_func_refs["_set_io_channel_config"].assert_called_once_with(
+            self.channel, self.io_channels[f"IO{self.channel}"]
+        )
+        qtm_manager.module_func_refs["_set_sequencer_config"].assert_called_once_with(
+            self.channel, self.sequencers[f"sequencer{self.channel}"]
+        )
 
 
 class QbloxQcmDacMarkerClassTestCase(unittest.TestCase):
