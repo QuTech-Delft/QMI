@@ -624,11 +624,10 @@ class QbloxQcmDacMarkerClassTestCase(unittest.TestCase):
                 old_val = self.sequencers[f"sequencer{s}"][d[0]][0][d[1]]
                 new_val = [old_val[0], v] if d[2] else [v, old_val[1]]
                 self.sequencers[f"sequencer{s}"][d[0]][0].update({d[1]: new_val})
+        elif isinstance(d[2], str):
+            self.sequencers[f"sequencer{s}"][d[0]][d[1]][d[2]].update({d[3]: v})
         else:
-            if isinstance(d[2], str):
-                self.sequencers[f"sequencer{s}"][d[0]][d[1]][d[2]].update({d[3]: v})
-            else:
-                self.sequencers[f"sequencer{s}"][d[0]][d[1]][d[2]][d[3]] = v
+            self.sequencers[f"sequencer{s}"][d[0]][d[1]][d[2]][d[3]] = v
 
     def _sequencer_config_val_getter(self, s, d):
         return self.sequencers[f"sequencer{s}"][d[0]][0][d[1]][d[2]]
@@ -882,11 +881,10 @@ class QbloxQcmRfDacClassTestCase(unittest.TestCase):
                 old_val = self.sequencers[f"sequencer{s}"][d[0]][0][d[1]]
                 new_val = [old_val[0], v] if d[2] else [v, old_val[1]]
                 self.sequencers[f"sequencer{s}"][d[0]][0].update({d[1]: new_val})
+        elif isinstance(d[2], str):
+            self.sequencers[f"sequencer{s}"][d[0]][d[1]][d[2]].update({d[3]: v})
         else:
-            if isinstance(d[2], str):
-                self.sequencers[f"sequencer{s}"][d[0]][d[1]][d[2]].update({d[3]: v})
-            else:
-                self.sequencers[f"sequencer{s}"][d[0]][d[1]][d[2]][d[3]] = v
+            self.sequencers[f"sequencer{s}"][d[0]][d[1]][d[2]][d[3]] = v
 
     def _sequencer_config_val_getter(self, s, d):
         if len(d) == 2:
@@ -1108,11 +1106,10 @@ class QbloxQrmAdcClassTestCase(unittest.TestCase):
                 old_val = self.sequencers[f"sequencer{s}"][d[0]][0][d[1]]
                 new_val = [old_val[0], v] if d[2] else [v, old_val[1]]
                 self.sequencers[f"sequencer{s}"][d[0]][0].update({d[1]: new_val})
+        elif isinstance(d[2], str):
+            self.sequencers[f"sequencer{s}"][d[0]][0][d[1]].update({d[2]: v})
         else:
-            if isinstance(d[2], str):
-                self.sequencers[f"sequencer{s}"][d[0]][0][d[1]].update({d[2]: v})
-            else:
-                self.sequencers[f"sequencer{s}"][d[0]][0][d[1]][d[2]] = v
+            self.sequencers[f"sequencer{s}"][d[0]][0][d[1]][d[2]] = v
 
     def _sequencer_config_val_getter(self, s, d):
         if len(d) == 2:
@@ -1333,11 +1330,10 @@ class QbloxQtmIOClassTestCase(unittest.TestCase):
                 old_val = self.sequencers[f"sequencer{s}"][d[0]][0][d[1]]
                 new_val = [old_val[0], v] if d[2] else [v, old_val[1]]
                 self.sequencers[f"sequencer{s}"][d[0]][0].update({d[1]: new_val})
+        elif isinstance(d[2], str):
+            self.sequencers[f"sequencer{s}"][d[0]][d[1]][d[2]].update({d[3]: v})
         else:
-            if isinstance(d[2], str):
-                self.sequencers[f"sequencer{s}"][d[0]][d[1]][d[2]].update({d[3]: v})
-            else:
-                self.sequencers[f"sequencer{s}"][d[0]][d[1]][d[2]][d[3]] = v
+            self.sequencers[f"sequencer{s}"][d[0]][d[1]][d[2]][d[3]] = v
 
     def _sequencer_config_val_getter(self, s, d):
         if len(d) == 2:

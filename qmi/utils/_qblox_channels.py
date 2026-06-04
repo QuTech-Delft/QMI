@@ -783,15 +783,14 @@ class QbloxDacChannel(_QbloxChannel):
 
         if not enable:
             self._module_func_refs["_set_sequencer_connect_out"](self._sequencer, output, "off")
+        elif self._is_rf_type:
+            # The last input as 'True' is interpreted the same as it being "IQ" state for RF-modules.
+            self._module_func_refs["_set_sequencer_connect_out"](self._sequencer, output, enable)
         else:
-            if self._is_rf_type:
-                # The last input as 'True' is interpreted the same as it being "IQ" state for RF-modules.
-                self._module_func_refs["_set_sequencer_connect_out"](self._sequencer, output, enable)
-            else:
-                sequencer_channel_map = self._module_func_refs["_get_sequencer_channel_map"](self._sequencer)
-                # Channels in first list item are "I" and in second item are "Q"
-                state = "I" if output in sequencer_channel_map[0] else "Q"
-                self._module_func_refs["_set_sequencer_connect_out"](self._sequencer, output, state)
+            sequencer_channel_map = self._module_func_refs["_get_sequencer_channel_map"](self._sequencer)
+            # Channels in first list item are "I" and in second item are "Q"
+            state = "I" if output in sequencer_channel_map[0] else "Q"
+            self._module_func_refs["_set_sequencer_connect_out"](self._sequencer, output, state)
 
     def get_sequencer_continuous_waveform_mode_enable(self, path: int | None = None) -> bool:
         """Get current continuous waveform mode state of a given AWG path.

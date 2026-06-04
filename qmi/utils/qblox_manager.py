@@ -1,3 +1,4 @@
+# mypy: disable-error-code=import-not-found
 """QBlox manager classes for controlling Qblox cluster modules: QCM, QRM, -RF and QTM control.
 
 The classes should work equally with "native" and "Qcodes" Qblox `Cluster` instances.
