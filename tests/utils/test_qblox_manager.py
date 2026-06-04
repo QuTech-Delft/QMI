@@ -18,15 +18,13 @@ from qmi.instruments.qblox.cluster import (
 from qmi.utils.qblox_manager import (
     QbloxIOManager,
     QbloxManager,
-    _QbloxChannel,
-    _QbloxAdcChannel,
-    _QbloxDacChannel,
-    _QbloxIOChannel,
-    _QbloxMarkerChannel,
 )
+from qmi.utils._qblox_channels import _QbloxChannel, QbloxAdcChannel, QbloxDacChannel, QbloxIOChannel, \
+    QbloxMarkerChannel
 from tests.patcher import PatcherQmiContext as QMI_Context
 
 logging.getLogger("qmi.utils.qblox_manager").setLevel(logging.CRITICAL)
+logging.getLogger("qmi.utils._qblox_channels").setLevel(logging.CRITICAL)
 # Some default sequencer settings
 AWG = [
     {
@@ -321,9 +319,9 @@ class QbloxNativeQrmManagerClassTestCase(unittest.TestCase):
             mrk_channel = qrm_manager.get_marker_channel(channel)
 
         # Assert
-        self.assertIsInstance(adc_channel, _QbloxAdcChannel)
-        self.assertIsInstance(dac_channel, _QbloxDacChannel)
-        self.assertIsInstance(mrk_channel, _QbloxMarkerChannel)
+        self.assertIsInstance(adc_channel, QbloxAdcChannel)
+        self.assertIsInstance(dac_channel, QbloxDacChannel)
+        self.assertIsInstance(mrk_channel, QbloxMarkerChannel)
         self.qblox_cluster.get_module_func_refs.assert_called_once_with(self.module, self.slot)
         self.qblox_cluster.get_module_channels.assert_called_once_with(self.module, self.slot)
         qrm_manager.module_func_refs["_set_io_channel_config"].assert_not_called()
@@ -416,14 +414,14 @@ class QbloxQcmDacMarkerClassTestCase(unittest.TestCase):
 
     def test_dac_channel_properties(self):
         """Test that _QbloxDacChannel instance was created with expected properties."""
-        expected_voltage_range = _QbloxDacChannel.OUTPUT_VOLTAGE_RANGE[self.module]
+        expected_voltage_range = QbloxDacChannel.OUTPUT_VOLTAGE_RANGE[self.module]
 
         self.assertListEqual(expected_voltage_range, self.dac_channel.voltage_range)
 
     def test_marker_channel_properties(self):
         """Test that _QbloxMarkerChannel instance was created with expected properties."""
         expected_marker_direction = "awg"
-        expected_voltage_range = _QbloxDacChannel.OUTPUT_VOLTAGE_RANGE["MRK"]
+        expected_voltage_range = QbloxDacChannel.OUTPUT_VOLTAGE_RANGE["MRK"]
 
         self.assertEqual(expected_marker_direction, self.mrk_channel._marker_direction)
         self.assertListEqual(expected_voltage_range, self.mrk_channel.voltage_range)
@@ -471,8 +469,8 @@ class QbloxQcmDacMarkerClassTestCase(unittest.TestCase):
 
     def test_dac_set_output_level(self):
         """Test we can set output level with integer values"""
-        i_range = _QbloxDacChannel.CHANNEL_LEVEL_RANGE
-        v_range = _QbloxDacChannel.OUTPUT_VOLTAGE_RANGE[self.module]
+        i_range = QbloxDacChannel.CHANNEL_LEVEL_RANGE
+        v_range = QbloxDacChannel.OUTPUT_VOLTAGE_RANGE[self.module]
         default_voltage = 0.0
         new_voltage = 0.5
         default_level = int((default_voltage - v_range[0]) / (v_range[1] - v_range[0]) * i_range)
@@ -759,7 +757,7 @@ class QbloxQcmRfDacClassTestCase(unittest.TestCase):
 
     def test_dac_set_output_level(self):
         """Test we can set output level with integer values"""
-        i_range = _QbloxDacChannel.CHANNEL_LEVEL_RANGE
+        i_range = QbloxDacChannel.CHANNEL_LEVEL_RANGE
         v_range = self.module_v_range
         default_voltage = 0.0
         new_voltage = 0.5
@@ -932,14 +930,14 @@ class QbloxQrmAdcClassTestCase(unittest.TestCase):
 
     def test_adc_channel_properties(self):
         """Test that _QbloxAdcChannel instance was created with expected properties."""
-        expected_voltage_range = _QbloxAdcChannel.OUTPUT_VOLTAGE_RANGE[self.module]
+        expected_voltage_range = QbloxAdcChannel.OUTPUT_VOLTAGE_RANGE[self.module]
 
         self.assertListEqual(expected_voltage_range, self.adc_channel.voltage_range)
 
     def test_marker_channel_properties(self):
         """Test that _QbloxMarkerChannel instance was created with expected properties."""
         expected_marker_direction = "acq"
-        expected_voltage_range = _QbloxAdcChannel.OUTPUT_VOLTAGE_RANGE["MRK"]
+        expected_voltage_range = QbloxAdcChannel.OUTPUT_VOLTAGE_RANGE["MRK"]
 
         self.assertEqual(expected_marker_direction, self.mrk_channel._marker_direction)
         self.assertListEqual(expected_voltage_range, self.mrk_channel.voltage_range)
@@ -1134,7 +1132,7 @@ class QbloxQtmIOClassTestCase(unittest.TestCase):
 
     def test_io_channel_properties(self):
         """Test that _QbloxIOChannel instance was created with expected properties."""
-        expected_voltage_range = _QbloxIOChannel.OUTPUT_VOLTAGE_RANGE[self.module]
+        expected_voltage_range = QbloxIOChannel.OUTPUT_VOLTAGE_RANGE[self.module]
 
         self.assertListEqual(expected_voltage_range, self.io_channel.voltage_range)
         dict_seq = self.io_channel._sequencer_cfg
