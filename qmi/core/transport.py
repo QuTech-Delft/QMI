@@ -1311,7 +1311,7 @@ def create_transport(
       - VXI-11 instrument: "vxi11:host"
       - UDP connection:    "udp:host<:port>"
       - TCP connection:    "tcp:host<:port><:connect_timeout=10>"
-      - Serial port:       "serial:device<:baudrate=115200><:databits=8><:parity=N><:stopbits=1>"
+      - Serial port:       "serial:device<:baudrate=115200><:databits=8><:parity=N><:stopbits=1><:rtscts=False>"
       - USBTMC device:     "usbtmc:vendorid:productid:serialnr"
       - GPIB device:       "gpib:<board=None:>primary_addr<:secondary_addr=None><:connect_timeout=30.0>"
 
