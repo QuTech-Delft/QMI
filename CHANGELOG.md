@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - QMI driver for Qblox cluster series device, with support for QCM[-RF], QRM[-RF] and QTM modules.
+- A qblox_manager.py module in utils, with which Qblox cluster modules and their [D]IO channels and markers can be controlled.
 
 ## [0.53.0] - 2026-05-11
 
