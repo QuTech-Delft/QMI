@@ -3,6 +3,7 @@
 import inspect
 import logging
 import math
+from threading import Timer
 import time
 from typing import NamedTuple
 import unittest
@@ -17,7 +18,7 @@ from qmi.core.rpc import (
     QMI_RpcObject, QMI_RpcTimeoutException, QMI_RpcFuture, QMI_RpcProxy, QMI_RpcNonBlockingProxy,
     rpc_method, is_rpc_method
 )
-from threading import Timer
+from qmi.core.pubsub import QMI_Signal
 
 
 class MyRpcTestClass(QMI_RpcObject):
@@ -29,7 +30,16 @@ class MyRpcTestClass(QMI_RpcObject):
 
     def __init__(self, context, name):
         super().__init__(context, name)
+        self._variable_string = "Hi"
 
+    @property
+    def variable_string(self) -> str:
+        return self._variable_string
+    
+    @staticmethod
+    def _call_me_maybe() -> bool:
+        return False
+        
     @rpc_method
     def remote_sqrt(self, x):
         """This is some_method."""
@@ -51,6 +61,7 @@ class MyRpcTestClass(QMI_RpcObject):
 class MyRpcSubClass(MyRpcTestClass):
     """An RPC sub class"""
     _rpc_constants = ["CONSTANT_STRING"]
+    mock_signal = QMI_Signal([None])
 
     CONSTANT_STRING = "testing"
 
@@ -152,9 +163,7 @@ class TestRPC(unittest.TestCase):
         # Extract constant values.
         doc += '\nRPC constants:\n'
         for constant_name in constant_names:
-            assert hasattr(rpc_object_class, constant_name)
             constant_value = getattr(rpc_object_class, constant_name)
-            assert not inspect.isfunction(constant_value)
             doc += f"  - {constant_name}: {type(constant_value).__name__} = {constant_value}\n"
 
         return doc
@@ -401,6 +410,58 @@ class TestRPC(unittest.TestCase):
         # Check that non-exported constants are not accessible.
         with self.assertRaises(AttributeError):
             proxy1.CONSTANT_FLOAT()
+
+    def test_invalid_constants(self):
+        """Test that RPC constants cannot have invalid names."""
+        # Name cannot be a class attribute that is created at __init__
+        MyRpcTestClass._rpc_constants = ["_variable_strings"]
+        with self.assertRaises(QMI_UsageException) as err:
+            self.c1.make_rpc_object("tc1", MyRpcTestClass)
+            self.assertIn(MyRpcTestClass._rpc_constants[0], str(err.exception))
+
+        # Name cannot be a property
+        MyRpcTestClass._rpc_constants = ["variable_strings"]
+        with self.assertRaises(QMI_UsageException) as err:
+            self.c1.make_rpc_object("tc1", MyRpcTestClass)
+            self.assertIn(MyRpcTestClass._rpc_constants[0], str(err.exception))
+
+        # Name cannot be a static method
+        MyRpcTestClass._rpc_constants = ["_call_me_maybe"]
+        with self.assertRaises(QMI_UsageException) as err:
+            self.c1.make_rpc_object("tc1", MyRpcTestClass)
+            self.assertIn(MyRpcTestClass._rpc_constants[0], str(err.exception))
+
+        # Name cannot be a class method
+        MyRpcTestClass._rpc_constants = ["get_category"]
+        with self.assertRaises(QMI_UsageException) as err:
+            self.c1.make_rpc_object("tc1", MyRpcTestClass)
+            self.assertIn(MyRpcTestClass._rpc_constants[0], str(err.exception))
+
+        # Name cannot be a function method
+        MyRpcTestClass._rpc_constants = ["release_rpc_object"]
+        with self.assertRaises(QMI_UsageException) as err:
+            self.c1.make_rpc_object("tc1", MyRpcTestClass)
+            self.assertIn(MyRpcTestClass._rpc_constants[0], str(err.exception))
+
+        # Name cannot be a RPC method
+        MyRpcTestClass._rpc_constants = ["remote_sqrt"]
+        with self.assertRaises(QMI_UsageException) as err:
+            self.c1.make_rpc_object("tc1", MyRpcTestClass)
+            self.assertIn(MyRpcTestClass._rpc_constants[0], str(err.exception))
+
+        # Name cannot be a protected name
+        for name in ("lock", "unlock", "force_unlock", "is_locked"):
+            MyRpcTestClass._rpc_constants = [name]
+            with self.assertRaises(QMI_UsageException) as err:
+                self.c1.make_rpc_object("tc1", MyRpcTestClass)
+                self.assertIn(name, str(err.exception))
+
+        # Name cannot be a class QMI signal object name
+        MyRpcSubClass._rpc_constants = ["mock_signal"]
+        with self.assertRaises(QMI_UsageException) as err:
+            self.c1.make_rpc_object("tc1", MyRpcSubClass)
+            self.assertIn(MyRpcSubClass._rpc_constants[0], str(err.exception))
+
 
     def test_call_to_disconnected(self):
 

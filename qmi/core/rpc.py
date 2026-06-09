@@ -1164,6 +1164,30 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
         return list(self._qmi_signals)  # type: ignore
 
 
+def _check_rpc_constants(
+    cls: Type[QMI_RpcObject], rpc_constant_names: list[str], protected_names: tuple[str, ...]
+) -> None:
+    """Internal function to check that the RPC constant names do not include protected names nor QMI_Signal objects.
+    It can also not be an internal function nor property nor a dunder variable or method.
+
+    The RPC constant names may include only class constants.
+    """
+    cls_items = cls.__dict__
+    for name in rpc_constant_names:
+        if (
+            name in protected_names or
+            name not in cls.__dict__ or
+            name.startswith("__") or name.endswith("__") or
+            inspect.isroutine(cls_items[name]) or
+            isinstance(cls_items[name], (property, staticmethod, classmethod))
+        ):
+            _logger.error(
+                f"RPC constant name {name} is invalid. Check that the name is not a " +
+                "protected name, QMI_Signal object, [internal] function, property nor a dunder variable name."
+            )
+            raise QMI_UsageException(f"Invalid RPC constant name {name}.")
+
+
 def make_interface_descriptor(
     rpc_object_class: Type[QMI_RpcObject], signal_declaration_class: Type[QMI_RpcObject] | None = None
 ) -> RpcInterfaceDescriptor:
@@ -1171,8 +1195,20 @@ def make_interface_descriptor(
     `QMI_RpcObject` subclass that can be accessed via RPC. Signal declarations
     are taken from the specified signal declaration class, which may be a
     different class than that from which the RPC methods are extracted.
-    """
 
+    Parameters:
+        rpc_object_class:         A QMI_RpcObject or a _ContextRpcObject.
+        signal_declaration_class: A QMI_RpcObject or any QMI_RpcObject derivate.
+
+    Returns:
+        RpcInterfaceDescriptor:   A descriptor about the RPC object and its interfaces.
+
+    Raises:
+        QMI_UsageException: If trying to use any of the RPC lock method names in the RPC object.
+        QMI_UsageException: If trying to set an RPC constant that is already defined as a signal or
+                            RPC method or lock method name.
+    """
+    protected_method_names = ("lock", "unlock", "force_unlock", "is_locked")
     # Use the RPC object class as the class to extract signal declarations from if no signal declaration class was
     # provided by the caller.
     if signal_declaration_class is None:
@@ -1184,7 +1220,7 @@ def make_interface_descriptor(
     # Extract RPC method declarations.
     methods = []
     for name, member in inspect.getmembers(rpc_object_class, is_rpc_method):
-        if name in ("lock", "unlock", "force_unlock", "is_locked"):
+        if name in protected_method_names:
             raise QMI_UsageException(f"`{name}` is a protected method name")
 
         signature = str(inspect.signature(member))
@@ -1208,14 +1244,14 @@ def make_interface_descriptor(
     for base in inspect.getmro(rpc_object_class):
         if hasattr(base, "_rpc_constants"):
             constant_names.update(getattr(base, "_rpc_constants"))
+            # Check validity of RPC constant name[s]
+            _check_rpc_constants(signal_declaration_class, constant_names, protected_method_names)
 
     # Extract constant values.
     doc += '\nRPC constants:\n'
     constants = []
     for constant_name in constant_names:
-        assert hasattr(rpc_object_class, constant_name)
         constant_value = getattr(rpc_object_class, constant_name)
-        assert not inspect.isfunction(constant_value)
         constants.append(RpcConstantDescriptor(constant_name, constant_value))
         doc += f"  - {constant_name}: {type(constant_value).__name__} = {constant_value}\n"
 
