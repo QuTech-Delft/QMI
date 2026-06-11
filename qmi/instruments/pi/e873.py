@@ -58,7 +58,7 @@ SystemStatus = NamedTuple('SystemStatus', [
 class PI_E873(QMI_Instrument):
     """Instrument driver for the PhysikInstrumente E-873 Servo Controller."""
 
-    _rpc_constants = ["RESPONSE_TIMEOUT"]
+    _rpc_constants = {"RESPONSE_TIMEOUT"}
 
     # Error codes returned by instrument via ERR? query.
     ERROR_CODES = GCS_CONTROLLER_ERROR_CODES

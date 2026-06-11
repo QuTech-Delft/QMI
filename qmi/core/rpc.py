@@ -1018,7 +1018,7 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
     Subclasses of `QMI_RpcObject` may choose to export (a subset of)
     their constant class attributes to be accessible directly via the proxy.
     This is done by creating a class attribute `_rpc_constants` holding
-    a list of attribute names to be exported.
+    a set of attribute names to be exported.
 
     Each instance of `QMI_RpcObject` runs in a separate thread. It is not allowed
     to invoke methods of the `QMI_RpcObject` directly from outside the class.
@@ -1031,6 +1031,8 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
     register a set of signals. Once registered, such signals can be published
     into the QMI network and routed to subscribed receivers.
     """
+
+    _rpc_constants: set[str]
 
     @classmethod
     def get_category(cls) -> str | None:
@@ -1172,20 +1174,22 @@ def _check_rpc_constants(
 
     The RPC constant names may include only class constants.
     """
-    cls_items = cls.__dict__
+    # Constant name could be inherited, so we need to as well check if it is present in any possible parent class.
+    cls_items: dict[str, Any] = {}
+    [cls_items.update(parent.__dict__) for parent in inspect.getmro(cls)]
     for name in rpc_constant_names:
         if (
             name in protected_names or
-            name not in cls.__dict__ or
+            not name in cls_items or
             name.startswith("__") or name.endswith("__") or
             inspect.isroutine(cls_items[name]) or
             isinstance(cls_items[name], (property, staticmethod, classmethod))
         ):
             _logger.error(
-                f"RPC constant name {name} is invalid. Check that the name is not a " +
+                f"RPC constant name `{name}` is invalid. Check that the name is not a " +
                 "protected name, QMI_Signal object, [internal] function, property nor a dunder variable name."
             )
-            raise QMI_UsageException(f"Invalid RPC constant name {name}.")
+            raise QMI_UsageException(f"Invalid RPC constant name `{name}`.")
 
 
 def make_interface_descriptor(
@@ -1204,9 +1208,9 @@ def make_interface_descriptor(
         RpcInterfaceDescriptor:   A descriptor about the RPC object and its interfaces.
 
     Raises:
-        QMI_UsageException: If trying to use any of the RPC lock method names in the RPC object.
+        QMI_UsageException: If trying to use any of the protected RPC lock method names in the RPC object.
         QMI_UsageException: If trying to set an RPC constant that is already defined as a signal or
-                            RPC method or lock method name.
+                            [RPC] method or protected lock method name.
     """
     protected_method_names = ("lock", "unlock", "force_unlock", "is_locked")
     # Use the RPC object class as the class to extract signal declarations from if no signal declaration class was
@@ -1221,7 +1225,7 @@ def make_interface_descriptor(
     methods = []
     for name, member in inspect.getmembers(rpc_object_class, is_rpc_method):
         if name in protected_method_names:
-            raise QMI_UsageException(f"`{name}` is a protected method name")
+            raise QMI_UsageException(f"`{name}` is a protected method name.")
 
         signature = str(inspect.signature(member))
         docstring = member.__doc__
@@ -1239,13 +1243,14 @@ def make_interface_descriptor(
         signals.append(RpcSignalDescriptor(name, arg_types))
         doc += f"  - {name}{arg_types}\n"
 
-    # Extract constant declarations.
+    # Extract constant declarations, including possible base class[es].
     constant_names = set()
     for base in inspect.getmro(rpc_object_class):
         if hasattr(base, "_rpc_constants"):
-            constant_names.update(getattr(base, "_rpc_constants"))
+            base_rpc_constants = getattr(base, "_rpc_constants")
             # Check validity of RPC constant name[s]
-            _check_rpc_constants(signal_declaration_class, constant_names, protected_method_names)
+            _check_rpc_constants(base, base_rpc_constants, protected_method_names)
+            constant_names.update(base_rpc_constants)
 
     # Extract constant values.
     doc += '\nRPC constants:\n'

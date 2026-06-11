@@ -46,7 +46,7 @@ class Thorlabs_K10CRxBase(QMI_Instrument):
                                The value is based on K10CR1 as no data for K10CR2 found.
         MAX_ACCELERATION:      Maximum acceleration in degrees/second^2.
     """
-    _rpc_constants = ["RESPONSE_TIMEOUT", "MAX_VELOCITY", "MAX_ACCELERATION"]
+    _rpc_constants = {"RESPONSE_TIMEOUT", "MAX_VELOCITY", "MAX_ACCELERATION"}
 
     RESPONSE_TIMEOUT = 1.0
     MAX_VELOCITY = 0

@@ -29,9 +29,9 @@ class AxisStatus(enum.IntEnum):
 class Newport_AG_UC8(QMI_Instrument):
     """Instrument driver for the Newport AG-UC8 Piezo Stepper Controller."""
 
-    _rpc_constants = [
+    _rpc_constants = {
         "RESPONSE_TIMEOUT", "SLOW_RESPONSE_TIMEOUT", "COMMAND_DELAY", "CHANNEL_SWITCH_DELAY", "RESET_DELAY"
-    ]
+    }
 
     # Meaning of error codes returned by the device.
     ERROR_CODES = {

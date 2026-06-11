@@ -190,14 +190,14 @@ class DIM3000Parameters(DIM3000Base):
 class TimeBase_DIM3000(QMI_Instrument):
     """QMI Instrument driver for the TimeBase DIM3000 AOM driver."""
 
-    _rpc_constants = [
+    _rpc_constants = {
         "FREQ_RANGE",
         "TIME_RANGE",
         "PULSE_FREQ_RANGE",
         "DUTY_CYCLE_RANGE",
         "AM_OFFSET_RANGE",
         "MINIMUM_EXEC_DELAY_S",
-    ]
+    }
 
     # Public class constants
     FREQ_RANGE = (10, 400_000_000)

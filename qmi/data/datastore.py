@@ -327,7 +327,8 @@ class DataFolder:
             raise QMI_UsageException(f"Data file already has an attribute named {ds.name}")
 
         if isinstance(hdf5_file, h5netcdf.File):
-            hdf5_file.dimensions[ds.column_label] = None
+            for column_label in ds.column_label:
+                hdf5_file.dimensions[column_label] = None
 
         keys = list(dict(hdf5_file.attrs).keys())
         ds_count = 0

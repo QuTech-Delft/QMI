@@ -148,7 +148,7 @@ class Bristol_871A(QMI_Instrument):
         STATUS_GOOD:        Status value of a wavelength measurement without any issues.
     """
 
-    _rpc_constants = ["RESPONSE_TIMEOUT", "STATUS_MASK", "STATUS_GOOD"]
+    _rpc_constants = {"RESPONSE_TIMEOUT", "STATUS_MASK", "STATUS_GOOD"}
 
     # Condition codes returned by get_condition(), by bit index.
     CONDITION_BITS = {
