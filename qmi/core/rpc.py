@@ -136,16 +136,16 @@ Reference
 #########
 """
 
+from abc import ABCMeta
+from collections import deque
+from collections.abc import Callable
+import enum
 import inspect
 import logging
 import threading
 import time
-import enum
-from abc import ABCMeta
-from collections import deque
-from collections.abc import Callable
-
 from typing import Any, NamedTuple, Type, TypeVar, TYPE_CHECKING
+import warnings
 
 from qmi.core.exceptions import (
     QMI_RuntimeException,
@@ -1241,11 +1241,21 @@ def make_interface_descriptor(
         name = signal_description.name
         arg_types = "(" + ", ".join(arg_type.__name__ for arg_type in signal_description.arg_types) + ")"
         signals.append(RpcSignalDescriptor(name, arg_types))
-        doc += f"  - {name}{arg_types}\n"
+        doc += f"  - {name}{arg_types}\n"    
 
     # Extract property declarations, including possible base class[es].
     property_names = set()
     for base in inspect.getmro(rpc_object_class):
+        # Check for deprecated use of '_rpc_constants'
+        if hasattr(base, "_rpc_constants"):
+            warnings.warn(
+                "The use of '_rpc_constants' is deprecated and will be removed in a future release. " +
+                "Use '_rpc_properties' instead. Now declaring them as '_rpc_properties'."
+            )
+            rpc_constants = getattr(base, "_rpc_constants")
+            _check_rpc_properties(base, rpc_constants, protected_method_names)
+            property_names.update(rpc_constants)
+
         if hasattr(base, "_rpc_properties"):
             base_rpc_properties = getattr(base, "_rpc_properties")
             # Check validity of RPC Property name[s]

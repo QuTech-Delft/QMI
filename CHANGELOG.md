@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Typed `_rpc_properties` to be a _set_ and changed all definitions to be _sets_.
 
+### Deprecated
+- Set the `_rpc_constants` to be deprecated and to point to `_rpc_properties`.
+
 ## [0.53.0] - 2026-05-11
 
 ### Added
