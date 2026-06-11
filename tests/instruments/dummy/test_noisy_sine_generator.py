@@ -50,7 +50,7 @@ class TestNsgOpenClose(unittest.TestCase):
 
     
 class TestNsgFunctions(unittest.TestCase):
-    """Tests for Dummy NSG methods and constants."""
+    """Tests for Dummy NSG methods and properties."""
     
     def setUp(self):
         qmi.start("dummy", None)
@@ -82,7 +82,7 @@ class TestNsgFunctions(unittest.TestCase):
                 self.nsg.set_frequency(invalid_freq)
 
     def test_max_frequency_change(self):
-        """Test that _rpc_constants 'max_frequency' constant can be manipulated."""
+        """Test that _rpc_properties 'max_frequency' property can be manipulated."""
         invalid_freq = NSG.max_frequency + 1.0
         new_max = NSG.max_frequency + 2.0
 
@@ -115,7 +115,7 @@ class TestNsgFunctions(unittest.TestCase):
                 self.nsg.set_amplitude(invalid_amp)
 
     def test_max_amplitude_change(self):
-        """Test that _rpc_constants 'max_amplitude' constant can be manipulated."""
+        """Test that _rpc_properties 'max_amplitude' property can be manipulated."""
         invalid_amp = NSG.max_amplitude + 1.0
         new_max = NSG.max_amplitude + 2.0
 
@@ -148,7 +148,7 @@ class TestNsgFunctions(unittest.TestCase):
                 self.nsg.set_noise(invalid_noise)
 
     def test_max_noise_not_modifiable(self):
-        """Test that 'max_noise' cannot be changed as it is not in _rpc_constants."""
+        """Test that 'max_noise' cannot be changed as it is not in _rpc_properties."""
         with self.assertRaises(AttributeError):
             self.nsg.max_noise = NSG.max_noise + 2.0
 
@@ -170,7 +170,7 @@ class TestNsgFunctions(unittest.TestCase):
                 self.nsg.wait(invalid_wait)
 
     def test_max_wait_change(self):
-        """Test that _rpc_constants 'max_wait' constant can be manipulated."""
+        """Test that _rpc_properties 'max_wait' property can be manipulated."""
         invalid_wait = NSG.max_wait + 0.1
         new_max = NSG.max_wait + 0.2
 

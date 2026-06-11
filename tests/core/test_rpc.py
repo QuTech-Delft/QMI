@@ -23,9 +23,10 @@ from qmi.core.pubsub import QMI_Signal
 
 class MyRpcTestClass(QMI_RpcObject):
     """An RPC test class"""
-    _rpc_constants = {"CONSTANT_NUMBER"}
+    _rpc_properties = {"PROPERTY_NUMBER"}
 
-    CONSTANT_NUMBER = 42
+    PROPERTY_NUMBER = 42
+    # Class constant, not a modifiable property
     CONSTANT_FLOAT = 3.1415
 
     def __init__(self, context, name):
@@ -60,10 +61,10 @@ class MyRpcTestClass(QMI_RpcObject):
 
 class MyRpcSubClass(MyRpcTestClass):
     """An RPC sub class"""
-    _rpc_constants = {"CONSTANT_STRING"}
+    _rpc_properties = {"PROPERTY_STRING"}
     mock_signal = QMI_Signal([float])
 
-    CONSTANT_STRING = "testing"
+    PROPERTY_STRING = "testing"
 
     @rpc_method
     def remote_log(self, x):
@@ -75,7 +76,7 @@ class ProxyInterface(NamedTuple):
     rpc_class_module: str = "SomeClass"
     rpc_class_name: str = "ClassyName"
     rpc_class_docstring: str = """This is Some Classy docstring."""
-    constants: list = []
+    properties: list = []
     methods: list = []
     signals: list = []
 
@@ -133,7 +134,7 @@ class TestRpcProxy(unittest.TestCase):
 
 class TestRPC(unittest.TestCase):
 
-    def _get_rpc_methods_signals_constants(self, rpc_object_class, signal_declaration_class):
+    def _get_rpc_methods_signals_properties(self, rpc_object_class, signal_declaration_class):
         # Get the class docstring for updating it with info
         doc = ""
         doc += '\n\nRPC methods:\n'
@@ -154,17 +155,17 @@ class TestRPC(unittest.TestCase):
             arg_types = "(" + ", ".join(arg_type.__name__ for arg_type in signal_description.arg_types) + ")"
             doc += f"  - {name}{arg_types}\n"
 
-        # Extract constant declarations.
-        constant_names = set()
+        # Extract property declarations.
+        property_names = set()
         for base in inspect.getmro(rpc_object_class):
-            if hasattr(base, "_rpc_constants"):
-                constant_names.update(getattr(base, "_rpc_constants"))
+            if hasattr(base, "_rpc_properties"):
+                property_names.update(getattr(base, "_rpc_properties"))
 
-        # Extract constant values.
-        doc += '\nRPC constants:\n'
-        for constant_name in constant_names:
-            constant_value = getattr(rpc_object_class, constant_name)
-            doc += f"  - {constant_name}: {type(constant_value).__name__} = {constant_value}\n"
+        # Extract property values.
+        doc += '\nRPC Properties:\n'
+        for property_name in property_names:
+            property_value = getattr(rpc_object_class, property_name)
+            doc += f"  - {property_name}: {type(property_value).__name__} = {property_value}\n"
 
         return doc
 
@@ -206,16 +207,16 @@ class TestRPC(unittest.TestCase):
 
         logging.getLogger("qmi.core.rpc").setLevel(logging.NOTSET)
         logging.getLogger("qmi.core.messaging").setLevel(logging.NOTSET)
-        
-        # Reset the correct constants.
-        MyRpcTestClass._rpc_constants = {"CONSTANT_NUMBER"}
-        MyRpcSubClass._rpc_constants = {"CONSTANT_STRING"}
+
+        # Reset the correct properties.
+        MyRpcTestClass._rpc_properties = {"PROPERTY_NUMBER"}
+        MyRpcSubClass._rpc_properties = {"PROPERTY_STRING"}
 
     def test_blocking_rpc(self):
         """Test for blocking RPC calls."""
-        # Get class documentation and update it with RPC methods, signals and constants listing
+        # Get class documentation and update it with RPC methods, signals and properties listing
         orig_doc = MyRpcTestClass.__doc__
-        orig_doc += self._get_rpc_methods_signals_constants(MyRpcTestClass, MyRpcTestClass)
+        orig_doc += self._get_rpc_methods_signals_properties(MyRpcTestClass, MyRpcTestClass)
         # Instantiate the class, as a thing to be serviced from context c1.
         # This gives us a proxy to the instance.
         proxy1 = self.c1.make_rpc_object("tc1", MyRpcTestClass)
@@ -259,9 +260,9 @@ class TestRPC(unittest.TestCase):
 
     def test_nonblocking_rpc(self):
         """Test for non-blocking RPC calls."""
-        # Get class documentation and update it with RPC methods, signals and constants listing
+        # Get class documentation and update it with RPC methods, signals and properties listing
         orig_doc = MyRpcTestClass.__doc__
-        orig_doc += self._get_rpc_methods_signals_constants(MyRpcTestClass, MyRpcTestClass)
+        orig_doc += self._get_rpc_methods_signals_properties(MyRpcTestClass, MyRpcTestClass)
         # Instantiate the class, as a thing to be serviced from context c1.
         # This gives us a proxy to the instance.
         proxy1 = self.c1.make_rpc_object("tc1", MyRpcTestClass)
@@ -368,9 +369,9 @@ class TestRPC(unittest.TestCase):
 
     def test_subclass(self):
 
-        # Get class documentation and update it with RPC methods, signals and constants listing
+        # Get class documentation and update it with RPC methods, signals and properties listing
         orig_doc = MyRpcSubClass.__doc__
-        orig_doc += self._get_rpc_methods_signals_constants(MyRpcSubClass, MyRpcSubClass)
+        orig_doc += self._get_rpc_methods_signals_properties(MyRpcSubClass, MyRpcSubClass)
         # Make instance of MyRpcSubClass in the first context.
         proxy1 = self.c1.make_rpc_object("tc1", MyRpcSubClass)
 
@@ -388,7 +389,7 @@ class TestRPC(unittest.TestCase):
         self.assertEqual(orig_doc, proxy1.__doc__)
         self.assertEqual(proxy1.__doc__, proxy2.__doc__)
 
-    def test_constants(self):
+    def test_properties(self):
 
         # Make instance of MyRpcSubClass in the first context.
         proxy1 = self.c1.make_rpc_object("tc1", MyRpcSubClass)
@@ -396,75 +397,75 @@ class TestRPC(unittest.TestCase):
         # Make a proxy via the second context.
         proxy2 = self.c2.get_rpc_object_by_name("c1.tc1")
 
-        # Check that constants are accessible via both proxies.
-        self.assertEqual(proxy1.CONSTANT_NUMBER, 42)
-        self.assertEqual(proxy1.CONSTANT_STRING, "testing")
-        self.assertEqual(proxy2.CONSTANT_NUMBER, 42)
-        self.assertEqual(proxy2.CONSTANT_STRING, "testing")
+        # Check that properties are accessible via both proxies.
+        self.assertEqual(proxy1.PROPERTY_NUMBER, 42)
+        self.assertEqual(proxy1.PROPERTY_STRING, "testing")
+        self.assertEqual(proxy2.PROPERTY_NUMBER, 42)
+        self.assertEqual(proxy2.PROPERTY_STRING, "testing")
 
-        # Check that constants are settable via both proxies.
-        proxy1.CONSTANT_NUMBER = 24
-        self.assertEqual(proxy1.CONSTANT_NUMBER, 24)
-        self.assertEqual(proxy2.CONSTANT_NUMBER, 24)
+        # Check that properties are settable via both proxies.
+        proxy1.PROPERTY_NUMBER = 24
+        self.assertEqual(proxy1.PROPERTY_NUMBER, 24)
+        self.assertEqual(proxy2.PROPERTY_NUMBER, 24)
 
-        proxy2.CONSTANT_STRING = "changed"
-        self.assertEqual(proxy1.CONSTANT_STRING, "changed")
-        self.assertEqual(proxy2.CONSTANT_STRING, "changed")
+        proxy2.PROPERTY_STRING = "changed"
+        self.assertEqual(proxy1.PROPERTY_STRING, "changed")
+        self.assertEqual(proxy2.PROPERTY_STRING, "changed")
 
         # Check that non-exported constants are not accessible.
         with self.assertRaises(AttributeError):
             proxy1.CONSTANT_FLOAT()
 
-    def test_invalid_constants(self):
-        """Test that RPC constants cannot have invalid names."""
+    def test_invalid_properties(self):
+        """Test that RPC Properties cannot have invalid names."""
         # Name cannot be a class attribute that is created at __init__
-        MyRpcTestClass._rpc_constants = {"_variable_strings"}
+        MyRpcTestClass._rpc_properties = {"_variable_strings"}
         with self.assertRaises(QMI_UsageException) as err:
             self.c1.make_rpc_object("tc1", MyRpcTestClass)
-            self.assertIn(MyRpcTestClass._rpc_constants[0], str(err.exception))
+            self.assertIn(MyRpcTestClass._rpc_properties[0], str(err.exception))
 
         # Name cannot be a property
-        MyRpcTestClass._rpc_constants = {"variable_strings"}
+        MyRpcTestClass._rpc_properties = {"variable_strings"}
         with self.assertRaises(QMI_UsageException) as err:
             self.c1.make_rpc_object("tc1", MyRpcTestClass)
-            self.assertIn(MyRpcTestClass._rpc_constants[0], str(err.exception))
+            self.assertIn(MyRpcTestClass._rpc_properties[0], str(err.exception))
 
         # Name cannot be a static method
-        MyRpcTestClass._rpc_constants = {"_call_me_maybe"}
+        MyRpcTestClass._rpc_properties = {"_call_me_maybe"}
         with self.assertRaises(QMI_UsageException) as err:
             self.c1.make_rpc_object("tc1", MyRpcTestClass)
-            self.assertIn(MyRpcTestClass._rpc_constants[0], str(err.exception))
+            self.assertIn(MyRpcTestClass._rpc_properties[0], str(err.exception))
 
         # Name cannot be a class method
-        MyRpcTestClass._rpc_constants = {"get_category"}
+        MyRpcTestClass._rpc_properties = {"get_category"}
         with self.assertRaises(QMI_UsageException) as err:
             self.c1.make_rpc_object("tc1", MyRpcTestClass)
-            self.assertIn(MyRpcTestClass._rpc_constants[0], str(err.exception))
+            self.assertIn(MyRpcTestClass._rpc_properties[0], str(err.exception))
 
         # Name cannot be a function method
-        MyRpcTestClass._rpc_constants = {"release_rpc_object"}
+        MyRpcTestClass._rpc_properties = {"release_rpc_object"}
         with self.assertRaises(QMI_UsageException) as err:
             self.c1.make_rpc_object("tc1", MyRpcTestClass)
-            self.assertIn(MyRpcTestClass._rpc_constants[0], str(err.exception))
+            self.assertIn(MyRpcTestClass._rpc_properties[0], str(err.exception))
 
         # Name cannot be a RPC method
-        MyRpcTestClass._rpc_constants = {"remote_sqrt"}
+        MyRpcTestClass._rpc_properties = {"remote_sqrt"}
         with self.assertRaises(QMI_UsageException) as err:
             self.c1.make_rpc_object("tc1", MyRpcTestClass)
-            self.assertIn(MyRpcTestClass._rpc_constants[0], str(err.exception))
+            self.assertIn(MyRpcTestClass._rpc_properties[0], str(err.exception))
 
         # Name cannot be a protected name
         for name in ("lock", "unlock", "force_unlock", "is_locked"):
-            MyRpcTestClass._rpc_constants = {name}
+            MyRpcTestClass._rpc_properties = {name}
             with self.assertRaises(QMI_UsageException) as err:
                 self.c1.make_rpc_object("tc1", MyRpcTestClass)
                 self.assertIn(name, str(err.exception))
 
         # Name cannot be a class QMI signal object name
-        MyRpcSubClass._rpc_constants = {"mock_signal"}
+        MyRpcSubClass._rpc_properties = {"mock_signal"}
         with self.assertRaises(QMI_UsageException) as err:
             self.c1.make_rpc_object("tc1", MyRpcSubClass)
-            self.assertIn(MyRpcSubClass._rpc_constants[0], str(err.exception))
+            self.assertIn(MyRpcSubClass._rpc_properties[0], str(err.exception))
 
     def test_call_to_disconnected(self):
 

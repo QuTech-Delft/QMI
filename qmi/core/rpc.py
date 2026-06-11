@@ -170,12 +170,12 @@ _logger = logging.getLogger(__name__)
 _T = TypeVar("_T")
 
 
-class RpcConstantDescriptor(NamedTuple):
-    """Description of an RPC constant.
+class RpcPropertyDescriptor(NamedTuple):
+    """Description of an RPC Property.
 
     Attributes:
-        name:  Name of the constant.
-        value: Value of the constant.
+        name:  Name of the property.
+        value: Value of the property.
     """
     name: str
     value: Any
@@ -216,7 +216,7 @@ class RpcInterfaceDescriptor(NamedTuple):
         rpc_class_module:    Name of the module in which the RPC object class was defined.
         rpc_class_name:      Name of the RPC object class.
         rpc_class_docstring: Docstring of the RPC object class.
-        constants:           A list of constant descriptors for the RPC constants declared
+        properties:          A list of property descriptors for the RPC Properties declared
                              by the RPC object class.
         methods:             A list of method descriptors for the RPC methods declared by
                              the RPC object class.
@@ -226,7 +226,7 @@ class RpcInterfaceDescriptor(NamedTuple):
     rpc_class_module: str
     rpc_class_name: str
     rpc_class_docstring: str | None
-    constants: list[RpcConstantDescriptor]
+    properties: list[RpcPropertyDescriptor]
     methods: list[RpcMethodDescriptor]
     signals: list[RpcSignalDescriptor]
 
@@ -329,36 +329,36 @@ class QMI_LockRpcReplyMessage(QMI_ReplyMessage):
         self.lock_token = lock_token
 
 
-class QMI_ConstantRpcRequestMessage(QMI_RequestMessage):
-    """Message sent by an RPC client to get or change a RPC constant value of a remote object.
+class QMI_PropertyRpcRequestMessage(QMI_RequestMessage):
+    """Message sent by an RPC client to get or change a RPC Property value of a remote object.
 
-    See `QMI_ConstantRpcReplyMessage` for how to interpret the reply to a request.
+    See `QMI_PropertyRpcReplyMessage` for how to interpret the reply to a request.
 
     Attributes:
-        constant_name:         The constant name.
-        constant_value:        The new constant value.
-        set_constant_value:    True to set the constant, False to get the current value.
+        property_name:         The property name.
+        property_value:        The new property value.
+        set_property_value:    True to set the property, False to get the current value.
         lock_token:            The unique token to use for the lock.
     """
-    __slots__ = ("constant_name", "constant_value", "set_constant_value", "lock_token")
+    __slots__ = ("property_name", "property_value", "set_property_value", "lock_token")
 
     def __init__(
         self,
         source_address: QMI_MessageHandlerAddress,
         destination_address: QMI_MessageHandlerAddress,
-        constant_name: str,
-        constant_value: Any,
-        set_constant_value: bool,
+        property_name: str,
+        property_value: Any,
+        set_property_value: bool,
         lock_token: QMI_LockTokenDescriptor | None = None
     ) -> None:
         super().__init__(source_address, destination_address)
-        self.constant_name = constant_name
-        self.constant_value = constant_value
-        self.set_constant_value = set_constant_value
+        self.property_name = property_name
+        self.property_value = property_value
+        self.set_property_value = set_property_value
         self.lock_token = lock_token
 
 
-class QMI_ConstantRpcReplyMessage(QMI_ReplyMessage):
+class QMI_PropertyRpcReplyMessage(QMI_ReplyMessage):
     """Message sent back to an RPC client with the result of the action.
 
     Attributes:
@@ -490,25 +490,25 @@ class QMI_RpcFuture(QMI_MessageHandler):
         except QMI_MessageDeliveryException as exc:
             self._set_result(QMI_RpcFutureState.RESULT_IS_EXCEPTION, exc)
 
-    def send_constant_rpc_request_message(
+    def send_property_rpc_request_message(
         self,
-        rpc_constant_name: str,
-        rpc_constant_value: Any,
-        set_constant_value: bool
+        rpc_property_name: str,
+        rpc_property_value: Any,
+        set_property_value: bool
     ) -> None:
-        """Send a request message to the RPC object to get or modify the specified constant.
+        """Send a request message to the RPC object to get or modify the specified property.
 
         Parameters:
-            rpc_constant_name:  Name of the constant to modify.
-            rpc_constant_value: The new constant value.
-            set_constant_value: True to modify the constant, False to get its current value.
+            rpc_property_name:  Name of the property to modify.
+            rpc_property_value: The new property value.
+            set_property_value: True to modify the property, False to get its current value.
         """
-        request = QMI_ConstantRpcRequestMessage(
+        request = QMI_PropertyRpcRequestMessage(
             self.address,
             self.rpc_object_address,
-            rpc_constant_name,
-            rpc_constant_value,
-            set_constant_value,
+            rpc_property_name,
+            rpc_property_value,
+            set_property_value,
             self.lock_token
         )
 
@@ -532,8 +532,8 @@ class QMI_RpcFuture(QMI_MessageHandler):
         if isinstance(message, QMI_MethodRpcReplyMessage):
             # Received result from RPC method call.
             self._set_result(message.state, message.result)
-        elif isinstance(message, QMI_ConstantRpcReplyMessage):
-            # Received result from RPC constant call.
+        elif isinstance(message, QMI_PropertyRpcReplyMessage):
+            # Received result from RPC Property call.
             self._set_result(message.state, message.result)
         elif isinstance(message, QMI_LockRpcReplyMessage):
             # Response to lock request message.
@@ -628,18 +628,18 @@ class QMI_RpcFuture(QMI_MessageHandler):
             self._context.unregister_message_handler(self)
 
 
-def rpc_constant_call(
+def rpc_property_call(
     context: "qmi.core.context.QMI_Context",
     rpc_object_address: QMI_MessageHandlerAddress,
-    constant_name: str,
+    property_name: str,
     rpc_lock_token: QMI_LockTokenDescriptor | None,
-    constant_value: Any = None,
+    property_value: Any = None,
     *,
-    set_constant_value: bool = False
+    set_property_value: bool = False
 ) -> Any:
-    """Helper function that performs a call to get or change a specific constant of the target RPC object."""
+    """Helper function that performs a call to get or change a specific property of the target RPC object."""
     future = QMI_RpcFuture(context, rpc_object_address, rpc_lock_token)
-    future.send_constant_rpc_request_message(constant_name, constant_value, set_constant_value)
+    future.send_property_rpc_request_message(property_name, property_value, set_property_value)
     return future.wait()
 
 
@@ -746,8 +746,8 @@ class QMI_RpcProxy:
         self._rpc_object_address = descriptor.address
         self._rpc_class_fqn = ".".join((descriptor.interface.rpc_class_module, descriptor.interface.rpc_class_name))
         self._lock_token: QMI_LockTokenDescriptor | None = None
-        self._rpc_constant_names = frozenset(
-            constant_descriptor.name for constant_descriptor in descriptor.interface.constants
+        self._rpc_property_names = frozenset(
+            property_descriptor.name for property_descriptor in descriptor.interface.properties
         )
         
         def make_rpc_method_forward_function(method_name: str):
@@ -796,9 +796,9 @@ class QMI_RpcProxy:
         self.rpc_nonblocking = QMI_RpcNonBlockingProxy(context, descriptor)
 
     def __getattribute__(self, name: str) -> Any:
-        rpc_constant_names = object.__getattribute__(self, "_rpc_constant_names")
-        if name in rpc_constant_names:
-            return rpc_constant_call(
+        rpc_property_names = object.__getattribute__(self, "_rpc_property_names")
+        if name in rpc_property_names:
+            return rpc_property_call(
                 object.__getattribute__(self, "_context"),
                 object.__getattribute__(self, "_rpc_object_address"),
                 name,
@@ -814,15 +814,15 @@ class QMI_RpcProxy:
             initialized = False
 
         if initialized:
-            rpc_constant_names = object.__getattribute__(self, "_rpc_constant_names")
-            if name in rpc_constant_names:
-                rpc_constant_call(
+            rpc_property_names = object.__getattribute__(self, "_rpc_property_names")
+            if name in rpc_property_names:
+                rpc_property_call(
                     object.__getattribute__(self, "_context"),
                     object.__getattribute__(self, "_rpc_object_address"),
                     name,
                     object.__getattribute__(self, "_lock_token"),
                     value,
-                    set_constant_value=True
+                    set_property_value=True
                 )
                 return
             
@@ -1016,8 +1016,8 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
     (a subset of) their methods to mark them as callable via RPC.
 
     Subclasses of `QMI_RpcObject` may choose to export (a subset of)
-    their constant class attributes to be accessible directly via the proxy.
-    This is done by creating a class attribute `_rpc_constants` holding
+    their property class attributes to be accessible directly via the proxy.
+    This is done by creating a class attribute `_rpc_properties` holding
     a set of attribute names to be exported.
 
     Each instance of `QMI_RpcObject` runs in a separate thread. It is not allowed
@@ -1032,7 +1032,7 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
     into the QMI network and routed to subscribed receivers.
     """
 
-    _rpc_constants: set[str]
+    _rpc_properties: set[str]
 
     @classmethod
     def get_category(cls) -> str | None:
@@ -1166,18 +1166,18 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
         return list(self._qmi_signals)  # type: ignore
 
 
-def _check_rpc_constants(
-    cls: Type[QMI_RpcObject], rpc_constant_names: list[str], protected_names: tuple[str, ...]
+def _check_rpc_properties(
+    cls: Type[QMI_RpcObject], rpc_property_names: list[str], protected_names: tuple[str, ...]
 ) -> None:
-    """Internal function to check that the RPC constant names do not include protected names nor QMI_Signal objects.
+    """Internal function to check that the RPC property names do not include protected names nor QMI_Signal objects.
     It can also not be an internal function nor property nor a dunder variable or method.
 
-    The RPC constant names may include only class constants.
+    The RPC property names may include only class properties.
     """
-    # Constant name could be inherited, so we need to as well check if it is present in any possible parent class.
+    # Property name could be inherited, so we need to as well check if it is present in any possible parent class.
     cls_items: dict[str, Any] = {}
     [cls_items.update(parent.__dict__) for parent in inspect.getmro(cls)]
-    for name in rpc_constant_names:
+    for name in rpc_property_names:
         if (
             name in protected_names or
             not name in cls_items or
@@ -1186,10 +1186,10 @@ def _check_rpc_constants(
             isinstance(cls_items[name], (property, staticmethod, classmethod))
         ):
             _logger.error(
-                f"RPC constant name `{name}` is invalid. Check that the name is not a " +
+                f"RPC Property name `{name}` is invalid. Check that the name is not a " +
                 "protected name, QMI_Signal object, [internal] function, property nor a dunder variable name."
             )
-            raise QMI_UsageException(f"Invalid RPC constant name `{name}`.")
+            raise QMI_UsageException(f"Invalid RPC Property name `{name}`.")
 
 
 def make_interface_descriptor(
@@ -1209,7 +1209,7 @@ def make_interface_descriptor(
 
     Raises:
         QMI_UsageException: If trying to use any of the protected RPC lock method names in the RPC object.
-        QMI_UsageException: If trying to set an RPC constant that is already defined as a signal or
+        QMI_UsageException: If trying to set an RPC Property that is already defined as a signal or
                             [RPC] method or protected lock method name.
     """
     protected_method_names = ("lock", "unlock", "force_unlock", "is_locked")
@@ -1243,26 +1243,26 @@ def make_interface_descriptor(
         signals.append(RpcSignalDescriptor(name, arg_types))
         doc += f"  - {name}{arg_types}\n"
 
-    # Extract constant declarations, including possible base class[es].
-    constant_names = set()
+    # Extract property declarations, including possible base class[es].
+    property_names = set()
     for base in inspect.getmro(rpc_object_class):
-        if hasattr(base, "_rpc_constants"):
-            base_rpc_constants = getattr(base, "_rpc_constants")
-            # Check validity of RPC constant name[s]
-            _check_rpc_constants(base, base_rpc_constants, protected_method_names)
-            constant_names.update(base_rpc_constants)
+        if hasattr(base, "_rpc_properties"):
+            base_rpc_properties = getattr(base, "_rpc_properties")
+            # Check validity of RPC Property name[s]
+            _check_rpc_properties(base, base_rpc_properties, protected_method_names)
+            property_names.update(base_rpc_properties)
 
-    # Extract constant values.
-    doc += '\nRPC constants:\n'
-    constants = []
-    for constant_name in constant_names:
-        constant_value = getattr(rpc_object_class, constant_name)
-        constants.append(RpcConstantDescriptor(constant_name, constant_value))
-        doc += f"  - {constant_name}: {type(constant_value).__name__} = {constant_value}\n"
+    # Extract property values.
+    doc += '\nRPC Properties:\n'
+    properties = []
+    for property_name in property_names:
+        property_value = getattr(rpc_object_class, property_name)
+        properties.append(RpcPropertyDescriptor(property_name, property_value))
+        doc += f"  - {property_name}: {type(property_value).__name__} = {property_value}\n"
 
     # Create interface descriptor.
     return RpcInterfaceDescriptor(
-        rpc_object_class.__module__, rpc_object_class.__name__, doc, constants, methods, signals
+        rpc_object_class.__module__, rpc_object_class.__name__, doc, properties, methods, signals
     )
 
 
@@ -1359,30 +1359,30 @@ class _RpcThread(QMI_Thread):
         )
         return reply
 
-    def _handle_constant_rpc_request(self, request: QMI_ConstantRpcRequestMessage) -> QMI_ConstantRpcReplyMessage:
-        """Handle RPC constant request."""
+    def _handle_property_rpc_request(self, request: QMI_PropertyRpcRequestMessage) -> QMI_PropertyRpcReplyMessage:
+        """Handle RPC Property request."""
         assert self._rpc_object is not None
 
-        # RPC constant call - need to check if the caller may invoke the RPC constant: allowed if the object is not
+        # RPC Property call - need to check if the caller may invoke the RPC Property: allowed if the object is not
         # locked (token is None) or if the provided lock token matches the locking token.
         if self._locking_token is None or self._locking_token == request.lock_token:
-            # Modify the constant; this can raise an exception or return a result.
+            # Modify the property; this can raise an exception or return a result.
             try:
-                constant = self._check_and_modify_constant(request)
+                property = self._check_and_modify_property(request)
                 result_type = QMI_RpcFutureState.RESULT_IS_VALUE
-                result = constant
+                result = property
 
             except BaseException as exception:
-                _logger.debug("RPC constant modify failed", exc_info=True)
+                _logger.debug("RPC Property modify failed", exc_info=True)
                 result_type = QMI_RpcFutureState.RESULT_IS_EXCEPTION
                 result = exception
 
         else:
-            _logger.error("%s locked, constant request without lock token is denied.", self._rpc_object._name)
+            _logger.error("%s locked, property request without lock token is denied.", self._rpc_object._name)
             result_type = QMI_RpcFutureState.OBJECT_IS_LOCKED
             result = None
 
-        reply = QMI_ConstantRpcReplyMessage(
+        reply = QMI_PropertyRpcReplyMessage(
             source_address=request.destination_address,
             destination_address=request.source_address,
             request_id=request.request_id,
@@ -1391,27 +1391,27 @@ class _RpcThread(QMI_Thread):
         )
         return reply
 
-    def _check_and_modify_constant(self, request: QMI_ConstantRpcRequestMessage) -> Any:
-        """Check if the object has the constant requested and is RPC-able; if so, return it."""
+    def _check_and_modify_property(self, request: QMI_PropertyRpcRequestMessage) -> Any:
+        """Check if the object has the property requested and is RPC-able; if so, return it."""
         assert self._rpc_object is not None
 
-        # Check that the constant was marked as RPC constant.
-        if not hasattr(self._rpc_object, request.constant_name):
+        # Check that the property was marked as RPC Property.
+        if not hasattr(self._rpc_object, request.property_name):
             raise QMI_UnknownRpcException(
                 f"Object {request.destination_address.object_id} of type {type(self._rpc_object).__name__}" +\
-                f" does not have constant {request.constant_name}."
+                f" does not have property {request.property_name}."
             )
 
-        constant = getattr(self._rpc_object, request.constant_name)
-        if not request.set_constant_value:
-            return constant
+        property = getattr(self._rpc_object, request.property_name)
+        if not request.set_property_value:
+            return property
 
-        if not check_value_structures_equal(constant, request.constant_value):
-            raise QMI_UnknownRpcException("New RPC constant value is of different type or size than original.")
+        if not check_value_structures_equal(property, request.property_value):
+            raise QMI_UnknownRpcException("New RPC Property value is of different type or size than original.")
 
-        setattr(self._rpc_object, request.constant_name, request.constant_value)
+        setattr(self._rpc_object, request.property_name, request.property_value)
 
-        return getattr(self._rpc_object, request.constant_name)
+        return getattr(self._rpc_object, request.property_name)
 
     def _handle_method_rpc_request(self, request: QMI_MethodRpcRequestMessage) -> QMI_MethodRpcReplyMessage:
         """Handle RPC method request."""
@@ -1476,7 +1476,7 @@ class _RpcThread(QMI_Thread):
 
             # Sanity check (this has already been checked by the RpcObjectManager).
             assert isinstance(request, (
-                    QMI_MethodRpcRequestMessage, QMI_ConstantRpcRequestMessage, QMI_LockRpcRequestMessage
+                    QMI_MethodRpcRequestMessage, QMI_PropertyRpcRequestMessage, QMI_LockRpcRequestMessage
                 )
             )
 
@@ -1563,11 +1563,11 @@ class _RpcThread(QMI_Thread):
                 request = self._fifo.popleft()
 
             # Process request.
-            reply: QMI_MethodRpcReplyMessage | QMI_ConstantRpcReplyMessage | QMI_LockRpcReplyMessage | None
+            reply: QMI_MethodRpcReplyMessage | QMI_PropertyRpcReplyMessage | QMI_LockRpcReplyMessage | None
             if isinstance(request, QMI_MethodRpcRequestMessage):
                 reply = self._handle_method_rpc_request(request)
-            elif isinstance(request, QMI_ConstantRpcRequestMessage):
-                reply = self._handle_constant_rpc_request(request)
+            elif isinstance(request, QMI_PropertyRpcRequestMessage):
+                reply = self._handle_property_rpc_request(request)
             elif isinstance(request, QMI_LockRpcRequestMessage):
                 reply = self._handle_lock_rpc_request(request)
             else:
@@ -1603,7 +1603,7 @@ class _RpcThread(QMI_Thread):
 
     def push_rpc_request(
         self,
-        rpc_request: QMI_MethodRpcRequestMessage | QMI_ConstantRpcRequestMessage | QMI_LockRpcRequestMessage | None
+        rpc_request: QMI_MethodRpcRequestMessage | QMI_PropertyRpcRequestMessage | QMI_LockRpcRequestMessage | None
     ) -> None:
         """Push an RPC request into the request queue and notify the thread."""
         with self._cv:
@@ -1688,7 +1688,7 @@ class RpcObjectManager(QMI_MessageHandler):
         """Called when a QMI message is delivered for our RPC object."""
 
         if not isinstance(message, (
-            QMI_MethodRpcRequestMessage, QMI_ConstantRpcRequestMessage, QMI_LockRpcRequestMessage
+            QMI_MethodRpcRequestMessage, QMI_PropertyRpcRequestMessage, QMI_LockRpcRequestMessage
             )
         ):
             _logger.error(

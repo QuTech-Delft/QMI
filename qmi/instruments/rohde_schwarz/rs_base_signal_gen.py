@@ -19,7 +19,7 @@ _logger = logging.getLogger(__name__)
 
 class RohdeSchwarz_Base(QMI_Instrument):
     """Base class for the instrument driver for the Rohde&Schwarz Signal Generators."""
-    _rpc_constants = {"DEFAULT_RESPONSE_TIMEOUT"}
+    _rpc_properties = {"DEFAULT_RESPONSE_TIMEOUT"}
     # Default response timeout in seconds.
     DEFAULT_RESPONSE_TIMEOUT = 5.0
 

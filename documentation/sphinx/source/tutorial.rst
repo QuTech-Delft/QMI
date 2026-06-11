@@ -78,7 +78,7 @@ We can look at the documentation of the Proxy instance:
 >>> help(nsg)
 
 This prints the docstring of the NoisySineGenerator class.
-It also shows a listing of all RPC methods, signals and class constants of the proxy instance::
+It also shows a listing of all RPC methods, signals and class properties of the proxy instance::
     Help on QMI_RpcProxy in module qmi.core.rpc:                                                             
 
     <rpc proxy for help.nsg (qmi.instruments.dummy.noisy_sine_generator.NoisySineGenerator)>
@@ -108,17 +108,17 @@ It also shows a listing of all RPC methods, signals and class constants of the p
 
         QMI signals:                                                                                         
 
-        RPC constants:
+        RPC Properties:
         - max_frequency: float = 1000000.0
         - max_amplitude: float = 1000.0
         - max_wait: = 10.0
 
 
-Using RPC constants
+Using RPC Properties
 ^^^^^^^^^^^^^^^^^^^
 
-From the docstring printed out you can see that there are four class attributes present: `max_frequency`, `max_amplitude`, `max_noise` and `max_wait`. But only three of these are listed under "RPC constants" and `max_noise` is not.
-These attributes are used in the class limit different `set` and the `wait` functions to have a maximum possible settable value. Now, the maximum values defined as "RPC constants" are now actually modifiable, while the `max_noise` is not.
+From the docstring printed out you can see that there are four class attributes present: `max_frequency`, `max_amplitude`, `max_noise` and `max_wait`. But only three of these are listed under "RPC Properties" and `max_noise` is not.
+These attributes are used in the class limit different `set` and the `wait` functions to have a maximum possible settable value. Now, the maximum values defined as "RPC Properties" are now actually modifiable, while the `max_noise` is not.
 So, using the usual way of adjusting class variables, the three attributes can given new values, f.ex.:
 
 >>> nsg.max_amplitude
@@ -128,7 +128,7 @@ So, using the usual way of adjusting class variables, the three attributes can g
     500.0
 
 Note that to change the value, *the same value type must be used*. Trying to set the `max_amplitude` with an integer value (like `500`) will lead to an exception.
-Also, trying to adjust `max_noise`, not included in RPC constants, will lead to an error:
+Also, trying to adjust `max_noise`, not included in RPC Properties, will lead to an error:
 
 >>> nsg.max_noise = 20.0
     Traceback (most recent call last):
@@ -180,7 +180,7 @@ We can make a very basic graph of *nsg* samples as follows:
 ...     print(" " * int(40.0 + 0.25 * nsg.get_sample()) + "*")
 ...     time.sleep(0.01)
 
-Feel free to experiment a bit with the NoisySineGenerator constants and other methods, of which you can read about by executing the ``help(nsg)``.
+Feel free to experiment a bit with the NoisySineGenerator properties and other methods, of which you can read about by executing the ``help(nsg)``.
 
 Also, if you want, have a look at the source code of ``qmi.instruments.dummy.noisy_sine_generator``.
 This should convince you that implementing device drivers for QMI instruments is pretty straightforward.

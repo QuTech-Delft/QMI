@@ -38,7 +38,7 @@ class Thorlabs_Kdc101(QMI_Instrument):
     An adaptation of the driver could be made in the future to also allow the use of the linear translation and
     rotation stages, and goniometers.
     """
-    _rpc_constants = {"RESPONSE_TIMEOUT"}
+    _rpc_properties = {"RESPONSE_TIMEOUT"}
 
     RESPONSE_TIMEOUT = 1.0
 

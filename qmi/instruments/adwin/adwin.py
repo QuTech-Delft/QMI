@@ -57,6 +57,8 @@ class Adwin_Base(QMI_Instrument):
     parameters and data that are dependent on processor type. The 'MAX_m' values here are valid for at least the T11,
     T12 and T12.1 processor types. The maximum number of slots instead is dependent on the enclosure type of the ADwin.
     """
+    _rpc_parameters = {"PROCESS_STOP_TIMEOUT"}
+    
     MAX_PAR: int = 80
     MAX_DATA: int = 200
     MAX_PROCESS_NO: int = 10

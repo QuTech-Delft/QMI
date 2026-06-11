@@ -49,6 +49,7 @@ class Wavelength_TC_Lab(QMI_Instrument):
     Configuring temperature sensors and sensor parameters is not supported.
     The auxiliary temperature sensor is not supported.
     """
+    _rpc_properties = {"COMMAND_RESPONSE_TIMEOUT", "OPEN_MAX_RETRY"}
 
     USB_VENDOR_ID = 0x1a45
     USB_PRODUCT_ID = 0x3101
