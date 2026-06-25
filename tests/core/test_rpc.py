@@ -59,7 +59,7 @@ class MyRpcSubClass(MyRpcTestClass):
         return math.log(x)
     
     @rpc_method
-    def foute_boel(self)=:
+    def foute_boel(self):
         raise RuntimeError("U can't run this")
 
 
