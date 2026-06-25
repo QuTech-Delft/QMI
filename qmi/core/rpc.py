@@ -508,7 +508,10 @@ class QMI_RpcFuture(QMI_MessageHandler):
                     # Check state of the future.
                     if self._state == QMI_RpcFutureState.RESULT_IS_EXCEPTION:
                         if not isinstance(self._result, tuple):
-                            raise QMI_RuntimeException("Received invalid exception object from RPC call.\
+if not isinstance(self._result, tuple):
+    if not isinstance(self._result, BaseException):
+        raise QMI_RuntimeException("Received invalid exception value from RPC call")
+    raise self._result
                             Is the RPC host running on an older QMI version?") from exc
                         exc = self._result[0]
                         tb = self._result[1]
