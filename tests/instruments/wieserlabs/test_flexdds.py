@@ -1,28 +1,28 @@
 """Unit test for Wieserlabs FlexDDS NG Dual instrument driver."""
 
-from typing import cast
 import unittest
 from unittest.mock import MagicMock, call, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.transport import QMI_SerialTransport
 from qmi.instruments.wieserlabs import OutputChannel, DdsRegister, DcpRegister, Wieserlabs_FlexDdsNg
 
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 class TestFlexDDS(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("Test_flex_dds")
+        self.ctx = QMI_Context("Test_flex_dds")
+        self.ctx.start()
         self._transport_mock = MagicMock(spec=QMI_SerialTransport)
         with patch(
-                'qmi.instruments.wieserlabs.flexdds.create_transport',
-                return_value=self._transport_mock):
-            self.instr: Wieserlabs_FlexDdsNg = qmi.make_instrument("instr", Wieserlabs_FlexDdsNg, "transp")
-            self.instr = cast(QMI_SerialTransport, self.instr)
+            'qmi.instruments.wieserlabs.flexdds.create_transport',
+            return_value=self._transport_mock
+        ):
+            self.instr = Wieserlabs_FlexDdsNg(self.ctx, "instr", "transp")
 
     def tearDown(self):
-        qmi.stop()
+        self.ctx.stop()
 
     def _helper_open(self):
         """Open the instrument and check transport interaction."""

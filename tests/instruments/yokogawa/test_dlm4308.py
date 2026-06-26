@@ -14,12 +14,19 @@ from tests.patcher import PatcherQmiContext as QMI_Context
 
 class TestInstrumentInitCase(unittest.TestCase):
 
+    def setUp(self):
+        self.ctx = QMI_Context("yoko")
+        self.ctx.start()
+
+    def tearDown(self):
+        self.ctx.stop()
+
     @patch("qmi.core.transport.vxi11")
     def test_open_close(self, vxi11_patch):
         """Test that the class initializes and open and close functions work as expected."""
         # Arrange
         expected_path = "O:/"
-        yokogawa = Yokogawa_Dlm4038(QMI_Context("yoko"), "gawa", "vxi11:123.45.67.89")
+        yokogawa = Yokogawa_Dlm4038(self.ctx, "gawa", "vxi11:123.45.67.89")
         # Act
         yokogawa.open()
         # Assert

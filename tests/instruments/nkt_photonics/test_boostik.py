@@ -1,22 +1,14 @@
 """Test for the NKT Photonics boostik driver."""
 
+from dataclasses import dataclass
 import logging
-
 from unittest import TestCase
 from unittest.mock import MagicMock
 from unittest.mock import patch
-from unittest.mock import call
-
 from typing import cast
 
-from dataclasses import dataclass
-
-
 from qmi.core.transport import QMI_Transport
-from qmi.core.scpi_protocol import ScpiProtocol
 from qmi.instruments.nkt_photonics.boostik import KoherasBoostikLaserAmplifier
-from qmi.core.exceptions import QMI_InstrumentException
-
 
 # Disable all logging
 logging.disable(logging.CRITICAL)

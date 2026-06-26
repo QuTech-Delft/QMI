@@ -3,28 +3,29 @@ import logging
 import unittest
 from unittest.mock import Mock, call, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_SerialTransport
 from qmi.core.usbtmc import Instrument
-
 from qmi.instruments.wl_photonics import WlPhotonics_WltfN
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class TestWlPhotonicsWltfNOpenCloseSerial(unittest.TestCase):
 
     def setUp(self):
         logging.getLogger("qmi.instruments.wl_photonics.wltf_n").setLevel(logging.CRITICAL)
-        qmi.start("TestWlPhotonicsWltfNClassContext")
+        self.ctx = QMI_Context("TestWlPhotonicsWltfNClassContext")
+        self.ctx.start()
         # Add patches
         patcher = patch('qmi.instruments.wl_photonics.wltf_n.create_transport', spec=QMI_SerialTransport)
         self._transport_mock = patcher.start()
         self.addCleanup(patcher.stop)
         # Make DUT
-        self.instr: WlPhotonics_WltfN = WlPhotonics_WltfN(qmi.context(), "WlPhotonics_wltf_n", "")
+        self.instr = WlPhotonics_WltfN(self.ctx, "WlPhotonics_wltf_n", "")
 
     def tearDown(self):
-        qmi.stop()
+        self.ctx.stop()
         logging.getLogger("qmi.instruments.wl_photonics.wltf_n").setLevel(logging.NOTSET)
 
     def test_open_close(self):
@@ -80,7 +81,8 @@ class TestWlPhotonicsWltfNOpenClosePyUSB(unittest.TestCase):
 
     def setUp(self):
         logging.getLogger("qmi.instruments.wl_photonics.wltf_n").setLevel(logging.CRITICAL)
-        qmi.start("TestWlPhotonicsWltfNClassContext")
+        self.ctx = QMI_Context("TestWlPhotonicsWltfNClassContext")
+        self.ctx.start()
         # Add patches - now we should patch a bit deeper to test the creation of USBTMC transport without SN.
         patcher = patch('qmi.core.usbtmc.Instrument', autospec=Instrument)
         self._transport_mock = patcher.start()
@@ -91,10 +93,10 @@ class TestWlPhotonicsWltfNOpenClosePyUSB(unittest.TestCase):
         serial = ""  # No serial number known. Does it still work?
         transport_string = f"usbtmc:vendorid={self.vendor_id}:productid={self.product_id}:serialnr={serial}"
         with patch("sys.platform", "linux1"):
-            self.instr: WlPhotonics_WltfN = WlPhotonics_WltfN(qmi.context(), "WlPhotonics_wltf_n", transport_string)
+            self.instr = WlPhotonics_WltfN(self.ctx, "WlPhotonics_wltf_n", transport_string)
 
     def tearDown(self):
-        qmi.stop()
+        self.ctx.stop()
         logging.getLogger("qmi.instruments.wl_photonics.wltf_n").setLevel(logging.NOTSET)
 
     def test_open_close(self):
@@ -157,14 +159,15 @@ class TestWlPhotonicsWltfNClassMethods(unittest.TestCase):
         expected_start_step = (self.step_max - self.step_min) // 2
 
         logging.getLogger("qmi.instruments.wl_photonics.wltf_n").setLevel(logging.CRITICAL)
-        qmi.start("TestWlPhotonicsWltfNClassContext")
+        self.ctx = QMI_Context("TestWlPhotonicsWltfNClassContext")
+        self.ctx.start()
         # Add patches
         patcher = patch('qmi.instruments.wl_photonics.wltf_n.create_transport', spec=QMI_SerialTransport)
         self._transport_mock = patcher.start()
         self.addCleanup(patcher.stop)
         self._transport_mock.write = Mock()
         # Make DUT
-        self.instr: WlPhotonics_WltfN = WlPhotonics_WltfN(qmi.context(), "RSB100a", "")
+        self.instr = WlPhotonics_WltfN(self.ctx, "RSB100a", "")
         self.instr._transport.read_until.side_effect = [
             # output of dev?
             b'WL200: SN(201307374), MD(2018-11-23)\r\n' +
@@ -179,7 +182,7 @@ class TestWlPhotonicsWltfNClassMethods(unittest.TestCase):
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
+        self.ctx.stop()
         logging.getLogger("qmi.instruments.wl_photonics.wltf_n").setLevel(logging.NOTSET)
 
     def test_wrong_int_value(self):

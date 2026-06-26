@@ -4,13 +4,13 @@ import unittest
 from unittest.mock import MagicMock, call, patch
 
 import logging
-from typing import cast
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.rigol import Rigol_Dg4102
 from qmi.utils.context_managers import open_close
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class SuppressLogging:
@@ -28,16 +28,17 @@ class SuppressLogging:
 class RigolDg4102TestCase(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("TestContext")
+        self.ctx = QMI_Context("TestContext")
+        self.ctx.start()
         self._transport_mock = MagicMock(spec=QMI_TcpTransport)
         with patch(
                 'qmi.instruments.rigol.dg4102.create_transport',
-                return_value=self._transport_mock):
-            self.instr: Rigol_Dg4102 = qmi.make_instrument("instr", Rigol_Dg4102, "transport_descriptor")
-            self.instr = cast(Rigol_Dg4102, self.instr)
+                return_value=self._transport_mock
+        ):
+            self.instr = Rigol_Dg4102(self.ctx, "instr", "transport_descriptor")
 
     def tearDown(self):
-        qmi.stop()
+        self.ctx.stop()
 
     def test_open_close(self):
         """Test that the open and close functions include calls as expected."""

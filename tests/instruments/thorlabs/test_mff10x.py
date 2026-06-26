@@ -2,9 +2,9 @@ import struct
 import unittest, unittest.mock
 
 from qmi.instruments.thorlabs import Thorlabs_Mff10X
-
 import qmi.core.exceptions
-from qmi.core.context import QMI_Context
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class TestParsingAndFormatFunctions(unittest.TestCase):
@@ -144,12 +144,15 @@ class TestThorlabsMFF10x(unittest.TestCase):
 
     def setUp(self) -> None:
         unittest.mock.patch("qmi.core.transport.QMI_SerialTransport._validate_device_name")
-        qmi_context = unittest.mock.MagicMock(spec=QMI_Context)
-        qmi_context.name = "mockyflop"
+        self.ctx = QMI_Context("mockyflop")
+        self.ctx.start()
         self.ser_address = "COM100"
         self.baudrate = 115200
         transport_id = "serial:{}:baudrate={}".format(self.ser_address, self.baudrate)
-        self.thorlabs = Thorlabs_Mff10X(qmi_context, "flippy", transport_id)
+        self.thorlabs = Thorlabs_Mff10X(self.ctx, "flippy", transport_id)
+
+    def tearDown(self):
+        self.ctx.stop()
 
     def test_open_close(self):
         with unittest.mock.patch("serial.Serial") as ser:

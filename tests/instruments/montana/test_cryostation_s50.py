@@ -4,20 +4,21 @@ import json
 import unittest
 from unittest.mock import MagicMock, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 
 from qmi.instruments.montana import Montana_CryostationS50
 from qmi.instruments.montana.cryostation_s50 import Montana_CryostationS50_System_Goal, Montana_CryostationS50_System_State
 
+from tests.patcher import PatcherQmiContext as QMI_Context
+
 
 class TestCryostation50(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("montana-s50-test-context")
+        self.ctx = QMI_Context("montana-s50-test-context")
+        self.ctx.start()
         self.ip_addres = "192.168.1.1"
-        self.instr: Montana_CryostationS50 = qmi.make_instrument(
-            "montana_s50_test_instr", Montana_CryostationS50, self.ip_addres)
+        self.instr = Montana_CryostationS50(self.ctx, "montana_s50_test_instr", self.ip_addres)
         self.instr.open()
         self.controller_properties_url = f"http://{self.ip_addres}:47101/v1/controller/properties"
         self.controller_methods_url = f"http://{self.ip_addres}:47101/v1/controller/methods"
@@ -27,7 +28,7 @@ class TestCryostation50(unittest.TestCase):
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
+        self.ctx.stop()
 
     def test_open_close(self):
         self.instr.close()

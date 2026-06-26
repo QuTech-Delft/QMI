@@ -5,22 +5,24 @@ from collections.abc import Sequence
 from qmi.instruments.thorlabs import Thorlabs_Tc200
 from qmi.instruments.thorlabs.tc200 import *
 from qmi.instruments.thorlabs.tc200 import _Query, _Command
-
 import qmi.core.exceptions
-from qmi.core.context import QMI_Context
 
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 class TestThorlabsTc200(unittest.TestCase):
 
     def setUp(self) -> None:
         unittest.mock.patch("qmi.core.transport.QMI_SerialTransport._validate_device_name")
-        qmi_context = unittest.mock.MagicMock(spec=QMI_Context)
-        qmi_context.name = "mockytemp"
+        self.ctx = QMI_Context("mockytemp")
+        self.ctx.start()
         self.ser_address = "COM298"
         self.baudrate = 115200
         transport_id = "serial:{}".format(self.ser_address)
-        self.thorlabs = Thorlabs_Tc200(qmi_context, "heet", transport_id)
+        self.thorlabs = Thorlabs_Tc200(self.ctx, "heet", transport_id)
 
+    def tearDown(self):
+        self.ctx.stop()
+        
     def test_open_close(self):
         with unittest.mock.patch("serial.Serial") as ser:
             self.thorlabs.open()

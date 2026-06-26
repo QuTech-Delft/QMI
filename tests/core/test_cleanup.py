@@ -1,8 +1,9 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Test cleanup behaviour of QMI framework."""
 
 import logging
+import os
 import unittest
 import warnings
 import weakref
@@ -77,6 +78,9 @@ class TestCleanup(unittest.TestCase):
     def setUp(self):
         # Suppress logging.
         logging.getLogger("qmi.core.task").setLevel(logging.ERROR)
+        # Make sure QMI_CONFIG is not present
+        if os.getenv("QMI_CONFIG"):
+            del os.environ["QMI_CONFIG"]
 
     def tearDown(self):
         logging.getLogger("qmi.core.task").setLevel(logging.NOTSET)
@@ -84,6 +88,7 @@ class TestCleanup(unittest.TestCase):
     def test_clean_stop(self):
         """Test shutdown with proper cleanup of all created objects."""
 
+        print(os.getenv("QMI_CONFIG"))
         # Start QMI.
         qmi.start("test_context")
 

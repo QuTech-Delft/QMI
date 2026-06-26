@@ -2,23 +2,25 @@
 import unittest
 from unittest.mock import call, MagicMock
 
-import qmi
 from qmi.instruments.stanford_research_systems import Srs_Sim900
 from qmi.instruments.quantum_opus import QuantumOpus_QoAmpSim
 from qmi.core.exceptions import QMI_UsageException, QMI_InstrumentException
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class TestAmpSimModule(unittest.TestCase):
     """Testcase of Quantum opus AmpSim Module instrument"""
 
     def setUp(self):
-        qmi.start("test_quantum_opus_ampsim900")
+        self.ctx = QMI_Context("test_quantum_opus_ampsim900")
+        self.ctx.start()
         self._sim900 = MagicMock(spec=Srs_Sim900)
         self._port = 6
-        self.amp_sim_module = qmi.make_instrument("QOAmpSim", QuantumOpus_QoAmpSim, self._sim900, self._port)
+        self.amp_sim_module = QuantumOpus_QoAmpSim(self.ctx, "QOAmpSim", self._sim900, self._port)
 
     def tearDown(self):
-        qmi.stop()
+        self.ctx.stop()
 
     def test_get_module_id(self):
         # arrange

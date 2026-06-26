@@ -2,24 +2,26 @@ import logging
 import unittest
 from unittest.mock import MagicMock
 
-import qmi
 import qmi.utils.context_managers
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException
 from qmi.core.transport import QMI_Transport
 from qmi.instruments.instru_tech.instrutech_agc302 import InstruTech_AGC302
 
+from tests.patcher import PatcherQmiContext as QMI_Context
 
-class MyTestCase(unittest.TestCase):
+
+class TestAGC302Case(unittest.TestCase):
 
     def setUp(self) -> None:
         # Suppress logging.
         logging.getLogger("qmi.core.instrument").setLevel(logging.CRITICAL)
         self.transport = MagicMock(spec=QMI_Transport)
-        qmi.start("AGC302_unit-test")
-        self.instrument: InstruTech_AGC302 = qmi.make_instrument("pressure_gauge", InstruTech_AGC302, self.transport)
+        self.ctx = QMI_Context("AGC302_unit-test")
+        self.ctx.start()
+        self.instrument = InstruTech_AGC302(self.ctx, "pressure_gauge", self.transport)
 
     def tearDown(self) -> None:
-        qmi.stop()
+        self.ctx.stop()
         logging.getLogger("qmi.core.instrument").setLevel(logging.NOTSET)
 
     def test_read_gauge(self):

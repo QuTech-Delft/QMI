@@ -1,16 +1,15 @@
 """Unit tests for Edwards Turbo Instrument Controller."""
 import logging
-from typing import cast
 import unittest
 from unittest.mock import Mock, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.edwards import EdwardsVacuum_TIC, EdwardsVacuum_TIC_AlertId,\
     EdwardsVacuum_TIC_GaugeState, EdwardsVacuum_TIC_Priority,\
     EdwardsVacuum_TIC_PumpState, EdwardsVacuum_TIC_State
 
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 class TestTurboInstrumentControllerOpenClose(unittest.TestCase):
     """
@@ -18,7 +17,8 @@ class TestTurboInstrumentControllerOpenClose(unittest.TestCase):
     """
 
     def setUp(self):
-        qmi.start("test-tic-context")
+        self.ctx = QMI_Context("test-tic-context")
+        self.ctx.start()
         # Add patches
         patcher = patch('qmi.instruments.edwards.turbo_instrument_controller.create_transport', spec=QMI_TcpTransport)
         self._transport_mock: Mock = patcher.start().return_value
@@ -27,12 +27,10 @@ class TestTurboInstrumentControllerOpenClose(unittest.TestCase):
         self._scpi_mock: Mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
         # Make DUTs
-        self.instr: EdwardsVacuum_TIC = qmi.make_instrument(
-            "test_instr", EdwardsVacuum_TIC, "transport_str")
-        self.instr = cast(EdwardsVacuum_TIC, self.instr)
+        self.instr = EdwardsVacuum_TIC(self.ctx, "test_instr", "transport_str")
 
     def tearDown(self):
-        qmi.stop()
+        self.ctx.stop()
         logging.getLogger("qmi.core.instrument").setLevel(logging.NOTSET)
 
     def test_open_close_opens_and_closes(self):
@@ -49,7 +47,8 @@ class TestTurboInstrumentController(unittest.TestCase):
     """
 
     def setUp(self):
-        qmi.start("test-tic-context")
+        self.ctx = QMI_Context("test-tic-context")
+        self.ctx.start()
         # Add patches
         patcher = patch('qmi.instruments.edwards.turbo_instrument_controller.create_transport', spec=QMI_TcpTransport)
         self._transport_mock: Mock = patcher.start().return_value
@@ -58,14 +57,12 @@ class TestTurboInstrumentController(unittest.TestCase):
         self._scpi_mock: Mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
         # Make DUTs
-        self.instr: EdwardsVacuum_TIC = qmi.make_instrument(
-            "test_instr", EdwardsVacuum_TIC, "transport_str")
-        self.instr = cast(EdwardsVacuum_TIC, self.instr)
+        self.instr = EdwardsVacuum_TIC(self.ctx, "test_instr", "transport_str")
         self.instr.open()
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
+        self.ctx.stop()
 
     def test_get_idn_gets_idn(self):
         """Get idn of device."""

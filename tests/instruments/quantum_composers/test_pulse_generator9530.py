@@ -5,7 +5,6 @@ from typing import cast
 import unittest
 from unittest.mock import MagicMock, call, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.quantum_composers import QuantumComposers_9530
@@ -13,6 +12,7 @@ from qmi.instruments.quantum_composers import (
     RefClkSource, PulseMode, TriggerMode, TriggerEdge, OutputDriver
 )
 
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 class SuppressLogging:
     """Context manager to temporarily suppress logging during a test."""
@@ -29,16 +29,18 @@ class SuppressLogging:
 class TestPulseGenerator9530(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("TestContext")
+        self.ctx = QMI_Context("TestContext")
+        self.ctx.start()
         self._transport_mock = MagicMock(spec=QMI_TcpTransport)
         with patch(
-                'qmi.instruments.quantum_composers.pulse_generator9530.create_transport',
-                return_value=self._transport_mock):
-            self.instr: QuantumComposers_9530 = qmi.make_instrument("instr", QuantumComposers_9530, "transport_descriptor")
+            'qmi.instruments.quantum_composers.pulse_generator9530.create_transport',
+            return_value=self._transport_mock
+        ):
+            self.instr = QuantumComposers_9530(self.ctx, "instr", "transport_descriptor")
             self.instr = cast(QuantumComposers_9530, self.instr)
 
     def tearDown(self):
-        qmi.stop()
+        self.ctx.stop()
 
     def test_open_close(self):
         self.instr.open()

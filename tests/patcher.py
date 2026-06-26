@@ -8,7 +8,7 @@ from qmi.core.context import QMI_Context, QMI_RpcProxy
 
 class PatcherQmiRpcProxy:
 
-    rpc_nonblocking = Mock()  # patch("qmi.core.rpc.QMI_RpcNonBlockingProxy")
+    rpc_nonblocking = Mock()
 
     def __init__(self, context, descriptor):
         self._context = context
@@ -40,7 +40,6 @@ class PatcherQmiContext:
 
     def stop(self):
         """Stop the qmi_context and patcher."""
-        qmi.stop()
         self.qmi_patcher.stop()
 
     def make_instrument(self, instrument_name, instrument_class, *args, **kwargs):

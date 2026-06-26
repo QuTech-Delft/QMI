@@ -2,21 +2,23 @@ import unittest
 from unittest.mock import Mock, patch, call
 import logging
 
-import qmi
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.pololu import Pololu_Maestro
 from qmi.core.exceptions import QMI_InstrumentException
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class PololuMaestroOpenCloseTestCase(unittest.TestCase):
 
     def setUp(self) -> None:
-        qmi.start("pololu_unit_test")
+        self.ctx = QMI_Context("pololu_unit_test")
+        self.ctx.start()
         transport = "serial:COM1"
-        self.instr = qmi.make_instrument("Pololu", Pololu_Maestro, transport)
+        self.instr = Pololu_Maestro(self.ctx, "Pololu", transport)
 
     def tearDown(self) -> None:
-        qmi.stop()
+        self.ctx.stop()
 
     def test_open_close(self):
         """Test opening and closing the instrument"""
@@ -50,20 +52,26 @@ class PololuMaestroMinMaxTargetsConfigTestCase(unittest.TestCase):
             logging.CRITICAL)
         self._cmd_lead = chr(0xAA) + chr(0x0C)
         self._error_check_cmd = bytes(self._cmd_lead + chr(0x21), "latin-1")
-        qmi.start("pololu_unit_test")
+        self.ctx = QMI_Context("pololu_unit_test")
+        self.ctx.start()
         patcher = patch(
             'qmi.instruments.pololu.maestro.create_transport', spec=QMI_TcpTransport)
         self._transport_mock: Mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
-        self.instr: Pololu_Maestro = qmi.make_instrument(
-            "Pololu", Pololu_Maestro, self.TRANSPORT_STR,
-            channels_min_max_targets={1: (self.CHANNEL1_MIN, self.CHANNEL1_MAX),
-                                      3: (self.CHANNEL3_MIN, self.CHANNEL3_MAX)})
+        self.instr = Pololu_Maestro(
+            self.ctx,
+            "Pololu",
+            self.TRANSPORT_STR,
+            channels_min_max_targets={
+                1: (self.CHANNEL1_MIN, self.CHANNEL1_MAX),
+                3: (self.CHANNEL3_MIN, self.CHANNEL3_MAX)
+            }
+        )
         self.instr.open()
 
     def tearDown(self) -> None:
         self.instr.close()
-        qmi.stop()
+        self.ctx.stop()
 
     def test_setting_channel_min_and_max_targets(self):
         """Test setting the min and max targets of channels."""
@@ -102,19 +110,23 @@ class PololuMaestroMinMaxSpeedsConfigTestCase(unittest.TestCase):
             logging.CRITICAL)
         self._cmd_lead = chr(0xAA) + chr(0x0C)
         self._error_check_cmd = bytes(self._cmd_lead + chr(0x21), "latin-1")
-        qmi.start("pololu_unit_test")
+        self.ctx = QMI_Context("pololu_unit_test")
+        self.ctx.start()
         patcher = patch(
             'qmi.instruments.pololu.maestro.create_transport', spec=QMI_TcpTransport)
         self._transport_mock: Mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
-        self.instr: Pololu_Maestro = qmi.make_instrument(
-            "Pololu", Pololu_Maestro, self.TRANSPORT_STR,
-            channels_min_max_speeds={1: (self.CHANNEL1_MIN, self.CHANNEL1_MAX)})
+        self.instr = Pololu_Maestro(
+            self.ctx,
+            "Pololu",
+            self.TRANSPORT_STR,
+            channels_min_max_speeds={1: (self.CHANNEL1_MIN, self.CHANNEL1_MAX)}
+        )
         self.instr.open()
 
     def tearDown(self) -> None:
         self.instr.close()
-        qmi.stop()
+        self.ctx.stop()
 
     def test_setting_channel_min_and_max_speed(self):
         """Test setting the min and max speeds of channels."""
@@ -138,19 +150,21 @@ class PololuMaestroMinMaxAccelerationsConfigTestCase(unittest.TestCase):
             logging.CRITICAL)
         self._cmd_lead = chr(0xAA) + chr(0x0C)
         self._error_check_cmd = bytes(self._cmd_lead + chr(0x21), "latin-1")
-        qmi.start("pololu_unit_test")
+        self.ctx = QMI_Context("pololu_unit_test")
+        self.ctx.start()
         patcher = patch(
             'qmi.instruments.pololu.maestro.create_transport', spec=QMI_TcpTransport)
         self._transport_mock: Mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
-        self.instr: Pololu_Maestro = qmi.make_instrument(
-            "Pololu", Pololu_Maestro, self.TRANSPORT_STR,
-            channels_min_max_accelerations={1: (self.CHANNEL1_MIN, self.CHANNEL1_MAX)})
+        self.instr = Pololu_Maestro(
+            self.ctx, "Pololu", self.TRANSPORT_STR,
+            channels_min_max_accelerations={1: (self.CHANNEL1_MIN, self.CHANNEL1_MAX)}
+        )
         self.instr.open()
 
     def tearDown(self) -> None:
         self.instr.close()
-        qmi.stop()
+        self.ctx.stop()
 
     def test_setting_channel_min_and_max_acceleration(self):
         """Test setting the min and max accelerations of channels."""
@@ -172,18 +186,18 @@ class PololuMaestroCommandsTestCase(unittest.TestCase):
             logging.CRITICAL)
         self._cmd_lead = chr(0xAA) + chr(0x0C)
         self._error_check_cmd = bytes(self._cmd_lead + chr(0x21), "latin-1")
-        qmi.start("pololu_unit_test")
+        self.ctx = QMI_Context("pololu_unit_test")
+        self.ctx.start()
         patcher = patch(
             'qmi.instruments.pololu.maestro.create_transport', spec=QMI_TcpTransport)
         self._transport_mock: Mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
-        self.instr: Pololu_Maestro = qmi.make_instrument(
-            "Pololu", Pololu_Maestro, self.TRANSPORT_STR)
+        self.instr = Pololu_Maestro(self.ctx, "Pololu", self.TRANSPORT_STR)
         self.instr.open()
 
     def tearDown(self) -> None:
         self.instr.close()
-        qmi.stop()
+        self.ctx.stop()
 
     def test_get_idn(self):
         """Test getting the QMI instrument ID."""

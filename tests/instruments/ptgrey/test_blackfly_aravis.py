@@ -67,7 +67,7 @@ class TestPtGreyBlackFly(unittest.TestCase):
 
     def setUp(self):
         logging.getLogger("qmi.instruments.ptgrey.blackfly_aravis").setLevel(logging.CRITICAL)
-        qmi.start("TestContext")
+        qmi.start("TestContext", None)
         ba.Aravis = self.aravis = MagicMock(spec=Aravis)
 
         # Most of these are slight guess work, for now this is not an issue.

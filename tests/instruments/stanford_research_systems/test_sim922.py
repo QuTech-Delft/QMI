@@ -2,24 +2,25 @@
 import unittest
 from unittest.mock import call, MagicMock
 
-import qmi
 from qmi.instruments.stanford_research_systems import Srs_Sim900
 from qmi.instruments.stanford_research_systems import Srs_Sim922
 from qmi.core.exceptions import QMI_UsageException, QMI_InstrumentException
 
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 class TestSIM922(unittest.TestCase):
     """Testcase of SIM922 temperature sensor."""
 
     def setUp(self):
-        qmi.start("test_siglent_sim922")
+        self.ctx = QMI_Context("test_siglent_sim922")
+        self.ctx.start()
         self._sim900 = MagicMock(spec=Srs_Sim900)
         self._port = 1
         self._channel = 2
-        self.sim922 = qmi.make_instrument("SIM922", Srs_Sim922, self._sim900, self._port)
+        self.sim922 = Srs_Sim922(self.ctx, "SIM922", self._sim900, self._port)
 
     def tearDown(self):
-        qmi.stop()
+        self.ctx.stop()
 
     def test_get_id(self):
         # arrange

@@ -1,24 +1,24 @@
 """Unit tests for a Newport single axis motion controller."""
-from typing import cast
 import unittest
 from unittest.mock import Mock, call, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.newport import Newport_Smc100Cc, ControlLoopState
 from qmi.instruments.newport.actuators import TRA12CC, TRB6CC, CMA25CCL
 
+from tests.patcher import PatcherQmiContext as QMI_Context
+
 
 class TestNewportSmc100Cc(unittest.TestCase):
-    """
-    Tests for the single axis motion controller.
-    """
+    """Tests for the single axis motion controller."""
 
     TRANSPORT_STR = "/dev/cu.usbserial-FT5TMFGL"
 
     def setUp(self):
-        qmi.start("Test100CcControllerContext", console_loglevel="CRITICAL")
+        self.ctx = QMI_Context("Test100CcControllerContext")
+        self.ctx.start()
+
         # Add patches
         patcher = patch(
             'qmi.instruments.newport.single_axis_motion_controller.create_transport', spec=QMI_TcpTransport)
@@ -32,16 +32,16 @@ class TestNewportSmc100Cc(unittest.TestCase):
         self.controller_address = 1
         Newport_Smc100Cc.PW0_EXEC_TIME = 0.1
         Newport_Smc100Cc.COMMAND_EXEC_TIME = 0.01
-        self.instr: Newport_Smc100Cc = qmi.make_instrument(
-            "sam_controller", Newport_Smc100Cc, self.TRANSPORT_STR, "FT5TMFGL",
+        self.instr = Newport_Smc100Cc(
+            self.ctx, "sam_controller", self.TRANSPORT_STR, "FT5TMFGL",
             {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
-            90210)
-        self.instr = cast(Newport_Smc100Cc, self.instr)
+            90210
+        )
         self.instr.open()
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
+        self.ctx.stop()
 
     def test_set_encoder_increment_sets_increment(self):
         """Test set encoder increment."""

@@ -2,29 +2,29 @@
 
 import math
 import time
-from typing import cast
 import unittest
 from unittest.mock import MagicMock, call, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.tt import AimTTi_Tgf30004000, WaveformType, CounterInputChannel
 
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 class TestTGF(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("Test_tgf_3000_4000")
+        self.ctx = QMI_Context("Test_tgf_3000_4000")
+        self.ctx.start()
         self._transport_mock = MagicMock(spec=QMI_TcpTransport)
         with patch(
-                'qmi.instruments.tt.tgf.create_transport',
-                return_value=self._transport_mock):
-            self.instr: AimTTi_Tgf30004000 = qmi.make_instrument("instr", AimTTi_Tgf30004000, "transport_descriptor")
-            self.instr = cast(AimTTi_Tgf30004000, self.instr)
+            'qmi.instruments.tt.tgf.create_transport',
+            return_value=self._transport_mock
+        ):
+            self.instr = AimTTi_Tgf30004000(self.ctx, "instr", "transport_descriptor")
 
     def tearDown(self):
-        qmi.stop()
+        self.ctx.stop()
 
     def _open_helper(self):
         """Open instrument and check transport calls."""

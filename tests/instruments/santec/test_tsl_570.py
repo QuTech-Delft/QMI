@@ -5,19 +5,19 @@ import unittest
 from unittest.mock import call, patch, Mock
 import numpy as np
 
-import qmi
 from qmi.core.scpi_protocol import ScpiProtocol
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
-
 from qmi.instruments.santec.tsl_570 import Santec_Tsl570
 
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 class TestSantecTsl570OpenClose(unittest.TestCase):
 
     def setUp(self):
         logging.getLogger("qmi.instruments.santec.tsl_570").setLevel(logging.CRITICAL)
-        qmi.start("TestSantecTsl570ClassContext")
+        self.ctx = QMI_Context("TestSantecTsl570ClassContext")
+        self.ctx.start()
         # Add patches
         patcher = patch('qmi.instruments.santec.tsl_570.create_transport', spec=QMI_TcpTransport)
         self._transport_mock = patcher.start()
@@ -27,10 +27,10 @@ class TestSantecTsl570OpenClose(unittest.TestCase):
         self.addCleanup(patcher2.stop)
         self._scpi_mock.write = Mock()
         # Make DUT
-        self.instr: Santec_Tsl570 = Santec_Tsl570(qmi.context(), "Santec_laser", "")
+        self.instr = Santec_Tsl570(self.ctx, "Santec_laser", "")
 
     def tearDown(self):
-        qmi.stop()
+        self.ctx.stop()
         logging.getLogger("qmi.instruments.santec.tsl_570").setLevel(logging.NOTSET)
 
     def test_open_close(self):
@@ -133,7 +133,8 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         self.power_max = 13.0
 
         logging.getLogger("qmi.instruments.santec.tsl_570").setLevel(logging.CRITICAL)
-        qmi.start("TestSantecTsl570ClassContext")
+        self.ctx = QMI_Context("TestSantecTsl570ClassContext")
+        self.ctx.start()
         # Add patches
         patcher = patch('qmi.instruments.santec.tsl_570.create_transport', spec=QMI_TcpTransport)
         self._transport_mock = patcher.start()
@@ -150,14 +151,14 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         ]
         self._scpi_mock.write = Mock()
         # Make DUT
-        self.instr: Santec_Tsl570 = Santec_Tsl570(qmi.context(), "RSB100a", "")
+        self.instr = Santec_Tsl570(self.ctx, "RSB100a", "")
         self.instr.open()
         # Reset the SCPI mock for further tests
         self._scpi_mock.reset_mock()
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
+        self.ctx.stop()
         logging.getLogger("qmi.instruments.santec.tsl_570").setLevel(logging.NOTSET)
 
     def test_wrong_int_value(self):

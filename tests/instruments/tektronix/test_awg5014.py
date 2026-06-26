@@ -7,17 +7,16 @@ import enum
 import struct
 from io import BytesIO
 from time import time, localtime, sleep
-from typing import Union, cast
 import logging
 
 import numpy as np
 
-import qmi
 from qmi.utils.context_managers import open_close
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.tektronix import Tektronix_Awg5014
 
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 ### GLOBALS ###
 AWG_FILE_FORMAT_HEAD = {
@@ -116,7 +115,7 @@ DELAY = 20
 TRIGGER_ANTICIPATION = 100
 
 
-def pack_record(name: str, value: Union[int, str, tuple], data_type_string: str) -> bytes:
+def pack_record(name: str, value: int | str | tuple, data_type_string: str) -> bytes:
     """
     packs awg_file record structure: "<I(lenname)I(lendat)s[data of data_type_string]"
     The file record format is as follows:
@@ -262,16 +261,17 @@ class TektronixAWG5014TestCase(unittest.TestCase):
     contents = b'1234,5678,"SAMPLE1.AWG,,2948","aaa.txt,,1024","ddd,DIR,0","zzz.awg,,2948"\n'
 
     def setUp(self):
-        qmi.start("TestContext")
+        self.ctx = QMI_Context("TestContext")
+        self.ctx.start()
         self._transport_mock = MagicMock(spec=QMI_TcpTransport)
         with patch(
-                'qmi.instruments.tektronix.awg5014.create_transport',
-                return_value=self._transport_mock):
-            self.instr: Tektronix_Awg5014 = qmi.make_instrument("instr", Tektronix_Awg5014, "transport_descriptor")
-            self.instr = cast(Tektronix_Awg5014, self.instr)
+            'qmi.instruments.tektronix.awg5014.create_transport',
+            return_value=self._transport_mock
+        ):
+            self.instr = Tektronix_Awg5014(self.ctx, "instr", "transport_descriptor")
 
     def tearDown(self):
-        qmi.stop()
+        self.ctx.stop()
 
     def test_open_close(self):
         """Test that the open and close functions include calls as expected."""

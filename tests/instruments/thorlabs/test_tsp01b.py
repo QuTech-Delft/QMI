@@ -131,7 +131,7 @@ class TestThorlabsTsp01b(unittest.TestCase):
         _usb_util_mock.endpoint_type = endpoint_type
         _usb_util_mock.endpoint_direction = endpoint_direction
 
-        qmi.start("TestTsp01bContext")
+        qmi.start("TestTsp01bContext", None)
         self._serial = "123456"
         self.instr: Thorlabs_Tsp01b = qmi.make_instrument("instr", Thorlabs_Tsp01b, self._serial)
 
@@ -248,7 +248,7 @@ class TestThorlabsTsp01bMethods(unittest.TestCase):
         _usb_util_mock.ENDPOINT_OUT = ENDPOINT_OUT
         _usb_util_mock.endpoint_type = endpoint_type
         _usb_util_mock.endpoint_direction = endpoint_direction
-        qmi.start("TestTsp01bContext")
+        qmi.start("TestTsp01bContext", None)
         self._serial = "123456"
         self.instr: Thorlabs_Tsp01b = qmi.make_instrument("instr", Thorlabs_Tsp01b, self._serial)
 

@@ -15,7 +15,7 @@ from qmi.instruments.montana import Montana_Cryostation
 class TestCryostation(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("TestContext")
+        qmi.start("TestContext", None)
         self._transport_mock = MagicMock(spec=QMI_TcpTransport)
         with patch(
                 'qmi.instruments.montana.cryostation.create_transport',
@@ -627,7 +627,7 @@ class TestCryostation(unittest.TestCase):
         self._transport_mock.write.assert_called_once_with(b"11SPHP 0.0000")
 
         # Start QMI again because tearDown() wants to stop it.
-        qmi.start("TestContext")
+        qmi.start("TestContext", None)
 
     @patch("time.sleep")
     def test_set_platform_heater_power_off_retry(self, sleep_mock):

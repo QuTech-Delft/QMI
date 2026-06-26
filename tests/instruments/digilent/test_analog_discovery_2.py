@@ -7,10 +7,11 @@ import pydwf
 import pydwf.utilities
 from pydwf.core.dwf_device import DwfDevice
 
-import qmi
 from qmi.core.exceptions import QMI_InvalidOperationException, QMI_InstrumentException, QMI_UsageException, \
     QMI_TimeoutException
 from qmi.instruments.digilent import Digilent_AnalogDiscovery2, OnClose, Filter
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class AnalogDiscovery2OpenCloseTestCase(unittest.TestCase):
@@ -27,13 +28,14 @@ class AnalogDiscovery2OpenCloseTestCase(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.addCleanup(open_patcher.stop)
 
-        qmi.start('analog_discovery_openclose_test')
+        self.ctx = QMI_Context("analog_discovery_openclose_test")
+        self.ctx.start()
 
         logging.getLogger("qmi.core.instrument").setLevel(logging.CRITICAL)
-        self._ad2: Digilent_AnalogDiscovery2 = qmi.make_instrument('AD2', Digilent_AnalogDiscovery2, '210321AD12A4')
+        self._ad2 = Digilent_AnalogDiscovery2(self.ctx, 'AD2', '210321AD12A4')
 
     def tearDown(self) -> None:
-        qmi.stop()
+        self.ctx.stop()
         logging.getLogger("qmi.core.instrument").setLevel(logging.NOTSET)
 
     def test_open_close(self):
@@ -122,10 +124,11 @@ class AnalogDiscovery2ErrorTestCase(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.addCleanup(open_patcher.stop)
 
-        qmi.start('analogdiscovery2_error_test')
+        self.ctx = QMI_Context("analog_discovery_error_test")
+        self.ctx.start()
 
     def tearDown(self) -> None:
-        qmi.stop()
+        self.ctx.stop()
         logging.getLogger("qmi.core.instrument").setLevel(logging.NOTSET)
 
     def test_close_raises_instrument_error_when_lib_error(self):
@@ -133,7 +136,7 @@ class AnalogDiscovery2ErrorTestCase(unittest.TestCase):
             raise pydwf.DwfLibraryError(code=pydwf.DwfErrorCode.UnknownError, msg='Fake lib error')
         self._device_mock.close.side_effect = raise_value_error
 
-        ad2: Digilent_AnalogDiscovery2 = qmi.make_instrument('AD2', Digilent_AnalogDiscovery2, '210321AD12A4')
+        ad2 = Digilent_AnalogDiscovery2(self.ctx, 'AD2', '210321AD12A4')
 
         ad2.open()
 
@@ -160,8 +163,9 @@ class AnalogDiscovery2MethodsTestCase(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.addCleanup(open_patcher.stop)
 
-        qmi.start('analogdiscovery2_methods_test')
-        self._ad2: Digilent_AnalogDiscovery2 = qmi.make_instrument('AD2', Digilent_AnalogDiscovery2, '210321AD12A4')
+        self.ctx = QMI_Context("analog_discovery_methods_test")
+        self.ctx.start()
+        self._ad2 = Digilent_AnalogDiscovery2(self.ctx, 'AD2', '210321AD12A4')
 
         self._analog_out_mock = unittest.mock.create_autospec(spec=pydwf.core.dwf_device.AnalogOut)
         self._device_mock.analogOut = self._analog_out_mock
@@ -173,7 +177,7 @@ class AnalogDiscovery2MethodsTestCase(unittest.TestCase):
 
     def tearDown(self) -> None:
         self._ad2.close()
-        qmi.stop()
+        self.ctx.stop()
 
     def test_prepare_analog_output_channel_for_static_output(self):
         self._ad2.prepare_analog_output_channel_for_static_output(1, 5.5)

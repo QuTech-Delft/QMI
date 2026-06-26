@@ -2,12 +2,13 @@ from dataclasses import asdict
 import unittest
 from unittest.mock import patch, ANY, create_autospec, PropertyMock
 
-import qmi
 from qmi.instruments.timebase import TimeBase_Dim3000
 from qmi.instruments.timebase.dim3000 import DIM3000SweepMode, DIM3000FMDeviation
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.instrument import QMI_InstrumentIdentification
 from qmi.core.transport import QMI_Transport
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class TestDim3000(unittest.TestCase):
@@ -15,7 +16,8 @@ class TestDim3000(unittest.TestCase):
     def setUp(self) -> None:
         self.maxDiff = None
 
-        qmi.start("TestDim3000", init_logging=False)
+        self.ctx = QMI_Context("TestDim3000")
+        self.ctx.start()
 
         # Create mocks
         self._transport_mock = create_autospec(QMI_Transport)
@@ -25,13 +27,13 @@ class TestDim3000(unittest.TestCase):
         self._transport_factory = patcher.start()
         self.addCleanup(patcher.stop)
 
-        self.instr: TimeBase_Dim3000 = qmi.make_instrument('dim3000', TimeBase_Dim3000, "foo")
+        self.instr = TimeBase_Dim3000(self.ctx, 'dim3000', "foo")
         self.instr.open()
 
     def tearDown(self) -> None:
         if self.instr.is_open():
             self.instr.close()
-        qmi.stop()
+        self.ctx.stop()
 
     def test_init(self):
         expected_default_attrs = {'baudrate': 19200}

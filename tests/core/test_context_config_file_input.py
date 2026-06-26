@@ -12,7 +12,6 @@ os.environ["QMI_CONFIG"] = qmi_config_path
 
 import qmi
 import qmi.core.context_singleton
-import qmi.core.exceptions
 
 QMI_ENV_CONFIG_FILE_PRESENT = False
 QMI_ENV_CONFIG_FILE = os.path.join(str(os.getenv("QMI_CONFIG")), "qmi.conf")
