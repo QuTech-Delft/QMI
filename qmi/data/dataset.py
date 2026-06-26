@@ -788,12 +788,11 @@ def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
             raise ValueError(f"Invalid character ':' in attribute name {name!r}")
 
         attrs[name] = val
-        
-    rawdata: np.ndarray # For mypy
+
     if dataset.data.ndim == 1:
         rawdata = dataset.data.reshape(-1, 1)
     elif dataset.data.ndim > 2:
-        nrow = np.prod(dataset.data.shape[:-1])
+        nrow = int(np.prod(dataset.data.shape[:-1]))
         rawdata = dataset.data.reshape((nrow, dataset.ncol))
     else:
         rawdata = dataset.data
