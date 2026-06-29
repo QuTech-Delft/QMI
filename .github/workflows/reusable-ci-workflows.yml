@@ -61,6 +61,7 @@ jobs:
           path: mypy-${{ inputs.python-version }}.log
 
       - name: Run coverage
+        timeout-minutes: 15
         run: |
           coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage-${{ inputs.python-version }}.log
