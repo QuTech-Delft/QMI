@@ -1,7 +1,6 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
-"""Test start/stop functionality of QMI framework with config files and optional inputs.
-"""
+"""Test qmi.start/stop functionality of QMI framework with config files, `QMI_CONFIG`, and optional inputs."""
 import logging
 import os
 import unittest
