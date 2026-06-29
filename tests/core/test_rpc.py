@@ -73,7 +73,7 @@ class MyRpcSubClass(MyRpcTestClass):
     
     @rpc_method
     def foute_boel(self):
-        raise RuntimeError("U can't run this")
+        raise RuntimeError("U can't run this.")
 
 
 class ProxyInterface(NamedTuple):
@@ -961,7 +961,6 @@ class TestRPClogger(unittest.TestCase):
         # Make a proxy via the second context.
         proxy2 = self.c2.get_rpc_object_by_name("c1.tc1")
         with self.assertLogs(qmi.core.rpc._logger.name, level="ERROR") as log_mes:
-            qmi.core.rpc._logger.error("gjeos")
             with self.assertRaises(RuntimeError):
                 # Start a remote RPC call from the second proxy that will except.
                 proxy2.foute_boel()
