@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.54.0-beta.0] - Unreleased
 
+### Changed
+- Improvement on exception messages from proxy calls: Exceptions caught in `qmi.core.rpc.QMI_RpcFuture` are now handled with `traceback` to extract the traceback from the exception. The traceback is sent along with the exception to `self._result` of the class so that also the full traceback of the exception can be logged, not just the exception raised.
+
+
 ## [0.53.0] - 2026-05-11
 
 ### Added

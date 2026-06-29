@@ -57,6 +57,10 @@ class MyRpcSubClass(MyRpcTestClass):
     @rpc_method
     def remote_log(self, x):
         return math.log(x)
+    
+    @rpc_method
+    def foute_boel(self):
+        raise RuntimeError("U can't run this")
 
 
 class ProxyInterface(NamedTuple):
@@ -162,7 +166,7 @@ class TestRPC(unittest.TestCase):
     def setUp(self):
 
         # Suppress warnings.
-        logging.getLogger("qmi.core.rpc").setLevel(logging.CRITICAL)
+        logging.getLogger("qmi.core.rpc").setLevel(logging.ERROR)
         logging.getLogger("qmi.core.messaging").setLevel(logging.ERROR)
 
         # Start two contexts.
@@ -828,6 +832,69 @@ class TestRPCWithClosingService(unittest.TestCase):
 
         # Then finally stop the "object provider"
         c1.stop()
+
+class TestRPClogger(unittest.TestCase):
+
+    def setUp(self):
+        # Start two contexts.
+        config = CfgQmi(
+            contexts={
+                "c1": CfgContext(tcp_server_port=0),
+                "c2": CfgContext(tcp_server_port=0)
+            }
+        )
+
+        c1 = QMI_Context("c1", config)
+        c1.start()
+        c1_port = c1.get_tcp_server_port()
+
+        c2 = QMI_Context("c2", config)
+        c2.start()
+
+        # Connect c2 to c1.
+        c1_address = "localhost:{}".format(c1_port)
+        c2.connect_to_peer("c1", c1_address)
+
+        # Make instance of MyRpcSubClass in the first context.
+        c1.make_rpc_object("tc1", MyRpcSubClass)
+
+        self.c1 = c1
+        self.c2 = c2
+
+        logging.disable(logging.NOTSET)
+
+    def tearDown(self):
+
+        logging.disable(logging.CRITICAL)
+
+        self.c1.stop()
+        self.c2.stop()
+
+        self.c1 = None
+        self.c2 = None
+
+    def test_exception_results_in_error_logging_in_Rpc_Future(self):
+
+        # We want to check that the logging error produces more output. See that following lines are present:
+        expected_lines = [
+            "Error occurred during RPC call. Traceback from RPC method:\n",
+            "in _handle_method_rpc_request\n",
+            "result = method(*request.method_args, **request.method_kwargs)\n",
+            "in foute_boel\n",
+            'raise RuntimeError("U can\'t run this.")\n',
+        ]
+        # Make a proxy via the second context.
+        proxy2 = self.c2.get_rpc_object_by_name("c1.tc1")
+        with self.assertLogs(qmi.core.rpc._logger.name, level="ERROR") as log_mes:
+            qmi.core.rpc._logger.error("gjeos")
+            with self.assertRaises(RuntimeError):
+                # Start a remote RPC call from the second proxy that will except.
+                proxy2.foute_boel()
+
+        entries = "".join(log_mes.output)
+        for exp_line in expected_lines:
+            self.assertIn(exp_line, entries)
+
 
 
 if __name__ == "__main__":
