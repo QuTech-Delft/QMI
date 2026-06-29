@@ -63,14 +63,15 @@ jobs:
       - name: Run coverage
         timeout-minutes: 15
         run: |
-          coverage erase
+          # First, run tests WITHOUT coverage to see if they hang
+          python -m unittest discover --start-directory=tests --pattern="test_*.py" -v
           batch=0
           for dir in "."; do
             subdirs=$(find "tests/$dir" -mindepth 1 -maxdepth 1 -type d ! -name "__pycache__" ! -name "data")
             if [ -n "$subdirs" ]; then
               for subdir in $subdirs; do
                 echo "Running coverage for tests in $subdir"
-                PYTHONWARNINGS="ignore::DeprecationWarning" coverage run --branch --data-file=".coverage.$batch" -m unittest discover --start-directory="$subdir" --pattern="test_*.py"
+                coverage run --branch --data-file=".coverage.$batch" -m unittest discover --start-directory="$subdir" --pattern="test_*.py"
                 batch=$((batch + 1))
               done
             else
