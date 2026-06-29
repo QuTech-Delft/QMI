@@ -64,7 +64,7 @@ dev = [
     "twine",
     # For static code checks
     "astroid",
-    "coverage==7.13.5",
+    "coverage=~7.12",
     "mypy",
     "ruff",
     # For generating documentation
