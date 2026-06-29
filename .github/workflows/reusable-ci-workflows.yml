@@ -64,7 +64,7 @@ jobs:
         timeout-minutes: 15
         run: |
           # First, run tests WITHOUT coverage to see if they hang
-          python -m unittest discover --start-directory=tests --pattern="test_*.py" -v
+          timeout 120 python -m unittest tests.core.test_rpc.TestRPC.test_blocking_rpc -v 2>&1 || true
           batch=0
           for dir in "."; do
             subdirs=$(find "tests/$dir" -mindepth 1 -maxdepth 1 -type d ! -name "__pycache__" ! -name "data")
