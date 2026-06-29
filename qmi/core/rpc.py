@@ -517,8 +517,10 @@ class QMI_RpcFuture(QMI_MessageHandler):
             self._context.send_message(request)
 
         except QMI_MessageDeliveryException as exc:
-            self._set_result(QMI_RpcFutureState.RESULT_IS_EXCEPTION, (exc,
-            traceback.extract_tb(exc.__traceback__)))
+            self._set_result(
+                QMI_RpcFutureState.RESULT_IS_EXCEPTION, (exc,
+                tuple(traceback.format_list(traceback.extract_tb(exc.__traceback__)))
+            ))
 
     def send_lock_rpc_request_message(self, action: QMI_LockRpcAction) -> None:
         request = QMI_LockRpcRequestMessage(self.address, self.rpc_object_address, self.lock_token, action)
@@ -526,8 +528,10 @@ class QMI_RpcFuture(QMI_MessageHandler):
             self._context.send_message(request)
 
         except QMI_MessageDeliveryException as exc:
-            self._set_result(QMI_RpcFutureState.RESULT_IS_EXCEPTION, (exc,
-            traceback.extract_tb(exc.__traceback__)))
+            self._set_result(
+                QMI_RpcFutureState.RESULT_IS_EXCEPTION, (exc,
+                tuple(traceback.format_list(traceback.extract_tb(exc.__traceback__)))
+            ))
 
     def handle_message(self, message: QMI_Message) -> None:
         """Called when a reply message is received."""
@@ -545,9 +549,9 @@ class QMI_RpcFuture(QMI_MessageHandler):
             # Delivery of RPC request failed.
             exc = QMI_MessageDeliveryException(message.error_msg)
             self._set_result(
-                QMI_RpcFutureState.RESULT_IS_EXCEPTION,
-                (exc, traceback.extract_tb(exc.__traceback__))
-            )
+                QMI_RpcFutureState.RESULT_IS_EXCEPTION, (exc,
+                tuple(traceback.format_list(traceback.extract_tb(exc.__traceback__)))
+            ))
         else:
             _logger.error(
                 "Future for %s.%s received unexpected message type %r",
@@ -611,17 +615,16 @@ class QMI_RpcFuture(QMI_MessageHandler):
                             if not isinstance(self._result, BaseException):
                                 raise QMI_RuntimeException("Received invalid exception value from RPC call.")
                             raise self._result
+
                         exc = self._result[0]
-                        tb = self._result[1]
+                        tb_str_tuple = self._result[1]
                         if not isinstance(exc, BaseException):
                             raise QMI_RuntimeException("Received invalid exception value from RPC call.") from exc
 
-                        tb_str_list = traceback.format_list(tb)
                         _logger.error("Error occurred during RPC call. Traceback from RPC method:\n")
-                        _logger.error("".join(tb_str_list))
+                        _logger.error("".join(tb_str_tuple))
                         _logger.error(exc)
                         raise exc
-
 
                     if self._state == QMI_RpcFutureState.RESULT_IS_VALUE:
                         return self._result
@@ -1459,7 +1462,7 @@ class _RpcThread(QMI_Thread):
                 _logger.debug("RPC method call failed", exc_info=True)
                 result_type = QMI_RpcFutureState.RESULT_IS_EXCEPTION
                 # return the exception, and the traceback
-                result = (exception, traceback.extract_tb(exception.__traceback__))
+                result = (exception, tuple(traceback.format_list(traceback.extract_tb(exception.__traceback__))))
         else:
             _logger.error("%s locked, method request without lock token is denied.", self._rpc_object._name)
             result_type = QMI_RpcFutureState.OBJECT_IS_LOCKED
