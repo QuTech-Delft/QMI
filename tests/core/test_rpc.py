@@ -9,6 +9,7 @@ from typing import NamedTuple
 import unittest
 from unittest.mock import Mock, MagicMock
 
+import qmi
 from qmi.core.config_defs import CfgQmi, CfgContext
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import (
