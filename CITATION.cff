@@ -72,6 +72,9 @@ authors:
   - given-names: Thom
     family-names: van der Steenhoven
     affiliation: TU Delft
+  - given-names: Hendrik Benjamin
+    family-names: van Ommen
+    affiliation: TU Delft
 identifiers:
   - type: url
     value: 'https://github.com/QuTech-Delft/QMI'

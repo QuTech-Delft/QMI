@@ -793,7 +793,7 @@ def write_dataset_to_text(dataset: DataSet, fh: TextIO) -> None:
         rawdata = dataset.data.reshape(-1, 1)
     elif dataset.data.ndim > 2:
         nrow = int(np.prod(dataset.data.shape[:-1]))
-        rawdata = dataset.data.reshape((nrow, dataset.ncol))
+        rawdata = dataset.data.reshape((nrow, dataset.ncol))  # type: ignore
     else:
         rawdata = dataset.data
 

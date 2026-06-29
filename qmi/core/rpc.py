@@ -144,6 +144,7 @@ import inspect
 import logging
 import threading
 import time
+import traceback
 from typing import Any, NamedTuple, Type, TypeVar, TYPE_CHECKING
 import warnings
 
@@ -516,7 +517,8 @@ class QMI_RpcFuture(QMI_MessageHandler):
             self._context.send_message(request)
 
         except QMI_MessageDeliveryException as exc:
-            self._set_result(QMI_RpcFutureState.RESULT_IS_EXCEPTION, exc)
+            self._set_result(QMI_RpcFutureState.RESULT_IS_EXCEPTION, (exc,
+            traceback.extract_tb(exc.__traceback__)))
 
     def send_lock_rpc_request_message(self, action: QMI_LockRpcAction) -> None:
         request = QMI_LockRpcRequestMessage(self.address, self.rpc_object_address, self.lock_token, action)
@@ -524,7 +526,8 @@ class QMI_RpcFuture(QMI_MessageHandler):
             self._context.send_message(request)
 
         except QMI_MessageDeliveryException as exc:
-            self._set_result(QMI_RpcFutureState.RESULT_IS_EXCEPTION, exc)
+            self._set_result(QMI_RpcFutureState.RESULT_IS_EXCEPTION, (exc,
+            traceback.extract_tb(exc.__traceback__)))
 
     def handle_message(self, message: QMI_Message) -> None:
         """Called when a reply message is received."""
@@ -540,8 +543,10 @@ class QMI_RpcFuture(QMI_MessageHandler):
             self._set_result(QMI_RpcFutureState.RESULT_IS_VALUE, message.lock_token)
         elif isinstance(message, QMI_ErrorReplyMessage):
             # Delivery of RPC request failed.
+            exc = QMI_MessageDeliveryException(message.error_msg)
             self._set_result(
-                QMI_RpcFutureState.RESULT_IS_EXCEPTION, QMI_MessageDeliveryException(message.error_msg)
+                QMI_RpcFutureState.RESULT_IS_EXCEPTION,
+                (exc, traceback.extract_tb(exc.__traceback__))
             )
         else:
             _logger.error(
@@ -601,9 +606,22 @@ class QMI_RpcFuture(QMI_MessageHandler):
                 while True:
                     # Check state of the future.
                     if self._state == QMI_RpcFutureState.RESULT_IS_EXCEPTION:
-                        if not isinstance(self._result, BaseException):
-                            raise QMI_RuntimeException("Received invalid exception value from RPC call.")
-                        raise self._result
+                        if not isinstance(self._result, tuple):
+                            # happens when we connect to an older QMI version
+                            if not isinstance(self._result, BaseException):
+                                raise QMI_RuntimeException("Received invalid exception value from RPC call.")
+                            raise self._result
+                        exc = self._result[0]
+                        tb = self._result[1]
+                        if not isinstance(exc, BaseException):
+                            raise QMI_RuntimeException("Received invalid exception value from RPC call.") from exc
+
+                        tb_str_list = traceback.format_list(tb)
+                        _logger.error("Error occurred during RPC call. Traceback from RPC method:\n")
+                        _logger.error("".join(tb_str_list))
+                        _logger.error(exc)
+                        raise exc
+
 
                     if self._state == QMI_RpcFutureState.RESULT_IS_VALUE:
                         return self._result
@@ -749,7 +767,7 @@ class QMI_RpcProxy:
         self._rpc_property_names = frozenset(
             property_descriptor.name for property_descriptor in descriptor.interface.properties
         )
-        
+
         def make_rpc_method_forward_function(method_name: str):
             """Helper function used to create a new scope such that each method created in the loop below uses the
             intended method name."""
@@ -769,7 +787,7 @@ class QMI_RpcProxy:
             # Update special attributes to make the forward function look like the method it is a proxy for.
             docstring = f"rpc proxy for {method_descriptor.name}{method_descriptor.signature} method of " +\
                         f"{self._rpc_class_fqn} instance."
-            
+
             if method_descriptor.docstring:
                 docstring = docstring + "\n\n" + method_descriptor.docstring
 
@@ -825,7 +843,7 @@ class QMI_RpcProxy:
                     set_property_value=True
                 )
                 return
-            
+
             elif name == "_lock_token":
                 # Lock token should always be allowed to be set
                 object.__setattr__(self, name, value)
@@ -1241,7 +1259,7 @@ def make_interface_descriptor(
         name = signal_description.name
         arg_types = "(" + ", ".join(arg_type.__name__ for arg_type in signal_description.arg_types) + ")"
         signals.append(RpcSignalDescriptor(name, arg_types))
-        doc += f"  - {name}{arg_types}\n"    
+        doc += f"  - {name}{arg_types}\n"
 
     # Extract property declarations, including possible base class[es].
     property_names = set()
@@ -1434,13 +1452,14 @@ class _RpcThread(QMI_Thread):
             try:
                 method: Callable = self._check_and_get_method(request)
                 result_type = QMI_RpcFutureState.RESULT_IS_VALUE
+                # return whatever the method should return
                 result = method(*request.method_args, **request.method_kwargs)
 
             except BaseException as exception:
                 _logger.debug("RPC method call failed", exc_info=True)
                 result_type = QMI_RpcFutureState.RESULT_IS_EXCEPTION
-                result = exception
-
+                # return the exception, and the traceback
+                result = (exception, traceback.extract_tb(exception.__traceback__))
         else:
             _logger.error("%s locked, method request without lock token is denied.", self._rpc_object._name)
             result_type = QMI_RpcFutureState.OBJECT_IS_LOCKED

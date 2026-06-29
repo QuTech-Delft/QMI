@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In `qmi.core.util` added functions for checking that two values are of same type, or size and type if the type is an iterable (excluding size for strings). This is used for checking that we set only same type of values (and of same size for iterables) as modifiable `_rpc_properties`.
 
 ### Changed
+- Improvement on exception messages from proxy calls: Exceptions caught in `qmi.core.rpc.QMI_RpcFuture` are now handled with `traceback` to extract the traceback from the exception. The traceback is sent along with the exception to `self._result` of the class so that also the full traceback of the exception can be logged, not just the exception raised.
 - Typed `_rpc_properties` to be a _set_ and changed all definitions to be _sets_.
 
 ### Deprecated
