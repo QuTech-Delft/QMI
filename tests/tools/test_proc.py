@@ -8,6 +8,8 @@ import os
 import sys
 import socket
 import subprocess
+import threading
+import time
 import unittest
 from unittest.mock import Mock, MagicMock, patch, call
 
@@ -1407,7 +1409,7 @@ class QmiProcRealStartStatusStopTestCase(unittest.TestCase):
         # set QMI_CONFIG
         os.environ["QMI_CONFIG"] = self.path_to_conf
         CONTEXT_CFG[self.context_name]["program_module"] = self.service_module
-        CONTEXT_CFG[self.context_name]["host"] = "localhost"
+        CONTEXT_CFG[self.context_name]["host"] = "127.0.0.1"
         dump_config_file({"contexts": CONTEXT_CFG, "logging": {"loglevel": "CRITICAL"}}, self.path_to_conf)
 
     def tearDown(self):
@@ -1424,15 +1426,25 @@ class QmiProcRealStartStatusStopTestCase(unittest.TestCase):
         and check that the process is running. Windows environment."""
         # Arrange
         exename = "qmi_proc"
-        sys.argv = [exename, "start", self.context_name]
-        pid = proc.run()
-        self.assertEqual(0, pid)
-        sys.argv = [exename, "status", self.context_name]
-        pid = proc.run()
-        self.assertEqual(0, pid)
-        sys.argv = [exename, "stop", self.context_name]
-        pid = proc.run()
-        self.assertEqual(0, pid)
+        sys_argv = [exename, "start", self.context_name]
+        myenv = os.environ.copy()
+        _proc_start = threading.Thread(
+            target=subprocess.run,
+            args=(" ".join(sys_argv),),
+            kwargs={"shell": True, "capture_output": True, "check": False, "env": myenv}
+        )
+        _proc_start.start()
+        time.sleep(3)
+        sys_argv = [exename, "status", self.service_module]
+        _proc_status = subprocess.run(" ".join(sys_argv), shell=True, capture_output=True, check=False, env=myenv)
+        time.sleep(3)
+        sys_argv = [exename, "stop", self.service_module]
+        _proc_stop = subprocess.run(" ".join(sys_argv), shell=True, capture_output=True, check=False, env=myenv)
+        _proc_start.join()
+        self.assertFalse(_proc_status.returncode)
+        self.assertIn("[\x1b[32mRUNNING\x1b[39m] responding via TCP", _proc_status.stdout.decode())
+        self.assertFalse(_proc_stop.returncode)
+        self.assertIn("[\x1b[32mSTOPPED\x1b[39m]", _proc_stop.stdout.decode())
 
 
 class ArgParserTestCase(unittest.TestCase):

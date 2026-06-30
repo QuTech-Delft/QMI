@@ -546,7 +546,7 @@ def get_context_status(context_name: str) -> tuple[int, str]:
         _logger.debug(
             "Can not connect to context %r (%s: %s)", context_name, type(exc).__name__, str(exc)
         )
-        print("Can not connect to context %r (%s: %s)", context_name, type(exc).__name__, str(exc))
+        print("Can not connect to context %r (%s: %s)" % (context_name, type(exc).__name__, str(exc)))
         return -1, ""
 
     except QMI_Exception as exc:
@@ -631,8 +631,9 @@ def shutdown_context(context_name: str, progressfn: Callable[[str], None]) -> Sh
         qmi.context().connect_to_peer(context_name, peer_addr)
     except OSError as exc:
         # Can not connect to context; mark it as not responding.
-        _logger.debug("Can not connect to context %r (%s: %s)",
-                      context_name, type(exc).__name__, str(exc))
+        _logger.debug(
+            "Can not connect to context %r (%s: %s)", context_name, type(exc).__name__, str(exc)
+        )
         return ShutdownResult(responding=False, pid=-1, success=False)
     except QMI_Exception as exc:
         # Unexpected error while connecting to context (bad handshake, etc.).
@@ -1107,16 +1108,20 @@ def run() -> int:
         Processes are identified by their context name, as specified in
         the QMI configuration file. Processes can run either on the local computer
         or on a remote, network-connected computer."""
-    parser.add_argument("--config", action="store", type=str, # default="",
-                        help="specify the QMI configuration file")
+    parser.add_argument(
+        "--config", action="store", type=str, default=None, help="specify the QMI configuration file"
+    )
     mutex_group = parser.add_mutually_exclusive_group()
     mutex_group.add_argument("--all", action="store_true", help="start or stop all configured processes")
     mutex_group.add_argument("--locals", action="store_true", help="start or stop local configured processes")
-    parser.add_argument("command", action="store", choices=["start", "stop", "restart", "status", "server"],
-                        help="'start' to start the specified process; 'stop' to stop a running process;"
-                             + " 'restart' to restart the running process; 'status' to show the process status")
-    parser.add_argument("context_name", action="store", type=str, nargs="?",
-                        help="context name of the process to start or stop")
+    parser.add_argument(
+        "command", action="store", choices=["start", "stop", "restart", "status", "server"],
+        help="'start' to start the specified process; 'stop' to stop a running process;"
+        + " 'restart' to restart the running process; 'status' to show the process status"
+    )
+    parser.add_argument(
+        "context_name", action="store", type=str, nargs="?", help="context name of the process to start or stop"
+    )
     args = parser.parse_args()
 
     if args.command == "server" and (args.all or args.context_name or args.locals):
@@ -1140,7 +1145,6 @@ def run() -> int:
     # Get the QMI configuration.
     cfg = qmi.context().get_config()
     try:
-
         if args.command == "server":
             return proc_server(cfg=cfg)
 

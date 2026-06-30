@@ -4,26 +4,12 @@ import time
 import qmi
 from qmi.core.exceptions import QMI_Exception
 
-import logging
-
-_logger = logging.Logger(__file__)
 
 def main() -> int:
     """Application entry point."""
-    _logger.warning("Starting using configuration %s", os.getenv("QMI_CONFIG"))
-    print("Starting using configuration", os.getenv("QMI_CONFIG"))
     runs: int = 10
     try:
-        qmi.start("some_proc_service", console_loglevel="WARNING")
-
-        # Get contexts/processes for specified node
-        print()
-        print(f"Service {qmi.context().name!r} is running.")
-        print("To stop the service, type 'Q' followed by Enter, or use the qmi_proc.py tool.")
-        print()
-
-        # Wait until the context receives a shutdown request via RPC,
-        # or until the operator types "Q".
+        qmi.start("some_proc_service", console_loglevel="CRITICAL")
 
         runned = 0
 
@@ -35,7 +21,6 @@ def main() -> int:
             # `get_context_status(...)` requiring main thread access.
             time.sleep(5)
             runned += 1
-            _logger.warning("Ran already %s steps", runned)
 
     except QMI_Exception as exc:
         print(f"ERROR: ({type(exc).__name__})", exc, file=sys.stderr)
