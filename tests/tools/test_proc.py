@@ -1431,15 +1431,15 @@ class QmiProcRealStartStatusStopTestCase(unittest.TestCase):
         _proc_start = threading.Thread(
             target=subprocess.run,
             args=(" ".join(sys_argv),),
-            kwargs={"shell": True, "capture_output": True, "check": False, "env": myenv}
+            kwargs={"shell": False, "capture_output": True, "check": False, "env": myenv}
         )
         _proc_start.start()
         time.sleep(3)
         sys_argv = [exename, "status", self.service_module]
-        _proc_status = subprocess.run(" ".join(sys_argv), shell=True, capture_output=True, check=False, env=myenv)
+        _proc_status = subprocess.run(" ".join(sys_argv), shell=False, capture_output=True, check=False, env=myenv)
         time.sleep(3)
         sys_argv = [exename, "stop", self.service_module]
-        _proc_stop = subprocess.run(" ".join(sys_argv), shell=True, capture_output=True, check=False, env=myenv)
+        _proc_stop = subprocess.run(" ".join(sys_argv), shell=False, capture_output=True, check=False, env=myenv)
         _proc_start.join()
         self.assertFalse(_proc_status.returncode)
         self.assertIn("[\x1b[32mRUNNING\x1b[39m] responding via TCP", _proc_status.stdout.decode())
