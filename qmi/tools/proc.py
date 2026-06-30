@@ -1107,7 +1107,7 @@ def run() -> int:
         Processes are identified by their context name, as specified in
         the QMI configuration file. Processes can run either on the local computer
         or on a remote, network-connected computer."""
-    parser.add_argument("--config", action="store", type=str, default="",
+    parser.add_argument("--config", action="store", type=str, # default="",
                         help="specify the QMI configuration file")
     mutex_group = parser.add_mutually_exclusive_group()
     mutex_group.add_argument("--all", action="store_true", help="start or stop all configured processes")
