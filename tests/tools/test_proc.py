@@ -1402,18 +1402,18 @@ class QmiProcRealStartStatusStopTestCase(unittest.TestCase):
     def setUp(self):
         self.context_name = "ContextName1"
         self.service_module = "some_proc_service"
-        self.qmi_conf = "qmi.conf"
-        path_to_conf = os.path.join(os.path.dirname(__file__), self.qmi_conf)
+        qmi_conf = "qmi.conf"
+        self.path_to_conf = os.path.join(os.path.dirname(__file__), qmi_conf)
         # set QMI_CONFIG
-        os.environ["QMI_CONFIG"] = path_to_conf
+        os.environ["QMI_CONFIG"] = self.path_to_conf
         CONTEXT_CFG[self.context_name]["program_module"] = self.service_module
         CONTEXT_CFG[self.context_name]["host"] = "localhost"
-        dump_config_file({"contexts": CONTEXT_CFG, "logging": {"loglevel": "CRITICAL"}}, self.qmi_conf)
+        dump_config_file({"contexts": CONTEXT_CFG, "logging": {"loglevel": "CRITICAL"}}, self.path_to_conf)
 
     def tearDown(self):
         del os.environ["QMI_CONFIG"]
         CONTEXT_CFG[self.context_name]["program_module"] = CONFIG["program_module"]
-        os.remove(self.qmi_conf)
+        os.remove(self.path_to_conf)
         try:
             qmi.stop()
         except:
