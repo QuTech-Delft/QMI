@@ -1425,8 +1425,8 @@ class QmiProcRealStartStatusStopTestCase(unittest.TestCase):
         """Test start_local_process, with creating and specifying a virtual environment location,
         and check that the process is running. Windows environment."""
         # Arrange
-        exename = "qmi_proc"
-        sys_argv = [exename, "start", self.context_name]
+        qmi_proc_loc = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "qmi", "tools", "proc.py")
+        sys_argv = ["python", qmi_proc_loc, "start", self.context_name]
         myenv = os.environ.copy()
         _proc_start = threading.Thread(
             target=subprocess.run,
@@ -1435,10 +1435,10 @@ class QmiProcRealStartStatusStopTestCase(unittest.TestCase):
         )
         _proc_start.start()
         time.sleep(3)
-        sys_argv = [exename, "status", self.service_module]
+        sys_argv = ["python", qmi_proc_loc, "status", self.service_module]
         _proc_status = subprocess.run(" ".join(sys_argv), shell=False, capture_output=True, check=False, env=myenv)
         time.sleep(3)
-        sys_argv = [exename, "stop", self.service_module]
+        sys_argv = ["python", qmi_proc_loc, "stop", self.service_module]
         _proc_stop = subprocess.run(" ".join(sys_argv), shell=False, capture_output=True, check=False, env=myenv)
         _proc_start.join()
         self.assertFalse(_proc_status.returncode)

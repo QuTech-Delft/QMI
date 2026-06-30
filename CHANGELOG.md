@@ -6,9 +6,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.54.0-beta.0] - Unreleased
 
-### Added
-- QMI driver for Qblox cluster series device, with support for QCM[-RF], QRM[-RF] and QTM modules.
-
 ### Fixed
 - The default value for the configuration file in `qmi_proc` calls was `None`, which results with "None means None" QMI context behaviour `QMI_CONFIG` environment variable not being read by default. The issue is fixed by setting the default value to '""' in  `qmi_proc.py` `--config` arguments.
 
