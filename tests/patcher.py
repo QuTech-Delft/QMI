@@ -17,7 +17,8 @@ class PatcherQmiRpcProxy:
     def get_pid(self):
         return 123
 
-    def get_version(self):
+    @classmethod
+    def get_version(cls):
         return "SomeVersion"
 
 

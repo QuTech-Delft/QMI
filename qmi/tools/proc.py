@@ -543,8 +543,10 @@ def get_context_status(context_name: str) -> tuple[int, str]:
 
     except OSError as exc:
         # Can not connect to context; mark it as not responding.
-        _logger.debug("Can not connect to context %r (%s: %s)",
-                      context_name, type(exc).__name__, str(exc))
+        _logger.debug(
+            "Can not connect to context %r (%s: %s)", context_name, type(exc).__name__, str(exc)
+        )
+        print("Can not connect to context %r (%s: %s)", context_name, type(exc).__name__, str(exc))
         return -1, ""
 
     except QMI_Exception as exc:
@@ -956,7 +958,7 @@ def proc_start(cfg: CfgQmi, context_name: str | None, local: bool) -> int:
                     print(started_str)
                 elif status_pid < 0:
                     # New process does not respond via TCP.
-                    print("not responding via TCP", failed_str)
+                    print("Not responding via TCP", failed_str)
                     ret = 1
                 else:
                     raise ProcessException(
@@ -1016,7 +1018,7 @@ def proc_stop(cfg: CfgQmi, context_name: str | None, local: bool) -> int:
             if result.success:
                 print(stopped_str)
             elif not result.responding:
-                print("not responding via TCP")
+                print("Not responding via TCP")
             else:
                 print(failed_str)
                 # Failed to stop via TCP.
@@ -1082,7 +1084,7 @@ def proc_status(cfg: CfgQmi, context_name: str | None) -> int:
             if pid >= 0:
                 print(running_str, f"responding via TCP (PID={pid}, QMI={ver})")
             else:
-                print(offline_str, "not responding via TCP")
+                print(offline_str, "Not responding via TCP")
         except ProcessException as exc:
             print()
             print(f"ERROR: {exc}", file=sys.stderr)
@@ -1105,7 +1107,7 @@ def run() -> int:
         Processes are identified by their context name, as specified in
         the QMI configuration file. Processes can run either on the local computer
         or on a remote, network-connected computer."""
-    parser.add_argument("--config", action="store", type=str,
+    parser.add_argument("--config", action="store", type=str, default="",
                         help="specify the QMI configuration file")
     mutex_group = parser.add_mutually_exclusive_group()
     mutex_group.add_argument("--all", action="store_true", help="start or stop all configured processes")
@@ -1134,7 +1136,7 @@ def run() -> int:
         print("ERROR: Specify either: a context_name, or --all, or --local", file=sys.stderr)
         return 1
 
-    qmi.start("proc_mgr", config_file=args.config, console_loglevel="WARNING")
+    qmi.start("proc_mgr", config_file=args.config, console_loglevel="DEBUG")
     # Get the QMI configuration.
     cfg = qmi.context().get_config()
     try:
