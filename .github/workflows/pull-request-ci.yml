@@ -38,25 +38,25 @@ jobs:
           fetch_depth: 0
 
       - name: Get ruff log file from Python 3.14 build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ruff-results-3.14
           path: .
 
       - name: Get mypy log file from Python 3.14 build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: mypy-results-3.14
           path: .
 
       - name: Get coverage log file from Python 3.14 build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-results-3.14
           path: .
 
       - name: Get coverage log file from Python latest build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: coverage-results-3.14
           path: .
