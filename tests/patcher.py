@@ -66,4 +66,5 @@ class PatcherQmiContext:
         return temp_dir
 
     def get_config(self):
-        return Mock()
+        return qmi.core.context_singleton._qmi_context._config
+

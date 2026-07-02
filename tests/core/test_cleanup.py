@@ -88,7 +88,6 @@ class TestCleanup(unittest.TestCase):
     def test_clean_stop(self):
         """Test shutdown with proper cleanup of all created objects."""
 
-        print(os.getenv("QMI_CONFIG"))
         # Start QMI.
         qmi.start("test_context")
 

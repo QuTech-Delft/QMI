@@ -9,7 +9,7 @@ def main() -> int:
     """Application entry point."""
     runs: int = 10
     try:
-        qmi.start("some_proc_service", console_loglevel="CRITICAL")
+        qmi.start("ContextName1", console_loglevel="CRITICAL")
 
         runned = 0
 
@@ -19,7 +19,7 @@ def main() -> int:
 
             # We do the update here instead of in a task due to
             # `get_context_status(...)` requiring main thread access.
-            time.sleep(5)
+            time.sleep(0.5)
             runned += 1
 
     except QMI_Exception as exc:

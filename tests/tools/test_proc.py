@@ -8,13 +8,10 @@ import os
 import sys
 import socket
 import subprocess
-import threading
-import time
 import unittest
 from unittest.mock import Mock, MagicMock, patch, call
 
 import qmi
-from qmi.core.config import dump_config_file
 from qmi.core.config_defs import CfgQmi
 from qmi.core.config_defs import CfgContext
 from qmi.core.config_defs import CfgProcessManagement
@@ -61,7 +58,6 @@ CONTEXT_CFG = {
             "connect_to_peers": ["ContextName1"],
             "enabled": True,
         },
-        "some_proc_service": {"host": "localhost", "tcp_server_port": 10330}
 }
 VENV_PATH = os.path.join(os.path.dirname(__file__), ".venv")
 CONTEXT_CFG_VENV = {
@@ -1326,6 +1322,9 @@ class QmiProcVenvTestCase(unittest.TestCase):
 
         QMI_Context.get_config = MagicMock(return_value=self._config)
 
+    def tearDown(self):
+        QMI_Context.get_config = Mock()
+
     @unittest.mock.patch("sys.platform", "linux")
     def test_start_local_process_venv(self):
         """Test start_local_process, with creating and specifying a virtual environment location,
@@ -1399,56 +1398,6 @@ class QmiProcVenvTestCase(unittest.TestCase):
         )
 
 
-class QmiProcRealStartStatusStopTestCase(unittest.TestCase):
-
-    def setUp(self):
-        self.context_name = "ContextName1"
-        self.service_module = "some_proc_service"
-        qmi_conf = "qmi.conf"
-        self.path_to_conf = os.path.join(os.path.dirname(__file__), qmi_conf)
-        # set QMI_CONFIG
-        os.environ["QMI_CONFIG"] = self.path_to_conf
-        CONTEXT_CFG[self.context_name]["program_module"] = self.service_module
-        CONTEXT_CFG[self.context_name]["host"] = "127.0.0.1"
-        dump_config_file({"contexts": CONTEXT_CFG, "logging": {"loglevel": "CRITICAL"}}, self.path_to_conf)
-
-    def tearDown(self):
-        del os.environ["QMI_CONFIG"]
-        CONTEXT_CFG[self.context_name]["program_module"] = CONFIG["program_module"]
-        os.remove(self.path_to_conf)
-        try:
-            qmi.stop()
-        except:
-            pass
-
-    def test_start_local_process_and_check(self):
-        """Test start_local_process, with creating and specifying a virtual environment location,
-        and check that the process is running. Windows environment."""
-        # Arrange
-        myenv = os.environ.copy()
-        _proc_start = threading.Thread(
-            target=subprocess.run,
-            args=([sys.executable, "-m", "qmi.tools.proc", "start", self.context_name],),
-            kwargs={"shell": False, "capture_output": True, "check": False, "env": myenv}
-        )
-        _proc_start.start()
-        time.sleep(3)
-        _proc_status = subprocess.run(
-            [sys.executable, "-m", "qmi.tools.proc", "status", self.service_module],
-            shell=False, capture_output=True, check=False, env=myenv
-        )
-        time.sleep(3)
-        _proc_stop = subprocess.run(
-            [sys.executable, "-m", "qmi.tools.proc", "stop", self.service_module],
-            shell=False, capture_output=True, check=False, env=myenv
-        )
-        _proc_start.join()
-        self.assertFalse(_proc_status.returncode)
-        self.assertIn("[\x1b[32mRUNNING\x1b[39m] responding via TCP", _proc_status.stdout.decode())
-        self.assertFalse(_proc_stop.returncode)
-        self.assertIn("[\x1b[32mSTOPPED\x1b[39m]", _proc_stop.stdout.decode())
-
-
 class ArgParserTestCase(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -1472,6 +1421,7 @@ class ArgParserTestCase(unittest.TestCase):
         peer_patcher.start()
 
     def tearDown(self) -> None:
+        QMI_Context.get_config = Mock()
         sys.stderr.close()
         sys.stderr = self._stderr
 

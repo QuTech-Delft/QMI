@@ -1123,7 +1123,6 @@ def run() -> int:
         "context_name", action="store", type=str, nargs="?", help="context name of the process to start or stop"
     )
     args = parser.parse_args()
-
     if args.command == "server" and (args.all or args.context_name or args.locals):
         print("ERROR: Can not specify server mode together with other options")
         return 1
@@ -1141,36 +1140,33 @@ def run() -> int:
         print("ERROR: Specify either: a context_name, or --all, or --local", file=sys.stderr)
         return 1
 
-    qmi.start("proc_mgr", config_file=args.config, console_loglevel="DEBUG")
-    # Get the QMI configuration.
-    cfg = qmi.context().get_config()
-    try:
-        if args.command == "server":
-            return proc_server(cfg=cfg)
+    with qmi.start("proc_mgr", config_file=args.config, console_loglevel="DEBUG") as ctx:
+        # Get the QMI configuration.
+        cfg = ctx.get_config()
+        try:
+            if args.command == "server":
+                return proc_server(cfg=cfg)
 
-        if args.command == "start":
-            return proc_start(cfg=cfg, context_name=args.context_name, local=args.locals)
+            if args.command == "start":
+                return proc_start(cfg=cfg, context_name=args.context_name, local=args.locals)
 
-        elif args.command == "stop":
-            return proc_stop(cfg=cfg, context_name=args.context_name, local=args.locals)
+            elif args.command == "stop":
+                return proc_stop(cfg=cfg, context_name=args.context_name, local=args.locals)
 
-        elif args.command == "restart":
-            proc_stop(cfg=cfg, context_name=args.context_name, local=args.locals)
-            return proc_start(cfg=cfg, context_name=args.context_name, local=args.locals)
+            elif args.command == "restart":
+                proc_stop(cfg=cfg, context_name=args.context_name, local=args.locals)
+                return proc_start(cfg=cfg, context_name=args.context_name, local=args.locals)
 
-        elif args.command == "status":
-            return proc_status(cfg=cfg, context_name=args.context_name)
+            elif args.command == "status":
+                return proc_status(cfg=cfg, context_name=args.context_name)
 
-        else:
-            print(f"ERROR: Unknown command {args.command!r}", file=sys.stderr)
+            else:
+                print(f"ERROR: Unknown command {args.command!r}", file=sys.stderr)
+                return 1
+
+        except QMI_ApplicationException as exc:
+            print("ERROR:", exc, file=sys.stderr)
             return 1
-
-    except QMI_ApplicationException as exc:
-        print("ERROR:", exc, file=sys.stderr)
-        return 1
-
-    finally:
-        qmi.stop()
 
 
 if __name__ == "__main__":
