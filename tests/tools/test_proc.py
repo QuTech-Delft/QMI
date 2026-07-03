@@ -1576,7 +1576,7 @@ class ArgParserTestCase(unittest.TestCase):
 
     def test_status_context_name(self):
         """Test that select_(local_)context is called with command 'restart'.
-        Actually this will call only `proc_stop` as we set it to except. But the logic is then tested.
+        Actually, this will call only `proc_stop` as we set it to except. But the logic is then tested.
         """
         ctx = self.context_cfg
         ctx_name = list(ctx.contexts.keys())[0]
