@@ -59,11 +59,11 @@ def context() -> QMI_Context:
 
 
 def start(
-        context_name: str,
-        config_file: str | None = "",
-        init_logging: bool = True,
-        console_loglevel: str | None = None,
-        context_cfg: dict | None = None
+    context_name: str,
+    config_file: str | None = "",
+    init_logging: bool = True,
+    console_loglevel: str | None = None,
+    context_cfg: dict | None = None
 ) -> QMI_Context:
     """Create and start a global QMI_Context instance.
 
@@ -118,7 +118,7 @@ def start(
     if _qmi_context is not None:
         raise QMI_UsageException("QMI context already started")
 
-    config = create_config_from_file(config_file)  # this will raise FileNotFoundError if config_file == ""
+    config = create_config_from_file(config_file)
 
     # Check for insert or override of context or contexts.
     if context_cfg is not None:
@@ -168,7 +168,7 @@ def create_config_from_file(config_file: str | None) -> CfgQmi:
     """
     # Try first to see if input is given or QMI_CONFIG is set
     if config_file == "":
-        config_file = QMI_CONFIG
+        config_file = QMI_CONFIG or os.getenv("QMI_CONFIG")
 
     if config_file is None:
         # Failing that, use the default class

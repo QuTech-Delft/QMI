@@ -8,7 +8,7 @@ from qmi.core.context import QMI_Context, QMI_RpcProxy
 
 class PatcherQmiRpcProxy:
 
-    rpc_nonblocking = Mock()  # patch("qmi.core.rpc.QMI_RpcNonBlockingProxy")
+    rpc_nonblocking = Mock()
 
     def __init__(self, context, descriptor):
         self._context = context
@@ -17,7 +17,8 @@ class PatcherQmiRpcProxy:
     def get_pid(self):
         return 123
 
-    def get_version(self):
+    @classmethod
+    def get_version(cls):
         return "SomeVersion"
 
 
@@ -40,7 +41,6 @@ class PatcherQmiContext:
 
     def stop(self):
         """Stop the qmi_context and patcher."""
-        qmi.stop()
         self.qmi_patcher.stop()
 
     def make_instrument(self, instrument_name, instrument_class, *args, **kwargs):
@@ -66,4 +66,5 @@ class PatcherQmiContext:
         return temp_dir
 
     def get_config(self):
-        return Mock()
+        return qmi.core.context_singleton._qmi_context._config
+
