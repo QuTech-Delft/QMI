@@ -27,7 +27,7 @@ filename = "qmi/__init__.py"
 
 [[tool.bumpversion.files]]
 filename = "CHANGELOG.md"
-search = "[{current_version}] - Unreleased"
+search = "[VERSION] - Unreleased"
 replace = "[{new_version}] - Unreleased"
 
 [[tool.bumpversion.files]]
@@ -37,5 +37,10 @@ replace = "main"
 
 [[tool.bumpversion.files]]
 filename = "pyproject.toml"
+search = "{current_version}"
+replace = "{new_version}"
+
+[[tool.bumpversion.files]]
+filename = "CITATION.cff"
 search = "v{current_version}"
-replace = "main"
+replace = "v{new_version}"
