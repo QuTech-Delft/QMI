@@ -543,10 +543,9 @@ def get_context_status(context_name: str) -> tuple[int, str]:
 
     except OSError as exc:
         # Can not connect to context; mark it as not responding.
-        _logger.debug(
+        _logger.warning(
             "Can not connect to context %r (%s: %s)", context_name, type(exc).__name__, str(exc)
         )
-        print("Can not connect to context %r (%s: %s)" % (context_name, type(exc).__name__, str(exc)))
         return -1, ""
 
     except QMI_Exception as exc:
