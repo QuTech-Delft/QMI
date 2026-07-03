@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.53.1-beta.0] - Unreleased
+## [0.53.1] - 2026-07-03
 
 ### Fixed
 The default value for the configuration file in qmi_proc calls was None, which results with "None means None" QMI context behaviour QMI_CONFIG environment variable not being read by default. The issue is fixed by setting the default value to '""' in qmi_proc.py --config arguments.
