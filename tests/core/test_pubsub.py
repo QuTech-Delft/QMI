@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Test publish/subscribe functionality."""
 import random
@@ -49,7 +49,7 @@ class TestLocalPubSub(unittest.TestCase):
 
     def setUp(self):
         self.context_name = "test_local_pubsub"
-        qmi.start(self.context_name)
+        qmi.start(self.context_name, None)
 
     def tearDown(self):
         qmi.stop()
@@ -823,7 +823,7 @@ class TestRemotePubSubQmi(unittest.TestCase):
         )
         self.context3 = QMI_Context(self.random_context_1, config)
         self.context3.start()
-        qmi.start(self.random_context_2, context_cfg=context_config)
+        qmi.start(self.random_context_2, None, context_cfg=context_config)
         # Create publisher in context3.
         self.pub1 = self.context3.make_rpc_object("pub1", MyPublisher)
 

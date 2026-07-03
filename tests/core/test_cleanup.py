@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Test cleanup behaviour of QMI framework."""
 
@@ -85,7 +85,7 @@ class TestCleanup(unittest.TestCase):
         """Test shutdown with proper cleanup of all created objects."""
 
         # Start QMI.
-        qmi.start("test_context")
+        qmi.start("test_context", None)
 
         # Create an instrument as RPC object.
         inst = qmi.make_instrument("inst", SimpleTestInstrument)
@@ -144,7 +144,7 @@ class TestCleanup(unittest.TestCase):
         """Test shutdown without proper cleanup."""
 
         # Start QMI.
-        qmi.start("test_context")
+        qmi.start("test_context", None)
 
         # Create an instrument as RPC object.
         inst = qmi.make_instrument("inst", SimpleTestInstrument)
@@ -189,7 +189,7 @@ class TestCleanup(unittest.TestCase):
             cb2_count += 1
 
         # Start QMI.
-        qmi.start("test_context")
+        qmi.start("test_context", None)
 
         # Setup stop handlers.
         qmi.context().register_stop_handler(cb1)

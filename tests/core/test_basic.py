@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Test basic start/stop functionality of QMI framework.
 """
@@ -26,8 +26,8 @@ class TestQmiBasic(unittest.TestCase):
         with self.assertRaises(qmi.core.exceptions.QMI_NoActiveContextException):
             qmi.stop()
 
-        # Start QMI.
-        qmi.start("my_test_context")
+        # Start QMI explicitly with default config.
+        qmi.start("my_test_context", None)
 
         # Check qmi.context() returns a context.
         ctx = qmi.context()

@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Test basic start/stop functionality of QMI framework.
 """
@@ -83,11 +83,11 @@ class TestContextConfigFileInputs(unittest.TestCase):
             os.remove(qmi_config_file)
 
     def test_03_no_config_file(self):
-        # Check that, when no config file is defined, an exception is raised when checking the configured contexts.
+        # Check that, when explicitly no config file is defined, an exception is raised when checking the configured contexts.
         context_name = "instr_server"
 
         try:
-            qmi.start(context_name)
+            qmi.start(context_name, None)
             contexts = qmi.get_configured_contexts()
             self.assertIsInstance(contexts, OrderedDict)
             self.assertTrue(context_name not in contexts.keys())
