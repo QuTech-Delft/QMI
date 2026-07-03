@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 "A basic test script for the NKT Koheras Boostik laser amplifier."
 

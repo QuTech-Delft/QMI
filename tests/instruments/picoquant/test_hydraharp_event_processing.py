@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Unit test for T3 mode event processing in HydraHarp driver."""
 

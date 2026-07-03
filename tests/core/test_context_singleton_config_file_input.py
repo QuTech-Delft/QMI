@@ -163,9 +163,8 @@ class TestContextConfigFileInputs(unittest.TestCase):
     def test_05_no_input_override_default_loglevel(self):
         # Check that we can override default loglevel.
         loglevel = "WARN"
-        qmi.core.context_singleton.QMI_CONFIG = None
 
-        qmi.start(self.ctx_name, console_loglevel=loglevel)
+        qmi.start(self.ctx_name, None, console_loglevel=loglevel)
         ctx = qmi.context()
 
         self.assertEqual(ctx.get_config().logging.console_loglevel, loglevel.upper())
@@ -173,9 +172,8 @@ class TestContextConfigFileInputs(unittest.TestCase):
     def test_06_no_input_invalid_override_loglevel(self):
         # Check that we raise an error with an invalid loglevel.
         loglevel = "SILENT"
-        qmi.core.context_singleton.QMI_CONFIG = None
         with self.assertRaises(qmi.core.exceptions.QMI_ConfigurationException):
-            qmi.start(self.ctx_name, console_loglevel=loglevel)
+            qmi.start(self.ctx_name, None, console_loglevel=loglevel)
 
     def test_07_explicit_none_config_file(self) -> None:
         # Check that providing an explicit None argument for the config_file parameter
@@ -201,9 +199,8 @@ class TestContextOptionalConfigInputs(unittest.TestCase):
         # Check that not giving an input config file, but giving optional cfg input leads to use of optional context.
         context_name = "instr_server"
         second_context = "instr_client"
-        qmi.core.context_singleton.QMI_CONFIG = None
 
-        qmi.start(context_name, context_cfg=CONTEXT_CFG)
+        qmi.start(context_name, None, context_cfg=CONTEXT_CFG)
 
         try:
             contexts = qmi.get_configured_contexts()
@@ -279,16 +276,15 @@ class TestContextOptionalConfigInputs(unittest.TestCase):
         # Check that the type checking in context_singleton catches wrong types on inputs in optional config
         context_name = "instr_server"
         second_context = "instr_client"
-        qmi.core.context_singleton.QMI_CONFIG = None
 
         with self.assertRaises(qmi.core.exceptions.QMI_ConfigurationException):
-            qmi.start(context_name, context_cfg=BAD_OPTIONAL_CONTEXT_1)
+            qmi.start(context_name, None, context_cfg=BAD_OPTIONAL_CONTEXT_1)
 
         with self.assertRaises(qmi.core.exceptions.QMI_ConfigurationException):
-            qmi.start(second_context, context_cfg=BAD_OPTIONAL_CONTEXT_2)
+            qmi.start(second_context, None, context_cfg=BAD_OPTIONAL_CONTEXT_2)
 
         with self.assertRaises(qmi.core.exceptions.QMI_ConfigurationException):
-            qmi.start(context_name, context_cfg=BAD_OPTIONAL_CONTEXT_3)
+            qmi.start(context_name, None, context_cfg=BAD_OPTIONAL_CONTEXT_3)
 
     def test_04_no_context_started_raises_QMI_NoActiveContextException(self):
         with self.assertRaises(qmi.core.exceptions.QMI_NoActiveContextException):

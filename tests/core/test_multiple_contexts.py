@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 import logging
 import time
 import unittest
@@ -142,7 +142,7 @@ class TestMultipleContextsPeers(unittest.TestCase):
         c1.start()
         c2.start()
 
-        qmi.start("c3", context_cfg=config)
+        qmi.start("c3", None, context_cfg=config)
         contexts = qmi.get_configured_contexts()
         expect_contexts = {
             "c1": CfgContext(host="localhost", tcp_server_port=12345),

@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Test publish/subscribe functionality."""
 import random
@@ -49,7 +49,7 @@ class TestLocalPubSub(unittest.TestCase):
 
     def setUp(self):
         self.context_name = "test_local_pubsub"
-        qmi.start(self.context_name)
+        qmi.start(self.context_name, None)
 
     def tearDown(self):
         qmi.stop()

@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 """Unit-tests for testing context managing for `QMI_Instrument` class."""
 import logging
 import unittest

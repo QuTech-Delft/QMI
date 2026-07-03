@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Test QMI task functionality."""
 
@@ -255,7 +255,7 @@ class TestQMITaskContextManager(unittest.TestCase):
         """Test the 'with' context manager run as QMI_TaskRunner."""
         logging.getLogger("qmi.core.task").setLevel(logging.ERROR)
         logging.getLogger("qmi.core.rpc").setLevel(logging.ERROR)
-        qmi.start("test-taskrunner")
+        qmi.start("test-taskrunner", None)
         with qmi.make_task(
             "taskrunner", SimpleTestTask, False, False, 1.0, 2.0
         ) as task:
@@ -269,7 +269,7 @@ class TestQMITaskContextManager(unittest.TestCase):
         """Test the 'start_stop' context manager run as QMI_TaskRunner."""
         logging.getLogger("qmi.core.task").setLevel(logging.ERROR)
         logging.getLogger("qmi.core.rpc").setLevel(logging.ERROR)
-        qmi.start("test-taskrunner")
+        qmi.start("test-taskrunner", None)
         task: QMI_TaskRunner = qmi.make_task(
             "taskrunner", SimpleTestTask, False, False, 1.0, 2.0
         )
@@ -285,7 +285,7 @@ class TestQMITaskContextManager(unittest.TestCase):
         """Test the 'start_stop_join' context manager run as QMI_TaskRunner."""
         logging.getLogger("qmi.core.task").setLevel(logging.ERROR)
         logging.getLogger("qmi.core.rpc").setLevel(logging.ERROR)
-        qmi.start("test-taskrunner2")
+        qmi.start("test-taskrunner2", None)
         task: QMI_TaskRunner = qmi.make_task(
             "taskrunner2", SimpleTestTask, False, False, 1.0, 2.0
         )
