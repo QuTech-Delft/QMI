@@ -1139,7 +1139,7 @@ def run() -> int:
         print("ERROR: Specify either: a context_name, or --all, or --local", file=sys.stderr)
         return 1
 
-    with qmi.start("proc_mgr", config_file=args.config, console_loglevel="DEBUG") as ctx:
+    with qmi.start("proc_mgr", config_file=args.config, console_loglevel="WARNING") as ctx:
         # Get the QMI configuration.
         cfg = ctx.get_config()
         try:
