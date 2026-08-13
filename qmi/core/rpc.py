@@ -58,6 +58,45 @@ name to run in the remote context::
     proxy = qmi.context().get_rpc_object_by_name("other_context.my_object")
     y = proxy.square(5)
 
+    
+Defining RPC properties
+#######################
+
+Classes inheriting from `QMI_RpcObject` can also have mutable class variables,
+called RPC properties. They can be defined by setting a class variable, and 
+adding its name in a "_rpc_properties" class variable, which is a set::
+
+  class MyClass(QMI_RpcObject):
+  
+      _rpc_properties = {"STRING_PROPERTY", "DICT_PROPERTY", "LIST_OF_VALUES"}
+
+      STRING_PROPERTY = "hello there!"
+      DICT_PROPERTY = {"change": 1, "my": 2, "values": 3}
+      LIST_OF_VALUES = [1, "list of", 2.0]
+      NOT_AN_RPC_PROPERTY = True
+
+After obtaining proxy instance for the class, the property values can be changed.
+For example::
+
+    proxy = qmi.context().make_rpc_object("my_object", MyClass, ...)
+    proxy.STRING_PROPERTY = "Oh, hello!"
+    proxy.DICT_PROPERTY = {"change": 2, "my": 3, "values": 1}
+    proxy.LIST_OF_VALUES = [2, "from list", 1.0]
+      
+Trying to set a new value for `proxy.NOT_AN_RPC_PROPERTY` will raise an exception
+as that class attribute was not defined as an RPC property and hence will not be   
+present in the proxy instance.
+
+Further, for stringent functioning of the parent class and to avoid various errors,
+the new value for the property _must be_ of _same type_ as the original property.
+For lists (or sets or tuples), the length of the new list must be equal to the 
+original property length, and the values in the list must of the same type, in same
+order, as the original. For dictionaries, the new dictionary must be of same length
+as the original and also must have the exact same keys. Only the values of a
+dictionary can be changed. Also, changing only one or two values of a list, set, 
+tuple or dictionary of length 3 can be done only by also including the 3rd value or
+key-value pair with the original value in the new list, set, tuple or dictionary.
+
 Locking RPC objects
 ###################
 
@@ -1207,10 +1246,10 @@ def _check_rpc_properties(
             isinstance(cls_items[name], (property, staticmethod, classmethod))
         ):
             _logger.error(
-                f"RPC Property name `{name}` is invalid. Check that the name is not a " +
+                f"RPC property name `{name}` is invalid. Check that the name is not a " +
                 "protected name, QMI_Signal object, [internal] function, property nor a dunder variable name."
             )
-            raise QMI_UsageException(f"Invalid RPC Property name `{name}`.")
+            raise QMI_UsageException(f"Invalid RPC property name `{name}`.")
 
 
 def make_interface_descriptor(
@@ -1438,7 +1477,7 @@ class _RpcThread(QMI_Thread):
             return property
 
         if not check_value_structures_equal(property, request.property_value):
-            raise QMI_UnknownRpcException("New RPC Property value is of different type or size than original.")
+            raise QMI_UsageException("New RPC property value is of different type or size than original.")
 
         setattr(self._rpc_object, request.property_name, request.property_value)
 

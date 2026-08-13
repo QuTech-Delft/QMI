@@ -417,6 +417,26 @@ class TestRPC(unittest.TestCase):
         self.assertEqual(proxy1.PROPERTY_STRING, "changed")
         self.assertEqual(proxy2.PROPERTY_STRING, "changed")
 
+    def test_set_property_with_mismatched_type_raises(self):
+        """Test that setting an RPC property to a value of a different type or size raises QMI_UsageException."""
+        # Make instance of MyRpcSubClass in the first context.
+        proxy1 = self.c1.make_rpc_object("tc1", MyRpcSubClass)
+
+        # Make a proxy via the second context.
+        proxy2 = self.c2.get_rpc_object_by_name("c1.tc1")
+
+        # Setting a property to a value of a different type is rejected, locally...
+        with self.assertRaises(QMI_UsageException):
+            proxy1.PROPERTY_NUMBER = "not_a_number"
+
+        # ... and remotely.
+        with self.assertRaises(QMI_UsageException):
+            proxy2.PROPERTY_STRING = 12345
+
+        # The property values are unchanged after the rejected assignments.
+        self.assertEqual(proxy1.PROPERTY_NUMBER, 42)
+        self.assertEqual(proxy2.PROPERTY_STRING, "testing")
+
         # Check that non-exported constants are not accessible.
         with self.assertRaises(AttributeError):
             proxy1.CONSTANT_FLOAT()
