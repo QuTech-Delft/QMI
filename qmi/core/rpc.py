@@ -211,7 +211,7 @@ _T = TypeVar("_T")
 
 
 class RpcPropertyDescriptor(NamedTuple):
-    """Description of an RPC Property.
+    """Description of an RPC property.
 
     Attributes:
         name:  Name of the property.
@@ -256,7 +256,7 @@ class RpcInterfaceDescriptor(NamedTuple):
         rpc_class_module:    Name of the module in which the RPC object class was defined.
         rpc_class_name:      Name of the RPC object class.
         rpc_class_docstring: Docstring of the RPC object class.
-        properties:          A list of property descriptors for the RPC Properties declared
+        properties:          A list of property descriptors for the RPC properties declared
                              by the RPC object class.
         methods:             A list of method descriptors for the RPC methods declared by
                              the RPC object class.
@@ -370,7 +370,7 @@ class QMI_LockRpcReplyMessage(QMI_ReplyMessage):
 
 
 class QMI_PropertyRpcRequestMessage(QMI_RequestMessage):
-    """Message sent by an RPC client to get or change a RPC Property value of a remote object.
+    """Message sent by an RPC client to get or change a RPC property value of a remote object.
 
     See `QMI_PropertyRpcReplyMessage` for how to interpret the reply to a request.
 
@@ -579,7 +579,7 @@ class QMI_RpcFuture(QMI_MessageHandler):
             # Received result from RPC method call.
             self._set_result(message.state, message.result)
         elif isinstance(message, QMI_PropertyRpcReplyMessage):
-            # Received result from RPC Property call.
+            # Received result from RPC property call.
             self._set_result(message.state, message.result)
         elif isinstance(message, QMI_LockRpcReplyMessage):
             # Response to lock request message.
@@ -1269,7 +1269,7 @@ def make_interface_descriptor(
 
     Raises:
         QMI_UsageException: If trying to use any of the protected RPC lock method names in the RPC object.
-        QMI_UsageException: If trying to set an RPC Property that is already defined as a signal or
+        QMI_UsageException: If trying to set an RPC property that is already defined as a signal or
                             [RPC] method or protected lock method name.
     """
     protected_method_names = ("lock", "unlock", "force_unlock", "is_locked")
@@ -1318,7 +1318,7 @@ def make_interface_descriptor(
 
         if hasattr(base, "_rpc_properties"):
             base_rpc_properties = getattr(base, "_rpc_properties")
-            # Check validity of RPC Property name[s]
+            # Check validity of RPC property name[s]
             _check_rpc_properties(base, base_rpc_properties, protected_method_names)
             property_names.update(base_rpc_properties)
 
@@ -1430,10 +1430,10 @@ class _RpcThread(QMI_Thread):
         return reply
 
     def _handle_property_rpc_request(self, request: QMI_PropertyRpcRequestMessage) -> QMI_PropertyRpcReplyMessage:
-        """Handle RPC Property request."""
+        """Handle RPC property request."""
         assert self._rpc_object is not None
 
-        # RPC Property call - need to check if the caller may invoke the RPC Property: allowed if the object is not
+        # RPC property call - need to check if the caller may invoke the RPC property: allowed if the object is not
         # locked (token is None) or if the provided lock token matches the locking token.
         if self._locking_token is None or self._locking_token == request.lock_token:
             # Modify the property; this can raise an exception or return a result.
@@ -1443,7 +1443,7 @@ class _RpcThread(QMI_Thread):
                 result = property
 
             except BaseException as exception:
-                _logger.debug("RPC Property modify failed", exc_info=True)
+                _logger.debug("Modifying RPC property failed", exc_info=True)
                 result_type = QMI_RpcFutureState.RESULT_IS_EXCEPTION
                 result = exception
 
@@ -1465,7 +1465,7 @@ class _RpcThread(QMI_Thread):
         """Check if the object has the property requested and is RPC-able; if so, return it."""
         assert self._rpc_object is not None
 
-        # Check that the property was marked as RPC Property.
+        # Check that the property was marked as RPC property.
         if not hasattr(self._rpc_object, request.property_name):
             raise QMI_UnknownRpcException(
                 f"Object {request.destination_address.object_id} of type {type(self._rpc_object).__name__}" +\
