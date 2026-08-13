@@ -530,9 +530,10 @@ class TestHydraHarpEventFilter(unittest.TestCase):
         final_block_events = 10101
         events_per_call = PicoQuant_HydraHarp400.MAX_EVENTS_PER_CALL
         num_events = 2 * events_per_call + final_block_events
+        rng = np.random.default_rng(12345)
         events_in = np.empty(num_events, dtype=EventDataType)
         events_in["type"] = 0
-        events_in["timestamp"] = np.cumsum(np.random.randint(1, 1000, num_events) * int(resolution.value))
+        events_in["timestamp"] = np.cumsum(rng.integers(1, 1000, num_events) * int(resolution.value))
         # The events will be passed to the driver in smaller series, in blocks of TTREADMAX.
         # Calculate the sync moments and add into the expected events that should come out
         expected_events = np.array(events_in, dtype=EventDataType)
@@ -609,8 +610,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
 
         # Get the final batch of events. Reduce the added sync events from total count
         events = self._hydraharp.get_events()
-        self.assertEqual(len(events) - np.count_nonzero(expected_events["type"] == 64), final_block_events + 1)
-        self.assertTrue(np.all(events == expected_events[2*events_per_call-delta:]))
+        self.assertTrue(np.array_equal(events, expected_events[2*events_per_call-delta:]))
 
         # Check no further events.
         events = self._hydraharp.get_events()
