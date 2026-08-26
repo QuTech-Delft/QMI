@@ -76,6 +76,8 @@ class Montana_Cryostation(QMI_Instrument):
 
     [1] Montana Cryostation Communication Specification, version 1.9
     """
+    _rpc_properties = {"RESPONSE_TIMEOUT"}
+
     # Value ranges
     MIN_PROPORTIONAL_GAIN = 0.001
     MAX_PROPORTIONAL_GAIN = 100.0
