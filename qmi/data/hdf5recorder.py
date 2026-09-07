@@ -23,7 +23,7 @@ class _HDF5RecorderThread(QMI_Thread):
         filename: str,
         write_interval: float,
         keep_open: bool,
-        backend = "hdf5",
+        backend = "h5py",
     ) -> None:
         """Initialize thread.
         
