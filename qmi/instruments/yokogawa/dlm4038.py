@@ -44,7 +44,7 @@ class Yokogawa_DLM4038(QMI_Instrument):
     Arguments:
         CHANNELS: The number of signal channels in the device.
     """
-    _rpc_constants = ["CHANNELS"]
+    _rpc_properties = {"CHANNELS"}
     CHANNELS = 8
 
     def __init__(

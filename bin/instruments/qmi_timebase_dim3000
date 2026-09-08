@@ -8,7 +8,7 @@ import time
 
 import qmi
 from qmi.instruments.timebase.dim3000 import TimeBase_DIM3000, DIM3000SweepMode, DIM3000FMDeviation
-from qmi.utils.context_managers import start_stop, open_close
+from qmi.utils.context_managers import open_close
 
 
 def run() -> int:

@@ -118,7 +118,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         TRIGGER_LEVEL_RANGE:  The range of possible settable trigger levels.
     """
 
-    _rpc_constants = ["COMPILE_TIMEOUT", "UPLOAD_TIMEOUT", "POLL_PERIOD", "NUM_AWGS", "NUM_CHANNELS"]
+    _rpc_properties = {"COMPILE_TIMEOUT", "UPLOAD_TIMEOUT", "POLL_PERIOD", "NUM_AWGS", "NUM_CHANNELS"}
     COMPILE_TIMEOUT = 30
     UPLOAD_TIMEOUT = 30
     POLL_PERIOD = 1.0
@@ -198,7 +198,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         for parameter, replacement in replacements.items():
             # Convert replacements to "str".
             if isinstance(replacement, (int, float)):
-                replacement = repr(replacement)  # noqa: PLW2901
+                replacement = str(replacement)  # noqa: PLW2901
 
             # At this point, the replacement value should be a string.
             if not isinstance(replacement, str):

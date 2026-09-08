@@ -21,7 +21,7 @@ from collections.abc import Callable
 import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.instruments.high_finesse.wlm import HighFinesse_Wlm
-from qmi.utils.context_managers import start_stop, open_close
+from qmi.utils.context_managers import open_close
 
 
 def run() -> int:
