@@ -198,7 +198,7 @@ class ZurichInstruments_HDAWG(QMI_Instrument):
         for parameter, replacement in replacements.items():
             # Convert replacements to "str".
             if isinstance(replacement, (int, float)):
-                replacement = repr(replacement)  # noqa: PLW2901
+                replacement = str(replacement)  # noqa: PLW2901
 
             # At this point, the replacement value should be a string.
             if not isinstance(replacement, str):
