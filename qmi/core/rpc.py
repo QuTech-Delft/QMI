@@ -528,7 +528,10 @@ class QMI_RpcFuture(QMI_MessageHandler):
             self._context.send_message(request)
 
         except QMI_MessageDeliveryException as exc:
-            self._set_result(QMI_RpcFutureState.RESULT_IS_EXCEPTION, exc)
+            self._set_result(
+                QMI_RpcFutureState.RESULT_IS_EXCEPTION, (exc,
+                    tuple(traceback.format_list(traceback.extract_tb(exc.__traceback__)))
+                ))
 
     def send_property_rpc_request_message(
         self,
@@ -1469,7 +1472,7 @@ class _RpcThread(QMI_Thread):
         if not hasattr(self._rpc_object, request.property_name):
             raise QMI_UnknownRpcException(
                 f"Object {request.destination_address.object_id} of type {type(self._rpc_object).__name__}" +\
-                f" does not have property {request.property_name}."
+                f" does not have RPC property {request.property_name}."
             )
 
         property = getattr(self._rpc_object, request.property_name)
