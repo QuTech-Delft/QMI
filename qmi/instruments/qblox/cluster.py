@@ -4,6 +4,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import Enum
 import inspect
 import logging
 import sys
@@ -53,20 +54,21 @@ _EXTRA_ATTRS = [
 EXT_TRIGGERS_IN_CLUSTER = 15
 # Module configuration constants:
 # AO_IN_MODULE:              Analog output channels in modules with value range -1V...+1V.
-# AI_IN_MODULE:              Analog output channels in modules with value range -1V...+1V.
+# AI_IN_MODULE:              Analog input channels in modules with value range -1V...+1V.
 # DIGITAL_MARKERS_IN_MODULE: Digital marker channels in modules, with values 'low' and 'high' (3.3V LVTTL).
 # SEQUENCERS_IN_MODULE:      Number of sequencers available in module.
 AO_IN_MODULE = {"QCM": 4, "QCM-RF": 2, "QRM": 2, "QRM-RF": 1, "QTM": 0, "MM": 0}
 AI_IN_MODULE = {"QCM": 0, "QCM-RF": 0, "QRM": 2, "QRM-RF": 1, "QTM": 0, "MM": 0}
 DIGITAL_MARKERS_IN_MODULE = {"QCM": 4, "QCM-RF": 2, "QRM": 4, "QRM-RF": 2, "QTM": 4, "MM": 0}
 SEQUENCERS_IN_MODULE = {"QCM": 6, "QCM-RF": 6, "QRM": 6, "QRM-RF": 6, "QTM": 8, "MM": 0}
+# copy static methods from Qcodes Module
 _get_required_qrm_qcm_attr_names: Callable[..., list[str]] | None = None
 _get_required_qtm_attr_names: Callable[..., list[str]] | None = None
 
 
 def _import_modules() -> None:
     """Import the vendor-provided Qblox modules.
-    
+
     This import is done in a function, instead of at the top-level,
     to avoid an unnecessary dependency for programs that do not access
     the instrument directly.
@@ -89,6 +91,14 @@ def _import_modules() -> None:
         DEBUG_LEVEL = DebugLevel.MINIMAL_CHECK
         _get_required_qrm_qcm_attr_names = QcodesModule._get_required_parent_qrx_qcm_attr_names
         _get_required_qtm_attr_names = QcodesModule._get_required_parent_qtm_attr_names
+
+
+class ChannelTypes(Enum):
+    ALL = 0  # all channels (default)
+    AI = 1  # analog input channels (adc)
+    AO = 2  # analog output channels (dac)
+    MRK = 3  # marker channels
+    IO = 4  # IO channels (QTM only)
 
 
 class _QbloxModule:
@@ -182,13 +192,13 @@ class _QbloxModule:
 
 class Qblox_ClusterBase(QMI_Instrument):
     """Base class for Qblox cluster versions based on 'native' or Qcodes-based implementations.
-    
+
     Attributes:
         DEBUG_LEVEL: The debug level to use while using Qblox. If the user wants to change the debug level in an
                      interactive session, the cluster must be closed first, then the DEBUG_LEVEL RPC constant can
                      be changed, and the cluster instance re-opened.
     """
-    _rpc_constants = ["DEBUG_LEVEL"]
+    _rpc_properties = {"DEBUG_LEVEL"}
 
     DEBUG_LEVEL = DEBUG_LEVEL
 
@@ -301,7 +311,9 @@ class Qblox_ClusterBase(QMI_Instrument):
         raise NotImplementedError("This function is not implemented in the base class.")
 
     @rpc_method
-    def get_module_channels(self, module_type: str, slot_no: int | None = None, channel_type: int = 0) -> Any:
+    def get_module_channels(
+        self, module_type: str, slot_no: int | None = None, channel_type: ChannelTypes = ChannelTypes.ALL
+    ) -> Any:
         """Find and return requested channel configurations, all or of a specific type, on a module, on first matching
         or specified slot, from cluster.
 
@@ -389,7 +401,10 @@ class Qblox_ClusterBase(QMI_Instrument):
 
 
 class Qblox_NativeCluster(Qblox_ClusterBase):
-    """Class to control Qblox _native_ Cluster instrument with various devices."""
+    """Class to control Qblox _native_ Cluster instrument with various devices.
+
+    This class offers a more direct access to Qblox instrument and does not depend on QCoDeS package.
+    """
 
     def __init__(
         self,
@@ -425,13 +440,11 @@ class Qblox_NativeCluster(Qblox_ClusterBase):
     def _add_cluster_funcs(self) -> None:
         """Add more functions to 'native' Cluster, as it does not have that many implemented."""
         self.cluster_funcs["reset_trigger_monitor_count"] = partial(
-            getattr(self.cluster, "reset_trigger_monitor_count"), self.cluster
+            self.cluster.reset_trigger_monitor_count, self.cluster
         )
-        self.cluster_funcs["get_trigger_monitor_count"] = partial(
-            getattr(self.cluster, "get_trigger_monitor_count"), self.cluster
-        )
+        self.cluster_funcs["get_trigger_monitor_count"] = partial(self.cluster.get_trigger_monitor_count, self.cluster)
         self.cluster_funcs["get_trigger_monitor_latest"] = partial(
-            getattr(self.cluster, "get_trigger_monitor_latest"), self.cluster
+            self.cluster.get_trigger_monitor_latest, self.cluster
         )
         # self.cluster is the first "partial" parameter to fill in the 'self'.
         for x in range(4):
@@ -445,7 +458,7 @@ class Qblox_NativeCluster(Qblox_ClusterBase):
         # Add type handles as callables
         for type_handle, value in self.cluster._type_handle.__dict__.items():
             if type_handle.startswith("_is"):
-                # As 'value' gets overridden in memory for the lambda function, do like this:
+                # As 'value' gets overwritten in memory for the lambda function, do like this:
                 if value:
                     self.cluster_funcs[type_handle.lstrip("_")] = lambda: True
                 else:
@@ -454,16 +467,14 @@ class Qblox_NativeCluster(Qblox_ClusterBase):
     def _add_module_funcs(self, v: dict[str, Callable], module_type: str) -> None:
         """Add more functions to 'native' Cluster, specific for a module type."""
         # Reassign 'arm_sequencer', 'start_sequencer' and 'stop_sequencer' directly to SCPI calls
-        v["arm_sequencer"] = partial(getattr(ScpiCluster, "_arm_sequencer"), self.cluster)
-        v["start_sequencer"] = partial(getattr(ScpiCluster, "_start_sequencer"), self.cluster)
-        v["stop_sequencer"] = partial(getattr(ScpiCluster, "_stop_sequencer"), self.cluster)
+        v["arm_sequencer"] = partial(ScpiCluster._arm_sequencer, self.cluster)
+        v["start_sequencer"] = partial(ScpiCluster._start_sequencer, self.cluster)
+        v["stop_sequencer"] = partial(ScpiCluster._stop_sequencer, self.cluster)
         for o in range(AO_IN_MODULE[module_type]):
             for x in range(4):
-                v[f"_out{o}_exp{x}_config"] = partial(
-                    getattr(NativeCluster, "_set_pre_distortion_config"), self.cluster
-                )
+                v[f"_out{o}_exp{x}_config"] = partial(NativeCluster._set_pre_distortion_config, self.cluster)
 
-            v[f"_out{o}_fir_config"] = partial(getattr(NativeCluster, "_set_pre_distortion_config"), self.cluster)
+            v[f"_out{o}_fir_config"] = partial(NativeCluster._set_pre_distortion_config, self.cluster)
 
     @rpc_method
     def open(self) -> None:
@@ -478,8 +489,8 @@ class Qblox_NativeCluster(Qblox_ClusterBase):
         idn = self.cluster._get_idn()
         _, model, _, _ = idn.split(",")
         self._modules = {"0": _QbloxModule(model, self.cluster_funcs)}
-        for k, v in self.cluster._mod_handles.items():
-            type_handle_obj = v["type_handle"]
+        for slot_no, mod_handle in self.cluster._mod_handles.items():
+            type_handle_obj = mod_handle["type_handle"]
             module_type = type_handle_obj.instrument_type.value
             # Check if it is also "RF"
             if type_handle_obj.is_rf_type:
@@ -490,9 +501,9 @@ class Qblox_NativeCluster(Qblox_ClusterBase):
                 if type_handle.startswith("_is"):
                     # As 'value' gets overridden in memory for the lambda function, do like this:
                     if value:
-                        v[type_handle.lstrip("_")] = lambda: True
+                        mod_handle[type_handle.lstrip("_")] = lambda: True
                     else:
-                        v[type_handle.lstrip("_")] = lambda: False
+                        mod_handle[type_handle.lstrip("_")] = lambda: False
 
             extra_attrs = _EXTRA_ATTRS.copy()
             # With the new module version we need to rebrand the calls to have correct inputs
@@ -514,22 +525,22 @@ class Qblox_NativeCluster(Qblox_ClusterBase):
                     if hasattr(cluster, attr_name):
                         signature = str(inspect.signature(getattr(cluster, attr_name)))
                         if "slot: int" in signature:
-                            v[attr_name] = partial(getattr(cluster, attr_name), self.cluster, int(k))
+                            mod_handle[attr_name] = partial(getattr(cluster, attr_name), self.cluster, int(slot_no))
                         else:
-                            v[attr_name] = getattr(cluster, attr_name)
+                            mod_handle[attr_name] = getattr(cluster, attr_name)
 
                         break
 
-            self._add_module_funcs(v, module_type)
-            self._modules[k] = _QbloxModule(module_type, v)
+            self._add_module_funcs(mod_handle, module_type)
+            self._modules[slot_no] = _QbloxModule(module_type, mod_handle)
             # Add type handles as callables
             for type_handle, value in type_handle_obj.__dict__.items():
                 if type_handle.startswith("_is"):
                     # As 'value' gets overridden in memory for the lambda function, do like this:
                     if value:
-                        setattr(self._modules[k], type_handle, lambda slot: True)
+                        setattr(self._modules[slot_no], type_handle, lambda slot: True)
                     else:
-                        setattr(self._modules[k], type_handle, lambda slot: False)
+                        setattr(self._modules[slot_no], type_handle, lambda slot: False)
 
         # Add direct calls to ScpiCluster calls not implemented in 'native' Cluster
         self._add_cluster_funcs()
@@ -552,6 +563,9 @@ class Qblox_NativeCluster(Qblox_ClusterBase):
 
         # Find a module in cluster. These possibly are in numerical order, but loop anyhow.
         # dict entry key="<slot#>", value={"<instrument_type>", func_refs": _QbloxModule}
+        if slot_no is not None:
+            _logger.info("No slot number provided. Will try to return first module of type %s", module_type)
+
         for slot, module in self._modules.items():
             # Then check if slot_no was given and matches. No need to go on if not.
             if slot_no is not None and int(slot) != slot_no:
@@ -585,7 +599,9 @@ class Qblox_NativeCluster(Qblox_ClusterBase):
         return getattr(module, module_type.replace("-", "_"))
 
     @rpc_method
-    def get_module_channels(self, module_type: str, slot_no: int | None = None, channel_type: int = 0) -> Any:
+    def get_module_channels(
+        self, module_type: str, slot_no: int | None = None, channel_type: ChannelTypes = ChannelTypes.ALL
+    ) -> Any:
         module_type = module_type.upper()
         sequencers: dict[str, Any] = {}
         channels: dict[str, Any] = {}
@@ -595,7 +611,7 @@ class Qblox_NativeCluster(Qblox_ClusterBase):
         for sequencer in range(SEQUENCERS_IN_MODULE[module_type]):
             try:
                 sequencer_config = module_func_refs["_get_sequencer_config"](sequencer)
-                if channel_type in [0, 1] and AI_IN_MODULE[module_type] > 0:
+                if channel_type in [ChannelTypes.ALL, ChannelTypes.AI] and AI_IN_MODULE[module_type] > 0:
                     # Get 'ADC' input channels if present in module
                     sequencer_channel_map = module_func_refs["_get_sequencer_acq_channel_map"](sequencer)
                     if "RF" in module_type.upper():
@@ -609,7 +625,7 @@ class Qblox_NativeCluster(Qblox_ClusterBase):
                         for channel in sequencer_channel_map[1]:
                             channels[f"adc{channel}_acq_Q{sequencer}"] = sequencer_config["awg"]
 
-                if channel_type in [0, 2] and AO_IN_MODULE[module_type] > 0:
+                if channel_type in [ChannelTypes.ALL, ChannelTypes.AO] and AO_IN_MODULE[module_type] > 0:
                     sequencer_channel_map = module_func_refs["_get_sequencer_channel_map"](sequencer)
                     # The first list defines 'I' type channels, the second 'Q' type
                     for channel in sequencer_channel_map[0]:
@@ -618,18 +634,18 @@ class Qblox_NativeCluster(Qblox_ClusterBase):
                     for channel in sequencer_channel_map[1]:
                         channels[f"dac{channel}_Q{sequencer}"] = sequencer_config["awg"]  # TODO: Is this always valid?
 
-                if channel_type in [0, 3] and DIGITAL_MARKERS_IN_MODULE[module_type] > 0:
+                if channel_type in [ChannelTypes.ALL, ChannelTypes.MRK] and DIGITAL_MARKERS_IN_MODULE[module_type] > 0:
                     # For QCM-RF channels 0, 2 are 'daci_Is' channels and channels 1, 3 are 'dacq_Qs` channels
                     for channel in range(DIGITAL_MARKERS_IN_MODULE[module_type]):
                         channels[f"DO{channel}_{sequencer}"] = sequencer_config["seq_proc"]
 
             except RuntimeError as rt_err:
                 # This should always work, so except properly if something fails
-                _logger.exception("Module %s failed to map sequencer %i." % module_type, sequencer, exc_info=rt_err)
+                _logger.exception("Module %s failed to map sequencer %i.", module_type, sequencer, exc_info=rt_err)
                 raise Exception(f"Module {module_type} failed to map sequencer {sequencer}.") from rt_err
 
             sequencers[f"sequencer{sequencer}"] = sequencer_config
-            if channel_type in [0, 4] and module_type.upper() == "QTM":
+            if channel_type in [ChannelTypes.ALL, ChannelTypes.IO] and module_type.upper() == "QTM":
                 # QTM has IOx channels, where x is both the channel and sequencer number.
                 channels[f"IO{sequencer}"] = module_func_refs["_get_io_channel_config"](sequencer)
 
@@ -645,7 +661,10 @@ class TriggerThresholdConfig:
 
 
 class Qblox_QcodesCluster(Qblox_ClusterBase):
-    """Class to control Qblox Cluster instrument with various devices through QCoDeS."""
+    """Class to control Qblox Cluster instrument with various devices through QCoDeS.
+
+    This driver will use the (extended) cluster features by the standard QCoDeS Cluster object.
+    """
 
     def __init__(
         self,
@@ -695,13 +714,13 @@ class Qblox_QcodesCluster(Qblox_ClusterBase):
     def _add_type_check_calls(self, module: Any) -> Any:
         """Add `_is_xxx_type(slot)` calls into the module."""
         if hasattr(module, "is_mm_type"):
-            setattr(module, "_is_mm_type", lambda slot: module.is_mm_type)
+            module._is_mm_type = lambda slot: module.is_mm_type
 
-        setattr(module, "_is_qcm_type", lambda slot: module.is_qcm_type)
-        setattr(module, "_is_qrm_type", lambda slot: module.is_qrm_type)
-        setattr(module, "_is_qrc_type", lambda slot: module.is_qrc_type)
-        setattr(module, "_is_qtm_type", lambda slot: module.is_qtm_type)
-        setattr(module, "_is_rf_type", lambda slot: module.is_rf_type)
+        module._is_qcm_type = lambda slot: module.is_qcm_type
+        module._is_qrm_type = lambda slot: module.is_qrm_type
+        module._is_qrc_type = lambda slot: module.is_qrc_type
+        module._is_qtm_type = lambda slot: module.is_qtm_type
+        module._is_rf_type = lambda slot: module.is_rf_type
 
         return module
 
@@ -723,9 +742,9 @@ class Qblox_QcodesCluster(Qblox_ClusterBase):
                     setattr(module, attr_name, getattr(ScpiCluster, attr_name))
 
         # Reassign 'arm_sequencer', 'start_sequencer' and 'stop_sequencer' directly to SCPI write calls
-        setattr(module, "arm_sequencer", partial(getattr(ScpiCluster, "_arm_sequencer"), self.cluster))
-        setattr(module, "start_sequencer", partial(getattr(ScpiCluster, "_start_sequencer"), self.cluster))
-        setattr(module, "stop_sequencer", partial(getattr(ScpiCluster, "_stop_sequencer"), self.cluster))
+        module.arm_sequencer = partial(ScpiCluster._arm_sequencer, self.cluster)
+        module.start_sequencer = partial(ScpiCluster._start_sequencer, self.cluster)
+        module.stop_sequencer = partial(ScpiCluster._stop_sequencer, self.cluster)
 
         return module
 
@@ -738,9 +757,9 @@ class Qblox_QcodesCluster(Qblox_ClusterBase):
 
         # TODO: Missing functions `_arm_scope_trigger` and `is_qdm_type`?
         module_func_refs["_check_error_queue"] = self._check_error_queue
-        module_func_refs["_write"] = partial(getattr(ScpiCluster, "_write"), self.cluster)
-        module_func_refs["_read_bin"] = partial(getattr(ScpiCluster, "_read_bin"), self.cluster)
-        module_func_refs["_flush_line_end"] = partial(getattr(ScpiCluster, "_flush_line_end"), self.cluster)
+        module_func_refs["_write"] = partial(ScpiCluster._write, self.cluster)
+        module_func_refs["_read_bin"] = partial(ScpiCluster._read_bin, self.cluster)
+        module_func_refs["_flush_line_end"] = partial(ScpiCluster._flush_line_end, self.cluster)
 
         module_func_refs["is_qcm_type"] = lambda: module.is_qcm_type
         module_func_refs["is_qrm_type"] = lambda: module.is_qrm_type
@@ -773,7 +792,11 @@ class Qblox_QcodesCluster(Qblox_ClusterBase):
     def open(self):
         # Connect to the device cluster
         self._cluster = Cluster(
-            name=self._name, identifier=self.cluster_ip, port=self.port, debug=self.DEBUG_LEVEL, dummy_cfg=self.dummy_cfg
+            name=self._name,
+            identifier=self.cluster_ip,
+            port=self.port,
+            debug=self.DEBUG_LEVEL,
+            dummy_cfg=self.dummy_cfg,
         )
         self._instrument_type = self.cluster.instrument_type.value  # Should return string "MM" for cluster
         self._modules["0"] = {self._instrument_type: self.cluster._type_handle}
@@ -828,7 +851,9 @@ class Qblox_QcodesCluster(Qblox_ClusterBase):
         return self._make_func_refs_from_module(module, module.slot_idx)
 
     @rpc_method
-    def get_module_channels(self, module_type: str, slot_no: int | None = None, channel_type: int = 0) -> Any:
+    def get_module_channels(
+        self, module_type: str, slot_no: int | None = None, channel_type: ChannelTypes = ChannelTypes.ALL
+    ) -> Any:
         module_type = module_type.upper()
         if module_type == "MM" or slot_no == 0:
             raise ValueError("The Cluster management module at slot 0 doesn't have channels!")
@@ -854,7 +879,7 @@ class Qblox_QcodesCluster(Qblox_ClusterBase):
                 raise ValueError(f"Module {module_type} not found on cluster.")
 
         channels: dict[str, Any] = {}
-        if module_type == "QTM" and channel_type in [0, 4]:
+        if module_type == "QTM" and channel_type in [ChannelTypes.ALL, ChannelTypes.IO]:
             io_channels = len(module.io_channels)
             for channel in range(io_channels):
                 channels[f"IO{channel}"] = self.cluster._get_io_channel_config(slot_no, channel)
@@ -863,17 +888,17 @@ class Qblox_QcodesCluster(Qblox_ClusterBase):
 
         try:
             for sequencer_idx, seq_conn_point, channel_idx in module._iter_connections():
-                if channel_type in [0, 1]:
+                if channel_type in [ChannelTypes.ALL, ChannelTypes.AI]:
                     if "adc" in channel_idx:
                         ch_config = module.sequencers[sequencer_idx].parameters
                         channels[f"{channel_idx}_{seq_conn_point}{sequencer_idx}"] = ch_config
 
-                if channel_type in [0, 2]:
+                if channel_type in [ChannelTypes.ALL, ChannelTypes.AO]:
                     if "dac" in channel_idx:
                         ch_config = module.sequencers[sequencer_idx].parameters
                         channels[f"{channel_idx}_{seq_conn_point}{sequencer_idx}"] = ch_config
 
-                if channel_type in [0, 3]:
+                if channel_type in [ChannelTypes.ALL, ChannelTypes.MRK]:
                     marker_config = {
                         "sync_en": module.sequencers[sequencer_idx].sync_en,
                     }
@@ -887,7 +912,7 @@ class Qblox_QcodesCluster(Qblox_ClusterBase):
 
         except RuntimeError:
             # The module probably does not accept the SEQ#:CHAN? command. We do only the markers, if interested.
-            if channel_type in [0, 3]:
+            if channel_type in [ChannelTypes.ALL, ChannelTypes.MRK]:
                 for sequencer_idx, sequencer in enumerate(module.sequencers):
                     marker_config = {
                         "sync_en": sequencer.sync_en,

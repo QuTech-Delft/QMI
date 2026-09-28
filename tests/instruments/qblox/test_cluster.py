@@ -6,9 +6,14 @@ from unittest.mock import call, patch
 
 import qmi.instruments.qblox.cluster
 from qmi.instruments.qblox import (
-    Qblox_NativeCluster, Qblox_QcodesCluster, SEQUENCERS_IN_MODULE, AI_IN_MODULE, AO_IN_MODULE, DIGITAL_MARKERS_IN_MODULE
+    Qblox_NativeCluster,
+    Qblox_QcodesCluster,
+    SEQUENCERS_IN_MODULE,
+    AI_IN_MODULE,
+    AO_IN_MODULE,
+    DIGITAL_MARKERS_IN_MODULE,
 )
-from qmi.instruments.qblox.cluster import _QbloxModule
+from qmi.instruments.qblox.cluster import _QbloxModule, ChannelTypes
 from tests.patcher import PatcherQmiContext as QMI_Context
 
 # Suppress logging
@@ -33,47 +38,44 @@ mock_cluster_layout = {
 
 MOCK_CLUSTER_LAYOUT = json.dumps(mock_cluster_layout).encode("utf-8")
 modules = {
-        "0": {"model": "CLUSTER MM", "is_rf": False},
-        "1": {"model": "CLUSTER QCM", "is_rf": False},
-        "2": {"model": "CLUSTER QCM", "is_rf": True},
-        "3": {"model": "CLUSTER QRM", "is_rf": False},
-        "4": {"model": "CLUSTER QRM", "is_rf": True},
-        "5": {"model": "CLUSTER QTM", "is_rf": False},
-    }
-JSON_DESCR_MODULES = json.dumps({"modules": modules}).encode("utf-8")
-DO_DICT = {
-    'sync_en': False, 'trg': [{'count_threshold': 1, 'threshold_invert': False}] * 15
+    "0": {"model": "CLUSTER MM", "is_rf": False},
+    "1": {"model": "CLUSTER QCM", "is_rf": False},
+    "2": {"model": "CLUSTER QCM", "is_rf": True},
+    "3": {"model": "CLUSTER QRM", "is_rf": False},
+    "4": {"model": "CLUSTER QRM", "is_rf": True},
+    "5": {"model": "CLUSTER QTM", "is_rf": False},
 }
+JSON_DESCR_MODULES = json.dumps({"modules": modules}).encode("utf-8")
+DO_DICT = {'sync_en': False, 'trg': [{'count_threshold': 1, 'threshold_invert': False}] * 15}
 ADC_DICT = [
-            {
-                "demod": {"en": False},
-                "th_acq": {
-                    "discr_threshold": 0.0,
-                    "non_weighed_integration_len": 1024,
-                    "rotation_matrix_a11": 1.0,
-                    "rotation_matrix_a12": 0.0,
-                },
-                "th_acq_mrk_map": {"addr": 1, "en": False, "inv": False},
-                "th_acq_trg_map": {"addr": 1, "en": False, "inv": False},
-                "ttl": {"auto_bin_incr_en": False, "in": False, "threshold": 0.0},
-            }
+    {
+        "demod": {"en": False},
+        "th_acq": {
+            "discr_threshold": 0.0,
+            "non_weighed_integration_len": 1024,
+            "rotation_matrix_a11": 1.0,
+            "rotation_matrix_a12": 0.0,
+        },
+        "th_acq_mrk_map": {"addr": 1, "en": False, "inv": False},
+        "th_acq_trg_map": {"addr": 1, "en": False, "inv": False},
+        "ttl": {"auto_bin_incr_en": False, "in": False, "threshold": 0.0},
+    }
 ]
 DAC_DICT = [
-    {'cont_mode': {'en_path': [False, False], 'wave_idx_path': [0, 0]}, 'gain_path': [1.0, 1.0],
-     'marker_ovr': {'en': False, 'val': 0},
-     'mixer': {'corr_gain_ratio': 1.0, 'corr_phase_offset_degree': -0.0, 'en': False},
-     'nco': {'delay_comp': 0, 'delay_comp_en': False, 'freq_hz': 0.0, 'po': 0.0},
-     'offs_path': [0.0, 0.0], 'upsample_rate_path': [0, 0]}
+    {
+        'cont_mode': {'en_path': [False, False], 'wave_idx_path': [0, 0]},
+        'gain_path': [1.0, 1.0],
+        'marker_ovr': {'en': False, 'val': 0},
+        'mixer': {'corr_gain_ratio': 1.0, 'corr_phase_offset_degree': -0.0, 'en': False},
+        'nco': {'delay_comp': 0, 'delay_comp_en': False, 'freq_hz': 0.0, 'po': 0.0},
+        'offs_path': [0.0, 0.0],
+        'upsample_rate_path': [0, 0],
+    }
 ]
-QCM_SEQUENCER_CONFIG = {
-    "awg": DAC_DICT,
-    "seq_proc": DO_DICT
-}
+QCM_SEQUENCER_CONFIG = {"awg": DAC_DICT, "seq_proc": DO_DICT}
 QRM_SEQUENCER_CONFIG = copy.deepcopy(QCM_SEQUENCER_CONFIG)
 QRM_SEQUENCER_CONFIG.update(dict(acq=ADC_DICT))
-QTM_SEQUENCER_CONFIG = {
-    "seq_proc": DO_DICT
-}
+QTM_SEQUENCER_CONFIG = {"seq_proc": DO_DICT}
 IO_CHANNEL_CONFIG = {
     "binned_acq_on_invalid_time_delta": "error",
     "binned_acq_threshold_source": "thresh0",
@@ -98,7 +100,7 @@ IO_CHANNEL_CONFIG = {
 
 class TypeHandle_QbloxModule(_QbloxModule):
     """Extended class for more complex module function handles.
-    
+
     Made compatible for both Native and QCodes cluster versions.
     """
 
@@ -125,7 +127,7 @@ class TypeHandle_QbloxModule(_QbloxModule):
 
     def present(self) -> bool:
         return True  # Qcodes only
-    
+
     def _get_sequencer_config(self, slot: int, sequencer: int) -> dict:
         if "QCM" in modules[str(slot)]["model"]:
             return QCM_SEQUENCER_CONFIG
@@ -141,15 +143,16 @@ class TypeHandle_QbloxModule(_QbloxModule):
     def _get_sequencer_channel_map(self, slot: int, sequencer: int) -> tuple:
         if "QRM" in modules[str(slot)]["model"]:
             return ([0], [1])
-        
+
         return ([0, 2], [1, 3])
-    
+
     def _get_sequencer_acq_channel_map(self, slot: int, sequencer: int) -> tuple:
         return ([0], [1])
-    
+
 
 class ScpiClusterStub:
     """Mock the ScpiCluster class"""
+
     def __init__(self): ...
     def _arm_sequencer(self): ...
     def _start_sequencer(self): ...
@@ -177,8 +180,12 @@ class CreateClusterTestCase(unittest.TestCase):
         self._scpi_cluster_patch = patch("qmi.instruments.qblox.cluster.ScpiCluster", ScpiClusterStub)
         self._scpi_cluster_patch.start()
         self.addCleanup(self._scpi_cluster_patch.stop)
-        self._attr_names_patch = patch("qmi.instruments.qblox.cluster._get_required_qrm_qcm_attr_names", return_value=[])
-        self._qtm_attr_names_patch = patch("qmi.instruments.qblox.cluster._get_required_qtm_attr_names", return_value=[])
+        self._attr_names_patch = patch(
+            "qmi.instruments.qblox.cluster._get_required_qrm_qcm_attr_names", return_value=[]
+        )
+        self._qtm_attr_names_patch = patch(
+            "qmi.instruments.qblox.cluster._get_required_qtm_attr_names", return_value=[]
+        )
         self._attr_names_patch.start()
         self._qtm_attr_names_patch.start()
         self.addCleanup(self._attr_names_patch.stop)
@@ -204,12 +211,15 @@ class CreateClusterTestCase(unittest.TestCase):
         self.assertEqual(name, cluster._name)
         self.assertEqual("MM", cluster._instrument_type)
         cluster.close()
-        cluster_patch.assert_has_calls([
-            call(identifier=ip, port=None, debug=None, dummy_cfg=None),
-            call()._get_idn(),
-            call().stop_sequencer(),
-            call().clear_sequencer_flags()
-        ], any_order=True)
+        cluster_patch.assert_has_calls(
+            [
+                call(identifier=ip, port=None, debug=None, dummy_cfg=None),
+                call()._get_idn(),
+                call().stop_sequencer(),
+                call().clear_sequencer_flags(),
+            ],
+            any_order=True,
+        )
 
     def test_create_qcodes_cluster(self):
         # Arrange
@@ -228,11 +238,13 @@ class CreateClusterTestCase(unittest.TestCase):
         self.assertEqual(name, cluster._name)
         self.assertEqual("MM", cluster._instrument_type)
         cluster.close()
-        cluster_patch.assert_has_calls([
-            call(name=name, identifier=ip, port=None, debug=None, dummy_cfg=None),
-            call().stop_sequencer(),
-            call().clear_sequencer_flags()
-        ])
+        cluster_patch.assert_has_calls(
+            [
+                call(name=name, identifier=ip, port=None, debug=None, dummy_cfg=None),
+                call().stop_sequencer(),
+                call().clear_sequencer_flags(),
+            ]
+        )
 
     def test_base_cluster_helpers(self):
         cluster = qmi.instruments.qblox.cluster.Qblox_ClusterBase(
@@ -300,6 +312,7 @@ class CreateClusterTestCase(unittest.TestCase):
 
 class NativeClusterTestCase(unittest.TestCase):
     """Test native cluster instance methods."""
+
     EXTRA_ATTRS = ["_get_sequencer_config"]
 
     def setUp(self) -> None:
@@ -316,7 +329,7 @@ class NativeClusterTestCase(unittest.TestCase):
             _mod_handles[slot] = {
                 "type_handle": type_handle,
                 "_get_sequencer_channel_map": TypeHandle_QbloxModule._get_sequencer_channel_map,
-                "_get_io_channel_config": TypeHandle_QbloxModule._get_io_channel_config
+                "_get_io_channel_config": TypeHandle_QbloxModule._get_io_channel_config,
             }
 
         self._qblox_instruments_patch = patch("qmi.instruments.qblox.cluster.qblox_instruments", unittest.mock.Mock())
@@ -325,8 +338,12 @@ class NativeClusterTestCase(unittest.TestCase):
         self._scpi_cluster_patch = patch("qmi.instruments.qblox.cluster.ScpiCluster", ScpiClusterStub)
         self._scpi_cluster_patch.start()
         self.addCleanup(self._scpi_cluster_patch.stop)
-        self._attr_names_patch = patch("qmi.instruments.qblox.cluster._get_required_qrm_qcm_attr_names", return_value=self.EXTRA_ATTRS)
-        self._qtm_attr_names_patch = patch("qmi.instruments.qblox.cluster._get_required_qtm_attr_names", return_value=self.EXTRA_ATTRS)
+        self._attr_names_patch = patch(
+            "qmi.instruments.qblox.cluster._get_required_qrm_qcm_attr_names", return_value=self.EXTRA_ATTRS
+        )
+        self._qtm_attr_names_patch = patch(
+            "qmi.instruments.qblox.cluster._get_required_qtm_attr_names", return_value=self.EXTRA_ATTRS
+        )
         self._attr_names_patch.start()
         self._qtm_attr_names_patch.start()
         self.addCleanup(self._attr_names_patch.stop)
@@ -444,20 +461,20 @@ class NativeClusterTestCase(unittest.TestCase):
         self.assertIn("_get_sequencer_config", qcm_refs)
 
     def test_native_channel_filters_and_channel_map_cache(self):
-        adc_channels, sequencers = self.cluster.get_module_channels("QRM", slot_no=3, channel_type=1)
+        adc_channels, sequencers = self.cluster.get_module_channels("QRM", slot_no=3, channel_type=ChannelTypes.AI)
         self.assertEqual(2 * SEQUENCERS_IN_MODULE["QRM"], len(adc_channels))
         self.assertEqual(SEQUENCERS_IN_MODULE["QRM"], len(sequencers))
         self.assertTrue(all(name.startswith("adc") for name in adc_channels))
 
-        dac_channels, _ = self.cluster.get_module_channels("QCM", slot_no=1, channel_type=2)
+        dac_channels, _ = self.cluster.get_module_channels("QCM", slot_no=1, channel_type=ChannelTypes.AO)
         self.assertEqual(4 * SEQUENCERS_IN_MODULE["QCM"], len(dac_channels))
         self.assertTrue(all(name.startswith("dac") for name in dac_channels))
 
-        marker_channels, _ = self.cluster.get_module_channels("QCM", slot_no=1, channel_type=3)
+        marker_channels, _ = self.cluster.get_module_channels("QCM", slot_no=1, channel_type=ChannelTypes.MRK)
         self.assertEqual(DIGITAL_MARKERS_IN_MODULE["QCM"] * SEQUENCERS_IN_MODULE["QCM"], len(marker_channels))
         self.assertTrue(all(name.startswith("DO") for name in marker_channels))
 
-        io_channels, _ = self.cluster.get_module_channels("QTM", slot_no=5, channel_type=4)
+        io_channels, _ = self.cluster.get_module_channels("QTM", slot_no=5, channel_type=ChannelTypes.IO)
         self.assertEqual(SEQUENCERS_IN_MODULE["QTM"], len(io_channels))
         self.assertTrue(all(name.startswith("IO") for name in io_channels))
 
@@ -476,9 +493,7 @@ class NativeClusterTestCase(unittest.TestCase):
         for module in ["MM", "QCM", "QCM-RF", "QRM", "QRM-RF", "QTM"]:
             expected_sequencers = SEQUENCERS_IN_MODULE[module]
             expected_channels = (
-                AO_IN_MODULE[module]
-                + DIGITAL_MARKERS_IN_MODULE[module]
-                + AI_IN_MODULE[module]
+                AO_IN_MODULE[module] + DIGITAL_MARKERS_IN_MODULE[module] + AI_IN_MODULE[module]
             ) * SEQUENCERS_IN_MODULE[module]
             if "RF" in module:  # The RF modules are created using the regular non-RF channel map, giving double AIO
                 expected_channels += 2 * SEQUENCERS_IN_MODULE[module]
@@ -492,7 +507,6 @@ class NativeClusterTestCase(unittest.TestCase):
 
 
 class SequencerObject:
-
     parameters = IO_CHANNEL_CONFIG
 
 
@@ -524,14 +538,14 @@ class QcodesClusterTestCase(unittest.TestCase):
             qmi.instruments.qblox.cluster.DEBUG_LEVEL = 2  # Set to 2 to avoid useless error checks
             _ctx = QMI_Context("cluster_test")
             retval = unittest.mock.MagicMock()
-            retval.instrument_type = TypeHandle_QbloxModule("MM", False, 0).instrument_type
+            retval.instrument_type = TypeHandle_QbloxModule("MM", False, "0").instrument_type
             retval._type_handle = self._add_is_functions_to_module(unittest.mock.MagicMock("Cluster_MM"), "MM")
             retval_modules = []
             for e, mod in modules.items():
                 model = mod["model"][8:] + "-RF" if mod["is_rf"] else mod["model"][8:]
                 is_rf = True if "RF" in model else False
                 inst_mod = TypeHandle_QbloxModule(model, is_rf, e)
-                inst_mod.present = lambda : True
+                inst_mod.present = lambda: True
                 inst_mod.module_type = ValString(model)
                 inst_mod.is_mm_type = "MM" in model
                 inst_mod.is_qcm_type = "QCM" in model
@@ -677,18 +691,20 @@ class QcodesClusterTestCase(unittest.TestCase):
         qcm.sequencers = [unittest.mock.Mock(parameters=IO_CHANNEL_CONFIG, sync_en=False) for _ in range(2)]
         for sequencer in qcm.sequencers:
             sequencer._get_sequencer_config.return_value = SequencerObject
-        qcm._iter_connections = unittest.mock.Mock(return_value=[
-            [0, "I", "dac0"],
-            [0, "Q", "dac1"],
-            [1, "I", "dac2"],
-            [1, "Q", "dac3"],
-        ])
+        qcm._iter_connections = unittest.mock.Mock(
+            return_value=[
+                [0, "I", "dac0"],
+                [0, "Q", "dac1"],
+                [1, "I", "dac2"],
+                [1, "Q", "dac3"],
+            ]
+        )
 
-        dac_channels, sequencers = self.cluster.get_module_channels("QCM", slot_no=1, channel_type=2)
+        dac_channels, sequencers = self.cluster.get_module_channels("QCM", slot_no=1, channel_type=ChannelTypes.AO)
         self.assertEqual(["dac0_I0", "dac1_Q0", "dac2_I1", "dac3_Q1"], list(dac_channels))
         self.assertEqual(["sequencer0", "sequencer1"], list(sequencers))
 
-        marker_channels, _ = self.cluster.get_module_channels("QCM", slot_no=1, channel_type=3)
+        marker_channels, _ = self.cluster.get_module_channels("QCM", slot_no=1, channel_type=ChannelTypes.MRK)
         self.assertEqual(["DO0_0", "DO1_0", "DO2_1", "DO3_1"], list(marker_channels))
 
         qtm = self.cluster._modules["5"]["QTM"]
@@ -709,7 +725,9 @@ class QcodesClusterTestCase(unittest.TestCase):
                 raise AttributeError(name)
 
         qtm.sequencers = [SequencerStub(), SequencerStub()]
-        fallback_channels, fallback_sequencers = self.cluster.get_module_channels("QTM", slot_no=5, channel_type=3)
+        fallback_channels, fallback_sequencers = self.cluster.get_module_channels(
+            "QTM", slot_no=5, channel_type=ChannelTypes.MRK
+        )
         self.assertEqual(8, len(fallback_channels))
         self.assertEqual(["sequencer0", "sequencer1"], list(fallback_sequencers))
 
@@ -724,9 +742,7 @@ class QcodesClusterTestCase(unittest.TestCase):
             expected_sequencers = SEQUENCERS_IN_MODULE[module]
             if module != "QTM":
                 expected_channels = (
-                    AO_IN_MODULE[module]
-                    + DIGITAL_MARKERS_IN_MODULE[module]
-                    + AI_IN_MODULE[module]
+                    AO_IN_MODULE[module] + DIGITAL_MARKERS_IN_MODULE[module] + AI_IN_MODULE[module]
                 ) * SEQUENCERS_IN_MODULE[module]
             if module == "QTM":  # The QTM module has 8 "generic" IO channels in output
                 expected_channels = SEQUENCERS_IN_MODULE[module]
