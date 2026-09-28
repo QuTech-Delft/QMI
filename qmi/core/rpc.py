@@ -1448,7 +1448,8 @@ class _RpcThread(QMI_Thread):
             except BaseException as exception:
                 _logger.debug("Modifying RPC property failed", exc_info=True)
                 result_type = QMI_RpcFutureState.RESULT_IS_EXCEPTION
-                result = exception
+                # return the exception, and the traceback
+                result = (exception, tuple(traceback.format_list(traceback.extract_tb(exception.__traceback__))))
 
         else:
             _logger.error("%s locked, property request without lock token is denied.", self._rpc_object._name)
