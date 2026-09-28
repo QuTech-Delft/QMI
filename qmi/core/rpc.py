@@ -871,6 +871,11 @@ class QMI_RpcProxy:
         return object.__getattribute__(self, name)
 
     def __setattr__(self, name: str, value: Any) -> None:
+        """Overriding the class attribute setting to allow setting of the class attributes
+        until the ``self.rpc_nonblocking`` has been set. After this, the attribute value is 
+        sent via the `QMI_RpcFuture` to the RPC object. The exception is ``self._lock_token``
+        which must be allowed to be set all times.
+        """
         try:
             initialized = object.__getattribute__(self, "rpc_nonblocking")
         except AttributeError:
