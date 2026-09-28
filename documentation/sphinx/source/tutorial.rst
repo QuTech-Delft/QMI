@@ -78,12 +78,86 @@ We can look at the documentation of the Proxy instance:
 >>> help(nsg)
 
 This prints the docstring of the NoisySineGenerator class.
-It also shows a listing of all RPC methods, signals and class constants of the proxy instance.
+It also shows a listing of all RPC methods, signals and class properties of the proxy instance::
+    Help on QMI_RpcProxy in module qmi.core.rpc:                                                             
 
-As we can read in the help, our noisy sine generator ``nsg`` supports a bunch of methods, including the ``get_sample()`` method.
+    <rpc proxy for help.nsg (qmi.instruments.dummy.noisy_sine_generator.NoisySineGenerator)>
+        Simulated instrument, useful for testing.
+
+        Attributes:
+            max_frequency: Maximum allowed frequency that can be set.
+            max_amplitude: Maximum allowed amplitude that can be set.
+            max_wait:      Maximum wait time duration.
+            max_noise:     Maximum noise level that can be set. By default the same as max amplitude.        
+
+
+        RPC methods:
+        - close() -> None
+        - get_amplitude() -> float
+        - get_frequency() -> float
+        - get_name() -> str
+        - get_noise() -> float
+        - get_sample() -> float                                                                            
+        - get_signals() -> list[qmi.core.pubsub.SignalDescription]
+        - is_open() -> bool
+        - open() -> None
+        - set_amplitude(value: float) -> None
+        - set_frequency(value: float) -> None
+        - set_noise(value: float) -> None
+        - wait(duration: float) -> None
+
+        QMI signals:                                                                                         
+
+        RPC Properties:
+        - max_frequency: float = 1000000.0
+        - max_amplitude: float = 1000.0
+        - max_wait: = 10.0
+
+
+Using RPC Properties
+^^^^^^^^^^^^^^^^^^^
+
+From the docstring printed out you can see that there are four class attributes present: `max_frequency`, `max_amplitude`, `max_noise` and `max_wait`. But only three of these are listed under "RPC Properties" and `max_noise` is not.
+These attributes are used in the class limit different `set` and the `wait` functions to have a maximum possible settable value. Now, the maximum values defined as "RPC Properties" are now actually modifiable, while the `max_noise` is not.
+So, using the usual way of adjusting class variables, the three attributes can given new values, f.ex.:
+
+>>> nsg.max_amplitude
+    1000.0
+>>> nsg.max_amplitude = 500.0
+>>> nsg.max_amplitude
+    500.0
+
+Note that to change the value, *the same value type must be used*. Trying to set the `max_amplitude` with an integer value (like `500`) will lead to an exception.
+Also, trying to adjust `max_noise`, not included in RPC Properties, will lead to an error:
+
+>>> nsg.max_noise = 20.0
+    Traceback (most recent call last):
+    File "<stdin>", line 1, in <module>
+        nsg.max_noise = 20.0
+        ^^^^^^^^^^^^^
+    File ".\qmi\core\rpc.py", line 834, in __setattr__
+        raise AttributeError("Not allowed to set new attributes on a proxy class.")
+    AttributeError: Not allowed to set new attributes on a proxy class.
+
+
+Calling RPC methods
+^^^^^^^^^^^^^^^^^^^
+
+As we can read in the help, our noisy sine generator ``nsg`` supports a bunch of methods, including ``get_sample()`` method.
 We can retrieve that method's docstring as well:
 
 >>> help(nsg.get_sample)
+
+    Help on method get_sample in module qmi.core.rpc:                                                        
+
+    get_sample(*args, **kwargs) method of qmi.core.rpc.QMI_RpcProxy instance
+        rpc proxy for get_sample(self) -> float method of qmi.instruments.dummy.noisy_sine_generator.NoisySineGenerator instance.
+
+        Get a 'sample' from the virtual instrument sine wave.
+
+        Returns:
+            sample: A time-dependent sample value of sine wave with given frequency and amplitude,           
+                    and added Gaussian noise.
 
 Now, let's give it a shot and see what happens:
 
@@ -92,7 +166,7 @@ Now, let's give it a shot and see what happens:
 Whoops, we got an error! This is because we didn't "open" the instrument first.
 Opening an instrument makes a connection to the instrument, which is potentially far away.
 Closing the instrument then closes the connection again.
-Now, for a  virtual instrument this is of course not necessary, but as it simulates a real instrument, we also simulate opening and closing.
+Now, for a virtual instrument this is of course not necessary, but as it simulates a real instrument, we also simulate opening and closing.
 
 >>> nsg.open()
 >>> nsg.get_sample()
@@ -106,7 +180,7 @@ We can make a very basic graph of *nsg* samples as follows:
 ...     print(" " * int(40.0 + 0.25 * nsg.get_sample()) + "*")
 ...     time.sleep(0.01)
 
-Feel free to experiment a bit with the other NoisySineGenerator methods, which you can read about by executing the ``help(nsg)``.
+Feel free to experiment a bit with the NoisySineGenerator properties and other methods, of which you can read about by executing the ``help(nsg)``.
 
 Also, if you want, have a look at the source code of ``qmi.instruments.dummy.noisy_sine_generator``.
 This should convince you that implementing device drivers for QMI instruments is pretty straightforward.
@@ -116,7 +190,8 @@ When done, close the instrument and exit your Python interpreter:
 >>> nsg.close()
 >>> qmi.stop()
 
-From now on, we will no longer tell you to execute ``qmi.stop()``, but don't forget to do it.
+From now on, we will no longer tell you to execute ``qmi.stop()``, but don't forget to do it, or use a context manager.
+
 
 Locking an instrument
 ---------------------
@@ -166,11 +241,11 @@ The first proxy can interact with the instrument, but the second one cannot, bec
 2021-11-30 14:50:55.786 | ERROR    | qmi.core.rpc           | nsg locked, method request without lock token is denied
 Traceback (most recent call last):
   File "<stdin>", line 1, in <module>
-  File "/Users/qutech/Development/qmi/qmi/qmi/core/rpc.py", line 566, in <lambda>
+  File "./qmi/core/rpc.py", line 566, in <lambda>
     blocking_rpc_method_call(self._context, self._rpc_object_address, method_name, self._lock_token,
-  File "/Users/qutech/Development/qmi/qmi/qmi/core/rpc.py", line 505, in blocking_rpc_method_call
+  File "./qmi/core/rpc.py", line 505, in blocking_rpc_method_call
     return future.wait(rpc_timeout)
-  File "/Users/qutech/Development/qmi/qmi/qmi/core/rpc.py", line 458, in wait
+  File "./qmi/core/rpc.py", line 458, in wait
     raise QMI_RuntimeException("The object is locked by another proxy")
 qmi.core.exceptions.QMI_RuntimeException: The object is locked by another proxy
 
