@@ -30,7 +30,8 @@ class HighFinesse_Wlm(QMI_Instrument):
     (wlmData.dll for Windows, libwlmData.so for Linux, and libwlmData.dylib for MacOS). Make sure that the library is
     available on your system and that the wlmData.ini file contains the IP address of the server.
     """
-    # TODO: This could set with GetChannelsCount call after super().open().
+    _rpc_properties = {"MAX_CHANNEL_NUMBER"}
+
     MAX_CHANNEL_NUMBER = 8
 
     def __init__(self, context: QMI_Context, name: str) -> None:

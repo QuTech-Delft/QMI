@@ -140,29 +140,10 @@ class TestDataFolder(unittest.TestCase):
         """See that we can read in a data set in HDF5 format."""
         # Arrange
         expected_timestamp = 1776671773.6601706
-        # expected_time_str = "2026-04-20T07:56:13"
         with unittest.mock.patch("qmi.data.dataset.time") as time_patch:
             time_patch.time = unittest.mock.Mock(return_value=expected_timestamp)
             expected_dataset = _create_dataset()
 
-        # ds_name = expected_dataset.name
-        # expected_attrs = expected_dataset.attrs.copy()
-        # expected_attrs.update(
-        #     {
-        #         f"{ds_name}_axis0_label": "X",
-        #         f"{ds_name}_axis0_unit": "um",
-        #         f"{ds_name}_axis1_label": "Z",
-        #         f"{ds_name}_axis1_unit": "mm",
-        #         f"{ds_name}_column0_label": "power",
-        #         f"{ds_name}_column0_unit": "mW",
-        #         f"{ds_name}_column1_label": "countrate",
-        #         f"{ds_name}_column1_unit": "kHz",
-        #         f"{ds_name}_column2_label": "temperature",
-        #         f"{ds_name}_column2_unit": "K",
-        #         f"{ds_name}_time_str": expected_time_str,
-        #         f"{ds_name}_timestamp": expected_timestamp,
-        #     }
-        # )
         expected_file = os.path.join(os.getcwd(), expected_dataset.name + ".hdf5")
         try:
             self.datafolder.write_dataset(expected_dataset)
@@ -436,6 +417,25 @@ class TestDataFolder(unittest.TestCase):
         finally:
             os.remove(expected_file)
 
+    def test_17b_open_hdf5_file_in_write_mode_netcdf_backend(self):
+        """Open an existing hdf5 file in read/write mode."""
+        # Arrange
+        name = "write_mode" + ".hdf5"
+        expected_file = os.path.join(os.getcwd(), name)
+        # Act and Assert
+        try:
+            with self.datafolder.make_hdf5file(name, backend="h5netcdf"):
+                self.assertTrue(os.path.isfile(expected_file))
+
+            with self.datafolder.open_hdf5file(name, write_mode=True, backend="h5netcdf") as hdf5_file:
+                hdf5_file.attrs["extra"] = "value"
+
+            with self.datafolder.open_hdf5file(name, backend="h5netcdf") as hdf5_file:
+                self.assertEqual("value", hdf5_file.attrs["extra"])
+
+        finally:
+            os.remove(expected_file)
+
     def test_18_read_dataset_with_path_name_raises_exception(self):
         """Reading a dataset rejects names that contain a path component."""
         with self.assertRaises(ValueError):
@@ -458,6 +458,33 @@ class TestDataFolder(unittest.TestCase):
                 self.assertEqual(7, hdf5_file.attrs["run"])
 
             with self.datafolder.open_hdf5file(name) as hdf5_file:
+                read_dataset = qmi.data.dataset.read_dataset_from_hdf5(hdf5_file[dataset.name])
+
+            self.assertEqual(dataset.name, read_dataset.name)
+            self.assertListEqual(dataset.axis_label, read_dataset.axis_label)
+            self.assertListEqual(dataset.column_label, read_dataset.column_label)
+            self.assertEqual(dataset.data.shape, read_dataset.data.shape)
+
+        finally:
+            os.remove(expected_file)
+
+    def test_19b_add_dataset_to_hdf5_file_netcdf_backend(self):
+        """Add a dataset and root attributes to an existing HDF5 file."""
+        # Arrange
+        name = "combined" + ".hdf5"
+        expected_file = os.path.join(os.getcwd(), name)
+        dataset = _create_dataset()
+        root_attrs = {"operator": "QMI", "run": 7}
+        # Act and Assert
+        try:
+            with self.datafolder.make_hdf5file(name, backend="h5netcdf") as hdf5_file:
+                self.datafolder.add_dataset_to_file(hdf5_file, dataset, root_attrs=root_attrs)
+                self.assertIn(dataset.name, hdf5_file)
+                self.assertEqual(dataset.name, hdf5_file.attrs["QMI_Dataset_name_0"])
+                self.assertEqual("QMI", hdf5_file.attrs["operator"])
+                self.assertEqual(7, hdf5_file.attrs["run"])
+
+            with self.datafolder.open_hdf5file(name, backend="h5netcdf") as hdf5_file:
                 read_dataset = qmi.data.dataset.read_dataset_from_hdf5(hdf5_file[dataset.name])
 
             self.assertEqual(dataset.name, read_dataset.name)
@@ -628,7 +655,6 @@ class TestDataStore(unittest.TestCase):
 
         finally:
             os.removedirs(expected_folder)
-            # os.removedirs(day_folder)
 
     def test_02_make_folder_with_timestamp_as_input(self):
         """Make a new datastore folder in the base folder and that a DataFolder instance is returned."""
@@ -763,7 +789,6 @@ class TestDataStore(unittest.TestCase):
 
         finally:
             os.removedirs(expected_folder)
-            # os.removedirs(day_folder)
 
     def test_09_get_folder_with_name_date_and_time_as_inputs(self):
         """Get a datastore folder with the given input values."""

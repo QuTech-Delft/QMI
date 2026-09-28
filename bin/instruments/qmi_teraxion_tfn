@@ -6,7 +6,7 @@ import sys
 
 import qmi
 from qmi.instruments.teraxion.tfn import Teraxion_TFN, Teraxion_TFNElement
-from qmi.utils.context_managers import start_stop, open_close
+from qmi.utils.context_managers import open_close
 
 
 def run() -> int:
