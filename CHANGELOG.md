@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Dimension labeling for `h5netcdf.File` instances when adding a new dataset to file.
 - int | float to string conversion to work also for numpy ints and floats when numpy version is > 2.0, in `hdawg.py`. 
+- Default config file to be "" for `qmi_proc` instead of `None`, in line with the new "None means None" implementation.
 
 ### Deprecated
 - Set the `_rpc_constants` to be deprecated and to point to `_rpc_properties`.
