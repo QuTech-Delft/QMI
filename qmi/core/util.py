@@ -89,6 +89,8 @@ def check_value_structures_equal(value1: Any, value2: Any) -> bool:
     Scalar values must have exactly the same type. Lists, tuples and sets must
     have the same container type, length, and compatible element types.
     Dictionaries must have the same keys and compatible value types.
+
+    TODO: Figure out if we need also to be able to handle numpy arrays.
     """
 
     if type(value1) is not type(value2):  # noqa: E721
