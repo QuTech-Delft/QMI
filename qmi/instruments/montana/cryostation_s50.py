@@ -72,6 +72,7 @@ class Montana_CryostationS50(QMI_Instrument):
     Instrument driver for the Montana Cryostation S50.
     The S50 uses a RESTful API for communication.
     """
+    _rpc_properties = {"RESPONSE_TIMEOUT"}
 
     # Response Timeout.
     RESPONSE_TIMEOUT = 5.0

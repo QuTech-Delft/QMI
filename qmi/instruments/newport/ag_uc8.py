@@ -29,7 +29,9 @@ class AxisStatus(enum.IntEnum):
 class Newport_AG_UC8(QMI_Instrument):
     """Instrument driver for the Newport AG-UC8 Piezo Stepper Controller."""
 
-    _rpc_constants = ["ERROR_CODES", "SPEED_TABLE"]
+    _rpc_properties = {
+        "RESPONSE_TIMEOUT", "SLOW_RESPONSE_TIMEOUT", "COMMAND_DELAY", "CHANNEL_SWITCH_DELAY", "RESET_DELAY"
+    }
 
     # Meaning of error codes returned by the device.
     ERROR_CODES = {
@@ -53,8 +55,7 @@ class Newport_AG_UC8(QMI_Instrument):
     # By default, expect response to command within 1 second.
     RESPONSE_TIMEOUT = 1.0
 
-    # Some commands (position measurement and absolute move) can take
-    # up to 2 minutes to complete.
+    # Some commands (position measurement and absolute move) can take up to 2 minutes to complete.
     SLOW_RESPONSE_TIMEOUT = 120.0
 
     # After a command which does not generate a response, a short
@@ -64,8 +65,7 @@ class Newport_AG_UC8(QMI_Instrument):
     # Delay after changing channels.
     CHANNEL_SWITCH_DELAY = 0.02
 
-    # After a reset command, a longer delay is needed before
-    # we can send the following command.
+    # After a reset command, a longer delay is needed before we can send the following command.
     RESET_DELAY = 0.05
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:

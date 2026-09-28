@@ -1,24 +1,25 @@
 import unittest, unittest.mock
-from typing import cast
 
-from qmi.instruments.thorlabs import Thorlabs_Tsp01
-from qmi.core.transport_usbtmc_visa import QMI_VisaUsbTmcTransport
+import logging
+
 import qmi.core.exceptions
+from qmi.instruments.thorlabs import Thorlabs_Tsp01
 from qmi.utils.context_managers import open_close
 
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 class TestThorlabsTsp01(unittest.TestCase):
     def setUp(self):
-        qmi.start("TestTsp01Context")
-        self._transport_mock = unittest.mock.MagicMock(spec=QMI_VisaUsbTmcTransport)
+        self.ctx = QMI_Context("TestTsp01Context")
+        self.ctx.start()
+        self._transport_mock = unittest.mock.MagicMock()
         with unittest.mock.patch(
                 'qmi.instruments.thorlabs.tsp01.create_transport',
                 return_value=self._transport_mock):
-            self.instr: Thorlabs_Tsp01 = qmi.make_instrument("instr", Thorlabs_Tsp01, "transport_descriptor")
-            self.instr = cast(Thorlabs_Tsp01, self.instr)
+            self.instr = Thorlabs_Tsp01(self.ctx, "instr", "transport_descriptor")
 
     def tearDown(self):
-        qmi.stop()
+        self.ctx.stop()
 
     def test_open_close(self):
         """Test opening and closing the instrument"""

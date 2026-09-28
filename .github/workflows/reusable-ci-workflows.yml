@@ -61,8 +61,24 @@ jobs:
           path: mypy-${{ inputs.python-version }}.log
 
       - name: Run coverage
+        timeout-minutes: 15
         run: |
-          coverage run --branch --source=$SOURCE_DIRS -m unittest discover --start-directory=tests --pattern="test_*.py"
+          batch=0
+          for dir in "."; do
+            subdirs=$(find "tests/$dir" -mindepth 1 -maxdepth 1 -type d ! -name "__pycache__" ! -name "data")
+            if [ -n "$subdirs" ]; then
+              for subdir in $subdirs; do
+                echo "Running coverage for tests in $subdir"
+                coverage run --branch --data-file=".coverage.$batch" -m unittest discover --start-directory="$subdir" --pattern="test_*.py"
+                batch=$((batch + 1))
+              done
+            else
+              echo "Running coverage for tests in tests/$dir"
+              coverage run --branch --data-file=".coverage.$batch" -m unittest discover --start-directory=tests/"$dir" --pattern="test_*.py"
+              batch=$((batch + 1))
+            fi
+          done
+          coverage combine
           coverage report --show-missing --fail-under=$COVERAGE_MIN_PERC | tee coverage-${{ inputs.python-version }}.log
           COVERAGE_PERC=$(grep "TOTAL" coverage-${{ inputs.python-version }}.log | grep -Eo '[0-9.]+%' | sed 's/%//')
           echo "Coverage: $COVERAGE_PERC%"
