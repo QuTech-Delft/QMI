@@ -147,10 +147,29 @@ class TestNsgFunctions(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.nsg.set_noise(invalid_noise)
 
+    def test_max_noise_is_rpc_constant(self):
+        """Test that the _rpc_constants 'max_noise' constant is available in the proxy."""
+        self.assertEqual(NSG.max_noise, self.nsg.max_noise)
+
     def test_max_noise_not_modifiable(self):
-        """Test that 'max_noise' cannot be changed as it is not in _rpc_properties."""
-        with self.assertRaises(AttributeError):
+        """Test that the _rpc_constants 'max_noise' constant cannot be changed from the proxy."""
+        with self.assertRaises(AttributeError) as err:
             self.nsg.max_noise = NSG.max_noise + 2.0
+
+        self.assertEqual("Not allowed to modify an RPC constant value in proxy class.", str(err.exception))
+        # The value is unchanged in the proxy and in the instrument, i.e. the noise limit still applies.
+        self.assertEqual(NSG.max_noise, self.nsg.max_noise)
+        with self.assertRaises(ValueError):
+            self.nsg.set_noise(NSG.max_noise + 1.0)
+
+    def test_max_noise_in_proxy_docstring(self):
+        """Test that 'max_noise' is listed under RPC constants, and not under RPC properties, in the proxy docstring."""
+        constants_section, properties_section = self.nsg.__doc__.split("\nRPC Constants:\n")[1].split(
+            "\nRPC Properties:\n"
+        )
+
+        self.assertIn(f"  - max_noise: float = {NSG.max_noise}\n", constants_section)
+        self.assertNotIn("max_noise", properties_section)
 
     def test_wait_setting(self):
         """Test that wait waits."""

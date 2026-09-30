@@ -78,7 +78,8 @@ We can look at the documentation of the Proxy instance:
 >>> help(nsg)
 
 This prints the docstring of the NoisySineGenerator class.
-It also shows a listing of all RPC methods, signals and class properties of the proxy instance::
+It also shows a listing of all RPC methods, signals, class constants and class properties of the proxy instance::
+
     Help on QMI_RpcProxy in module qmi.core.rpc:                                                             
 
     <rpc proxy for help.nsg (qmi.instruments.dummy.noisy_sine_generator.NoisySineGenerator)>
@@ -106,20 +107,23 @@ It also shows a listing of all RPC methods, signals and class properties of the 
         - set_noise(value: float) -> None
         - wait(duration: float) -> None
 
-        QMI signals:                                                                                         
+        QMI signals:
+
+        RPC Constants:
+        - max_noise: float = 1000.0
 
         RPC Properties:
         - max_frequency: float = 1000000.0
         - max_amplitude: float = 1000.0
-        - max_wait: = 10.0
+        - max_wait: float = 10.0
 
 
 Using RPC Properties
-^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 
-From the docstring printed out you can see that there are four class attributes present: `max_frequency`, `max_amplitude`, `max_noise` and `max_wait`. But only three of these are listed under "RPC Properties" and `max_noise` is not.
-These attributes are used in the class limit different `set` and the `wait` functions to have a maximum possible settable value. Now, the maximum values defined as "RPC Properties" are now actually modifiable, while the `max_noise` is not.
-So, using the usual way of adjusting class variables, the three attributes can given new values, f.ex.:
+From the docstring printed out you can see that there are four class attributes present: `max_frequency`, `max_amplitude`, `max_noise` and `max_wait`. Three of these are listed under "RPC Properties", while `max_noise` is listed under "RPC Constants".
+These attributes are used in the class to limit the different `set` functions and the `wait` function to a maximum possible settable value. The maximum values defined as "RPC Properties" are modifiable from the proxy, while the "RPC Constants" are not.
+So, using the usual way of adjusting class variables, the three attributes can be given new values, f.ex.:
 
 >>> nsg.max_amplitude
     1000.0
@@ -128,16 +132,46 @@ So, using the usual way of adjusting class variables, the three attributes can g
     500.0
 
 Note that to change the value, *the same value type must be used*. Trying to set the `max_amplitude` with an integer value (like `500`) will lead to an exception.
-Also, trying to adjust `max_noise`, not included in RPC Properties, will lead to an error:
+Also, trying to set a class attribute that is not an RPC property nor an RPC constant, will lead to an error:
+
+>>> nsg.min_noise = 0.0
+    Traceback (most recent call last):
+    File "<stdin>", line 1, in <module>
+        nsg.min_noise = 0.0
+        ^^^^^^^^^^^^^
+    File ".\qmi\core\rpc.py", line 934, in __setattr__
+        raise AttributeError("Not allowed to set new attributes on a proxy class.")
+    AttributeError: Not allowed to set new attributes on a proxy class.
+
+Viewing RPC Constants
+^^^^^^^^^^^^^^^^^^^^^
+
+Class attributes that are listed under "RPC Constants" can be viewed via the proxy, just like the RPC properties:
+
+>>> nsg.max_noise
+    1000.0
+
+But, unlike the RPC properties, the RPC constants cannot be changed from the proxy. Trying to give `max_noise` a new value,
+even of the same value type, will lead to an error:
 
 >>> nsg.max_noise = 20.0
     Traceback (most recent call last):
     File "<stdin>", line 1, in <module>
         nsg.max_noise = 20.0
         ^^^^^^^^^^^^^
-    File ".\qmi\core\rpc.py", line 834, in __setattr__
-        raise AttributeError("Not allowed to set new attributes on a proxy class.")
-    AttributeError: Not allowed to set new attributes on a proxy class.
+    File ".\qmi\core\rpc.py", line 916, in __setattr__
+        raise AttributeError("Not allowed to modify an RPC constant value in proxy class.")
+    AttributeError: Not allowed to modify an RPC constant value in proxy class.
+
+In an RPC object class, the RPC constants are declared with a `_rpc_constants` class attribute holding a set of attribute
+names, similarly as the RPC properties are declared with `_rpc_properties`. For the ``NoisySineGenerator`` this is::
+
+    class NoisySineGenerator(QMI_Instrument):
+
+        _rpc_constants = {"max_noise"}
+        _rpc_properties = {"max_frequency", "max_amplitude", "max_wait"}
+
+A class attribute name can be declared either as an RPC constant or as an RPC property, but not as both.
 
 
 Calling RPC methods
