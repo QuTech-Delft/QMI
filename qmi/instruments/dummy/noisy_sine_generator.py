@@ -19,6 +19,7 @@ class NoisySineGenerator(QMI_Instrument):
         max_noise:     Maximum noise level that can be set. By default the same as max amplitude.
     """
 
+    _rpc_constants = {"max_noise"}
     _rpc_properties = {"max_frequency", "max_amplitude", "max_wait"}
 
     max_frequency: float = 1e6

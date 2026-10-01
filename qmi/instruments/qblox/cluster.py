@@ -69,9 +69,8 @@ _get_required_qtm_attr_names: Callable[..., list[str]] | None = None
 def _import_modules() -> None:
     """Import the vendor-provided Qblox modules.
 
-    This import is done in a function, instead of at the top-level,
-    to avoid an unnecessary dependency for programs that do not access
-    the instrument directly.
+    This import is done in a function, instead of at the top-level, to avoid an unnecessary dependency
+    for programs that do not access the instrument directly.
     """
     global qblox_instruments, Cluster, NativeCluster, ScpiCluster, ChannelMapCache, QcodesModule, DebugLevel  # noqa: PLW0603
     global DEBUG_LEVEL, _get_required_qrm_qcm_attr_names, _get_required_qtm_attr_names  # noqa: PLW0603
@@ -195,7 +194,7 @@ class Qblox_ClusterBase(QMI_Instrument):
 
     Attributes:
         DEBUG_LEVEL: The debug level to use while using Qblox. If the user wants to change the debug level in an
-                     interactive session, the cluster must be closed first, then the DEBUG_LEVEL RPC constant can
+                     interactive session, the cluster must be closed first, then the DEBUG_LEVEL RPC property can
                      be changed, and the cluster instance re-opened.
     """
     _rpc_properties = {"DEBUG_LEVEL"}

@@ -59,21 +59,23 @@ name to run in the remote context::
     y = proxy.square(5)
 
     
-Defining RPC properties
-#######################
+Defining RPC constants and properties
+#####################################
 
-Classes inheriting from `QMI_RpcObject` can also have mutable class variables,
-called RPC properties. They can be defined by setting a class variable, and 
-adding its name in a "_rpc_properties" class variable, which is a set::
+Classes inheriting from `QMI_RpcObject` can also have immutable and mutable class attributes,
+called RPC constants and RPC properties. They can be defined by setting a class attribute, and 
+adding its name in a "_rpc_constants" or "_rpc_properties" class variable, which are ``set``s::
 
   class MyClass(QMI_RpcObject):
   
+      _rpc_constants = {"RPC_CONSTANT"}
       _rpc_properties = {"STRING_PROPERTY", "DICT_PROPERTY", "LIST_OF_VALUES"}
 
       STRING_PROPERTY = "hello there!"
       DICT_PROPERTY = {"change": 1, "my": 2, "values": 3}
       LIST_OF_VALUES = [1, "list of", 2.0]
-      NOT_AN_RPC_PROPERTY = True
+      RPC_CONSTANT = True
+      NOT_SHARED_WITH_PROXY = 42
 
 After obtaining proxy instance for the class, the property values can be changed.
 For example::
@@ -82,10 +84,16 @@ For example::
     proxy.STRING_PROPERTY = "Oh, hello!"
     proxy.DICT_PROPERTY = {"change": 2, "my": 3, "values": 1}
     proxy.LIST_OF_VALUES = [2, "from list", 1.0]
-      
-Trying to set a new value for `proxy.NOT_AN_RPC_PROPERTY` will raise an exception
-as that class attribute was not defined as an RPC property and hence will not be   
-present in the proxy instance.
+
+The proxy constant value can be viewed, but not changed::
+
+    proxy.RPC_CONSTANT  # Returns True
+    proxy.RPC_CONSTANT = False  # Raises AttributeError
+
+Trying to set a new value for `proxy.NOT_SHARED_WITH_PROXY` will also raise an exception
+as that class attribute was not defined as an RPC constant or RPC property and hence it is
+not present in the proxy instance. Also, setting any new class attributes for the proxy is
+now forbidden.
 
 Further, for stringent functioning of the parent class and to avoid various errors,
 the new value for the property _must be_ of _same type_ as the original property.
@@ -185,7 +193,6 @@ import threading
 import time
 import traceback
 from typing import Any, NamedTuple, Type, TypeVar, TYPE_CHECKING
-import warnings
 
 from qmi.core.exceptions import (
     QMI_RuntimeException,
@@ -208,6 +215,17 @@ _logger = logging.getLogger(__name__)
 
 # Unbound type variable for type annotations.
 _T = TypeVar("_T")
+
+
+class RpcConstantDescriptor(NamedTuple):
+    """Description of an RPC constant.
+
+    Attributes:
+        name: Name of the constant.
+        value: Value of the constant.
+    """
+    name: str
+    value: Any
 
 
 class RpcPropertyDescriptor(NamedTuple):
@@ -256,6 +274,8 @@ class RpcInterfaceDescriptor(NamedTuple):
         rpc_class_module:    Name of the module in which the RPC object class was defined.
         rpc_class_name:      Name of the RPC object class.
         rpc_class_docstring: Docstring of the RPC object class.
+        constants:           A list of constant descriptors for the RPC constants declared
+                             by the RPC object class.
         properties:          A list of property descriptors for the RPC properties declared
                              by the RPC object class.
         methods:             A list of method descriptors for the RPC methods declared by
@@ -266,6 +286,7 @@ class RpcInterfaceDescriptor(NamedTuple):
     rpc_class_module: str
     rpc_class_name: str
     rpc_class_docstring: str | None
+    constants: list[RpcConstantDescriptor]
     properties: list[RpcPropertyDescriptor]
     methods: list[RpcMethodDescriptor]
     signals: list[RpcSignalDescriptor]
@@ -778,7 +799,7 @@ class QMI_RpcNonBlockingProxy:
             method = make_rpc_forward_function(method_descriptor.name)
 
             # Update special attributes to make the forward function look like the method it is a proxy for.
-            docstring = f"rpc proxy for {method_descriptor.name}{method_descriptor.signature} method of " +\
+            docstring = f"RPC proxy for {method_descriptor.name}{method_descriptor.signature} method of " +\
                         f"{self._rpc_class_fqn} instance"
 
             if method_descriptor.docstring:
@@ -793,7 +814,7 @@ class QMI_RpcNonBlockingProxy:
             setattr(self, method_descriptor.name, method.__get__(self))
 
     def __repr__(self) -> str:
-        return f"<non-blocking rpc proxy for {self._rpc_object_address} ({self._rpc_class_fqn})>"
+        return f"<non-blocking RPC proxy for {self._rpc_object_address} ({self._rpc_class_fqn})>"
 
 
 class QMI_RpcProxy:
@@ -809,6 +830,9 @@ class QMI_RpcProxy:
         self._rpc_object_address = descriptor.address
         self._rpc_class_fqn = ".".join((descriptor.interface.rpc_class_module, descriptor.interface.rpc_class_name))
         self._lock_token: QMI_LockTokenDescriptor | None = None
+        self._rpc_constant_names = frozenset(
+            constant_descriptor.name for constant_descriptor in descriptor.interface.constants
+        )
         self._rpc_property_names = frozenset(
             property_descriptor.name for property_descriptor in descriptor.interface.properties
         )
@@ -824,13 +848,17 @@ class QMI_RpcProxy:
         # Set docstring.
         setattr(self, "__doc__", descriptor.interface.rpc_class_docstring)
 
+        # Add constants. These are local copies of the values and cannot be modified after initialization.
+        for constant_descriptor in descriptor.interface.constants:
+            setattr(self, constant_descriptor.name, constant_descriptor.value)
+
         # Add methods.
         for method_descriptor in descriptor.interface.methods:
             # Generate a function that forward calls to itself to the corresponding RPC method of the peer context.
             method = make_rpc_method_forward_function(method_descriptor.name)
 
             # Update special attributes to make the forward function look like the method it is a proxy for.
-            docstring = f"rpc proxy for {method_descriptor.name}{method_descriptor.signature} method of " +\
+            docstring = f"RPC proxy for {method_descriptor.name}{method_descriptor.signature} method of " +\
                         f"{self._rpc_class_fqn} instance."
 
             if method_descriptor.docstring:
@@ -882,8 +910,12 @@ class QMI_RpcProxy:
             initialized = False
 
         if initialized:
+            rpc_constant_names = object.__getattribute__(self, "_rpc_constant_names")
             rpc_property_names = object.__getattribute__(self, "_rpc_property_names")
-            if name in rpc_property_names:
+            if name in rpc_constant_names:
+                raise AttributeError("Not allowed to modify an RPC constant value in proxy class.")
+
+            elif name in rpc_property_names:
                 rpc_property_call(
                     object.__getattribute__(self, "_context"),
                     object.__getattribute__(self, "_rpc_object_address"),
@@ -1083,23 +1115,24 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
     Subclasses of `QMI_RpcObject` apply the `@rpc_method` decorator to
     (a subset of) their methods to mark them as callable via RPC.
 
-    Subclasses of `QMI_RpcObject` may choose to export (a subset of)
-    their property class attributes to be accessible directly via the proxy.
-    This is done by creating a class attribute `_rpc_properties` holding
+    Subclasses of `QMI_RpcObject` may choose to export (a subset of) their constant class attributes to be accessible
+    directly via the proxy. This is done by creating a class attribute `_rpc_constants` holding
     a set of attribute names to be exported.
 
-    Each instance of `QMI_RpcObject` runs in a separate thread. It is not allowed
-    to invoke methods of the `QMI_RpcObject` directly from outside the class.
-    Instead, the proper way to access an instance of `QMI_RpcObject` is to
-    invoke a method on a special "proxy" object, which translates the call
-    into an RPC request, which triggers an invocation of the real method of
-    the `QMI_RpcObject` instance.
+    Subclasses of `QMI_RpcObject` may choose to export (a subset of) their property class attributes to be accessible
+    directly via the proxy. This is done by creating a class attribute `_rpc_properties` holding
+    a set of attribute names to be exported.
 
-    Instances of `QMI_RpcObject` may publish QMI signals. Each instance may
-    register a set of signals. Once registered, such signals can be published
-    into the QMI network and routed to subscribed receivers.
+    Each instance of `QMI_RpcObject` runs in a separate thread. It is not allowed to invoke methods of the
+    `QMI_RpcObject` directly from outside the class. Instead, the proper way to access an instance of
+    `QMI_RpcObject` is to invoke a method on a special "proxy" object, which translates the call into an
+    RPC request, which triggers an invocation of the real method of the `QMI_RpcObject` instance.
+
+    Instances of `QMI_RpcObject` may publish QMI signals. Each instance may register a set of signals.
+    Once registered, such signals can be published into the QMI network and routed to subscribed receivers.
     """
 
+    _rpc_constants: set[str]
     _rpc_properties: set[str]
 
     @classmethod
@@ -1234,30 +1267,39 @@ class QMI_RpcObject(metaclass=_RpcObjectMetaClass):
         return list(self._qmi_signals)  # type: ignore
 
 
-def _check_rpc_properties(
-    cls: Type[QMI_RpcObject], rpc_property_names: list[str], protected_names: tuple[str, ...]
+def _check_rpc_attribute_names(
+    cls: Type[QMI_RpcObject], rpc_attribute_names: set[str], protected_names: tuple[str, ...], attribute_type: str
 ) -> None:
-    """Internal function to check that the RPC property names do not include protected names nor QMI_Signal objects.
-    It can also not be an internal function nor property nor a dunder variable or method.
+    """Internal function to check that the RPC constant or property names do not include protected names nor
+    QMI_Signal objects. It can also not be an internal function nor property nor a dunder variable or method.
 
-    The RPC property names may include only class properties.
+    The RPC constant or property names may include only class attributes.
+
+    Parameters:
+        cls:                 The RPC object class, or one of its base classes, declaring the names.
+        rpc_attribute_names: The declared RPC constant or property names.
+        protected_names:     Names that are not allowed to be used.
+        attribute_type:      Type of the RPC attributes, 'constant' or 'property', used in the error message.
+
+    Raises:
+        QMI_UsageException: If any of the names is invalid.
     """
-    # Property name could be inherited, so we need to as well check if it is present in any possible parent class.
+    # Attribute name could be inherited, so we need to as well check if it is present in any possible parent class.
     cls_items: dict[str, Any] = {}
     [cls_items.update(parent.__dict__) for parent in inspect.getmro(cls)]
-    for name in rpc_property_names:
+    for name in rpc_attribute_names:
         if (
             name in protected_names or
             not name in cls_items or
             name.startswith("__") or name.endswith("__") or
             inspect.isroutine(cls_items[name]) or
-            isinstance(cls_items[name], (property, staticmethod, classmethod))
+            isinstance(cls_items[name], (property, staticmethod, classmethod, QMI_Signal))
         ):
             _logger.error(
-                f"RPC property name `{name}` is invalid. Check that the name is not a " +
+                f"RPC {attribute_type} name `{name}` is invalid. Check that the name is not a " +
                 "protected name, QMI_Signal object, [internal] function, property nor a dunder variable name."
             )
-            raise QMI_UsageException(f"Invalid RPC property name `{name}`.")
+            raise QMI_UsageException(f"Invalid RPC {attribute_type} name `{name}`.")
 
 
 def make_interface_descriptor(
@@ -1311,26 +1353,38 @@ def make_interface_descriptor(
         signals.append(RpcSignalDescriptor(name, arg_types))
         doc += f"  - {name}{arg_types}\n"
 
-    # Extract property declarations, including possible base class[es].
+    # Extract constant and property declarations, including possible base class[es].
+    constant_names = set()
     property_names = set()
     for base in inspect.getmro(rpc_object_class):
-        # Check for deprecated use of '_rpc_constants'
         if hasattr(base, "_rpc_constants"):
-            warnings.warn(
-                "The use of '_rpc_constants' is deprecated and will be removed in a future release. " +
-                "Use '_rpc_properties' instead. Now declaring them as '_rpc_properties'."
-            )
             rpc_constants = getattr(base, "_rpc_constants")
-            _check_rpc_properties(base, rpc_constants, protected_method_names)
-            property_names.update(rpc_constants)
+            _check_rpc_attribute_names(base, rpc_constants, protected_method_names, 'constant')
+            constant_names.update(rpc_constants)
 
         if hasattr(base, "_rpc_properties"):
             base_rpc_properties = getattr(base, "_rpc_properties")
             # Check validity of RPC property name[s]
-            _check_rpc_properties(base, base_rpc_properties, protected_method_names)
+            _check_rpc_attribute_names(base, base_rpc_properties, protected_method_names, 'property')
             property_names.update(base_rpc_properties)
 
-    # Extract property values.
+    if not constant_names.isdisjoint(property_names):
+        doubles = constant_names & property_names
+        _logger.error(
+            f"Attribute[s] {doubles} has or have been defined to be both " +
+            "RPC constants and RPC properties."
+        )
+        raise QMI_UsageException(f"Invalid RPC property or constant name[s] {doubles}.")
+
+    # Extract constant values to docstring.
+    doc += '\nRPC Constants:\n'
+    constants = []
+    for constant_name in constant_names:
+        constant_value = getattr(rpc_object_class, constant_name)
+        constants.append(RpcConstantDescriptor(constant_name, constant_value))
+        doc += f"  - {constant_name}: {type(constant_value).__name__} = {constant_value}\n"
+
+    # Extract property values to docstring.
     doc += '\nRPC Properties:\n'
     properties = []
     for property_name in property_names:
@@ -1340,7 +1394,7 @@ def make_interface_descriptor(
 
     # Create interface descriptor.
     return RpcInterfaceDescriptor(
-        rpc_object_class.__module__, rpc_object_class.__name__, doc, properties, methods, signals
+        rpc_object_class.__module__, rpc_object_class.__name__, doc, constants, properties, methods, signals
     )
 
 
