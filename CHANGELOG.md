@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Functions in `qmi.core.rpc` that enable RPC messages to adjust class properties marked as `_rpc_properties` in QMI RPC objects from their proxies.
 - In `qmi.core.util` added functions for checking that two values are of same type, or size and type if the type is an iterable (excluding size for strings). This is used for checking that we set only same type of values (and of same size for iterables) as modifiable `_rpc_properties`.
-- Non-modifiable RPC constants in `qmi.core.rpc`: class attributes listed in `_rpc_constants` are readable from the `QMI_RpcProxy`, but cannot be set. They are listed in an own "RPC Constants" section in the proxy docstring. A name cannot be both an RPC constant and an RPC property.
 - QMI driver for Qblox cluster series device, with support for QCM[-RF], QRM[-RF] and QTM modules.
+- Non-modifiable RPC constants in `qmi.core.rpc`: class attributes listed in `_rpc_constants` are readable from the `QMI_RpcProxy`, but cannot be set. They are listed in an own "RPC Constants" section in the proxy docstring. A name cannot be both an RPC constant and an RPC property.
 - A qblox_manager.py module in utils, with which Qblox cluster modules and their [D]IO channels and markers can be controlled.
 
 ### Changed
