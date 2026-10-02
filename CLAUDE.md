@@ -96,7 +96,7 @@ When implementing an issue:
 5. Review the complete diff.
 6. Describe the new code in the CHANGELOG.md, in one or more of the applying sections of the latest 'Unreleased' entry. Categorize accordingly under:
   - "Added", "Removed", "Changed", "Fixed", or "Deprecated"
-6. Create a pull request describing the changes in the PR and request 'heevasti' as reviewer.
+7. Create a pull request describing the changes in the PR and request 'heevasti' as reviewer.
 
 ## Working from a local Claude Code session
 
@@ -136,3 +136,4 @@ Never:
 - delete remote branches
 - modify branch protection
 - merge a PR
+- try to find or connect to real hardware to confirm code functionality.
