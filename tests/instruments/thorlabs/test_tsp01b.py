@@ -6,7 +6,9 @@ import binascii
 
 # Check for earlier possible mocking of the usb.core and usb.util modules and delete those
 if "usb.core" in sys.modules.keys():
-    del sys.modules['usb.core'], sys.modules['usb.core.find'], sys.modules['usb.util']
+    del sys.modules['usb.core'], sys.modules['usb.core.find']
+if "usb.util" in sys.modules.keys():
+    del sys.modules['usb.util']
 
 
 class EndpointMock:
