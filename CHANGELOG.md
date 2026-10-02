@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.55.0-beta.0] - Unreleased
 
+### Fixed
+- `tests/instruments/thorlabs/test_tsp01b.py` no longer unconditionally deletes `usb.util` from `sys.modules` when only `usb.core` was previously mocked; the presence of `usb.util` is now checked separately before deletion.
+
 ## [0.54.0] - 2026-10-02
 
 ### Added
