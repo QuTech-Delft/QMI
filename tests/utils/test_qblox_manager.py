@@ -1,3 +1,4 @@
+# ruff: noqa: PLW0108
 import logging
 import unittest
 import unittest.mock
