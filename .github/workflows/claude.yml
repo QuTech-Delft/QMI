@@ -24,6 +24,8 @@ jobs:
         with:
           fetch-depth: 1
 
+      - uses: astral-sh/setup-uv@v6   # Use the current major version; installs uv for the CLAUDE.md commands.
+
       - uses: anthropics/claude-code-action@v1
         with:
           # anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -44,6 +46,7 @@ jobs:
 
           # Keep runs bounded (cost + time control)
           claude_args: |
-            --max-turns 30
+            --max-turns 60
             --model claude-sonnet-5
+            --allowedTools "Bash(uv sync:*),Bash(uv run:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr edit:*)"
             --append-system-prompt "Follow this repository's CLAUDE.md exactly: use the exact test, lint, and mypy commands listed there (not your own defaults), update CHANGELOG.md, request heevasti as reviewer, and never merge the PR yourself."
