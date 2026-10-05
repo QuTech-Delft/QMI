@@ -109,6 +109,8 @@ class QbloxManager(QMI_RpcObject):
         self._dac_channel_count = AO_IN_MODULE[module]
         self._marker_channel_count = DIGITAL_MARKERS_IN_MODULE[module]
         self._sequencer_count = SEQUENCERS_IN_MODULE[module]
+        # Import modules
+        _import_modules()
 
     @property
     def adc_channel_count(self) -> int:

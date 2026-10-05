@@ -1,5 +1,7 @@
 # ruff: noqa: PLW0108
 import logging
+import sys
+import types
 import unittest
 import unittest.mock
 from copy import deepcopy
@@ -16,6 +18,7 @@ from qmi.instruments.qblox.cluster import (
     Qblox_NativeCluster,
     Qblox_QcodesCluster,
 )
+import qmi.utils.qblox_manager
 from qmi.utils.qblox_manager import (
     QbloxIOManager,
     QbloxManager,
@@ -162,6 +165,89 @@ class ChannelMapCacheStub:
 
     def is_connected(self, direction, sequencer, path, channel):
         return (direction, sequencer, path, channel) in self.connected
+
+
+def _fake_qblox_instruments_modules() -> dict[str, types.ModuleType]:
+    """Create a minimal fake 'qblox_instruments' package to be imported by `_import_modules`."""
+    qblox_instruments = types.ModuleType("qblox_instruments")
+    native = types.ModuleType("qblox_instruments.native")
+    definitions = types.ModuleType("qblox_instruments.native.definitions")
+    helpers = types.ModuleType("qblox_instruments.native.helpers")
+    definitions.ChannelType = ChannelTypeStub
+    helpers.ChannelMapCache = ChannelMapCacheStub
+    qblox_instruments.native = native
+    native.definitions = definitions
+    native.helpers = helpers
+    return {
+        "qblox_instruments": qblox_instruments,
+        "qblox_instruments.native": native,
+        "qblox_instruments.native.definitions": definitions,
+        "qblox_instruments.native.helpers": helpers,
+    }
+
+
+def setUpModule() -> None:
+    # The vendor package is not necessarily installed; make the lazy imports in the manager find a fake one.
+    modules_patcher = unittest.mock.patch.dict(sys.modules, _fake_qblox_instruments_modules())
+    modules_patcher.start()
+    unittest.addModuleCleanup(modules_patcher.stop)
+
+
+class QbloxManagerImportTestCase(unittest.TestCase):
+    """Test that the manager lazily imports the vendor modules and works without patching them in."""
+
+    def setUp(self) -> None:
+        # Reset the lazily imported names, so that the manager has to import them itself.
+        names_patcher = unittest.mock.patch.multiple(
+            qmi.utils.qblox_manager, qblox_instruments=None, ChannelType=None, ChannelMapCache=None
+        )
+        names_patcher.start()
+        self.addCleanup(names_patcher.stop)
+
+        self.module = "QRM"
+        self.slot = 2
+        self.qblox_cluster = unittest.mock.Mock(spec=Qblox_NativeCluster)
+        self.channel_map_cache = ChannelMapCacheStub()
+        self.qblox_cluster.get_module_channel_map_cache = unittest.mock.Mock(return_value=self.channel_map_cache)
+        sequencers = {
+            f"sequencer{k}": {"awg": {}, "acq": {}} for k in range(SEQUENCERS_IN_MODULE[self.module])
+        }
+        channels = {}
+        channels.update(_mock_channels(self.module, "adc"))
+        channels.update(_mock_channels(self.module, "dac"))
+        channels.update(_mock_channels(self.module, "marker"))
+        self.qblox_cluster.get_module_channels = unittest.mock.Mock(return_value=(channels, sequencers))
+
+    def test_manager_init_imports_modules(self):
+        """Test that creating a manager imports the vendor modules."""
+        # Act
+        QbloxManager(QMI_Context("import_test"), "manager", self.qblox_cluster, self.module, self.slot)
+        # Assert
+        self.assertIs(sys.modules["qblox_instruments"], qmi.utils.qblox_manager.qblox_instruments)
+        self.assertIs(ChannelTypeStub, qmi.utils.qblox_manager.ChannelType)
+        self.assertIs(ChannelMapCacheStub, qmi.utils.qblox_manager.ChannelMapCache)
+
+    def test_get_channels_without_patching_channel_type(self):
+        """Test getting channels end-to-end, with `ChannelType` coming from the lazy import."""
+        # Arrange
+        channel = 0
+        qrm_manager = QbloxIOManager(QMI_Context("import_test"), "qrm_manager", self.qblox_cluster, self.module, self.slot)
+        qrm_manager.module_func_refs = {
+            "_set_io_channel_config": unittest.mock.Mock(),
+            "_set_sequencer_config": unittest.mock.Mock(),
+            "is_qcm_type": lambda: False,
+            "is_qrm_type": lambda: True,
+            "is_rf_type": lambda: False,
+            "is_qtm_type": lambda: False,
+        }
+        # Act
+        adc_channel = qrm_manager.get_adc_channel(channel)
+        dac_channel = qrm_manager.get_dac_channel(channel)
+        # Assert
+        self.assertIsInstance(adc_channel, QbloxAdcChannel)
+        self.assertIsInstance(dac_channel, QbloxDacChannel)
+        self.assertTrue(self.channel_map_cache.is_connected(ChannelTypeStub.ACQ, channel, channel % 2, channel))
+        self.assertTrue(self.channel_map_cache.is_connected(ChannelTypeStub.AWG, channel, channel % 2, channel))
 
 
 class QbloxNativeManagerClassTestCase(unittest.TestCase):
@@ -420,10 +506,9 @@ class QbloxNativeQrmManagerClassTestCase(unittest.TestCase):
         qrm_manager.module_func_refs["is_qtm_type"] = lambda: False
         expected_call = [unittest.mock.call(channel, {"awg": {}, "acq": {}})]
         # Act
-        with unittest.mock.patch("qmi.utils.qblox_manager.ChannelType", ChannelTypeStub):
-            adc_channel = qrm_manager.get_adc_channel(channel)
-            dac_channel = qrm_manager.get_dac_channel(channel)
-            mrk_channel = qrm_manager.get_marker_channel(channel)
+        adc_channel = qrm_manager.get_adc_channel(channel)
+        dac_channel = qrm_manager.get_dac_channel(channel)
+        mrk_channel = qrm_manager.get_marker_channel(channel)
 
         # Assert
         self.assertIsInstance(adc_channel, QbloxAdcChannel)
@@ -501,10 +586,9 @@ class QbloxQcodesQrmManagerClassTestCase(unittest.TestCase):
         qrm_manager.module_func_refs["is_qtm_type"] = lambda: False
         expected_call = [unittest.mock.call(channel, {"awg": {}, "acq": {}})]
 
-        with unittest.mock.patch("qmi.utils.qblox_manager.ChannelType", ChannelTypeStub):
-            adc_channel = qrm_manager.get_adc_channel(channel)
-            dac_channel = qrm_manager.get_dac_channel(channel)
-            mrk_channel = qrm_manager.get_marker_channel(channel)
+        adc_channel = qrm_manager.get_adc_channel(channel)
+        dac_channel = qrm_manager.get_dac_channel(channel)
+        mrk_channel = qrm_manager.get_marker_channel(channel)
 
         self.assertIsInstance(adc_channel, QbloxAdcChannel)
         self.assertIsInstance(dac_channel, QbloxDacChannel)
@@ -633,7 +717,6 @@ class QbloxQcmDacMarkerClassTestCase(unittest.TestCase):
     def _sequencer_config_val_getter(self, s, d):
         return self.sequencers[f"sequencer{s}"][d[0]][0][d[1]][d[2]]
 
-    @unittest.mock.patch("qmi.utils.qblox_manager.ChannelType", ChannelTypeStub)
     def setUp(self) -> None:
         self.module = "QCM"
         self.slot = 1
@@ -897,7 +980,6 @@ class QbloxQcmRfDacClassTestCase(unittest.TestCase):
     def _set_output(self, val):
         self.output = val
 
-    @unittest.mock.patch("qmi.utils.qblox_manager.ChannelType", ChannelTypeStub)
     def setUp(self) -> None:
         module = "QCM-RF"
         slot = 2
@@ -1125,7 +1207,6 @@ class QbloxQrmAdcClassTestCase(unittest.TestCase):
     def _mrk_inv_en(self, en):
         self._inv_en = en
 
-    @unittest.mock.patch("qmi.utils.qblox_manager.ChannelType", ChannelTypeStub)
     def setUp(self) -> None:
         self.channel = 1
         self.module = "QRM"
