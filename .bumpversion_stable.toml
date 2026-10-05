@@ -37,3 +37,8 @@ replace = "main"
 
 [[tool.bumpversion.files]]
 filename = "pyproject.toml"
+
+[[tool.bumpversion.files]]
+filename = "CITATION.cff"
+search = "v{current_version}"
+replace = "v{new_version}"
