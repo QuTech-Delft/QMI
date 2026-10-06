@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.55.0-beta.0] - Unreleased
 
 ### Fixed
+- `RpcInterfaceDescriptor` in `qmi.core.rpc` now accepts descriptors with 6 fields, as sent by peer contexts running a QMI version before 0.54.0. The `properties` field added in 0.54.0 is set to an empty list for such descriptors, so that services of older QMI versions can be reached again (issue #232).
 - In `tests/instruments/thorlabs/test_tsp01b.py`, the cleanup of possibly earlier mocked `usb.core` and `usb.util` modules from `sys.modules` now checks the presence of `usb.util` separately, instead of deleting it unconditionally whenever `usb.core` was present.
 - `QbloxManager.__init__` now calls `_import_modules()`, so the lazily-imported `qblox_instruments` vendor module, `ChannelType` and `ChannelMapCache` are available as soon as a manager is created, instead of remaining `None` and raising errors on first use.
 - `.bumpversion_stable.toml`, used to prepare a patch release on a stable branch: the `CHANGELOG.md` entry now searches for the literal `[VERSION] - Unreleased` placeholder instead of `[{current_version}] - Unreleased`, the `pyproject.toml` entry now uses a plain version bump instead of an invalid `search`/`replace` pair, and a `CITATION.cff` entry was added so it gets bumped too.
