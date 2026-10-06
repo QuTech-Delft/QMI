@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In `tests/instruments/thorlabs/test_tsp01b.py`, the cleanup of possibly earlier mocked `usb.core` and `usb.util` modules from `sys.modules` now checks the presence of `usb.util` separately, instead of deleting it unconditionally whenever `usb.core` was present.
 - `QbloxManager.__init__` now calls `_import_modules()`, so the lazily-imported `qblox_instruments` vendor module, `ChannelType` and `ChannelMapCache` are available as soon as a manager is created, instead of remaining `None` and raising errors on first use.
 - `.bumpversion_stable.toml`, used to prepare a patch release on a stable branch: the `CHANGELOG.md` entry now searches for the literal `[VERSION] - Unreleased` placeholder instead of `[{current_version}] - Unreleased`, the `pyproject.toml` entry now uses a plain version bump instead of an invalid `search`/`replace` pair, and a `CITATION.cff` entry was added so it gets bumped too.
+- Randomly failing `test_pending_events_limit` in `tests/instruments/picoquant/test_hydraharp_event_processing.py`: the test reused and `clear()`-ed a single `threading.Event` across three successive measurement phases while repatching the mocked `ReadFiFo` side effect. The background fetch thread could re-set that shared event from a stale, already-exhausted FIFO stream right after it was cleared but before the new measurement's data had been processed, causing an intermittent `AssertionError`. Each phase now uses its own dedicated event instead.
 
 ## [0.54.0] - 2026-10-02
 
