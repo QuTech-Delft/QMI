@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - In `tests/instruments/thorlabs/test_tsp01b.py`, the cleanup of possibly earlier mocked `usb.core` and `usb.util` modules from `sys.modules` now checks the presence of `usb.util` separately, instead of deleting it unconditionally whenever `usb.core` was present.
+- `QbloxManager.__init__` now calls `_import_modules()`, so the lazily-imported `qblox_instruments` vendor module, `ChannelType` and `ChannelMapCache` are available as soon as a manager is created, instead of remaining `None` and raising errors on first use.
 - `.bumpversion_stable.toml`, used to prepare a patch release on a stable branch: the `CHANGELOG.md` entry now searches for the literal `[VERSION] - Unreleased` placeholder instead of `[{current_version}] - Unreleased`, the `pyproject.toml` entry now uses a plain version bump instead of an invalid `search`/`replace` pair, and a `CITATION.cff` entry was added so it gets bumped too.
 
 ## [0.54.0] - 2026-10-02
