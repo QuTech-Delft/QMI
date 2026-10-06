@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.54.2-beta.0] - Unreleased
+
+### Fixed
+- Fixing the issue with communication with scripts to older QMI services by allowing 6- and 7-field `RpcInterfaceDescriptors`. The new field `properties` will be set as an empty list when obtaining communication from services of older QMI versions. 
+
 ## [0.54.1] - 2026-10-05
 
 ### Fixed
