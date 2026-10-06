@@ -7,7 +7,7 @@ import os
 import atexit
 
 
-__version__ = "0.54.2-beta.0"
+__version__ = "0.54.2"
 
 
 # Check Python version.
