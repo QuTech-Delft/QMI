@@ -640,7 +640,6 @@ class TestHydraHarpEventFilter(unittest.TestCase):
 
         # Wait to make sure all queued events are processed.
         done_event.wait()
-        done_event.clear()
 
         # Fetch the events queued so far.
         events = self._hydraharp.get_events()
@@ -659,24 +658,29 @@ class TestHydraHarpEventFilter(unittest.TestCase):
 
         # Repatch the readFifo() function to feed the new events into the running measurement.
         # This should/will cause the pending event buffer to overflow.
+        # Use a fresh event here (instead of reusing and clearing `done_event`): the background fetch
+        # thread keeps calling the old (exhausted) ReadFiFo side effect until it is replaced below, and
+        # that stale call can re-set a reused event right after it is cleared, causing `wait()` further
+        # down to return before the new data has actually been processed.
         more_fifo_words_in = events_to_fifo(more_events_in, sync_period, resolution.value)
-        self._library_mock.ReadFiFo.side_effect = make_patched_read_fifo(more_fifo_words_in, done_event)
+        overflow_done_event = threading.Event()
+        self._library_mock.ReadFiFo.side_effect = make_patched_read_fifo(more_fifo_words_in, overflow_done_event)
         # Wait to make sure all queued events are processed.
-        done_event.wait()
+        overflow_done_event.wait()
 
         # Try to fetch events. This should raise an exception as a result of the overflow.
         with self.assertRaises(QMI_RuntimeException):
             _ = self._hydraharp.get_events()
 
         # Stop the measurement.
-        done_event.clear()
         self._hydraharp.stop_measurement()
 
         # Generate new events to check that a subsequent measurement runs cleanly after overflow.
         events_in = gen_events(max_events, sync_period)
 
         fifo_words_in = events_to_fifo(events_in, sync_period, resolution.value)
-        self._library_mock.ReadFiFo.side_effect = make_patched_read_fifo(fifo_words_in, done_event)
+        restart_done_event = threading.Event()
+        self._library_mock.ReadFiFo.side_effect = make_patched_read_fifo(fifo_words_in, restart_done_event)
 
         # Start the measurement.
         sync_rate = ctypes.c_int(int(self.SYNC_FREQUENCY_32MHz))  # Redefine this as otherwise it gets corrupted
@@ -684,7 +688,7 @@ class TestHydraHarpEventFilter(unittest.TestCase):
             self._hydraharp.start_measurement(1000)
 
         # Wait to make sure all queued events are processed.
-        done_event.wait()
+        restart_done_event.wait()
 
         # Fetch the events queued so far.
         events = self._hydraharp.get_events()
