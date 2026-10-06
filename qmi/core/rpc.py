@@ -264,11 +264,26 @@ class RpcSignalDescriptor(NamedTuple):
     arg_types: str
 
 
-class RpcInterfaceDescriptor(NamedTuple):
+class _RpcInterfaceDescriptorFields(NamedTuple):
+    """Field definitions of `RpcInterfaceDescriptor`. Do not use directly."""
+    rpc_class_module: str
+    rpc_class_name: str
+    rpc_class_docstring: str | None
+    constants: list[RpcConstantDescriptor]
+    properties: list[RpcPropertyDescriptor]
+    methods: list[RpcMethodDescriptor]
+    signals: list[RpcSignalDescriptor]
+
+
+class RpcInterfaceDescriptor(_RpcInterfaceDescriptorFields):
     """Description of the subset of the interface of an RPC object class that
     can be accessed via RPC. This includes the methods marked using the
     `@rpc_method` decorator and the signals declared by the RPC object class or
     a delegate class.
+
+    The `properties` field was added in QMI 0.54.0. Peer contexts running an older QMI version send
+    descriptors without it. To stay compatible, such descriptors are accepted and get an empty
+    `properties` list.
 
     Attributes:
         rpc_class_module:    Name of the module in which the RPC object class was defined.
@@ -283,15 +298,19 @@ class RpcInterfaceDescriptor(NamedTuple):
         signals:             A list of signal descriptors for the signals declared by the
                              RPC object class or a delegate class.
     """
-    rpc_class_module: str
-    rpc_class_name: str
-    rpc_class_docstring: str | None
-    constants: list[RpcConstantDescriptor]
-    properties: list[RpcPropertyDescriptor]
-    methods: list[RpcMethodDescriptor]
-    signals: list[RpcSignalDescriptor]
+    __slots__ = ()
 
+    # Number of positional fields in descriptors from QMI versions before 0.54.0.
+    _NUM_FIELDS_WITHOUT_PROPERTIES = 6
 
+    def __new__(cls, *args: Any, **kwargs: Any) -> "RpcInterfaceDescriptor":
+        # Unpickling calls __new__ with the stored fields as positional arguments. Insert an
+        # empty properties list if the descriptor comes from a QMI version that has no properties.
+        if len(args) == cls._NUM_FIELDS_WITHOUT_PROPERTIES and not kwargs:
+            args = args[:4] + ([],) + args[4:]
+        return super().__new__(cls, *args, **kwargs)
+    
+    
 class RpcObjectDescriptor(NamedTuple):
     """Description of an RPC object instance.
 
