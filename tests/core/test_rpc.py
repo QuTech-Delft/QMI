@@ -3,6 +3,7 @@
 import inspect
 import logging
 import math
+import pickle
 from threading import Timer
 import time
 from typing import NamedTuple
@@ -17,7 +18,7 @@ from qmi.core.exceptions import (
 )
 from qmi.core.rpc import (
     QMI_RpcObject, QMI_RpcTimeoutException, QMI_RpcFuture, QMI_RpcProxy, QMI_RpcNonBlockingProxy,
-    RpcConstantDescriptor, rpc_method, is_rpc_method
+    RpcConstantDescriptor, RpcInterfaceDescriptor, rpc_method, is_rpc_method
 )
 from qmi.core.pubsub import QMI_Signal
 
@@ -156,6 +157,24 @@ class TestRpcProxy(unittest.TestCase):
         with self.assertRaises((AttributeError, TypeError)):  # TypeError as no __enter__ and __exit__ present
             with QMI_RpcNonBlockingProxy(QMI_Context("test_rpcproxy"), ProxyDescriptor()):
                 pass
+
+    def test_unpickle_descriptor_without_properties(self):
+        """A descriptor from a QMI version before 0.54.0 (no properties field) unpickles with empty properties."""
+        # Arrange
+        old_fields = ("mod", "Cls", "doc", ["const"], ["meth"], ["sig"])
+        old_pickle = pickle.dumps(tuple.__new__(RpcInterfaceDescriptor, old_fields))
+        # Act
+        descriptor = pickle.loads(old_pickle)
+        # Assert
+        self.assertEqual([], descriptor.properties)
+        self.assertEqual(["const"], descriptor.constants)
+        self.assertEqual(["meth"], descriptor.methods)
+        self.assertEqual(["sig"], descriptor.signals)
+
+    def test_pickle_round_trip_with_properties(self):
+        """A current descriptor survives a pickle round trip unchanged."""
+        descriptor = RpcInterfaceDescriptor("mod", "Cls", None, [], ["prop"], ["meth"], ["sig"])
+        self.assertEqual(descriptor, pickle.loads(pickle.dumps(descriptor)))
 
 
 class TestRPC(unittest.TestCase):
