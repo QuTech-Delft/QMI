@@ -16,10 +16,20 @@ start (and later stop) the service with `qmi_proc`, run from the repository root
 Or run it directly, also from the repository root::
 
   python -m examples.noisy_sine_generator.noisy_sine_generator_service --config=examples/noisy_sine_generator/qmi.conf
+
+The `nsg_service` context in `qmi.conf` starts this module via `program_args` containing a
+`{config_dir}` placeholder (since `qmi_proc` passes `program_args` to `subprocess.Popen` literally,
+without QMI variable substitution). When starting the service this way, set the `CONFIG_DIR`
+environment variable to point to the `examples/noisy_sine_generator` folder, so the placeholder can
+be resolved::
+
+  export CONFIG_DIR=examples/noisy_sine_generator
+  qmi_proc start nsg_service
 """
 
 import argparse
 import logging
+import os
 import sys
 
 import qmi
@@ -48,6 +58,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--config", action="store", type=str, default="",
                         help="specify the QMI configuration file")
     return parser.parse_args(argv)
+
+
+def resolve_config_path(config: str) -> str:
+    """Resolve the value of the `--config` argument.
+
+    `qmi_proc` passes `program_args` to `subprocess.Popen` literally, without any shell or QMI
+    variable substitution. So a `{config_dir}` placeholder embedded in `program_args` is resolved
+    here instead, via the `CONFIG_DIR` environment variable.
+
+    Parameters:
+        config: Raw value of the `--config` argument, possibly quoted and/or containing the
+            `{config_dir}` placeholder.
+
+    Returns:
+        Resolved configuration file path.
+    """
+    resolved = config.strip("'\"")
+    if "{config_dir}" in resolved:
+        if "CONFIG_DIR" not in os.environ:
+            sys.exit("The '{config_dir}' placeholder is used in --config, but the CONFIG_DIR "
+                      "environment variable is not set.")
+        resolved = os.path.expandvars(resolved.replace("{config_dir}", "${CONFIG_DIR}"))
+    return resolved
 
 
 def main(config: str) -> int:
@@ -102,4 +135,4 @@ def main(config: str) -> int:
 
 if __name__ == "__main__":
     args = parse_args()
-    sys.exit(main(args.config))
+    sys.exit(main(resolve_config_path(args.config)))
