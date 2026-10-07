@@ -1,11 +1,23 @@
 #! /usr/bin/env python
 
+"""Client for the noisy sine generator example.
+
+This script starts the `nsg_client` QMI context and connects to the `nsg_server` and
+`nsg_service` contexts to show the instrument and task interfaces that they provide.
+
+Point the `QMI_CONFIG` environment variable to `examples/noisy_sine_generator/qmi.conf`
+before running this script, with `nsg_server` and `nsg_service` already running::
+
+  export QMI_CONFIG=examples/noisy_sine_generator/qmi.conf
+  python examples/noisy_sine_generator/noisy_sine_generator_client.py
+"""
+
 import qmi
 
 from qmi.core.pubsub import QMI_SignalReceiver
 from qmi.utils.context_managers import start_stop
 
-with qmi.start("nsg_client", "qmi.conf"):
+with start_stop(qmi, "nsg_client"):
 
     qmi.show_contexts()
     qmi.show_rpc_objects()

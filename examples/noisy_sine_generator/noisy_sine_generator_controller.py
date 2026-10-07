@@ -2,6 +2,7 @@
 Controller task for NSG.
 """
 
+import logging
 import time
 from typing import NamedTuple
 
@@ -9,6 +10,9 @@ from qmi.core.exceptions import QMI_Exception, QMI_TaskStopException
 from qmi.core.task import QMI_Task, QMI_TaskRunner
 from qmi.core.pubsub import QMI_Signal
 from qmi.instruments.dummy.noisy_sine_generator import NoisySineGenerator
+
+# Global variable holding the logger for this module.
+_logger = logging.getLogger(__name__)
 
 
 class NoisySineGeneratorSettings(NamedTuple):
@@ -71,12 +75,14 @@ class NoisySineGeneratorController(QMI_Task):
 
     def run(self) -> None:
         """Main loop."""
-        # Configure the device.
-        self._config_nsg()
-
-        # Start the sampling loop.
-        t_start = time.monotonic()
+        # Open the instrument before use; it is closed again in the `finally` block below.
+        self._nsg.open()
         try:
+            # Configure the device.
+            self._config_nsg()
+
+            # Start the sampling loop.
+            t_start = time.monotonic()
             # `stop_requested()` will return True if the task should stop (e.g. when context is torn down).
             while not self.stop_requested():
 
@@ -105,10 +111,11 @@ class NoisySineGeneratorController(QMI_Task):
             # Do nothing, this is expected when the task is stopped while it is sleeping.
             pass
 
-        except QMI_Exception:
-            # Unexpected exceptions are re-raised.
+        except QMI_Exception as exc:
+            # Log unexpected exceptions before they are re-raised.
+            _logger.exception("Unexpected error in %s: %s", type(self).__name__, exc)
             raise
 
         finally:
-            # Clean-up code goes here.
-            pass
+            # Always close the instrument again.
+            self._nsg.close()
