@@ -68,19 +68,18 @@ def resolve_config_path(config: str) -> str:
     here instead, via the `CONFIG_DIR` environment variable.
 
     Parameters:
-        config: Raw value of the `--config` argument, possibly quoted and/or containing the
-            `{config_dir}` placeholder.
+        config: Raw value of the `--config` argument, possibly containing the `{config_dir}`
+            placeholder.
 
     Returns:
         Resolved configuration file path.
     """
-    resolved = config.strip("'\"")
-    if "{config_dir}" in resolved:
+    if "{config_dir}" in config:
         if "CONFIG_DIR" not in os.environ:
             sys.exit("The '{config_dir}' placeholder is used in --config, but the CONFIG_DIR "
                       "environment variable is not set.")
-        resolved = os.path.expandvars(resolved.replace("{config_dir}", "${CONFIG_DIR}"))
-    return resolved
+        return os.path.expandvars(config.replace("{config_dir}", "${config_dir}"))
+    return config
 
 
 def main(config: str) -> int:
