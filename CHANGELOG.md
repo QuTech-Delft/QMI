@@ -6,7 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.55.0-beta.0] - Unreleased
 
+### Added
+- `qmi.core.logging_init.stop_logging()`, which undoes `start_logging()`: it removes the QMI console and file log handlers, restores the original `sys.excepthook`, and switches off `logging.captureWarnings()`. `qmi.stop()` now calls it automatically when the matching `qmi.start()` initialized logging.
+
 ### Fixed
+- `qmi.core.logging_init.start_logging()` used `logging.basicConfig()` to install the console log handler. `basicConfig()` silently does nothing once the root logger already has handlers, so a second call (for example a new `qmi.start()` after `qmi.stop()`, with a changed `console_loglevel` in `qmi.conf`) had no effect. The console handler is now tracked explicitly, like the file handler, and is replaced via `logging.getLogger().addHandler()` on every call.
 - In `tests/instruments/thorlabs/test_tsp01b.py`, the cleanup of possibly earlier mocked `usb.core` and `usb.util` modules from `sys.modules` now checks the presence of `usb.util` separately, instead of deleting it unconditionally whenever `usb.core` was present.
 - `QbloxManager.__init__` now calls `_import_modules()`, so the lazily-imported `qblox_instruments` vendor module, `ChannelType` and `ChannelMapCache` are available as soon as a manager is created, instead of remaining `None` and raising errors on first use.
 - `.bumpversion_stable.toml`, used to prepare a patch release on a stable branch: the `CHANGELOG.md` entry now searches for the literal `[VERSION] - Unreleased` placeholder instead of `[{current_version}] - Unreleased`, the `pyproject.toml` entry now uses a plain version bump instead of an invalid `search`/`replace` pair, and a `CITATION.cff` entry was added so it gets bumped too.
