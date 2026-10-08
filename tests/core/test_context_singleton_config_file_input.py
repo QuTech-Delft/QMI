@@ -17,6 +17,7 @@ os.environ["QMI_CONFIG"] = qmi_config_path
 import qmi
 import qmi.core.context_singleton
 import qmi.core.exceptions
+import qmi.core.logging_init
 
 QMI_ENV_CONFIG_FILE_PRESENT = False
 QMI_ENV_CONFIG_FILE = os.path.join(str(os.getenv("QMI_CONFIG")), "qmi.conf")
@@ -185,6 +186,50 @@ class TestContextConfigFileInputs(unittest.TestCase):
         context: QMI_Context = qmi.context()
 
         self.assertEqual(context._config, CfgQmi())
+
+    def test_08_start_stop_removes_qmi_log_handlers(self):
+        # Check that qmi.start() installs QMI log handlers, a second qmi.start()/qmi.stop() cycle
+        # replaces them (instead of silently keeping the old ones), and qmi.stop() removes them again.
+        qmi.core.context_singleton.QMI_CONFIG = None
+
+        qmi.start(self.ctx_name, console_loglevel="DEBUG")
+        first_console_handler = qmi.core.logging_init._console_handler
+        self.assertIsNotNone(first_console_handler)
+        self.assertIn(first_console_handler, logging.getLogger().handlers)
+        self.assertEqual(logging.DEBUG, first_console_handler.level)
+
+        qmi.stop()
+
+        self.assertIsNone(qmi.core.logging_init._console_handler)
+        self.assertNotIn(first_console_handler, logging.getLogger().handlers)
+
+        # A following start with a different console_loglevel must take effect.
+        qmi.start(self.ctx_name, console_loglevel="ERROR")
+        second_console_handler = qmi.core.logging_init._console_handler
+        self.assertIsNot(first_console_handler, second_console_handler)
+        self.assertEqual(logging.ERROR, second_console_handler.level)
+
+        qmi.stop()
+        self.assertIsNone(qmi.core.logging_init._console_handler)
+
+    def test_09_init_logging_false_does_not_touch_user_handlers(self):
+        # Check that qmi.start(init_logging=False) does not set up QMI log handlers, and that a following
+        # qmi.stop() does not remove log handlers that the user added themselves.
+        qmi.core.context_singleton.QMI_CONFIG = None
+
+        user_handler = logging.StreamHandler()
+        logging.getLogger().addHandler(user_handler)
+        try:
+            qmi.start(self.ctx_name, init_logging=False)
+            self.assertIsNone(qmi.core.logging_init._console_handler)
+            self.assertIsNone(qmi.core.logging_init._file_handler)
+
+            qmi.stop()
+
+            self.assertIn(user_handler, logging.getLogger().handlers)
+        finally:
+            logging.getLogger().removeHandler(user_handler)
+            user_handler.close()
 
 
 class TestContextOptionalConfigInputs(unittest.TestCase):

@@ -37,6 +37,9 @@ from qmi.core.util import format_address_and_port
 # Global variable holding the current QMI_Context instance.
 _qmi_context: QMI_Context | None = None
 
+# Global variable recording whether the current context's start() call initialized logging.
+_logging_initialized: bool = False
+
 # Global variable holding the logger for this module.
 _logger = logging.getLogger(__name__)
 
@@ -103,7 +106,10 @@ def start(
     Parameters:
         context_name:     Name of the QMI context.
         config_file:      Optional path to the QMI configuration file.
-        init_logging:     Optional flag; set False to skip logging initialization.
+        init_logging:     Optional flag; set False to skip logging initialization. Note that, even with
+                          `init_logging=False`, Python's default fallback behaviour still prints messages of
+                          level WARNING and higher to `stderr` if the application configures no handlers of
+                          its own.
         console_loglevel: Optionally override `console_loglevel` from config file.
         context_cfg:      Optionally insert or override context(s) in config.contexts.
 
@@ -112,6 +118,7 @@ def start(
     """
 
     global _qmi_context  # noqa: PLW0603
+    global _logging_initialized  # noqa: PLW0603
 
     qmi.core.thread.check_in_main_thread()
 
@@ -140,6 +147,7 @@ def start(
     _qmi_context = QMI_Context(context_name, config)
     _qmi_context.register_stop_handler(_clear_global_context)
 
+    _logging_initialized = init_logging
     if init_logging:
         _init_logging()
 
@@ -263,12 +271,20 @@ def stop() -> None:
     Raises:
         QMI_NoActiveContextException: If there is no active QMI context present.
     """
+    global _logging_initialized  # noqa: PLW0603
+
     qmi.core.thread.check_in_main_thread()
 
     if _qmi_context is None:
         raise QMI_NoActiveContextException()
 
     _qmi_context.stop()
+
+    # Undo logging setup made by the matching start(), but leave logging that the user set up themselves
+    # (init_logging=False) untouched.
+    if _logging_initialized:
+        qmi.core.logging_init.stop_logging()
+        _logging_initialized = False
 
 
 def _clear_global_context() -> None:

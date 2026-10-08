@@ -7,13 +7,15 @@ from collections import namedtuple
 from time import monotonic, sleep
 
 import qmi.core.logging_init
-from qmi.core.logging_init import start_logging, WatchedRotatingFileHandler, _RateLimitFilter, _log_excepthook
+from qmi.core.logging_init import start_logging, stop_logging, WatchedRotatingFileHandler, _RateLimitFilter, \
+    _log_excepthook
 
 
 class TestStartLoggingOptions(unittest.TestCase):
 
     def setUp(self):
         qmi.core.logging_init._file_handler = None
+        qmi.core.logging_init._console_handler = None
         self.logfile = "log.file"
         self.log_dir = ""
 
@@ -38,15 +40,18 @@ class TestStartLoggingOptions(unittest.TestCase):
         start_logging()
         # Assert
         logging_patch.getLogger.assert_has_calls([unittest.mock.call().setLevel(logging.INFO)], any_order=True)
-        self.assertEqual(2, logging_patch.getLogger.call_count)
+        # 3 calls: _remove_handlers() removeHandler on the old file handler, setLevel(), and addHandler()
+        # for the new console handler.
+        self.assertEqual(3, logging_patch.getLogger.call_count)
 
         logging_patch.StreamHandler.assert_called_once()
         logging_patch.StreamHandler.assert_has_calls([unittest.mock.call().setLevel(logging.WARNING)])
 
-        logging_patch.basicConfig.assert_called_once()
+        # basicConfig() is no longer used: the console handler is added explicitly instead.
+        logging_patch.basicConfig.assert_not_called()
+        logging_patch.getLogger().addHandler.assert_called_once_with(qmi.core.logging_init._console_handler)
 
         logging_patch.handlers.WatchedRotatingFileHandler.assert_not_called()
-        logging_patch.getLogger().addHandler.assert_not_called()
 
         logging_patch.captureWarnings.assert_called_with(True)
 
@@ -68,7 +73,9 @@ class TestStartLoggingOptions(unittest.TestCase):
         # Act
         start_logging(logfile=logfile, loglevels=loglevels)
         # Assert
-        self.assertEqual(4, logging_patch.getLogger.call_count)
+        # 5 calls: setLevel(), addHandler() for the console handler, addHandler() for the file handler,
+        # and setLevel() for each of the two loggers in `loglevels`.
+        self.assertEqual(5, logging_patch.getLogger.call_count)
         logging_patch.getLogger.assert_has_calls([
             unittest.mock.call(), unittest.mock.call().setLevel(logging.INFO),
             unittest.mock.call("logger1"), unittest.mock.call("logger2"),
@@ -79,13 +86,19 @@ class TestStartLoggingOptions(unittest.TestCase):
         logging_patch.StreamHandler.assert_called_once()
         logging_patch.StreamHandler.assert_has_calls([unittest.mock.call().setLevel(logging.WARNING)])
 
-        logging_patch.basicConfig.assert_called_once()
+        # basicConfig() is no longer used: the console handler is added explicitly instead.
+        logging_patch.basicConfig.assert_not_called()
 
         self.assertIsInstance(qmi.core.logging_init._file_handler, WatchedRotatingFileHandler)
         self.assertTrue(qmi.core.logging_init._file_handler.baseFilename.endswith(self.logfile))
         self.assertEqual(expected_max_bytes, qmi.core.logging_init._file_handler.maxBytes)
         self.assertEqual(expected_backup_count, qmi.core.logging_init._file_handler.backupCount)
-        logging_patch.getLogger().addHandler.assert_called_once()
+        # Console handler and file handler are both added explicitly.
+        logging_patch.getLogger().addHandler.assert_has_calls([
+            unittest.mock.call(qmi.core.logging_init._console_handler),
+            unittest.mock.call(qmi.core.logging_init._file_handler),
+        ], any_order=True)
+        self.assertEqual(2, logging_patch.getLogger().addHandler.call_count)
 
         logging_patch.captureWarnings.assert_called_with(True)
 
@@ -107,16 +120,18 @@ class TestStartLoggingOptions(unittest.TestCase):
             start_logging(logfile=logfile, rate_limit=rate_limit, burst_limit=burst_limit)
 
         # Assert
-        self.assertEqual(2, logging_patch.getLogger.call_count)
+        # 3 calls: setLevel(), addHandler() for the console handler, and addHandler() for the file handler.
+        self.assertEqual(3, logging_patch.getLogger.call_count)
         logging_patch.getLogger.assert_has_calls([unittest.mock.call(), unittest.mock.call().setLevel(logging.INFO)])
 
         logging_patch.StreamHandler.assert_called_once()
         logging_patch.StreamHandler.assert_has_calls([unittest.mock.call().setLevel(logging.WARNING)])
 
-        logging_patch.basicConfig.assert_called_once()
+        # basicConfig() is no longer used: the console handler is added explicitly instead.
+        logging_patch.basicConfig.assert_not_called()
 
         self.assertIsInstance(qmi.core.logging_init._file_handler, WatchedRotatingFileHandler)
-        logging_patch.getLogger().addHandler.assert_called_once()
+        self.assertEqual(2, logging_patch.getLogger().addHandler.call_count)
 
         rlf_patch.assert_called_once_with(rate_limit, burst_limit)
 
@@ -140,16 +155,18 @@ class TestStartLoggingOptions(unittest.TestCase):
             start_logging(logfile=logfile, rate_limit=rate_limit, burst_limit=burst_limit)
 
         # Assert
-        self.assertEqual(2, logging_patch.getLogger.call_count)
+        # 3 calls: setLevel(), addHandler() for the console handler, and addHandler() for the file handler.
+        self.assertEqual(3, logging_patch.getLogger.call_count)
         logging_patch.getLogger.assert_has_calls([unittest.mock.call(), unittest.mock.call().setLevel(logging.INFO)])
 
         logging_patch.StreamHandler.assert_called_once()
         logging_patch.StreamHandler.assert_has_calls([unittest.mock.call().setLevel(logging.WARNING)])
 
-        logging_patch.basicConfig.assert_called_once()
+        # basicConfig() is no longer used: the console handler is added explicitly instead.
+        logging_patch.basicConfig.assert_not_called()
 
         self.assertIsInstance(qmi.core.logging_init._file_handler, WatchedRotatingFileHandler)
-        logging_patch.getLogger().addHandler.assert_called_once()
+        self.assertEqual(2, logging_patch.getLogger().addHandler.call_count)
 
         rlf_patch.assert_called_once_with(rate_limit, burst_limit)
 
@@ -281,6 +298,85 @@ class TestStartLoggingOptions(unittest.TestCase):
             size_total += os.path.getsize(os.path.join(self.log_dir, lf))
 
         self.assertLessEqual(size_total, max_log_size * (backups + 1))
+
+
+class TestStartStopLogging(unittest.TestCase):
+    """Test start_logging()/stop_logging() against the real logging module, without mocking.
+
+    These tests confirm the behaviour requested in issue #237: a second call to start_logging() must replace
+    the console handler (and thus apply a new console_loglevel) instead of being silently ignored, and
+    stop_logging() must undo everything start_logging() set up.
+    """
+
+    def setUp(self):
+        qmi.core.logging_init._file_handler = None
+        qmi.core.logging_init._console_handler = None
+        self._original_except_hook = sys.excepthook
+
+    def tearDown(self):
+        stop_logging()
+        logging.shutdown()
+        sys.excepthook = self._original_except_hook
+        qmi.core.logging_init._saved_except_hook = None
+
+    def _qmi_console_handlers(self):
+        return [
+            hdlr for hdlr in logging.getLogger().handlers
+            if hdlr is qmi.core.logging_init._console_handler
+        ]
+
+    def test_second_start_logging_replaces_console_handler(self):
+        """A second call to start_logging() with a different console_loglevel must take effect."""
+        # Act
+        start_logging(console_loglevel=logging.WARNING)
+        first_handler = qmi.core.logging_init._console_handler
+        start_logging(console_loglevel=logging.DEBUG)
+        second_handler = qmi.core.logging_init._console_handler
+
+        # Assert: exactly one QMI console handler remains, and it is the newest one.
+        self.assertIsNot(first_handler, second_handler)
+        self.assertEqual([second_handler], self._qmi_console_handlers())
+        self.assertEqual(logging.DEBUG, second_handler.level)
+
+    def test_stop_logging_removes_handlers_and_restores_excepthook(self):
+        """stop_logging() removes the QMI handlers and restores the original excepthook."""
+        # Arrange
+        logfile = os.path.join(os.path.expanduser("~"), "stop_logging_test.log")
+        original_hook = sys.excepthook
+        # Act
+        start_logging(logfile=logfile)
+        console_handler = qmi.core.logging_init._console_handler
+        file_handler = qmi.core.logging_init._file_handler
+        self.assertIn(console_handler, logging.getLogger().handlers)
+        self.assertIn(file_handler, logging.getLogger().handlers)
+
+        stop_logging()
+
+        # Assert
+        self.assertNotIn(console_handler, logging.getLogger().handlers)
+        self.assertNotIn(file_handler, logging.getLogger().handlers)
+        self.assertIsNone(qmi.core.logging_init._console_handler)
+        self.assertIsNone(qmi.core.logging_init._file_handler)
+        self.assertIs(original_hook, sys.excepthook)
+        self.assertIsNone(qmi.core.logging_init._saved_except_hook)
+
+        if os.path.isfile(logfile):  # The handler uses delay=True, so the file may not have been created.
+            os.remove(logfile)
+
+    def test_stop_logging_does_not_remove_user_handlers(self):
+        """stop_logging() must only remove QMI's own handlers, not ones added by a user."""
+        # Arrange
+        user_handler = logging.StreamHandler()
+        logging.getLogger().addHandler(user_handler)
+        try:
+            start_logging()
+            # Act
+            stop_logging()
+            # Assert
+            self.assertIn(user_handler, logging.getLogger().handlers)
+        finally:
+            logging.getLogger().removeHandler(user_handler)
+            user_handler.close()
 
 
 class Test_RateLimitFilter(unittest.TestCase):

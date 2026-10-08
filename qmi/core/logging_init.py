@@ -43,6 +43,9 @@ from types import TracebackType
 # Global variable holding the file log handler (if any).
 _file_handler: logging.FileHandler | None = None
 
+# Global variable holding the console log handler (if any).
+_console_handler: logging.StreamHandler | None = None
+
 # Global variable holding the saved exception hook.
 _saved_except_hook: Callable | None = None
 
@@ -181,31 +184,24 @@ def start_logging(
         backup_count:     Number of backup files to be used. Default is 5.
     """
 
+    global _console_handler  # noqa: PLW0603
     global _file_handler  # noqa: PLW0603
     global _saved_except_hook  # noqa: PLW0603
 
-    # If there is still an old file log handler, remove it.
-    if _file_handler is not None:
-        logging.getLogger().removeHandler(_file_handler)
-        _file_handler.close()
-        _file_handler = None
+    # If there are still old QMI log handlers, remove them.
+    _remove_handlers()
 
     # Set log level of the root logger.
     logging.getLogger().setLevel(loglevel)
 
-    # Set basic configuration: logging to stderr.
-    hdlr = logging.StreamHandler()
+    # Set up logging to stderr.
+    _console_handler = logging.StreamHandler()
     fmt = _makeLogFormatter(log_process=False)
-    hdlr.setFormatter(fmt)
-    hdlr.setLevel(console_loglevel)
-    logging.basicConfig(handlers=[hdlr])
+    _console_handler.setFormatter(fmt)
+    _console_handler.setLevel(console_loglevel)
+    logging.getLogger().addHandler(_console_handler)
 
     # Create log file handler.
-    # This must be done as a separate step (separate from basicConfig())
-    # because basicConfig() ignores subsequent calls once logging is configured.
-    # However, we must support the case where logging is configured during
-    # early initialization via QMI_DEBUG, then later re-configured to add
-    # a log file after the configuration is processed.
     if logfile:
         # Use the custom WatchedRotatingFileHandler class for logging to file[s].
         # This handler will automatically create or re-open the log file if the underlying
@@ -236,6 +232,40 @@ def start_logging(
     if not sys.warnoptions:
         # Enable all warnings but log only the first occurrence.
         warnings.simplefilter("default")
+
+
+def _remove_handlers() -> None:
+    """Remove and close the QMI console and file log handlers (if any) from the root logger."""
+    global _console_handler  # noqa: PLW0603
+    global _file_handler  # noqa: PLW0603
+
+    for hdlr in (_console_handler, _file_handler):
+        if hdlr is not None:
+            logging.getLogger().removeHandler(hdlr)
+            hdlr.close()
+
+    _console_handler = None
+    _file_handler = None
+
+
+def stop_logging() -> None:
+    """Undo `start_logging()`.
+
+    This removes the QMI console and file log handlers from the root logger, restores the exception hook that
+    was in place before `start_logging()` was called, and switches off capturing of Python warnings through the
+    logging system.
+
+    This function is normally called automatically by `qmi.stop()`.
+    """
+    global _saved_except_hook  # noqa: PLW0603
+
+    _remove_handlers()
+
+    if _saved_except_hook is not None:
+        sys.excepthook = _saved_except_hook
+        _saved_except_hook = None
+
+    logging.captureWarnings(False)
 
 
 def _log_excepthook(
