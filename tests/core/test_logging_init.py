@@ -40,6 +40,9 @@ class TestStartLoggingOptions(unittest.TestCase):
         start_logging()
         # Assert
         logging_patch.getLogger.assert_has_calls([unittest.mock.call().setLevel(logging.INFO)], any_order=True)
+        # 3 calls: _remove_handlers() removeHandler on the old file handler, setLevel(), and addHandler()
+        # for the new console handler.
+        self.assertEqual(3, logging_patch.getLogger.call_count)
 
         logging_patch.StreamHandler.assert_called_once()
         logging_patch.StreamHandler.assert_has_calls([unittest.mock.call().setLevel(logging.WARNING)])
@@ -70,6 +73,9 @@ class TestStartLoggingOptions(unittest.TestCase):
         # Act
         start_logging(logfile=logfile, loglevels=loglevels)
         # Assert
+        # 5 calls: setLevel(), addHandler() for the console handler, addHandler() for the file handler,
+        # and setLevel() for each of the two loggers in `loglevels`.
+        self.assertEqual(5, logging_patch.getLogger.call_count)
         logging_patch.getLogger.assert_has_calls([
             unittest.mock.call(), unittest.mock.call().setLevel(logging.INFO),
             unittest.mock.call("logger1"), unittest.mock.call("logger2"),
@@ -114,6 +120,8 @@ class TestStartLoggingOptions(unittest.TestCase):
             start_logging(logfile=logfile, rate_limit=rate_limit, burst_limit=burst_limit)
 
         # Assert
+        # 3 calls: setLevel(), addHandler() for the console handler, and addHandler() for the file handler.
+        self.assertEqual(3, logging_patch.getLogger.call_count)
         logging_patch.getLogger.assert_has_calls([unittest.mock.call(), unittest.mock.call().setLevel(logging.INFO)])
 
         logging_patch.StreamHandler.assert_called_once()
@@ -147,6 +155,8 @@ class TestStartLoggingOptions(unittest.TestCase):
             start_logging(logfile=logfile, rate_limit=rate_limit, burst_limit=burst_limit)
 
         # Assert
+        # 3 calls: setLevel(), addHandler() for the console handler, and addHandler() for the file handler.
+        self.assertEqual(3, logging_patch.getLogger.call_count)
         logging_patch.getLogger.assert_has_calls([unittest.mock.call(), unittest.mock.call().setLevel(logging.INFO)])
 
         logging_patch.StreamHandler.assert_called_once()
