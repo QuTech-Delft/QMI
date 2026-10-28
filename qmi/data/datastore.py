@@ -250,17 +250,25 @@ class DataFolder:
             if os.path.isfile(file_path):
                 if backend == "h5py":
                     with h5py.File(file_path, "r") as f:
-                        if name not in f:
-                            raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
+                        if name in f:
+                            return qmi.data.dataset.read_dataset_from_hdf5(f[name])
 
-                        return qmi.data.dataset.read_dataset_from_hdf5(f[name])
+                        if f.attrs.get(qmi.data.dataset.QMI_DATASET_NAME) == name:
+                            # Raw layout datasets without axes are stored at the file root.
+                            return qmi.data.dataset.read_dataset_from_hdf5(f)
+
+                        raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
 
                 elif backend == "h5netcdf":
                     with h5netcdf.File(file_path, "r", decode_vlen_strings=False) as f:
-                        if name not in f:
-                            raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
+                        if name in f:
+                            return qmi.data.dataset.read_dataset_from_hdf5(f[name])
 
-                        return qmi.data.dataset.read_dataset_from_hdf5(f[name])
+                        if f.attrs.get(qmi.data.dataset.QMI_DATASET_NAME) == name:
+                            # Raw layout datasets without axes are stored at the file root.
+                            return qmi.data.dataset.read_dataset_from_hdf5(f)
+
+                        raise FileNotFoundError(f"No dataset {name!r} found in {file_path}.")
 
                 else:
                     raise ValueError(f"Invalid backend type {backend}.")

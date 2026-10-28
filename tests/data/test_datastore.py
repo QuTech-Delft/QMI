@@ -10,6 +10,7 @@ import inspect
 import json
 import time
 
+import numpy as np
 from h5py import File
 from h5netcdf import File as NetCdfFile
 
@@ -592,6 +593,42 @@ class TestDataFolder(unittest.TestCase):
                 self.datafolder.add_dataset_to_file(hdf5_file, dataset)
 
                 self.assertEqual(dataset.name, hdf5_file.attrs["QMI_Dataset_name_1"])
+
+        finally:
+            os.remove(expected_file)
+
+    def test_29_read_raw_2d_dataset_without_axes_in_hdf5(self):
+        """A raw 2D dataset without axes is stored at the file root and must be readable by name."""
+        # Arrange
+        expected_dataset = DataSet("raw_2d", data=np.arange(6.0).reshape(3, 2))
+        expected_file = os.path.join(os.getcwd(), expected_dataset.name + ".hdf5")
+        try:
+            self.datafolder.write_dataset(expected_dataset)
+            # Act
+            dataset = self.datafolder.read_dataset(expected_dataset.name)
+            # Assert
+            self.assertEqual(expected_dataset.name, dataset.name)
+            self.assertTrue(dataset.is_raw)
+            np.testing.assert_array_equal(expected_dataset.data, dataset.data)
+
+        finally:
+            os.remove(expected_file)
+
+    def test_29b_read_raw_2d_dataset_without_axes_in_hdf5_h5netcdf_backend(self):
+        """A raw 2D dataset without axes is stored at the file root and must be readable with the h5netcdf
+        backend too.
+        """
+        # Arrange
+        expected_dataset = DataSet("raw_2d_netcdf", data=np.arange(6.0).reshape(3, 2))
+        expected_file = os.path.join(os.getcwd(), expected_dataset.name + ".hdf5")
+        try:
+            self.datafolder.write_dataset(expected_dataset, backend="h5netcdf")
+            # Act
+            dataset = self.datafolder.read_dataset(expected_dataset.name, backend="h5netcdf")
+            # Assert
+            self.assertEqual(expected_dataset.name, dataset.name)
+            self.assertTrue(dataset.is_raw)
+            np.testing.assert_array_equal(expected_dataset.data, dataset.data)
 
         finally:
             os.remove(expected_file)
