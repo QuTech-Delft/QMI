@@ -4,7 +4,7 @@ import json
 import jsonschema
 import logging
 import unittest
-from unittest.mock import call, Mock, ANY, PropertyMock
+from unittest.mock import call, Mock, ANY, PropertyMock, patch
 import warnings
 
 import numpy as np
@@ -1018,8 +1018,15 @@ class TestHDAWG(unittest.TestCase):
         ]
         expected_calls_getdouble = [call("progress"), call("progress")]
 
-        with self.assertRaises(QMI_TimeoutException) as exc:
-            self.hdawg.compile_and_upload(source)
+        # Mock the monotonic clock so that the timeout trip point is deterministic. Relying on real
+        # elapsed wall-clock time together with a mocked `getDouble` progress sequence made this test
+        # flaky: under CI scheduling jitter, `time.sleep` calls could take longer than expected, causing
+        # the timeout to trip one poll iteration earlier than intended and report the wrong progress value.
+        monotonic_values = [0.0, 0.0, 0.0, 0.05, self.hdawg.UPLOAD_TIMEOUT + 0.01]
+        with patch("qmi.instruments.zurich_instruments.hdawg.time.sleep"), \
+                patch("qmi.instruments.zurich_instruments.hdawg.time.monotonic", side_effect=monotonic_values):
+            with self.assertRaises(QMI_TimeoutException) as exc:
+                self.hdawg.compile_and_upload(source)
 
         self.assertEqual(expected_exception, str(exc.exception))
         self._awg_module.awg.raw_module.set.assert_has_calls(expected_calls_set)
