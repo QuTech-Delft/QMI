@@ -119,15 +119,7 @@ class TestKeithleySourcemeter2400(TestCase):
         """Keithley_Sourcemeter2400.open(), happy flow."""
         self._meta.instr.open()
         self._meta.transport.open.assert_called_once_with()
-        self._meta.scpi.write.assert_called_once_with(":FORM:ELEM VOLT")
         self._meta.super().open.assert_called_once_with()
-
-    def test_open_exception(self):
-        """Keithley_Sourcemeter2400.open(), exception on write."""
-        self._meta.scpi.write = MagicMock(side_effect=Exception)
-        with self.assertRaises(Exception):
-            self._meta.instr.open()
-        self._meta.transport.close.assert_called_once_with()
 
     def test_close(self):
         """Keithley_Sourcemeter2400.close(), happy flow."""
@@ -164,7 +156,7 @@ class TestKeithleySourcemeter2400(TestCase):
         self._meta.instr._check_is_open = MagicMock()
         self._meta.scpi.ask = MagicMock(return_value=mock_resp)
         rt_val = self._meta.instr._ask_float(mock_cmd)
-        self._meta.scpi.ask.assert_called_once_with(mock_cmd)
+        self._meta.scpi.ask.assert_called_once_with(mock_cmd, timeout=self._meta.instr.DEFAULT_RESPONSE_TIMEOUT)
         self._meta.instr._check_is_open.assert_called_once_with()
         self.assertEqual(rt_val, float(mock_resp))
 
@@ -176,7 +168,7 @@ class TestKeithleySourcemeter2400(TestCase):
         self._meta.scpi.ask = MagicMock(return_value=mock_resp)
         with self.assertRaises(QMI_InstrumentException):
             self._meta.instr._ask_float(mock_cmd)
-        self._meta.scpi.ask.assert_called_once_with(mock_cmd)
+        self._meta.scpi.ask.assert_called_once_with(mock_cmd, timeout=self._meta.instr.DEFAULT_RESPONSE_TIMEOUT)
         self._meta.instr._check_is_open.assert_called_once_with()
 
     def test_reset(self):

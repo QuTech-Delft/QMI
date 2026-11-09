@@ -100,7 +100,7 @@ class Keithley_Sourcemeter2400(QMI_Instrument):
     def _ask_float(self, cmd: str) -> float:
         """Send a query and return a floating-point response."""
         self._check_is_open()
-        resp = self._scpi_protocol.ask(cmd)
+        resp = self._scpi_protocol.ask(cmd, timeout=self.DEFAULT_RESPONSE_TIMEOUT)
         try:
             return float(resp)
         except ValueError as exc:
@@ -110,13 +110,6 @@ class Keithley_Sourcemeter2400(QMI_Instrument):
     def open(self) -> None:
         _logger.info("[%s] Opening connection to instrument", self._name)
         self._transport.open()
-        try:
-            # Restrict the response of READ?/MEASure queries to the voltage reading only,
-            # so that get_measured_voltage() can parse it unambiguously.
-            self._scpi_protocol.write(":FORM:ELEM VOLT")
-        except Exception:
-            self._transport.close()
-            raise
         super().open()
 
     @rpc_method
