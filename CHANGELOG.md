@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `qmi.core.logging_init.stop_logging()`, which undoes `start_logging()`: it removes the QMI console and file log handlers, restores the original `sys.excepthook`, and switches off `logging.captureWarnings()`. `qmi.stop()` now calls it automatically when the matching `qmi.start()` initialized logging.
+- QMI driver for the Keithley 2400 series SourceMeter, `qmi.instruments.keithley.Keithley_Sourcemeter2400`, supporting GPIB and RS-232 transports. Implements resetting, configuring a fixed voltage or current source, selecting the sense function, reading out the measured voltage, and switching the output on and off.
 
 ### Fixed
 - `qmi.core.logging_init.start_logging()` used `logging.basicConfig()` to install the console log handler. `basicConfig()` silently does nothing once the root logger already has handlers, so a second call (for example a new `qmi.start()` after `qmi.stop()`, with a changed `console_loglevel` in `qmi.conf`) had no effect. The console handler is now tracked explicitly, like the file handler, and is replaced via `logging.getLogger().addHandler()` on every call.
