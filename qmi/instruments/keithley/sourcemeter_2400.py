@@ -26,8 +26,8 @@ class SourceFunction(Enum):
 
 class SenseFunction(Enum):
     """Sense function of the instrument."""
-    VOLTAGE = "VOLT:DC"
-    CURRENT = "CURR:DC"
+    VOLTAGE = "VOLT"
+    CURRENT = "CURR"
 
 
 class Keithley_Sourcemeter2400(QMI_Instrument):
@@ -190,6 +190,7 @@ class Keithley_Sourcemeter2400(QMI_Instrument):
             mode: "FIXED" for fixed-level sourcing mode.
         """
         function = self._validate_function(function)
+        self._check_is_open()
         return self._ask(f":SOUR:{function.value}:MODE?").strip()
 
     @rpc_method
@@ -227,7 +228,7 @@ class Keithley_Sourcemeter2400(QMI_Instrument):
         """Set the (single) sense function.
 
         Parameters:
-            function: Sense function, SenseFunction.VOLTAGE / "VOLT:DC" or SenseFunction.CURRENT / "CURR:DC".
+            function: Sense function, SenseFunction.VOLTAGE / "VOLT" or SenseFunction.CURRENT / "CURR".
         """
         function = function if isinstance(function, SenseFunction) else SenseFunction(function)
         self._check_is_open()
@@ -238,6 +239,10 @@ class Keithley_Sourcemeter2400(QMI_Instrument):
         """Return the currently selected sense function."""
         resp = self._ask(":SENS:FUNC?").strip()
         first = resp.split(",")[0].strip().strip('"').strip("'")
+        # The instrument may report some functions (e.g. "VOLT:DC") with a ":DC" suffix, while others (e.g. a
+        # possible future "RES") do not use this suffix. Strip it before matching against SenseFunction.
+        if first.endswith(":DC"):
+            first = first[:-len(":DC")]
         try:
             return SenseFunction(first)
         except ValueError as exc:

@@ -259,9 +259,11 @@ class TestKeithleySourcemeter2400(TestCase):
     def test_get_function_mode(self):
         """Keithley_Sourcemeter2400.get_function_mode(), happy flow."""
         for function in SourceFunction:
+            self._meta.instr._check_is_open = MagicMock()
             self._meta.instr._ask = MagicMock(return_value="FIXED")
             rt_val = self._meta.instr.get_function_mode(function)
             self._meta.instr._ask.assert_called_once_with(f":SOUR:{function.value}:MODE?")
+            self._meta.instr._check_is_open.assert_called_once_with()
             self.assertEqual(rt_val, "FIXED")
 
     def test_set_source_voltage(self):
@@ -311,8 +313,8 @@ class TestKeithleySourcemeter2400(TestCase):
         """Keithley_Sourcemeter2400.set_sense_function(), string input happy flow."""
         self._meta.instr._check_is_open = MagicMock()
         self._meta.scpi.write = MagicMock()
-        self._meta.instr.set_sense_function("VOLT:DC")
-        self._meta.scpi.write.assert_called_once_with(":SENS:FUNC 'VOLT:DC'")
+        self._meta.instr.set_sense_function("VOLT")
+        self._meta.scpi.write.assert_called_once_with(":SENS:FUNC 'VOLT'")
 
     def test_set_sense_function_invalid(self):
         """Keithley_Sourcemeter2400.set_sense_function(), invalid value handling."""
@@ -325,6 +327,13 @@ class TestKeithleySourcemeter2400(TestCase):
             self._meta.instr._ask = MagicMock(return_value=f'"{function.value}"')
             rt_val = self._meta.instr.get_sense_function()
             self._meta.instr._ask.assert_called_once_with(":SENS:FUNC?")
+            self.assertEqual(rt_val, function)
+
+    def test_get_sense_function_dc_suffix(self):
+        """Keithley_Sourcemeter2400.get_sense_function(), response with ':DC' suffix is accepted."""
+        for function in SenseFunction:
+            self._meta.instr._ask = MagicMock(return_value=f'"{function.value}:DC"')
+            rt_val = self._meta.instr.get_sense_function()
             self.assertEqual(rt_val, function)
 
     def test_get_sense_function_multiple(self):
