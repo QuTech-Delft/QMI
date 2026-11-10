@@ -240,13 +240,13 @@ class TestRunAdBasicCompiler(unittest.TestCase):
                 )
 
     def test_run_adbasic_compiler_raises_AdbasicCompilerException(self):
-        """Test that adbasic compiler works raises AdbasicCompilerException on errative stderr lines"""
+        """Test that adbasic compiler raises AdbasicCompilerException on unrecognized stderr text that
+        does not look like a warning (i.e. does not contain the word 'warning')."""
         # Arrange
         expected_returncode = 99
         error1 = "Liirum laarum pimpeli pompeli"  # nonsense
-        warning1 = "{} warning.s., {} error.s.".format(4, 0)  # wrong order
         warning2 = "002b:todo:ver:SomeCommandToFix (0x33f1d0 (nil)): stub\n"  # 'todo' instead of 'fixme'
-        tests = [error1, warning1, warning2]
+        tests = [error1, warning2]
         for test_string in tests:
             stderr_string = f"{test_string}\r\n".encode("ASCII")
             # run_adbasic_compiler arguments
@@ -275,6 +275,124 @@ class TestRunAdBasicCompiler(unittest.TestCase):
                         self.adwin_dir[sys.platform], "T11", adbasic_arguments, working_dir, parse_stderr,
                         remove_c_directory, pretty_print
                         )
+
+    def test_run_adbasic_compiler_reports_unrecognized_text_as_warning(self):
+        """Test that unrecognized stderr text that looks like a warning (contains the word 'warning') is
+        reported as a warning instead of raising AdbasicCompilerException, and does not affect compiler
+        success."""
+        # Suppress logging.
+        logging.getLogger("qmi.utils.adbasic_compiler").setLevel(logging.CRITICAL)
+
+        # Arrange
+        expected_returncode = 0
+        warning1 = "{} warning.s., {} error.s.".format(4, 0)  # wrong order, not recognized, but has 'warning'
+        tests = [warning1]
+        for test_string in tests:
+            stderr_string = f"{test_string}\r\n".encode("ASCII")
+            # run_adbasic_compiler arguments
+            adbasic_arguments = ["ls", "-l", "/dev/null"]
+            working_dir = None
+            parse_stderr = True
+            remove_c_directory = False
+            pretty_print = False
+
+            run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=expected_returncode,
+                             stdout=b"some stdout line\n", stderr=bytes(stderr_string))
+
+            # Act
+            with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
+                adbasic_result_linux = run_adbasic_compiler(
+                    self.adwin_dir[sys.platform], "T11", adbasic_arguments, working_dir, parse_stderr,
+                    remove_c_directory, pretty_print
+                    )
+
+            with mock.patch("sys.platform", "win32"), mock.patch("subprocess.run", return_value=run_return):
+                adbasic_result_win = run_adbasic_compiler(
+                    self.adwin_dir[sys.platform], "T11", adbasic_arguments, working_dir, parse_stderr,
+                    remove_c_directory, pretty_print
+                    )
+
+            # Assert
+            for result in (adbasic_result_linux, adbasic_result_win):
+                self.assertEqual(result.errors, [])
+                self.assertEqual(len(result.warnings), 1)
+                self.assertEqual(result.warnings[0].error_description, test_string)
+                self.assertTrue(result.success)
+
+    def test_run_adbasic_compiler_reports_linker_warning_as_warning(self):
+        """Test the exact linker warning reported in issue #245 is reported as a warning, not an error,
+        so that the overall compilation is still considered successful."""
+        # Suppress logging.
+        logging.getLogger("qmi.utils.adbasic_compiler").setLevel(logging.CRITICAL)
+
+        # Arrange
+        expected_returncode = 0
+        linker_warning = (
+            "/usr/bin/arm-linux-gnueabihf-ld: warning: /opt/adwin/share/adbasic/ARM/Lib/libc_T12ld.a: "
+            "requires executable stack (because the .note.GNU-stack section is executable)\n"
+        )
+        adbasic_arguments = ["ls", "-l", "/dev/null"]
+        working_dir = None
+        parse_stderr = True
+        remove_c_directory = False
+        pretty_print = False
+
+        run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=expected_returncode,
+                         stdout=b"some stdout line\n", stderr=linker_warning.encode("ASCII"))
+
+        # Act
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
+            adbasic_result_linux = run_adbasic_compiler(
+                self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr,
+                remove_c_directory, pretty_print
+                )
+
+        # Assert
+        self.assertEqual(adbasic_result_linux.errors, [])
+        self.assertEqual(len(adbasic_result_linux.warnings), 1)
+        self.assertEqual(adbasic_result_linux.warnings[0].error_description, linker_warning)
+        self.assertTrue(adbasic_result_linux.success)
+
+    def test_run_adbasic_compiler_reports_unrecognized_text_mixed_with_recognized_patterns(self):
+        """Test that unrecognized text mixed with recognized error and warning patterns is reported as
+        an additional warning, while the recognized patterns are still parsed as before."""
+        # Suppress logging.
+        logging.getLogger("qmi.utils.adbasic_compiler").setLevel(logging.CRITICAL)
+
+        # Arrange
+        expected_returncode = 99
+        f = "bad_input.bas"
+        error_description = "Small error"
+        error1 = "Error: No: {} {} line: {} file: {} line no.: {} ".format(1, error_description, 2, f, 3)
+        trailing_noise = "unexpected trailing linker warning chatter"
+        warning1 = "{} error.s., {} warning.s.".format(1, 0)
+        standalone_noise = "/usr/bin/arm-linux-gnueabihf-ld: warning: requires executable stack\n"
+        stderr_string = "\r\n".join([error1 + trailing_noise, warning1, standalone_noise])
+        # run_adbasic_compiler arguments
+        adbasic_arguments = ["ls", "-l", "/dev/null"]
+        working_dir = None
+        parse_stderr = True
+        remove_c_directory = False
+        pretty_print = False
+
+        run_return = subprocess.CompletedProcess(args=adbasic_arguments, returncode=expected_returncode,
+                         stdout=b"some stdout line\n", stderr=bytes(stderr_string, encoding="ASCII"))
+
+        # Act
+        with mock.patch("sys.platform", "linux1"), mock.patch("subprocess.run", return_value=run_return):
+            adbasic_result_linux = run_adbasic_compiler(
+                self.adwin_dir[sys.platform], "T12", adbasic_arguments, working_dir, parse_stderr,
+                remove_c_directory, pretty_print
+                )
+
+        # Assert
+        self.assertEqual(len(adbasic_result_linux.errors), 1)
+        self.assertEqual(adbasic_result_linux.errors[0].error_description, error_description)
+        self.assertEqual(len(adbasic_result_linux.warnings), 3)
+        self.assertEqual(adbasic_result_linux.warnings[0].error_description, trailing_noise)
+        self.assertEqual(adbasic_result_linux.warnings[1].error_description, warning1)
+        self.assertEqual(adbasic_result_linux.warnings[2].error_description, standalone_noise)
+        self.assertFalse(adbasic_result_linux.success)
 
     def test_print_adbasic_compiler_help_T11(self):
         """Test that print_adbasic_compiler_help() works on linux and windows"""
