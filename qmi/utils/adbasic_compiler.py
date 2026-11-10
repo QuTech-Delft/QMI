@@ -182,11 +182,15 @@ def _parse_stderr_lines(stderr_lines: list[str]) -> tuple[list[AdbasicError], li
                 line = line[match.end():]  # noqa: PLW2901
                 continue
 
-            # Unrecognised stderr text (e.g. linker warnings from newer binutils) is not a compiler
-            # error or a recognised warning pattern, but it should not abort parsing either: record
-            # it as a warning and consume the rest of the line.
-            warnings.append(AdbasicError(0, line, "", "", 0))
-            break
+            if "warning" in line.lower():
+                # Unrecognised stderr text that looks like a warning (e.g. linker warnings from newer
+                # binutils) is not a compiler error or a recognised warning pattern, but it should not
+                # abort parsing either: record it as a warning and consume the rest of the line.
+                warnings.append(AdbasicError(0, line, "", "", 0))
+                line = ""  # noqa: PLW2901
+                continue
+
+            raise AdbasicCompilerException(f"Unrecognized ADbasic error string: {line!r}", [])
 
     return errors, warnings
 
