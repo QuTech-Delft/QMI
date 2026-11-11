@@ -34,6 +34,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         """Initialize driver.
 
         Parameters:
+            context:    QMI_Context object for this instrument instance.
             name:       Name for this instrument instance.
             transport:  QMI transport descriptor to connect to the instrument.
             serial:     The serial number of the instrument.
@@ -66,7 +67,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         return persist
 
     def _set_configuration_or_disable(self, parameter: str, persist: bool):
-        """The state must be either CONFIGURATION or DISABLE.
+        """Enter either CONFIGURATION or DISABLE state, depending on the `persist` flag.
 
         Parameters:
             parameter: String to indicate which command parameter is being checked
@@ -87,7 +88,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
         Parameters:
             exit_persist: True to exit from CONFIGURATION state to NOT REFERENCED state.
-                               False to exit from DISABLE state to READY state.
+                          False to exit from DISABLE state to READY state.
         """
         if exit_persist:
             self._exit_configuration_state()
@@ -101,8 +102,8 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         Get the encoder increment value.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             Encoder increment value.
@@ -126,8 +127,8 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
         Parameters:
             value:              Increment value.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
         """
         self.controller_address = controller_address
         _logger.info(
@@ -145,8 +146,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         Get the max. output voltage of the driver to the motor.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Returns:
+            The max. output voltage of the driver to the motor.
         """
         self.controller_address = controller_address
         _logger.info(
@@ -165,8 +169,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
         Parameters:
             driver_voltage:     New motor driver voltage in Volts. Must be 12 V <= driver_voltage <= 48 V.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided driver voltage is out of the valid range.
         """
         if driver_voltage < 12.0 or driver_voltage > 48.0:
             raise QMI_InstrumentException(
@@ -190,8 +197,8 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         Get the low pass filter cut-off frequency Kd.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The low pass filter cut-off frequency, Kd, in Hertz.
@@ -218,8 +225,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             persist:            Flag to indicate if the frequency cutoff should be persisted to the controller's memory,
                                 so it is still available after powering down the controller. When not persisted, the
                                 frequency cutoff is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised frequency of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided frequency is out of the valid range.
         """
         if frequency <= self.MIN_FLOAT_LIMIT or frequency >= 2000:
             raise QMI_InstrumentException(
@@ -241,8 +251,8 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         Get the maximum allowed following error.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The value for the maximum allowed following error.
@@ -270,8 +280,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             persist:            Flag to indicate if the error limit should be persisted to the controller's memory, so
                                 it is still available after powering down the controller. When not persisted, the error
                                 limit is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised error limit of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided error limit is out of the valid range.
         """
         if error_limit <= self.MIN_FLOAT_LIMIT or error_limit >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
@@ -297,8 +310,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         Get the friction compensation.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Returns:
+            The friction compensation.
         """
         self.controller_address = controller_address
         _logger.info(
@@ -327,8 +343,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             persist:               Flag to indicate if the friction compensation should be persisted to the controller's
                                    memory, so it is still available after powering down the controller. When not
                                    persisted, the friction compensation is the one stored in the controller's memory.
-            controller_address:    Optional address of the controller that needs to be controlled. By default,
-                                   it is set to the initialised value of the controller address.
+            controller_address:    Optional address of the controller to send the command to. If not given,
+                                   DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided friction compensation value is out of the valid range.
         """
         self.controller_address = controller_address
         if persist:
@@ -366,8 +385,8 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         Get the derivative gain of the PID control loop.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The derivative gain of the PID control loop.
@@ -394,8 +413,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             persist:            Flag to indicate if the derivative gain should be persisted to the controller's memory,
                                 so it is still available after powering down the controller. When not persisted, the
                                 derivative gain is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised derivative_gain of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided derivative gain is out of the valid range.
         """
         if derivative_gain < 0 or derivative_gain >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
@@ -419,8 +441,8 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         Get the integral gain of the PID control loop.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The integral gain of the PID control loop.
@@ -443,12 +465,15 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         Set the integral gain of the PID control loop.
 
         Parameters:
-            integral_gain:    New integral_gain value in Volt * second/preset unit.
+            integral_gain:      New integral_gain value in Volt * second/preset unit.
             persist:            Flag to indicate if the integral gain should be persisted to the controller's memory,
                                 so it is still available after powering down the controller. When not persisted, the
                                 integral gain is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised integral_gain of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided integral gain is out of the valid range.
         """
         if integral_gain < 0 or integral_gain >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
@@ -472,8 +497,8 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         Get the proportional gain of the PID control loop.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The proportional gain of the PID control loop.
@@ -500,8 +525,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             persist:            Flag to indicate if the proportional gain should be persisted to the controller's
                                 memory, so it is still available after powering down the controller. When not persisted,
                                 the proportional gain is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised proportional_gain of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided proportional gain is out of the valid range.
         """
         if proportional_gain < 0 or proportional_gain >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
@@ -527,8 +555,8 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         Get the velocity feed forward of the PID control loop.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The velocity feed forward of the PID control loop.
@@ -553,11 +581,15 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
         Parameters:
             velocity_feed_forward: New velocity_feed_forward value in Volt * second/preset unit.
-            persist:            Flag to indicate if the velocity feed forward should be persisted to the controller's
-                                memory, so it is still available after powering down the controller. When not persisted,
-                                the velocity feed forward is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised velocity_feed_forward of the controller address.
+            persist:               Flag to indicate if the velocity feed forward should be persisted to the
+                                   controller's memory, so it is still available after powering down the controller.
+                                   When not persisted, the velocity feed forward is the one stored in the
+                                   controller's memory.
+            controller_address:    Optional address of the controller to send the command to. If not given,
+                                   DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided velocity feed forward is out of the valid range.
         """
         if velocity_feed_forward < 0 or velocity_feed_forward >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
@@ -583,8 +615,8 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         Get the current state of the control loop.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             control_loop_state: The current control loop state.
@@ -607,8 +639,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
         Parameters:
             control_loop_state: New state for the control loop. 0 is OPEN, 1 is CLOSED.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided control loop state is not a valid value.
         """
         cls_values = [c.value for c in set(ControlLoopState)]
         if control_loop_state not in cls_values:
