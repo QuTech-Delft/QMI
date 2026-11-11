@@ -2,6 +2,7 @@
 Instrument driver for a Newport single axis motion controller. This is a base class for other controllers,
 but can be used without extending.
 """
+from collections.abc import Iterator
 from contextlib import contextmanager
 import enum
 import logging
@@ -33,6 +34,23 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
     """
     Instrument driver for a Newport single-axis motion controller. This device
     is the controller for an actuator and is controlled via serial.
+
+    Attributes:
+        DEFAULT_RESPONSE_TIMEOUT:    Default response timeout in seconds, used when the instrument is opened.
+                                      This is an RPC property and can be changed at runtime via the instrument
+                                      proxy, e.g. `instr.DEFAULT_RESPONSE_TIMEOUT = 10.0`.
+        DEFAULT_HOME_SEARCH_TIMEOUT: Default timeout for the home search, in seconds. This is an RPC property
+                                      and can be changed at runtime via the instrument proxy, e.g.
+                                      `instr.DEFAULT_HOME_SEARCH_TIMEOUT = 10.0`.
+        DEFAULT_CONTROLLER_ADDRESS:  Default controller address to send commands to, used when a method is
+                                      called without an explicit `controller_address` argument. This is an RPC
+                                      property and can be changed at runtime via the instrument proxy, e.g.
+                                      `instr.DEFAULT_CONTROLLER_ADDRESS = 2`.
+        COMMAND_EXEC_TIME:           Time to wait for a regular command to execute, in seconds.
+        PW0_EXEC_TIME:               Time to wait for the PW0 command to execute, in seconds.
+        ERROR_CODE_NONE:             Code returned by the controller to indicate that there is no error.
+        MIN_FLOAT_LIMIT:             Minimum floating point value accepted by the controller firmware.
+        MAX_FLOAT_LIMIT:             Maximum floating point value accepted by the controller firmware.
     """
     # Names of class attributes exposed as modifiable RPC properties.
     _rpc_properties = {"DEFAULT_RESPONSE_TIMEOUT", "DEFAULT_HOME_SEARCH_TIMEOUT", "DEFAULT_CONTROLLER_ADDRESS"}
@@ -40,20 +58,20 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
     # Default response timeout in seconds.
     DEFAULT_RESPONSE_TIMEOUT = 5.0
 
-    # Default home search time out
+    # Default home search timeout, in seconds.
     DEFAULT_HOME_SEARCH_TIMEOUT = 5.0
 
-    # Time to execute a command
+    # Time to execute a command, in seconds.
     COMMAND_EXEC_TIME = 0.5
     PW0_EXEC_TIME = 10
 
-    # Code for no error
+    # Code for no error.
     ERROR_CODE_NONE = "@"
 
-    # Default contoller address to send commands to.
+    # Default controller address to send commands to.
     DEFAULT_CONTROLLER_ADDRESS = 1
 
-    # Floating point value FW limits
+    # Floating point value limits accepted by the controller firmware.
     MIN_FLOAT_LIMIT = 1E-6
     MAX_FLOAT_LIMIT = 1E12
 
@@ -105,6 +123,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         """Initialize driver.
 
         Parameters:
+            context:                QMI_Context object for this instrument instance.
             name:                   Name for this instrument instance.
             transport:              QMI transport descriptor to connect to the instrument.
             serial:                 The serial number of the instrument.
@@ -128,7 +147,14 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
     @property
     def controller_address(self) -> int | None:
-        """Address of the controller that needs to be controlled."""
+        """Address of the controller that needs to be controlled.
+
+        If set to None, falls back to DEFAULT_CONTROLLER_ADDRESS. The resulting address is validated against the
+        keys of the actuators dictionary.
+
+        Raises:
+            QMI_InstrumentException: If the resulting address is not a key of the actuators dictionary.
+        """
         return self._controller_address
 
     @controller_address.setter
@@ -141,9 +167,13 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
                 f"Invalid controller address {self._controller_address}")
 
     @contextmanager
-    def configuration_state(self):
+    def configuration_state(self) -> Iterator[None]:
+        """Context manager to enter the CONFIGURATION state of the controller for the duration of the `with`
+        block, and exit it again afterwards, even if an exception is raised within the block.
+        """
         try:
-            yield self._enter_configuration_state()
+            self._enter_configuration_state()
+            yield
         finally:
             self._exit_configuration_state()
 
@@ -155,6 +185,9 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Parameters:
             cmd:                Name of command.
             value:              Value to go with command if needed.
+
+        Returns:
+            The command string, addressed to the current controller address, ready to be sent to the instrument.
         """
         controller_address = self.controller_address
         return f"{controller_address}{cmd}{value}\r\n" if value is not None else f"{controller_address}{cmd}\r\n"
@@ -248,8 +281,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
     def _enter_disable_state(self) -> None:
         """
-        Enter the DISABLE state of the controller from the READY state. If the controller
-        is not in the NOT REFERENCE state, then call the `reset` method.
+        Enter the DISABLE state of the controller from the READY state.
         NOTE:   In this state the parameters are stored in the flash memory of the controller.
                 The device supports up to 100 writes, so this command should not be used often.
         """
@@ -289,8 +321,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Reset the instrument. Equivalent to a power-up.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
         """
         self.controller_address = controller_address
         _logger.info("Resetting instrument [%s]", self._name)
@@ -305,8 +337,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Read instrument type and version and return QMI_InstrumentIdentification instance.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             QMI_InstrumentIdentification with the information of the instrument.
@@ -328,8 +360,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Read stage identifier.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The stage identifier.
@@ -350,8 +382,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the positioner error and the current state of the controller.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Returns:
+            A tuple of the list of human-readable positioner error descriptions and the current controller state.
         """
         _logger.info(
             "Getting positioner error and state of instrument [%s]", self._name)
@@ -377,8 +412,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         for the actuator. Can be done only in NOT REFERENCED state.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
         """
         _logger.info("Homing instrument [%s]", self._name)
         self.controller_address = controller_address
@@ -393,9 +428,9 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Set the timeout for the home search.
 
         Parameters:
-            timeout:            Optional timeout in seconds. If not set, it defaults DEFAULT_HOME_SEARCH_TIMEOUT
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            timeout:            Optional timeout in seconds. If not set, it defaults to DEFAULT_HOME_SEARCH_TIMEOUT.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
         """
         t = timeout if timeout else self.DEFAULT_HOME_SEARCH_TIMEOUT
         _logger.info(
@@ -414,8 +449,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the timeout for the home search.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The timeout in seconds.
@@ -435,8 +470,12 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
         Parameters:
             position:           New position to move to, in encoder units. Must be within actuator's travel range.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the position is outside the actuator's travel range, or the controller
+                                      is not in READY state.
         """
         self.controller_address = controller_address
         if position > self._actuators[self.controller_address].TRAVEL_RANGE.max or \
@@ -464,8 +503,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the set-point position of the actuator according to the encoder value.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             Set-point position in encoder units.
@@ -483,8 +522,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the actual position of the actuator according to the encoder value.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             Current position in encoder units.
@@ -503,8 +542,12 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
         Parameters:
             displacement:       Displacement from current position.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the displacement is below the actuator's minimum incremental motion,
+                                      or the controller is not in READY state.
         """
         self.controller_address = controller_address
         if abs(displacement) < self._actuators[self.controller_address].MIN_INCREMENTAL_MOTION:
@@ -530,8 +573,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
         Parameters:
             displacement:       Displacement from current position (relative move size).
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             Motion time for a relative move in seconds.
@@ -549,8 +592,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the CONFIGURATION state of the controller.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             state: Boolean indicating if the controller is in CONFIGURATION state (True) or not (False).
@@ -566,14 +609,14 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
     def set_configuration_state(self, state: bool, controller_address: int | None = None) -> None:
         """
         Set the NOT REFERENCED or CONFIGURATION state of the controller.
-        If the controller is not in the either state, then an exception is raised in the _check_error.
+        If the controller is not in either state, then an exception is raised in the _check_error.
         NOTE: In this state the parameters are stored in the flash memory of the controller.
 
         Parameters:
-            state:              False for setting the configuration state from CONFIGURATION to NOT REFERENECED or
-                                True for setting the configuration state from NOT REFERENECED to CONFIGURATION.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            state:              False for setting the configuration state from CONFIGURATION to NOT REFERENCED or
+                                True for setting the configuration state from NOT REFERENCED to CONFIGURATION.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         """
         _logger.info(
@@ -597,8 +640,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the DISABLE or READY state of the controller.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             state: Boolean to indicate state is DISABLE (True) or READY (False)
@@ -614,13 +657,13 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
     def set_disable_state(self, state: bool, controller_address: int | None = None) -> None:
         """
         Set the DISABLE or READY state of the controller from the READY or DISABLE state, respectively.
-        If the controller is not in the either state, then an exception is raised in the _check_error.
+        If the controller is not in either state, then an exception is raised in the _check_error.
         NOTE: In this state the parameters are stored in the flash memory of the controller.
 
         Parameters:
             state: True for setting state from READY to DISABLE, False for vice versa.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
         """
         _logger.info("Setting state of instrument [%s] to [%s]", self._name, "DISABLE" if state else "READY")
         self.controller_address = controller_address
@@ -636,11 +679,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         then the returned value is in mm/s^2.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
-            Encoder increment value.
+            Acceleration in preset unit/s^2.
         """
         def _get_acceleration() -> str:
             acceleration = self._scpi_protocol.ask(
@@ -676,8 +719,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
                                 it is still available after powering down the controller. When not persisted, the
                                 maximum allowable acceleration that can be set is the one stored in the controller's
                                 memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the acceleration is not in the valid range.
         """
         def _set_acceleration():
             self._scpi_protocol.write(
@@ -711,8 +757,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         then the returned value is in mm/s.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Returns:
+            Velocity in unit/s.
         """
         def _get_velocity() -> str:
             velocity = self._scpi_protocol.ask(
@@ -745,8 +794,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             persist:            Flag to indicate if the velocity should be persisted to the controller's memory, so it
                                 is still available after powering down the controller. When not persisted, the maximum
                                 allowable velocity that can be set is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the velocity is outside the actuator's allowed velocity range.
         """
         def _set_velocity():
             self._scpi_protocol.write(
@@ -785,8 +837,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the jerk time of the actuator.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             jerk_time: Jerk time in seconds.
@@ -820,8 +872,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             persist:            Flag to indicate if the jerk time should be persisted to the controller's memory, so it
                                 is still available after powering down the controller. When not persisted, the maximum
                                 allowable jerk time that can be set is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the jerk time is not in the valid range.
         """
         def _set_jerk_time():
             self._scpi_protocol.write(self._build_command(
@@ -852,8 +907,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the currently memorised error.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             A tuple containing the error code and the human-readable error message.
@@ -875,8 +930,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Stop the motion of the actuator by decelerating it. Works on DISABLE, READY and MOTION states.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
         """
         _logger.info("Stop motion of instrument [%s]", self._name)
         self.controller_address = controller_address
@@ -890,8 +945,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the backlash value in encoder units.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Returns:
+            Backlash compensation in encoder units.
         """
         self.controller_address = controller_address
         _logger.info("Getting backlash compensation of controller [%s] instrument [%s]",
@@ -911,8 +969,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
         Parameters:
             backlash_comp:      backlash compensation in encoder units.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If hysteresis compensation is enabled on the controller.
         """
         self.controller_address = controller_address
         # instrument must be in CONFIGURATION state to set the backlash compensation.
@@ -941,8 +1002,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the hysteresis value in encoder units.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Returns:
+            Hysteresis compensation in encoder units.
         """
         self.controller_address = controller_address
         _logger.info("Getting hysteresis compensation of controller [%s] instrument [%s]",
@@ -962,8 +1026,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
         Parameters:
             hysteresis_comp:      hysteresis compensation in encoder units.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If backlash compensation is enabled on the controller.
         """
         self.controller_address = controller_address
         # instrument must be in CONFIGURATION state to set the hysteresis compensation.
@@ -991,8 +1058,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the type of HOME search used with the OR command.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Returns:
+            The type of HOME search used with the OR command, as an integer value of `HomeSearchTypes`.
         """
         self.controller_address = controller_address
         _logger.info(
@@ -1012,8 +1082,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
         Parameters:
             home_search_type:   New type of HOME search used with the OR command.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the home search type is not a valid value of `HomeSearchTypes`.
         """
         hst_values = [hst.value for hst in set(HomeSearchTypes)]
         if home_search_type not in hst_values:
@@ -1037,8 +1110,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the controller’s maximum or peak output current limit to the motor.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Returns:
+            Controller’s maximum or peak output current limit to the motor, in [A].
         """
         self.controller_address = controller_address
         _logger.info("Getting the peak current limit of controller [%s] instrument [%s]",
@@ -1058,8 +1134,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
         Parameters:
             current_limit:    Controller’s maximum or peak output current limit to the motor in [A].
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the current limit is not in the valid range.
         """
         if current_limit < 0.05 or current_limit > 3.0:
             raise QMI_InstrumentException(
@@ -1082,8 +1161,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the controller’s rms output current limit to the motor.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Returns:
+            Controller’s RMS output current limit to the motor, in [A].
         """
         self.controller_address = controller_address
         _logger.info("Getting the RMS current limit of controller [%s] instrument [%s]",
@@ -1099,12 +1181,16 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
     @rpc_method
     def set_rms_current_limit(self, current_limit: float, controller_address: int | None = None) -> None:
         """
-        Set the controller’s maximum or rms output current limit to the motor.
+        Set the controller’s rms output current limit to the motor. The upper bound of the valid range is
+        the minimum of 1.5A and the controller’s peak current limit.
 
         Parameters:
-            current_limit:    Controller’s maximum or rms output current limit to the motor in [A].
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            current_limit:    Controller’s rms output current limit to the motor in [A].
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the current limit is not in the valid range.
         """
         self.controller_address = controller_address
         # instrument must be in CONFIGURATION state to check the peak current limit and to set the RMS current limit.
@@ -1132,8 +1218,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the controller’s averaging period for rms current calculation.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Returns:
+            Controller’s averaging period for rms current calculation, in [s].
         """
         self.controller_address = controller_address
         # instrument must be in CONFIGURATION state to get the current limit.
@@ -1153,8 +1242,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
         Parameters:
             averaging_time:    Controller’s averaging period for rms current calculation in [s].
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the averaging time is not in the valid range.
         """
         if averaging_time <= 0.01 or averaging_time > 100.0:
             raise QMI_InstrumentException(
@@ -1177,8 +1269,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the analog input value.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             Analog input value in Volts.
@@ -1201,11 +1293,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         between these two values, the result is unreliable and can be 1 or 0.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
-            TTL input value in bits. E.g. '5' means input 0 and 2 are high, all others are low.
+            TTL input value in bits. E.g. '5' means input 1 and 3 are high, all others are low.
         """
         self.controller_address = controller_address
         _logger.info("Getting TTL input value of instrument [%s]", self._name)
@@ -1224,8 +1316,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         collector output transistor of the output.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             TTL output value in bits. E.g. '3' means TTL outputs 1 & 2 are closed and outputs 3 & 4 open.
@@ -1240,7 +1332,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
     @rpc_method
     def set_ttl_output_value(self, ttl_output_value: int, controller_address: int | None = None) -> None:
         """
-        Get the TTL output value. The value is a binary word made of all 4 outputs,
+        Set the TTL output value. The value is a binary word made of all 4 outputs,
         where bit 0 is output 1, bit 1 is output 2, bit 2 is output 3, and bit 3 is output 4.
 
         A 1 closes the open collector output transistor of the output. A 0 blocks the open
@@ -1248,8 +1340,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
         Parameters:
             ttl_output_value:   New TTL output value.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the TTL output value is not in the valid range 0-15.
         """
         if ttl_output_value not in range(16):
             raise QMI_InstrumentException(
@@ -1302,6 +1397,9 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
         Parameters:
             rs485_address:      Controller's axis number for new RS485 address.
+
+        Raises:
+            QMI_InstrumentException: If the RS-485 address is not in the valid range 2-31.
         """
         if 2 > rs485_address or rs485_address > 31:
             raise QMI_InstrumentException(
@@ -1333,8 +1431,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the negative software limit.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             neg_sw_limit:      Controller's negative software limit.
@@ -1373,8 +1471,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             persist:            Flag to indicate if the software limit should be persisted to the controller's memory,
                                 so it is still available after powering down the controller. When not persisted, the
                                 negative software limit is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the negative software limit is not in the valid range.
         """
         def _set_negative_software_limit():
             self._scpi_protocol.write(
@@ -1408,8 +1509,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         Get the positive software limit.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             pos_sw_limit:      Controller's positive software limit.
@@ -1447,8 +1548,11 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             persist:            Flag to indicate if the software limit should be persisted to the controller's memory,
                                 so it is still available after powering down the controller. When not persisted, the
                                 positive software limit is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the positive software limit is not in the valid range.
         """
         def _set_positive_software_limit():
             self._scpi_protocol.write(
