@@ -138,6 +138,37 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.write.assert_not_called()
         self._scpi_mock.ask.assert_not_called()
 
+    def test_default_controller_address_is_rpc_property(self):
+        """Test that DEFAULT_CONTROLLER_ADDRESS can be changed through the RPC property and that commands sent
+        without an explicit controller address then use the new default."""
+        self._scpi_mock.ask.return_value = "@"
+        self.instr.DEFAULT_CONTROLLER_ADDRESS = 2
+
+        self.instr.reset()
+
+        self._scpi_mock.write.assert_called_once_with("2RS\r\n")
+        self._scpi_mock.ask.assert_called_once_with("2TE\r\n")
+
+    def test_default_controller_address_can_still_be_overridden_explicitly(self):
+        """Test that an explicitly given controller address still takes precedence over a changed default."""
+        self._scpi_mock.ask.return_value = "@"
+        self.instr.DEFAULT_CONTROLLER_ADDRESS = 2
+
+        self.instr.reset(3)
+
+        self._scpi_mock.write.assert_called_once_with("3RS\r\n")
+        self._scpi_mock.ask.assert_called_once_with("3TE\r\n")
+
+    def test_default_controller_address_with_invalid_value_throws_exception_on_use(self):
+        """Test that an invalid DEFAULT_CONTROLLER_ADDRESS still raises an exception when it is used."""
+        self.instr.DEFAULT_CONTROLLER_ADDRESS = 4
+
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.reset()
+
+        self._scpi_mock.write.assert_not_called()
+        self._scpi_mock.ask.assert_not_called()
+
     def test_get_idn_address_gets_idn(self):
         """Test get idn."""
         self._scpi_mock.ask.side_effect = [f"{self.controller_address}VE CONEX-CC 2.0.1", "@"]

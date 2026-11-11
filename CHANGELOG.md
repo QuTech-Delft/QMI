@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `qmi.core.logging_init.stop_logging()`, which undoes `start_logging()`: it removes the QMI console and file log handlers, restores the original `sys.excepthook`, and switches off `logging.captureWarnings()`. `qmi.stop()` now calls it automatically when the matching `qmi.start()` initialized logging.
 - QMI driver for the Keithley 2400 series SourceMeter, `qmi.instruments.keithley.Keithley_Sourcemeter2400`, supporting GPIB and RS-232 transports. Implements resetting, configuring a fixed voltage or current source, selecting the sense function, reading out the measured voltage, and switching the output on and off.
+- `qmi.instruments.newport.single_axis_motion_controller.Newport_SingleAxisMotionController.DEFAULT_CONTROLLER_ADDRESS`, `DEFAULT_RESPONSE_TIMEOUT` and `DEFAULT_HOME_SEARCH_TIMEOUT` are now RPC properties, so e.g. `instr.DEFAULT_CONTROLLER_ADDRESS = 2` can be used to change the controller address that subsequent commands default to, without having to pass an explicit `controller_address` to every call. This also applies to the `Newport_SMC100CC`, `Newport_SMC100PP` and `Newport_ConexCC` drivers that derive from it.
+
+### Changed
+- Modernized the type hints of `qmi.instruments.newport.single_axis_motion_controller` and `qmi.instruments.newport.smc_100cc` to use builtin generics and `X | None` instead of the `typing` module's `Dict`, `List`, `Optional`, `Tuple` and `Union`.
 
 ### Fixed
 - `qmi.core.logging_init.start_logging()` used `logging.basicConfig()` to install the console log handler. `basicConfig()` silently does nothing once the root logger already has handlers, so a second call (for example a new `qmi.start()` after `qmi.stop()`, with a changed `console_loglevel` in `qmi.conf`) had no effect. The console handler is now tracked explicitly, like the file handler, and is replaced via `logging.getLogger().addHandler()` on every call.

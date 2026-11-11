@@ -3,7 +3,6 @@ Instrument driver for the Newport SMC100CC motion controller.
 """
 import logging
 from time import sleep
-from typing import Dict, Optional
 import enum
 
 from qmi.core.context import QMI_Context
@@ -30,7 +29,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
                  name: str,
                  transport: str,
                  serial: str,
-                 actuators: Dict[Optional[int], LinearActuator],
+                 actuators: dict[int | None, LinearActuator],
                  baudrate: int = 57600) -> None:
         """Initialize driver.
 
@@ -97,7 +96,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             self._exit_disable_state()
 
     @rpc_method
-    def get_encoder_increment_value(self, controller_address: Optional[int] = None) -> float:
+    def get_encoder_increment_value(self, controller_address: int | None = None) -> float:
         """
         Get the encoder increment value.
 
@@ -119,7 +118,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         return self._actuators[self.controller_address].ENCODER_RESOLUTION / float(res[3:])
 
     @rpc_method
-    def set_encoder_increment_value(self, value: float, controller_address: Optional[int] = None) -> None:
+    def set_encoder_increment_value(self, value: float, controller_address: int | None = None) -> None:
         """
         Set the encoder increment value. By default, to be as close to 1mm as possible.
         Check the example (SU command) in the doc below to see how the increment value is calculated:
@@ -141,7 +140,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_state()
 
     @rpc_method
-    def get_driver_voltage(self, controller_address: Optional[int] = None) -> float:
+    def get_driver_voltage(self, controller_address: int | None = None) -> float:
         """
         Get the max. output voltage of the driver to the motor.
 
@@ -160,7 +159,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         return float(driver_voltage[3:])
 
     @rpc_method
-    def set_driver_voltage(self, driver_voltage: float, controller_address: Optional[int] = None) -> None:
+    def set_driver_voltage(self, driver_voltage: float, controller_address: int | None = None) -> None:
         """
         Set the max. output voltage of the driver to the motor.
 
@@ -186,7 +185,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_state()
 
     @rpc_method
-    def get_low_pass_filter_cutoff_frequency(self, controller_address: Optional[int] = None) -> float:
+    def get_low_pass_filter_cutoff_frequency(self, controller_address: int | None = None) -> float:
         """
         Get the low pass filter cut-off frequency Kd.
 
@@ -210,7 +209,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_low_pass_filter_cutoff_frequency(
-            self, frequency: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+            self, frequency: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the low pass filter cut-off frequency Kd. Can be set only in CONFIGURATION or DISABLE states.
 
@@ -237,7 +236,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_following_error_limit(self, controller_address: Optional[int] = None) -> float:
+    def get_following_error_limit(self, controller_address: int | None = None) -> float:
         """
         Get the maximum allowed following error.
 
@@ -262,7 +261,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_following_error_limit(
-            self, error_limit: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+            self, error_limit: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the value for the maximum allowed following error. It can be set only in CONFIGURATION or DISABLE state.
 
@@ -293,7 +292,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_friction_compensation(self, controller_address: Optional[int] = None) -> float:
+    def get_friction_compensation(self, controller_address: int | None = None) -> float:
         """
         Get the friction compensation.
 
@@ -314,7 +313,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_friction_compensation(
-            self, friction_compensation: float, persist: bool = False, controller_address: Optional[int] = None
+            self, friction_compensation: float, persist: bool = False, controller_address: int | None = None
     ) -> None:
         """
         Set the friction compensation. It must not be larger than the driver voltage set by DV command. We can check
@@ -362,7 +361,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_derivative_gain(self, controller_address: Optional[int] = None) -> float:
+    def get_derivative_gain(self, controller_address: int | None = None) -> float:
         """
         Get the derivative gain of the PID control loop.
 
@@ -386,7 +385,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_derivative_gain(
-            self, derivative_gain: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+            self, derivative_gain: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the derivative gain of the PID control loop.
 
@@ -415,7 +414,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_integral_gain(self, controller_address: Optional[int] = None) -> float:
+    def get_integral_gain(self, controller_address: int | None = None) -> float:
         """
         Get the integral gain of the PID control loop.
 
@@ -439,7 +438,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_integral_gain(
-            self, integral_gain: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+            self, integral_gain: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the integral gain of the PID control loop.
 
@@ -468,7 +467,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_proportional_gain(self, controller_address: Optional[int] = None) -> float:
+    def get_proportional_gain(self, controller_address: int | None = None) -> float:
         """
         Get the proportional gain of the PID control loop.
 
@@ -492,7 +491,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_proportional_gain(
-            self, proportional_gain: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+            self, proportional_gain: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the proportional gain of the PID control loop.
 
@@ -523,7 +522,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_velocity_feed_forward(self, controller_address: Optional[int] = None) -> float:
+    def get_velocity_feed_forward(self, controller_address: int | None = None) -> float:
         """
         Get the velocity feed forward of the PID control loop.
 
@@ -547,7 +546,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_velocity_feed_forward(
-            self, velocity_feed_forward: float, persist: bool = False, controller_address: Optional[int] = None
+            self, velocity_feed_forward: float, persist: bool = False, controller_address: int | None = None
     ) -> None:
         """
         Set the velocity feed forward of the PID control loop.
@@ -579,7 +578,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_control_loop_state(self, controller_address: Optional[int] = None) -> ControlLoopState:
+    def get_control_loop_state(self, controller_address: int | None = None) -> ControlLoopState:
         """
         Get the current state of the control loop.
 
@@ -602,7 +601,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         return ControlLoopState(int(control_loop_state[3:]))
 
     @rpc_method
-    def set_control_loop_state(self, control_loop_state: int, controller_address: Optional[int] = None) -> None:
+    def set_control_loop_state(self, control_loop_state: int, controller_address: int | None = None) -> None:
         """
         Set the current state of the control loop.
 

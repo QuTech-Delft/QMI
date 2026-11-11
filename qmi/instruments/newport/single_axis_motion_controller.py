@@ -6,7 +6,6 @@ from contextlib import contextmanager
 import enum
 import logging
 from time import sleep
-from typing import Dict, List, Optional, Tuple, Union
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
@@ -35,6 +34,8 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
     Instrument driver for a Newport single-axis motion controller. This device
     is the controller for an actuator and is controlled via serial.
     """
+    # Names of class attributes exposed as modifiable RPC properties.
+    _rpc_properties = {"DEFAULT_RESPONSE_TIMEOUT", "DEFAULT_HOME_SEARCH_TIMEOUT", "DEFAULT_CONTROLLER_ADDRESS"}
 
     # Default response timeout in seconds.
     DEFAULT_RESPONSE_TIMEOUT = 5.0
@@ -99,7 +100,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
                  name: str,
                  transport: str,
                  serial: str,
-                 actuators: Dict[Optional[int], LinearActuator],
+                 actuators: dict[int | None, LinearActuator],
                  baudrate: int) -> None:
         """Initialize driver.
 
@@ -126,12 +127,12 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         self._controller_address: int = self.DEFAULT_CONTROLLER_ADDRESS
 
     @property
-    def controller_address(self) -> Optional[int]:
+    def controller_address(self) -> int | None:
         """Address of the controller that needs to be controlled."""
         return self._controller_address
 
     @controller_address.setter
-    def controller_address(self, controller_address: Optional[int]) -> None:
+    def controller_address(self, controller_address: int | None) -> None:
         # if controller address is not given use the default one.
         self._controller_address = controller_address or self.DEFAULT_CONTROLLER_ADDRESS
         # Check that the address is valid.
@@ -147,7 +148,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             self._exit_configuration_state()
 
     def _build_command(
-            self, cmd: str, value: Union[float, int, None] = None
+            self, cmd: str, value: float | int | None = None
     ) -> str:
         """Build the command.
 
@@ -283,7 +284,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         super().close()
 
     @rpc_method
-    def reset(self, controller_address: Optional[int] = None) -> None:
+    def reset(self, controller_address: int | None = None) -> None:
         """
         Reset the instrument. Equivalent to a power-up.
 
@@ -299,7 +300,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         self._check_error()
 
     @rpc_method
-    def get_idn(self, controller_address: Optional[int] = None) -> QMI_InstrumentIdentification:
+    def get_idn(self, controller_address: int | None = None) -> QMI_InstrumentIdentification:
         """
         Read instrument type and version and return QMI_InstrumentIdentification instance.
 
@@ -322,7 +323,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
                                             serial=self._serial)
 
     @rpc_method
-    def get_stage_identifier(self, controller_address: Optional[int] = None) -> str:
+    def get_stage_identifier(self, controller_address: int | None = None) -> str:
         """
         Read stage identifier.
 
@@ -344,7 +345,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return identifier
 
     @rpc_method
-    def get_positioner_error_and_state(self, controller_address: Optional[int] = None) -> Tuple[List[str], str]:
+    def get_positioner_error_and_state(self, controller_address: int | None = None) -> tuple[list[str], str]:
         """
         Get the positioner error and the current state of the controller.
 
@@ -370,7 +371,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return errors, self.STATE_TABLE[state]
 
     @rpc_method
-    def home_search(self, controller_address: Optional[int] = None) -> None:
+    def home_search(self, controller_address: int | None = None) -> None:
         """
         Execute the home search. This is needed before any motion commands can be executed. It finds an origin position
         for the actuator. Can be done only in NOT REFERENCED state.
@@ -387,7 +388,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
     @rpc_method
     def set_home_search_timeout(
-            self, timeout: Optional[float] = None, controller_address: Optional[int] = None) -> None:
+            self, timeout: float | None = None, controller_address: int | None = None) -> None:
         """
         Set the timeout for the home search.
 
@@ -408,7 +409,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             self._check_error()
 
     @rpc_method
-    def get_home_search_timeout(self, controller_address: Optional[int] = None) -> float:
+    def get_home_search_timeout(self, controller_address: int | None = None) -> float:
         """
         Get the timeout for the home search.
 
@@ -427,7 +428,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(timeout[3:])
 
     @rpc_method
-    def move_absolute(self, position: float, controller_address: Optional[int] = None) -> None:
+    def move_absolute(self, position: float, controller_address: int | None = None) -> None:
         """
         Perform an absolute move. This command can take several seconds to finish. However, it is not blocking.
         Use other methods such as `get_positioner_error_and_state` to query the state of the controller.
@@ -458,7 +459,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         self._check_error()
 
     @rpc_method
-    def get_setpoint(self, controller_address: Optional[int] = None) -> float:
+    def get_setpoint(self, controller_address: int | None = None) -> float:
         """
         Get the set-point position of the actuator according to the encoder value.
 
@@ -477,7 +478,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(setpoint[3:])
 
     @rpc_method
-    def get_position(self, controller_address: Optional[int] = None) -> float:
+    def get_position(self, controller_address: int | None = None) -> float:
         """
         Get the actual position of the actuator according to the encoder value.
 
@@ -496,7 +497,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(pos[3:])
 
     @rpc_method
-    def move_relative(self, displacement: float, controller_address: Optional[int] = None) -> None:
+    def move_relative(self, displacement: float, controller_address: int | None = None) -> None:
         """
         Perform a relative move from the current position.
 
@@ -523,7 +524,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         self._check_error()
 
     @rpc_method
-    def get_motion_time(self, displacement: float, controller_address: Optional[int] = None) -> float:
+    def get_motion_time(self, displacement: float, controller_address: int | None = None) -> float:
         """
         Get the motion time for a relative move.
 
@@ -543,7 +544,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(move_time[3:])
 
     @rpc_method
-    def is_in_configuration_state(self, controller_address: Optional[int] = None) -> bool:
+    def is_in_configuration_state(self, controller_address: int | None = None) -> bool:
         """
         Get the CONFIGURATION state of the controller.
 
@@ -562,7 +563,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return bool(int(state[3:]))
 
     @rpc_method
-    def set_configuration_state(self, state: bool, controller_address: Optional[int] = None) -> None:
+    def set_configuration_state(self, state: bool, controller_address: int | None = None) -> None:
         """
         Set the NOT REFERENCED or CONFIGURATION state of the controller.
         If the controller is not in the either state, then an exception is raised in the _check_error.
@@ -591,7 +592,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             sleep(self.COMMAND_EXEC_TIME)
 
     @rpc_method
-    def is_in_disable_state(self, controller_address: Optional[int] = None) -> bool:
+    def is_in_disable_state(self, controller_address: int | None = None) -> bool:
         """
         Get the DISABLE or READY state of the controller.
 
@@ -610,7 +611,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return bool(int(state[3:]))
 
     @rpc_method
-    def set_disable_state(self, state: bool, controller_address: Optional[int] = None) -> None:
+    def set_disable_state(self, state: bool, controller_address: int | None = None) -> None:
         """
         Set the DISABLE or READY state of the controller from the READY or DISABLE state, respectively.
         If the controller is not in the either state, then an exception is raised in the _check_error.
@@ -629,7 +630,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         self._check_error()
 
     @rpc_method
-    def get_acceleration(self, controller_address: Optional[int] = None) -> float:
+    def get_acceleration(self, controller_address: int | None = None) -> float:
         """
         Get the acceleration of the actuator in preset unit/s^2, so if the encoder unit is mm,
         then the returned value is in mm/s^2.
@@ -663,7 +664,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
     @rpc_method
     def set_acceleration(
-            self, acceleration: float, persist: bool = False, controller_address: Optional[int] = None
+            self, acceleration: float, persist: bool = False, controller_address: int | None = None
     ) -> None:
         """
         Set the acceleration at which the actuator moves. Can be set only in CONFIGURATION, READY and DISABLE states.
@@ -704,7 +705,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             _set_acceleration()
 
     @rpc_method
-    def get_velocity(self, controller_address: Optional[int] = None) -> float:
+    def get_velocity(self, controller_address: int | None = None) -> float:
         """
         Get the velocity of the actuator in unit/s, so if the encoder unit is mm,
         then the returned value is in mm/s.
@@ -734,7 +735,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(velocity[3:])
 
     @rpc_method
-    def set_velocity(self, velocity: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+    def set_velocity(self, velocity: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the velocity at which the actuator moves.
 
@@ -779,7 +780,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             _set_velocity()
 
     @rpc_method
-    def get_jerk_time(self, controller_address: Optional[int] = None) -> float:
+    def get_jerk_time(self, controller_address: int | None = None) -> float:
         """
         Get the jerk time of the actuator.
 
@@ -810,7 +811,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(jerk_time[3:])
 
     @rpc_method
-    def set_jerk_time(self, jerk_time: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+    def set_jerk_time(self, jerk_time: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the jerk time at which the actuator accelerates.
 
@@ -846,7 +847,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             _set_jerk_time()
 
     @rpc_method
-    def get_error(self, controller_address: Optional[int] = None) -> Tuple[str, str]:
+    def get_error(self, controller_address: int | None = None) -> tuple[str, str]:
         """
         Get the currently memorised error.
 
@@ -869,7 +870,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return error_code, error_str
 
     @rpc_method
-    def stop_motion(self, controller_address: Optional[int] = None) -> None:
+    def stop_motion(self, controller_address: int | None = None) -> None:
         """
         Stop the motion of the actuator by decelerating it. Works on DISABLE, READY and MOTION states.
 
@@ -884,7 +885,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         self._check_error()
 
     @rpc_method
-    def get_backlash_compensation(self, controller_address: Optional[int] = None) -> float:
+    def get_backlash_compensation(self, controller_address: int | None = None) -> float:
         """
         Get the backlash value in encoder units.
 
@@ -904,7 +905,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(backlash_comp[3:])
 
     @rpc_method
-    def set_backlash_compensation(self, backlash_comp: float, controller_address: Optional[int] = None) -> None:
+    def set_backlash_compensation(self, backlash_comp: float, controller_address: int | None = None) -> None:
         """
         Set the backlash compensation of a controller.
 
@@ -935,7 +936,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             self._check_error()
 
     @rpc_method
-    def get_hysteresis_compensation(self, controller_address: Optional[int] = None) -> float:
+    def get_hysteresis_compensation(self, controller_address: int | None = None) -> float:
         """
         Get the hysteresis value in encoder units.
 
@@ -955,7 +956,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(hysteresis_comp[3:])
 
     @rpc_method
-    def set_hysteresis_compensation(self, hysteresis_comp: float, controller_address: Optional[int] = None) -> None:
+    def set_hysteresis_compensation(self, hysteresis_comp: float, controller_address: int | None = None) -> None:
         """
         Set the hysteresis compensation of a controller.
 
@@ -985,7 +986,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             self._check_error()
 
     @rpc_method
-    def get_home_search_type(self, controller_address: Optional[int] = None) -> int:
+    def get_home_search_type(self, controller_address: int | None = None) -> int:
         """
         Get the type of HOME search used with the OR command.
 
@@ -1005,7 +1006,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return int(home_search_type[3:])
 
     @rpc_method
-    def set_home_search_type(self, home_search_type: int, controller_address: Optional[int] = None) -> None:
+    def set_home_search_type(self, home_search_type: int, controller_address: int | None = None) -> None:
         """
         Set the type of HOME search used with the OR command.
 
@@ -1031,7 +1032,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             self._check_error()
 
     @rpc_method
-    def get_peak_current_limit(self, controller_address: Optional[int] = None) -> float:
+    def get_peak_current_limit(self, controller_address: int | None = None) -> float:
         """
         Get the controller’s maximum or peak output current limit to the motor.
 
@@ -1051,7 +1052,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(current_limit[4:])
 
     @rpc_method
-    def set_peak_current_limit(self, current_limit: float, controller_address: Optional[int] = None) -> None:
+    def set_peak_current_limit(self, current_limit: float, controller_address: int | None = None) -> None:
         """
         Set the controller’s maximum or peak output current limit to the motor.
 
@@ -1076,7 +1077,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             self._check_error()
 
     @rpc_method
-    def get_rms_current_limit(self, controller_address: Optional[int] = None) -> float:
+    def get_rms_current_limit(self, controller_address: int | None = None) -> float:
         """
         Get the controller’s rms output current limit to the motor.
 
@@ -1096,7 +1097,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(current_limit[4:])
 
     @rpc_method
-    def set_rms_current_limit(self, current_limit: float, controller_address: Optional[int] = None) -> None:
+    def set_rms_current_limit(self, current_limit: float, controller_address: int | None = None) -> None:
         """
         Set the controller’s maximum or rms output current limit to the motor.
 
@@ -1126,7 +1127,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             self._check_error()
 
     @rpc_method
-    def get_rms_current_averaging_time(self, controller_address: Optional[int] = None) -> float:
+    def get_rms_current_averaging_time(self, controller_address: int | None = None) -> float:
         """
         Get the controller’s averaging period for rms current calculation.
 
@@ -1146,7 +1147,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(averaging_time[4:])
 
     @rpc_method
-    def set_rms_current_averaging_time(self, averaging_time: float, controller_address: Optional[int] = None) -> None:
+    def set_rms_current_averaging_time(self, averaging_time: float, controller_address: int | None = None) -> None:
         """
         Set the controller’s averaging period for rms current calculation.
 
@@ -1171,7 +1172,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             self._check_error()
 
     @rpc_method
-    def get_analog_input_value(self, controller_address: Optional[int] = None) -> float:
+    def get_analog_input_value(self, controller_address: int | None = None) -> float:
         """
         Get the analog input value.
 
@@ -1190,7 +1191,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return float(analog_input[3:])
 
     @rpc_method
-    def get_ttl_input_value(self, controller_address: Optional[int] = None) -> int:
+    def get_ttl_input_value(self, controller_address: int | None = None) -> int:
         """
         Get the TTL input value. The returned decimal number represents the binary word made of all 4 inputs,
         where bit 0 is input 1, bit 1 is input 2, bit 2 is input 3, and bit 3 is input 4.
@@ -1214,7 +1215,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return int(ttl_input[3:])
 
     @rpc_method
-    def get_ttl_output_value(self, controller_address: Optional[int] = None) -> int:
+    def get_ttl_output_value(self, controller_address: int | None = None) -> int:
         """
         Get the TTL output value. The returned decimal number represents the binary word made of all 4 outputs,
         where bit 0 is output 1, bit 1 is output 2, bit 2 is output 3, and bit 3 is output 4.
@@ -1237,7 +1238,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
         return int(ttl_output[3:])
 
     @rpc_method
-    def set_ttl_output_value(self, ttl_output_value: int, controller_address: Optional[int] = None) -> None:
+    def set_ttl_output_value(self, ttl_output_value: int, controller_address: int | None = None) -> None:
         """
         Get the TTL output value. The value is a binary word made of all 4 outputs,
         where bit 0 is output 1, bit 1 is output 2, bit 2 is output 3, and bit 3 is output 4.
@@ -1307,7 +1308,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             self._check_error()
 
     @rpc_method
-    def get_negative_software_limit(self, controller_address: Optional[int] = None) -> float:
+    def get_negative_software_limit(self, controller_address: int | None = None) -> float:
         """
         Get the negative software limit.
 
@@ -1342,7 +1343,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
     @rpc_method
     def set_negative_software_limit(
-            self, neg_sw_limit: float, persist: bool = False, controller_address: Optional[int] = None
+            self, neg_sw_limit: float, persist: bool = False, controller_address: int | None = None
     ) -> None:
         """
         Set the negative software limit.
@@ -1382,7 +1383,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             _set_negative_software_limit()
 
     @rpc_method
-    def get_positive_software_limit(self, controller_address: Optional[int] = None) -> float:
+    def get_positive_software_limit(self, controller_address: int | None = None) -> float:
         """
         Get the positive software limit.
 
@@ -1417,7 +1418,7 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
 
     @rpc_method
     def set_positive_software_limit(
-            self, pos_sw_limit: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+            self, pos_sw_limit: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the positive software limit.
 
