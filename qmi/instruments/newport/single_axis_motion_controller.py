@@ -1266,27 +1266,39 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
     @rpc_method
     def get_controller_rs485_address(self) -> int:
         """
-        Get the controller’s RS-485 address. Controller address is always 1 for this command.
+        Get the controller’s RS-485 address. This command is always sent to controller address 1. If the
+        current controller address is not 1, it is temporarily switched to 1 for the duration of the command
+        and restored to its previous value afterwards, also if an exception occurs.
 
         Returns:
-            rs485_address:      Controller's axis number for new RS485 address.
+            rs485_address:      The current RS-485 address of the controller.
         """
-        self.controller_address = self.DEFAULT_CONTROLLER_ADDRESS
-        _logger.info(
-            "Getting RS485 address of controller [%s] instrument [%s]", self.controller_address, self._name
-        )
-        # instrument must be in CONFIGURATION state to get the RS485 address.
-        with self.configuration_state():
-            axis = self._scpi_protocol.ask(
-                self._build_command("SA?"))
-            self._check_error()
+        previous_address = self.controller_address
+        if previous_address != 1:
+            self.controller_address = 1
 
-        return int(axis[3:])
+        try:
+            _logger.info(
+                "Getting RS485 address of controller [%s] instrument [%s]", self.controller_address, self._name
+            )
+            # instrument must be in CONFIGURATION state to get the RS485 address.
+            with self.configuration_state():
+                axis = self._scpi_protocol.ask(
+                    self._build_command("SA?"))
+                self._check_error()
+
+            return int(axis[3:])
+
+        finally:
+            if previous_address != 1:
+                self.controller_address = previous_address
 
     @rpc_method
     def set_controller_rs485_address(self, rs485_address: int) -> None:
         """
-        Set the controller’s RS-485 address. Controller address is always 1 for this command.
+        Set the controller’s RS-485 address. This command is always sent to controller address 1. If the
+        current controller address is not 1, it is temporarily switched to 1 for the duration of the command
+        and restored to its previous value afterwards, also if an exception occurs.
 
         Parameters:
             rs485_address:      Controller's axis number for new RS485 address.
@@ -1295,17 +1307,25 @@ class Newport_SingleAxisMotionController(QMI_Instrument):
             raise QMI_InstrumentException(
                 f"Invalid controller axis number {rs485_address}")
 
-        self.controller_address = self.DEFAULT_CONTROLLER_ADDRESS
-        _logger.info(
-            "Setting RS485 address of controller [%s] instrument [%s] to axis [%i]",
-            self.controller_address, self._name, rs485_address
-        )
-        # instrument must be in CONFIGURATION state to set the RS485 address.
-        with self.configuration_state():
-            self._scpi_protocol.write(
-                self._build_command("SA", rs485_address))
-            sleep(self.COMMAND_EXEC_TIME)
-            self._check_error()
+        previous_address = self.controller_address
+        if previous_address != 1:
+            self.controller_address = 1
+
+        try:
+            _logger.info(
+                "Setting RS485 address of controller [%s] instrument [%s] to axis [%i]",
+                self.controller_address, self._name, rs485_address
+            )
+            # instrument must be in CONFIGURATION state to set the RS485 address.
+            with self.configuration_state():
+                self._scpi_protocol.write(
+                    self._build_command("SA", rs485_address))
+                sleep(self.COMMAND_EXEC_TIME)
+                self._check_error()
+
+        finally:
+            if previous_address != 1:
+                self.controller_address = previous_address
 
     @rpc_method
     def get_negative_software_limit(self, controller_address: int | None = None) -> float:
