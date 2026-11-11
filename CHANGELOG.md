@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `qmi.instruments.newport.single_axis_motion_controller.Newport_SingleAxisMotionController.DEFAULT_CONTROLLER_ADDRESS`, `DEFAULT_RESPONSE_TIMEOUT` and `DEFAULT_HOME_SEARCH_TIMEOUT` are now RPC properties, so e.g. `instr.DEFAULT_CONTROLLER_ADDRESS = 2` can be used to change the controller address that subsequent commands default to, without having to pass an explicit `controller_address` to every call. This also applies to the `Newport_SMC100CC`, `Newport_SMC100PP` and `Newport_ConexCC` drivers that derive from it.
 
 ### Changed
-- Modernized the type hints of `qmi.instruments.newport.single_axis_motion_controller` and `qmi.instruments.newport.smc_100cc` to use builtin generics and `X | None` instead of the `typing` module's `Dict`, `List`, `Optional`, `Tuple` and `Union`.
+- Modernized the type hints of `qmi.instruments.newport.single_axis_motion_controller`, `qmi.instruments.newport.smc_100cc` and `qmi.instruments.newport.smc_100pp` to use builtin generics and `X | None` instead of the `typing` module's `Dict`, `List`, `Optional`, `Tuple` and `Union`.
 
 ### Fixed
 - `qmi.core.logging_init.start_logging()` used `logging.basicConfig()` to install the console log handler. `basicConfig()` silently does nothing once the root logger already has handlers, so a second call (for example a new `qmi.start()` after `qmi.stop()`, with a changed `console_loglevel` in `qmi.conf`) had no effect. The console handler is now tracked explicitly, like the file handler, and is replaced via `logging.getLogger().addHandler()` on every call.

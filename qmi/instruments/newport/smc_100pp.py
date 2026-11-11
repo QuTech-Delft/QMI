@@ -3,7 +3,6 @@ Instrument driver for the Newport SMC100PP motion controller.
 """
 import logging
 from time import sleep
-from typing import Dict, Optional
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
@@ -23,7 +22,7 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
                  name: str,
                  transport: str,
                  serial: str,
-                 actuators: Dict[Optional[int], LinearActuator],
+                 actuators: dict[int | None, LinearActuator],
                  baudrate: int = 57600) -> None:
         """Initialize driver.
 
@@ -40,7 +39,7 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
                          actuators, baudrate)
 
     @rpc_method
-    def get_micro_step_per_full_step_factor(self, controller_address: Optional[int] = None) -> float:
+    def get_micro_step_per_full_step_factor(self, controller_address: int | None = None) -> float:
         """
         Get the micro-step per full step factor of the motor configuration.
 
@@ -63,7 +62,7 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
         return float(factor[4:])
 
     @rpc_method
-    def set_micro_step_per_full_step_factor(self, factor: int, controller_address: Optional[int] = None) -> None:
+    def set_micro_step_per_full_step_factor(self, factor: int, controller_address: int | None = None) -> None:
         """
         Set the micro-step per full step factor of the motor configuration.
 
@@ -88,7 +87,7 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
         self._exit_configuration_state()
 
     @rpc_method
-    def get_motion_distance_per_full_step(self, controller_address: Optional[int] = None) -> float:
+    def get_motion_distance_per_full_step(self, controller_address: int | None = None) -> float:
         """
         Get the motion distance per motor’s full step.
 
@@ -111,7 +110,7 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
         return float(m_dist[4:])
 
     @rpc_method
-    def set_motion_distance_per_full_step(self, m_dist: float, controller_address: Optional[int] = None) -> None:
+    def set_motion_distance_per_full_step(self, m_dist: float, controller_address: int | None = None) -> None:
         """
         Set the motion distance per motor’s full step.
 
@@ -136,7 +135,7 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
         self._exit_configuration_state()
 
     @rpc_method
-    def get_base_velocity(self, controller_address: Optional[int] = None) -> float:
+    def get_base_velocity(self, controller_address: int | None = None) -> float:
         """
         Get the profile generator base velocity.
 
@@ -172,7 +171,7 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_base_velocity(
-            self, base_velocity: float, persist: Optional[bool] = False, controller_address: Optional[int] = None
+            self, base_velocity: float, persist: bool | None = False, controller_address: int | None = None
     ) -> None:
         """
         Set the profile generator base velocity. It must not be larger than the maximum velocity set by VA command.
