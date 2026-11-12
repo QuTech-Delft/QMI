@@ -1,23 +1,23 @@
 """Unit-tests for Santec TSL-570 driver class."""
 import logging
 import random
+import struct
 import unittest
 from unittest.mock import call, patch, Mock
 import numpy as np
 
-import qmi
 from qmi.core.scpi_protocol import ScpiProtocol
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
-
 from qmi.instruments.santec.tsl_570 import Santec_Tsl570
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class TestSantecTsl570OpenClose(unittest.TestCase):
 
     def setUp(self):
         logging.getLogger("qmi.instruments.santec.tsl_570").setLevel(logging.CRITICAL)
-        qmi.start("TestSantecTsl570ClassContext")
         # Add patches
         patcher = patch('qmi.instruments.santec.tsl_570.create_transport', spec=QMI_TcpTransport)
         self._transport_mock = patcher.start()
@@ -27,10 +27,9 @@ class TestSantecTsl570OpenClose(unittest.TestCase):
         self.addCleanup(patcher2.stop)
         self._scpi_mock.write = Mock()
         # Make DUT
-        self.instr: Santec_Tsl570 = Santec_Tsl570(qmi.context(), "Santec_laser", "")
+        self.instr: Santec_Tsl570 = Santec_Tsl570(QMI_Context("Santec_tls-570-test"), "Santec_laser", "")
 
     def tearDown(self):
-        qmi.stop()
         logging.getLogger("qmi.instruments.santec.tsl_570").setLevel(logging.NOTSET)
 
     def test_open_close(self):
@@ -133,7 +132,6 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         self.power_max = 13.0
 
         logging.getLogger("qmi.instruments.santec.tsl_570").setLevel(logging.CRITICAL)
-        qmi.start("TestSantecTsl570ClassContext")
         # Add patches
         patcher = patch('qmi.instruments.santec.tsl_570.create_transport', spec=QMI_TcpTransport)
         self._transport_mock = patcher.start()
@@ -150,14 +148,13 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         ]
         self._scpi_mock.write = Mock()
         # Make DUT
-        self.instr: Santec_Tsl570 = Santec_Tsl570(qmi.context(), "RSB100a", "")
+        self.instr: Santec_Tsl570 = Santec_Tsl570(QMI_Context("Santec_tls-570-test"), "RSB100a", "")
         self.instr.open()
         # Reset the SCPI mock for further tests
         self._scpi_mock.reset_mock()
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
         logging.getLogger("qmi.instruments.santec.tsl_570").setLevel(logging.NOTSET)
 
     def test_wrong_int_value(self):
@@ -1448,6 +1445,46 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         self._scpi_mock.assert_has_calls([call().ask(":SYST:ERR?")])
         self._scpi_mock.assert_has_calls([call().ask(":SYST:ALER?")])
 
+    def test_set_trigger_input_standby(self):
+        """Test setting the trigger input standby mode."""
+        inputs = [True, False]
+        self._scpi_mock(self._transport_mock).ask.side_effect = [
+            '0,"No error"',
+            "No alerts.",
+            '0,"No error"',
+            "No alerts.",
+        ]
+        expected_calls = [
+            call().write(":TRIG:INP:STAN 1"),
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?"),
+            call().write(":TRIG:INP:STAN 0"),
+            call().ask(":SYST:ERR?"),
+            call().ask(":SYST:ALER?"),
+        ]
+        # Act
+        for inp in inputs:
+            self.instr.set_trigger_input_standby(inp)
+        # Assert
+        self._scpi_mock.assert_has_calls(expected_calls)
+
+    def test_get_trigger_input_standby(self):
+        """Test getting the trigger input standby mode."""
+        self._scpi_mock(self._transport_mock).ask.side_effect = ["1", "0"]
+        # Act
+        enabled = self.instr.get_trigger_input_standby()
+        disabled = self.instr.get_trigger_input_standby()
+        # Assert
+        self.assertTrue(enabled)
+        self.assertFalse(disabled)
+        self._scpi_mock.assert_has_calls([call().ask(":TRIG:INP:STAN?")])
+
+    def test_get_trigger_input_standby_excepts(self):
+        """See that the function excepts with an unexpected response."""
+        self._scpi_mock(self._transport_mock).ask.side_effect = ["2"]
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.get_trigger_input_standby()
+
     def test_readout_points(self):
         """Test getting number of readout points."""
         readout_points = 124
@@ -1476,6 +1513,29 @@ class TestSantecTsl570ClassMethods(unittest.TestCase):
         # Use numpy list assertion as otherwise some float inaccuracy errors appear
         np.testing.assert_allclose(expected_data, data, rtol=1e-4)
         self._scpi_mock.assert_has_calls(expected_write_calls)
+
+    def test_readout_power_data(self):
+        """Test reading out power monitor data."""
+        expected_data_points = 200
+        expected_data = [random.uniform(-10.0, 10.0) for _ in range(expected_data_points)]
+        binary_data = struct.pack(f"<{expected_data_points}f", *expected_data)
+        self._scpi_mock(self._transport_mock).read_binary_data.side_effect = [
+            binary_data
+        ]
+        expected_write_calls = [
+            call().write(":READout:DATa:POWer?"),
+        ]
+        # Act
+        data = self.instr.readout_power_data()
+        # Assert
+        np.testing.assert_allclose(expected_data, data, rtol=1e-6)
+        self._scpi_mock.assert_has_calls(expected_write_calls)
+
+    def test_readout_power_data_excepts(self):
+        """See that the function excepts if the data length is not a multiple of 4 bytes."""
+        self._scpi_mock(self._transport_mock).read_binary_data.side_effect = [b"\x00" * 7]
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.readout_power_data()
 
     def test_shutdown(self):
         """Test shutdown."""
