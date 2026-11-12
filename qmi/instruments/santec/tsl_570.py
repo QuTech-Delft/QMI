@@ -3,6 +3,7 @@ Instrument driver for the Santec TSL 570 laser.
 """
 
 import logging
+import struct
 from dataclasses import dataclass
 
 from qmi.core.context import QMI_Context
@@ -46,6 +47,7 @@ class Santec_Tsl570(QMI_Instrument):
     The driver is currently based on running at "Legacy" communication, which is also based on
     SCPI protocol, but perhaps not fully complying to it.
     """
+    _rpc_properties = {"DEFAULT_RESPONSE_TIMEOUT"}
 
     # Default response timeout in seconds.
     DEFAULT_RESPONSE_TIMEOUT = 5.0
@@ -879,6 +881,25 @@ class Santec_Tsl570(QMI_Instrument):
         self._write_and_check_errors(":TRIG:INP:SOFT")
 
     @rpc_method
+    def set_trigger_input_standby(self, enabled: bool) -> None:
+        """Enable or disable the trigger input standby mode. In standby mode, a started sweep waits in the
+        "Standing by trigger" state until a trigger is received, e.g. by `issue_soft_trigger`.
+
+        Parameters:
+            enabled: True to enable, False to disable the trigger input standby mode.
+        """
+        self._write_and_check_errors(f":TRIG:INP:STAN {int(enabled)}")
+
+    @rpc_method
+    def get_trigger_input_standby(self) -> bool:
+        """Get the trigger input standby mode.
+
+        Returns:
+            enabled: True if the trigger input standby mode is enabled, else False.
+        """
+        return self._ask_bool(":TRIG:INP:STAN?")
+
+    @rpc_method
     def readout_points(self) -> int:
         """reads the number of logging data available.
 
@@ -902,6 +923,25 @@ class Santec_Tsl570(QMI_Instrument):
         hex_data = [binary_data[p : p + data_binary_size] for p in range(0, len(binary_data), data_binary_size)]
 
         return [int.from_bytes(h_d, byteorder="little") * 1e-4 for h_d in hex_data]
+
+    @rpc_method
+    def readout_power_data(self) -> list[float]:
+        """Read out power monitor logging data of the last sweep. The data points are returned as 4-byte
+        little-endian floating point values, in the power level unit of the instrument.
+
+        Returns:
+            data: Power monitor data points list.
+
+        Raises:
+            QMI_InstrumentException: If the binary data length is not a multiple of 4 bytes.
+        """
+        data_binary_size = 4
+        self._scpi_protocol.write(":READout:DATa:POWer?")
+        binary_data = self._scpi_protocol.read_binary_data(read_terminator_flag=False)
+        if len(binary_data) % data_binary_size:
+            raise QMI_InstrumentException(f"Invalid power data length {len(binary_data)} bytes.")
+
+        return list(struct.unpack(f"<{len(binary_data) // data_binary_size}f", binary_data))
 
     @rpc_method
     def shutdown(self) -> None:
