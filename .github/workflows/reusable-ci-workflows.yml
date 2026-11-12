@@ -61,7 +61,7 @@ jobs:
           path: mypy-${{ inputs.python-version }}.log
 
       - name: Run coverage
-        timeout-minutes: 15
+        timeout-minutes: 20
         run: |
           batch=0
           for dir in "."; do
@@ -69,12 +69,12 @@ jobs:
             if [ -n "$subdirs" ]; then
               for subdir in $subdirs; do
                 echo "Running coverage for tests in $subdir"
-                coverage run --branch --data-file=".coverage.$batch" -m unittest discover --start-directory="$subdir" --pattern="test_*.py"
+                timeout -s ABRT -k 30s 9m python -X faulthandler -m coverage run --branch --data-file=".coverage.$batch" -m unittest discover -v --start-directory="$subdir" --pattern="test_*.py"
                 batch=$((batch + 1))
               done
             else
               echo "Running coverage for tests in tests/$dir"
-              coverage run --branch --data-file=".coverage.$batch" -m unittest discover --start-directory=tests/"$dir" --pattern="test_*.py"
+              timeout -s ABRT -k 30s 9m python -X faulthandler -m coverage run --branch --data-file=".coverage.$batch" -m unittest discover -v --start-directory=tests/"$dir" --pattern="test_*.py"
               batch=$((batch + 1))
             fi
           done
