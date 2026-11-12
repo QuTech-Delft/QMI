@@ -63,6 +63,8 @@ jobs:
       - name: Run coverage
         timeout-minutes: 20
         run: |
+          ( while sleep 15; do echo "[mon] $(date -u +%T) $(free -m | awk '/Mem:/{print "used="$3"M avail="$7"M"}') threads=$(ps -eLf | wc -l)"; done ) &
+          ulimit -v 6000000
           batch=0
           for dir in "."; do
             subdirs=$(find "tests/$dir" -mindepth 1 -maxdepth 1 -type d ! -name "__pycache__" ! -name "data")
