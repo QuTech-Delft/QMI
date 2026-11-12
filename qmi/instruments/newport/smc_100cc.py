@@ -3,7 +3,6 @@ Instrument driver for the Newport SMC100CC motion controller.
 """
 import logging
 from time import sleep
-from typing import Dict, Optional
 import enum
 
 from qmi.core.context import QMI_Context
@@ -30,11 +29,12 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
                  name: str,
                  transport: str,
                  serial: str,
-                 actuators: Dict[Optional[int], LinearActuator],
+                 actuators: dict[int | None, LinearActuator],
                  baudrate: int = 57600) -> None:
         """Initialize driver.
 
         Parameters:
+            context:    QMI_Context object for this instrument instance.
             name:       Name for this instrument instance.
             transport:  QMI transport descriptor to connect to the instrument.
             serial:     The serial number of the instrument.
@@ -67,7 +67,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         return persist
 
     def _set_configuration_or_disable(self, parameter: str, persist: bool):
-        """The state must be either CONFIGURATION or DISABLE.
+        """Enter either CONFIGURATION or DISABLE state, depending on the `persist` flag.
 
         Parameters:
             parameter: String to indicate which command parameter is being checked
@@ -88,7 +88,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
         Parameters:
             exit_persist: True to exit from CONFIGURATION state to NOT REFERENCED state.
-                               False to exit from DISABLE state to READY state.
+                          False to exit from DISABLE state to READY state.
         """
         if exit_persist:
             self._exit_configuration_state()
@@ -97,13 +97,13 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             self._exit_disable_state()
 
     @rpc_method
-    def get_encoder_increment_value(self, controller_address: Optional[int] = None) -> float:
+    def get_encoder_increment_value(self, controller_address: int | None = None) -> float:
         """
         Get the encoder increment value.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             Encoder increment value.
@@ -119,7 +119,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         return self._actuators[self.controller_address].ENCODER_RESOLUTION / float(res[3:])
 
     @rpc_method
-    def set_encoder_increment_value(self, value: float, controller_address: Optional[int] = None) -> None:
+    def set_encoder_increment_value(self, value: float, controller_address: int | None = None) -> None:
         """
         Set the encoder increment value. By default, to be as close to 1mm as possible.
         Check the example (SU command) in the doc below to see how the increment value is calculated:
@@ -127,8 +127,8 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
         Parameters:
             value:              Increment value.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
         """
         self.controller_address = controller_address
         _logger.info(
@@ -141,13 +141,16 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_state()
 
     @rpc_method
-    def get_driver_voltage(self, controller_address: Optional[int] = None) -> float:
+    def get_driver_voltage(self, controller_address: int | None = None) -> float:
         """
         Get the max. output voltage of the driver to the motor.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Returns:
+            The max. output voltage of the driver to the motor.
         """
         self.controller_address = controller_address
         _logger.info(
@@ -160,14 +163,17 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         return float(driver_voltage[3:])
 
     @rpc_method
-    def set_driver_voltage(self, driver_voltage: float, controller_address: Optional[int] = None) -> None:
+    def set_driver_voltage(self, driver_voltage: float, controller_address: int | None = None) -> None:
         """
         Set the max. output voltage of the driver to the motor.
 
         Parameters:
             driver_voltage:     New motor driver voltage in Volts. Must be 12 V <= driver_voltage <= 48 V.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided driver voltage is out of the valid range.
         """
         if driver_voltage < 12.0 or driver_voltage > 48.0:
             raise QMI_InstrumentException(
@@ -186,13 +192,13 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_state()
 
     @rpc_method
-    def get_low_pass_filter_cutoff_frequency(self, controller_address: Optional[int] = None) -> float:
+    def get_low_pass_filter_cutoff_frequency(self, controller_address: int | None = None) -> float:
         """
         Get the low pass filter cut-off frequency Kd.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The low pass filter cut-off frequency, Kd, in Hertz.
@@ -210,7 +216,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_low_pass_filter_cutoff_frequency(
-            self, frequency: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+            self, frequency: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the low pass filter cut-off frequency Kd. Can be set only in CONFIGURATION or DISABLE states.
 
@@ -219,8 +225,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             persist:            Flag to indicate if the frequency cutoff should be persisted to the controller's memory,
                                 so it is still available after powering down the controller. When not persisted, the
                                 frequency cutoff is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised frequency of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided frequency is out of the valid range.
         """
         if frequency <= self.MIN_FLOAT_LIMIT or frequency >= 2000:
             raise QMI_InstrumentException(
@@ -237,13 +246,13 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_following_error_limit(self, controller_address: Optional[int] = None) -> float:
+    def get_following_error_limit(self, controller_address: int | None = None) -> float:
         """
         Get the maximum allowed following error.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The value for the maximum allowed following error.
@@ -262,7 +271,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_following_error_limit(
-            self, error_limit: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+            self, error_limit: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the value for the maximum allowed following error. It can be set only in CONFIGURATION or DISABLE state.
 
@@ -271,8 +280,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             persist:            Flag to indicate if the error limit should be persisted to the controller's memory, so
                                 it is still available after powering down the controller. When not persisted, the error
                                 limit is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised error limit of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided error limit is out of the valid range.
         """
         if error_limit <= self.MIN_FLOAT_LIMIT or error_limit >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
@@ -293,13 +305,16 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_friction_compensation(self, controller_address: Optional[int] = None) -> float:
+    def get_friction_compensation(self, controller_address: int | None = None) -> float:
         """
         Get the friction compensation.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Returns:
+            The friction compensation.
         """
         self.controller_address = controller_address
         _logger.info(
@@ -314,7 +329,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_friction_compensation(
-            self, friction_compensation: float, persist: bool = False, controller_address: Optional[int] = None
+            self, friction_compensation: float, persist: bool = False, controller_address: int | None = None
     ) -> None:
         """
         Set the friction compensation. It must not be larger than the driver voltage set by DV command. We can check
@@ -328,8 +343,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             persist:               Flag to indicate if the friction compensation should be persisted to the controller's
                                    memory, so it is still available after powering down the controller. When not
                                    persisted, the friction compensation is the one stored in the controller's memory.
-            controller_address:    Optional address of the controller that needs to be controlled. By default,
-                                   it is set to the initialised value of the controller address.
+            controller_address:    Optional address of the controller to send the command to. If not given,
+                                   DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided friction compensation value is out of the valid range.
         """
         self.controller_address = controller_address
         if persist:
@@ -362,13 +380,13 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_derivative_gain(self, controller_address: Optional[int] = None) -> float:
+    def get_derivative_gain(self, controller_address: int | None = None) -> float:
         """
         Get the derivative gain of the PID control loop.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The derivative gain of the PID control loop.
@@ -386,7 +404,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_derivative_gain(
-            self, derivative_gain: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+            self, derivative_gain: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the derivative gain of the PID control loop.
 
@@ -395,8 +413,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             persist:            Flag to indicate if the derivative gain should be persisted to the controller's memory,
                                 so it is still available after powering down the controller. When not persisted, the
                                 derivative gain is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised derivative_gain of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided derivative gain is out of the valid range.
         """
         if derivative_gain < 0 or derivative_gain >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
@@ -415,13 +436,13 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_integral_gain(self, controller_address: Optional[int] = None) -> float:
+    def get_integral_gain(self, controller_address: int | None = None) -> float:
         """
         Get the integral gain of the PID control loop.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The integral gain of the PID control loop.
@@ -439,17 +460,20 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_integral_gain(
-            self, integral_gain: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+            self, integral_gain: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the integral gain of the PID control loop.
 
         Parameters:
-            integral_gain:    New integral_gain value in Volt * second/preset unit.
+            integral_gain:      New integral_gain value in Volt * second/preset unit.
             persist:            Flag to indicate if the integral gain should be persisted to the controller's memory,
                                 so it is still available after powering down the controller. When not persisted, the
                                 integral gain is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised integral_gain of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided integral gain is out of the valid range.
         """
         if integral_gain < 0 or integral_gain >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
@@ -468,13 +492,13 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_proportional_gain(self, controller_address: Optional[int] = None) -> float:
+    def get_proportional_gain(self, controller_address: int | None = None) -> float:
         """
         Get the proportional gain of the PID control loop.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The proportional gain of the PID control loop.
@@ -492,7 +516,7 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_proportional_gain(
-            self, proportional_gain: float, persist: bool = False, controller_address: Optional[int] = None) -> None:
+            self, proportional_gain: float, persist: bool = False, controller_address: int | None = None) -> None:
         """
         Set the proportional gain of the PID control loop.
 
@@ -501,8 +525,11 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
             persist:            Flag to indicate if the proportional gain should be persisted to the controller's
                                 memory, so it is still available after powering down the controller. When not persisted,
                                 the proportional gain is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised proportional_gain of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided proportional gain is out of the valid range.
         """
         if proportional_gain < 0 or proportional_gain >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
@@ -523,13 +550,13 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_velocity_feed_forward(self, controller_address: Optional[int] = None) -> float:
+    def get_velocity_feed_forward(self, controller_address: int | None = None) -> float:
         """
         Get the velocity feed forward of the PID control loop.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             The velocity feed forward of the PID control loop.
@@ -547,18 +574,22 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_velocity_feed_forward(
-            self, velocity_feed_forward: float, persist: bool = False, controller_address: Optional[int] = None
+            self, velocity_feed_forward: float, persist: bool = False, controller_address: int | None = None
     ) -> None:
         """
         Set the velocity feed forward of the PID control loop.
 
         Parameters:
             velocity_feed_forward: New velocity_feed_forward value in Volt * second/preset unit.
-            persist:            Flag to indicate if the velocity feed forward should be persisted to the controller's
-                                memory, so it is still available after powering down the controller. When not persisted,
-                                the velocity feed forward is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised velocity_feed_forward of the controller address.
+            persist:               Flag to indicate if the velocity feed forward should be persisted to the
+                                   controller's memory, so it is still available after powering down the controller.
+                                   When not persisted, the velocity feed forward is the one stored in the
+                                   controller's memory.
+            controller_address:    Optional address of the controller to send the command to. If not given,
+                                   DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided velocity feed forward is out of the valid range.
         """
         if velocity_feed_forward < 0 or velocity_feed_forward >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
@@ -579,13 +610,13 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         self._exit_configuration_or_disable(persist)
 
     @rpc_method
-    def get_control_loop_state(self, controller_address: Optional[int] = None) -> ControlLoopState:
+    def get_control_loop_state(self, controller_address: int | None = None) -> ControlLoopState:
         """
         Get the current state of the control loop.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             control_loop_state: The current control loop state.
@@ -602,14 +633,17 @@ class Newport_SMC100CC(Newport_SingleAxisMotionController):
         return ControlLoopState(int(control_loop_state[3:]))
 
     @rpc_method
-    def set_control_loop_state(self, control_loop_state: int, controller_address: Optional[int] = None) -> None:
+    def set_control_loop_state(self, control_loop_state: int, controller_address: int | None = None) -> None:
         """
         Set the current state of the control loop.
 
         Parameters:
             control_loop_state: New state for the control loop. 0 is OPEN, 1 is CLOSED.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the provided control loop state is not a valid value.
         """
         cls_values = [c.value for c in set(ControlLoopState)]
         if control_loop_state not in cls_values:

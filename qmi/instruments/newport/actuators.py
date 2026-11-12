@@ -3,13 +3,27 @@ from typing import NamedTuple
 
 
 class TravelRange(NamedTuple):
-    """Travel range """
+    """The allowed travel range of a linear actuator.
+
+    Attributes:
+        min: Minimum allowed position in mm.
+        max: Maximum allowed position in mm.
+    """
     min: float
     max: float
 
 
 class LinearActuator:
-    """Linear actuator."""
+    """Linear actuator.
+
+    Attributes:
+        TRAVEL_RANGE:           The allowed travel range of the actuator, as a `TravelRange` of min/max in mm.
+        MAX_VELOCITY:           Maximum velocity in mm/s.
+        MIN_VELOCITY:           Minimum velocity in mm/s.
+        MIN_INCREMENTAL_MOTION: Minimum incremental motion in mm.
+        PUSH_FORCE:             Maximum push force in N.
+        ENCODER_RESOLUTION:     Resolution of the encoder in mm.
+    """
 
     def __init__(self,
                  travel_range_min: float,
@@ -29,7 +43,7 @@ class LinearActuator:
             min_velocity:               Minimum velocity in mm/s.
             min_incremental_motion:     Minimum incremental motion in mm.
             push_force:                 Maximum push force in N.
-            encoder_resolution:         Resolution of encoder in mm
+            encoder_resolution:         Resolution of encoder in mm.
         """
         self.TRAVEL_RANGE = TravelRange(travel_range_min, travel_range_max)
         self.MAX_VELOCITY = max_velocity
@@ -39,7 +53,7 @@ class LinearActuator:
         self.ENCODER_RESOLUTION = encoder_resolution
 
 
-# max speed set to 0.03mm/s as axials loads over 45N can only support 0.03mm/s
+# Maximum speed is set to 0.03 mm/s, as axial loads over 45 N can only support 0.03 mm/s.
 TRA12CC: LinearActuator = LinearActuator(
     0, 12, 0.03, 0.000001, 0.0002, 60, 0.000030517578)
 TRB6CC: LinearActuator = LinearActuator(
