@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.55.0-beta.0] - Unreleased
 
 ### Added
+- QMI driver for the AlphaLab MR3 three-axis magnetic field meter, `qmi.instruments.alphalab.AlphaLab_MR3`, communicating over a serial port using the AlphaLab Data Acquisition Communication Protocol. Includes unit tests in `tests/instruments/alphalab/test_mr3.py`.
 - QMI driver for the Bluefors dilution refrigerator, `qmi.instruments.bluefors.Bluefors_DilutionRefrigerator`, based on the Bluefors control software HTTP API. Includes unit tests in `tests/instruments/bluefors/test_dilution_refrigerator.py`.
 - `qmi.core.logging_init.stop_logging()`, which undoes `start_logging()`: it removes the QMI console and file log handlers, restores the original `sys.excepthook`, and switches off `logging.captureWarnings()`. `qmi.stop()` now calls it automatically when the matching `qmi.start()` initialized logging.
 - QMI driver for the Keithley 2400 series SourceMeter, `qmi.instruments.keithley.Keithley_Sourcemeter2400`, supporting GPIB and RS-232 transports. Implements resetting, configuring a fixed voltage or current source, selecting the sense function, reading out the measured voltage, and switching the output on and off.
