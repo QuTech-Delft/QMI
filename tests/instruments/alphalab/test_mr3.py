@@ -254,7 +254,10 @@ class AlphaLabMR3TestCase(unittest.TestCase):
     def test_perform_measurement_settings_changed_logs_warning(self):
         """A data point with the settings-changed flag logs a warning."""
         self._set_stream_response(make_data_point(0, settings_changed=True), *(4 * [make_data_point(0)]))
-        logging.getLogger("qmi.instruments.alphalab.mr3").setLevel(logging.WARNING)
+        # Other test modules may have disabled logging globally with `logging.disable()`, which `assertLogs` does
+        # not override. Lift it for this test only. The logger level itself is lowered by `assertLogs`.
+        self.addCleanup(logging.disable, logging.root.manager.disable)
+        logging.disable(logging.NOTSET)
 
         with self.assertLogs("qmi.instruments.alphalab.mr3", logging.WARNING):
             self.instr.perform_measurement()
