@@ -109,6 +109,7 @@ class AlphaLabMR3TestCase(unittest.TestCase):
     def tearDown(self) -> None:
         if self.instr.is_open():
             self.instr.close()
+        logging.getLogger("qmi.instruments.alphalab.mr3").setLevel(logging.NOTSET)
 
     def _set_stream_response(self, *data_points: bytes, terminator: bytes = ACK) -> None:
         self.transport.read.return_value = b"".join(data_points) + terminator
@@ -253,6 +254,7 @@ class AlphaLabMR3TestCase(unittest.TestCase):
     def test_perform_measurement_settings_changed_logs_warning(self):
         """A data point with the settings-changed flag logs a warning."""
         self._set_stream_response(make_data_point(0, settings_changed=True), *(4 * [make_data_point(0)]))
+        logging.getLogger("qmi.instruments.alphalab.mr3").setLevel(logging.WARNING)
 
         with self.assertLogs("qmi.instruments.alphalab.mr3", logging.WARNING):
             self.instr.perform_measurement()
@@ -341,6 +343,7 @@ class AlphaLabMR3DataLabelsTestCase(unittest.TestCase):
     def tearDown(self) -> None:
         if self.instr.is_open():
             self.instr.close()
+        logging.getLogger("qmi.instruments.alphalab.mr3").setLevel(logging.NOTSET)
 
     def test_default_labels_do_not_query_properties(self):
         """With no empty labels, only the stream command is sent."""
