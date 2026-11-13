@@ -38,7 +38,7 @@ class TestDerivingClassCase(unittest.TestCase):
         """
         Test SMC100PP
         """
-        expected_rpc_class = "qmi.instruments.newport.smc_100pp.Newport_SMC100PP"
+        expected_rpc_class = "Newport_SMC100PP"
         # Make DUT
         self.instr: Newport_Smc100Pp = Newport_Smc100Pp(
             self._ctx, "pp_controller", "Beverly_Hills", "FT5TMFGL", {1: UTS100PP}, 90210
@@ -50,7 +50,7 @@ class TestDerivingClassCase(unittest.TestCase):
         """
         Test SMC100CC
         """
-        expected_rpc_class = "qmi.instruments.newport.smc_100cc.Newport_SMC100CC"
+        expected_rpc_class = "Newport_SMC100CC"
         # Make DUT
         self.instr: Newport_Smc100Cc = Newport_Smc100Cc(
             self._ctx,
@@ -67,7 +67,7 @@ class TestDerivingClassCase(unittest.TestCase):
         """
         Test Conex CC
         """
-        expected_rpc_class = "qmi.instruments.newport.conex_cc.Newport_ConexCC"
+        expected_rpc_class = "Newport_ConexCC"
         # Make DUT
         self.instr: Newport_ConexCc = Newport_ConexCc(
             self._ctx,
