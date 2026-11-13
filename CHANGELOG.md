@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.55.0-beta.0] - Unreleased
 
 ### Added
+- QMI driver for the Bluefors dilution refrigerator, `qmi.instruments.bluefors.Bluefors_DilutionRefrigerator`, based on the Bluefors control software HTTP API.
 - `qmi.core.logging_init.stop_logging()`, which undoes `start_logging()`: it removes the QMI console and file log handlers, restores the original `sys.excepthook`, and switches off `logging.captureWarnings()`. `qmi.stop()` now calls it automatically when the matching `qmi.start()` initialized logging.
 - QMI driver for the Keithley 2400 series SourceMeter, `qmi.instruments.keithley.Keithley_Sourcemeter2400`, supporting GPIB and RS-232 transports. Implements resetting, configuring a fixed voltage or current source, selecting the sense function, reading out the measured voltage, and switching the output on and off.
 - `qmi.instruments.newport.single_axis_motion_controller.Newport_SingleAxisMotionController.DEFAULT_CONTROLLER_ADDRESS`, `DEFAULT_RESPONSE_TIMEOUT` and `DEFAULT_HOME_SEARCH_TIMEOUT` are now RPC properties, so e.g. `instr.DEFAULT_CONTROLLER_ADDRESS = 2` can be used to change the controller address that subsequent commands default to, without having to pass an explicit `controller_address` to every call. This also applies to the `Newport_SMC100CC`, `Newport_SMC100PP` and `Newport_ConexCC` drivers that derive from it.
