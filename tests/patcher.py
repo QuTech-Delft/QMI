@@ -40,7 +40,6 @@ class PatcherQmiContext:
 
     def stop(self):
         """Stop the qmi_context and patcher."""
-        qmi.stop()
         self.qmi_patcher.stop()
 
     def make_instrument(self, instrument_name, instrument_class, *args, **kwargs):

@@ -1,22 +1,26 @@
 """Unit tests for a Newport single axis motion controller."""
 
-from typing import cast
+import logging
 import unittest
 from unittest.mock import MagicMock, Mock, call, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
-from qmi.utils.context_managers import start_stop
 from qmi.instruments.newport import Newport_Smc100Pp, Newport_Smc100Cc, Newport_ConexCc
 from qmi.instruments.newport.actuators import TRA12CC, TRB6CC, CMA25CCL, UTS100PP
 from qmi.instruments.newport.single_axis_motion_controller import Newport_SingleAxisMotionController
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class TestDerivingClassCase(unittest.TestCase):
     """Test that the creation of child classes of Newport_Single_Axis_Motion_Controller work as expected."""
 
     def setUp(self):
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.CRITICAL)
+        self._ctx = QMI_Context("TestDerivingClassContext")
+        self._ctx.start()
+        self.addCleanup(self._ctx.stop)
         # Add patches
         patcher = patch(
             "qmi.instruments.newport.single_axis_motion_controller.create_transport", spec=QMI_TcpTransport
@@ -27,54 +31,54 @@ class TestDerivingClassCase(unittest.TestCase):
         self._scpi_mock: Mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
 
+    def tearDown(self):
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.NOTSET)
+
     def test_smc100pp(self):
         """
         Test SMC100PP
         """
-        expected_rpc_class = "qmi.instruments.newport.smc_100pp.Newport_SMC100PP"
-        with qmi.start("TestSMC100PP", console_loglevel="CRITICAL"):
-            # Make DUT
-            self.instr: Newport_Smc100Pp = qmi.make_instrument(
-                "pp_controller", Newport_Smc100Pp, "Beverly_Hills", "FT5TMFGL", {1: UTS100PP}, 90210
-            )
-            # Test __init__ is of correct module
-            self.assertIn(expected_rpc_class, str(self.instr.__init__))
+        expected_rpc_class = "Newport_SMC100PP"
+        # Make DUT
+        self.instr: Newport_Smc100Pp = Newport_Smc100Pp(
+            self._ctx, "pp_controller", "Beverly_Hills", "FT5TMFGL", {1: UTS100PP}, 90210
+        )
+        # Test __init__ is of correct module
+        self.assertIn(expected_rpc_class, str(self.instr.__init__))
 
     def test_smc100cc(self):
         """
         Test SMC100CC
         """
-        expected_rpc_class = "qmi.instruments.newport.smc_100cc.Newport_SMC100CC"
-        with qmi.start("TestSMC100CC", console_loglevel="CRITICAL"):
-            # Make DUT
-            self.instr: Newport_Smc100Cc = qmi.make_instrument(
-                "sam_controller",
-                Newport_Smc100Cc,
-                "Beverly_Hills",
-                "FT5TMFGL",
-                {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
-                90210,
-            )
-            # Test __init__ is of correct module
-            self.assertIn(expected_rpc_class, str(self.instr.__init__))
+        expected_rpc_class = "Newport_SMC100CC"
+        # Make DUT
+        self.instr: Newport_Smc100Cc = Newport_Smc100Cc(
+            self._ctx,
+            "sam_controller",
+            "Beverly_Hills",
+            "FT5TMFGL",
+            {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
+            90210,
+        )
+        # Test __init__ is of correct module
+        self.assertIn(expected_rpc_class, str(self.instr.__init__))
 
     def test_conex_cc(self):
         """
         Test Conex CC
         """
-        expected_rpc_class = "qmi.instruments.newport.conex_cc.Newport_ConexCC"
-        with qmi.start("TestConexCC", console_loglevel="CRITICAL"):
-            # Make DUT
-            self.instr: Newport_ConexCc = qmi.make_instrument(
-                "sam_controller",
-                Newport_ConexCc,
-                "Beverly_Hills",
-                "FT5TMFGL",
-                {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
-                90210,
-            )
-            # Test __init__ is of correct module
-            self.assertIn(expected_rpc_class, str(self.instr.__init__))
+        expected_rpc_class = "Newport_ConexCC"
+        # Make DUT
+        self.instr: Newport_ConexCc = Newport_ConexCc(
+            self._ctx,
+            "sam_controller",
+            "Beverly_Hills",
+            "FT5TMFGL",
+            {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
+            90210,
+        )
+        # Test __init__ is of correct module
+        self.assertIn(expected_rpc_class, str(self.instr.__init__))
 
 
 class TestSingleAxisMotionController(unittest.TestCase):
@@ -85,7 +89,10 @@ class TestSingleAxisMotionController(unittest.TestCase):
     TRANSPORT_STR = "/dev/cu.usbserial-FT5TMFGL"
 
     def setUp(self):
-        qmi.start("TestSamControllerContext", console_loglevel="CRITICAL")
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.CRITICAL)
+        self._ctx = QMI_Context("TestSamControllerContext")
+        self._ctx.start()
+        self.addCleanup(self._ctx.stop)
         # Add patches
         patcher = patch(
             "qmi.instruments.newport.single_axis_motion_controller.create_transport", spec=QMI_TcpTransport
@@ -99,20 +106,19 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self.controller_address = 1
         Newport_SingleAxisMotionController.PW0_EXEC_TIME = 0.1
         Newport_SingleAxisMotionController.COMMAND_EXEC_TIME = 0.01
-        self.instr: Newport_SingleAxisMotionController = qmi.make_instrument(
+        self.instr: Newport_SingleAxisMotionController = Newport_SingleAxisMotionController(
+            self._ctx,
             "sam_controller",
-            Newport_SingleAxisMotionController,
             self.TRANSPORT_STR,
             "FT5TMFGL",
             {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
             90210,
         )
-        self.instr = cast(Newport_SingleAxisMotionController, self.instr)
         self.instr.open()
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.NOTSET)
 
     def test_reset_without_controller_address_resets(self):
         """Test reset."""
@@ -1348,6 +1354,7 @@ class TestControllerRs485AddressRestoration(unittest.TestCase):
     which is not exposed via RPC, can be inspected directly."""
 
     def setUp(self):
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.CRITICAL)
         patcher = patch(
             "qmi.instruments.newport.single_axis_motion_controller.create_transport", spec=QMI_TcpTransport
         )
@@ -1366,6 +1373,9 @@ class TestControllerRs485AddressRestoration(unittest.TestCase):
             {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
             90210,
         )
+
+    def tearDown(self):
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.NOTSET)
 
     def test_get_controller_rs485_address_restores_address_when_different(self):
         """Test that the controller address is switched to 1 and the original value is restored afterwards,

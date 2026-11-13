@@ -8,7 +8,7 @@ import logging
 import re
 import sys
 import time
-from typing import Any, List, Tuple, Union
+from typing import Any
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
@@ -49,7 +49,7 @@ class NewFocus_TLB670X(QMI_Instrument):
     VENDOR_ID = 0x104D
     PRODUCT_ID = 0x100A
 
-    def __init__(self, context: QMI_Context, name: str, serial_number: Union[int, str]) -> None:
+    def __init__(self, context: QMI_Context, name: str, serial_number: int | str) -> None:
         """Initialize the instrument driver.
 
         Parameters:
@@ -128,7 +128,7 @@ class NewFocus_TLB670X(QMI_Instrument):
 
         return response[0]
 
-    def _receive(self) -> List[str]:
+    def _receive(self) -> list[str]:
         """Query the controller for a command response.
 
         Returns:
@@ -158,7 +158,7 @@ class NewFocus_TLB670X(QMI_Instrument):
         response = [r for r in response if r != ""]
         return response
 
-    def _get_device_info(self) -> List[Tuple[int, str]]:
+    def _get_device_info(self) -> list[tuple[int, str]]:
         """Get the contents of the device information buffer (a list of deviceID,deviceDescription pairs).
 
         Raises:
@@ -253,7 +253,7 @@ class NewFocus_TLB670X(QMI_Instrument):
         self._uninit_device()
 
     @rpc_method
-    def get_available_devices_info(self) -> List[Tuple[int, str]]:
+    def get_available_devices_info(self) -> list[tuple[int, str]]:
         """Get a list of all available devices that match the product ID for the TLB670-X."""
         self._check_is_open()
         try:
@@ -381,7 +381,7 @@ class NewFocus_TLB670X(QMI_Instrument):
         return float(response)
 
     @rpc_method
-    def set_diode_current(self, current: Union[int, float, str]) -> None:
+    def set_diode_current(self, current: int | float | str) -> None:
         """Set the laser diode current in mA.
 
         Parameters:

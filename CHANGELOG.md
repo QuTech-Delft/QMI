@@ -15,10 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Modernized the type hints of `qmi.instruments.newport.single_axis_motion_controller`, `qmi.instruments.newport.smc_100cc` and `qmi.instruments.newport.smc_100pp` to use builtin generics and `X | None`.
+- Modernized the type hints of `qmi.instruments.newport.ag_uc8`, `conex_cc`, `newport_843r`, `newport_843r_libusb` and `tlb670x` to use builtin generics and `X | None`. Updated the Newport unit tests to use `tests.patcher` instead of running on full QMI contexts, and added missing unit tests for the 843R modules.
 - Improved and corrected the docstrings of `qmi.instruments.newport` modules `single_axis_motion_controller.py`, `smc_100cc.py`, `smc_100pp.py` and `actuators.py`.
 - `tests/instruments/santec/test_tsl_570.py` now uses `tests.patcher` instead of running on full QMI contexts.
 
 ### Fixed
+- `tests.patcher.PatcherQmiContext.stop()` no longer calls the now-unused `qmi.stop()`.
 - `qmi.core.logging_init.start_logging()` used `logging.basicConfig()` to install the console log handler. `basicConfig()` silently does nothing once the root logger already has handlers, so a second call (for example a new `qmi.start()` after `qmi.stop()`, with a changed `console_loglevel` in `qmi.conf`) had no effect. The console handler is now tracked explicitly, like the file handler, and is replaced via `logging.getLogger().addHandler()` on every call.
 - In `tests/instruments/thorlabs/test_tsp01b.py`, the cleanup of possibly earlier mocked `usb.core` and `usb.util` modules from `sys.modules` now checks the presence of `usb.util` separately, instead of deleting it unconditionally whenever `usb.core` was present.
 - `QbloxManager.__init__` now calls `_import_modules()`, so the lazily-imported `qblox_instruments` vendor module, `ChannelType` and `ChannelMapCache` are available as soon as a manager is created, instead of remaining `None` and raising errors on first use.
