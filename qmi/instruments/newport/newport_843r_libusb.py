@@ -92,7 +92,6 @@ where it can no longer respond to USB descriptor requests.
 """
 
 import logging
-from typing import List, Optional
 
 import usb
 import usb.core
@@ -110,7 +109,7 @@ class Newport_843R_libusb:
     INTERFACE = 0
 
     @classmethod
-    def list_instruments(cls) -> List[str]:
+    def list_instruments(cls) -> list[str]:
         """Return serial numbers of attached Newport 843-R instruments.
 
         Scan the USB bus for attached Newport 843-R instruments and
@@ -137,7 +136,7 @@ class Newport_843R_libusb:
 
         return instruments
 
-    def __init__(self, serial_number: Optional[str]) -> None:
+    def __init__(self, serial_number: str | None) -> None:
         """Open a connection to an attached Newport 843-R instrument.
 
         Note that read/write permission to the USB device node is

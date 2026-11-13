@@ -1,7 +1,6 @@
 """
 Instrument driver for the Newport CONEX-CC DC servo motion controller.
 """
-from typing import Dict, Optional
 from qmi.core.context import QMI_Context
 from qmi.instruments.newport.actuators import LinearActuator
 from qmi.instruments.newport.single_axis_motion_controller import Newport_SingleAxisMotionController
@@ -15,7 +14,7 @@ class Newport_ConexCC(Newport_SingleAxisMotionController):
                  name: str,
                  transport: str,
                  serial: str,
-                 actuators: Dict[Optional[int], LinearActuator],
+                 actuators: dict[int | None, LinearActuator],
                  baudrate: int = 921600) -> None:
         """Initialize driver.
 

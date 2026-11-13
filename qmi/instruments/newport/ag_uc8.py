@@ -4,7 +4,6 @@ import enum
 import logging
 import re
 import time
-from typing import Optional, Tuple
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
@@ -87,7 +86,7 @@ class Newport_AG_UC8(QMI_Instrument):
                 "stopbits": 1,
             },
         )
-        self._current_channel: Optional[int] = None
+        self._current_channel: int | None = None
 
     @rpc_method
     def open(self) -> None:
@@ -282,7 +281,7 @@ class Newport_AG_UC8(QMI_Instrument):
             self._current_channel = channel
 
     @rpc_method
-    def get_limit_status(self, channel: int) -> Tuple[bool, bool]:
+    def get_limit_status(self, channel: int) -> tuple[bool, bool]:
         """Get the limit switch status for the specified channel.
 
         :argument channel: Channel index (range 1 .. 4).

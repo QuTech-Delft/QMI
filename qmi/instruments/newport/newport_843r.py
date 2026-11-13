@@ -9,15 +9,14 @@ import time
 import logging
 import math
 
-import typing
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.instrument import QMI_Instrument, QMI_InstrumentIdentification
 from qmi.core.rpc import rpc_method
 
-if sys.platform.startswith("linux") or typing.TYPE_CHECKING:
+if sys.platform.startswith("linux") or TYPE_CHECKING:
     # Newport USB access is only supported on Linux.
     from qmi.instruments.newport.newport_843r_libusb import Newport_843R_libusb
 
@@ -47,7 +46,7 @@ class Newport_843R(QMI_Instrument):
     COMMAND_DELAY = 0.05
 
     @staticmethod
-    def list_instruments() -> List[str]:
+    def list_instruments() -> list[str]:
         """Return a list of serial numbers for attached Newport 843-R instruments."""
         return Newport_843R_libusb.list_instruments()
 
@@ -63,7 +62,7 @@ class Newport_843R(QMI_Instrument):
         """
         super().__init__(context, name)
         self._serial_number = serial_number
-        self._instr = None  # type: Optional[Newport_843R_libusb]
+        self._instr: "Newport_843R_libusb | None" = None
         self._last_query_time: float = 0.0
 
     @rpc_method
@@ -135,7 +134,7 @@ class Newport_843R(QMI_Instrument):
                                             version=fw_version)
 
     @rpc_method
-    def get_sensor_info(self) -> Tuple[str, str, str, str]:
+    def get_sensor_info(self) -> tuple[str, str, str, str]:
         """Get sensor type and return information.
 
         :return: Tuple (sensor_type, serial_number, sensor_name, capabilities).
@@ -192,7 +191,7 @@ class Newport_843R(QMI_Instrument):
         return float(resp[1:])
 
     @rpc_method
-    def get_timestamped_power(self) -> Tuple[float, float]:
+    def get_timestamped_power(self) -> tuple[float, float]:
         """Return a tuple of (unix_timestamp, measured_power).
 
         The timestamp is determined on the computer and may deviate
@@ -229,7 +228,7 @@ class Newport_843R(QMI_Instrument):
         self.ask("$ZS")
 
     @rpc_method
-    def get_available_ranges(self) -> List[str]:
+    def get_available_ranges(self) -> list[str]:
         """Return a list of available range settings.
 
         Each range is formatted as a number with unit, e.g. "3.00uW".
@@ -297,7 +296,7 @@ class Newport_843R(QMI_Instrument):
             self.set_range(selected_range)
 
     @rpc_method
-    def get_wavelength_range(self) -> Tuple[int, int]:
+    def get_wavelength_range(self) -> tuple[int, int]:
         """Return the range of available wavelengths.
 
         Returns a tuple (min_wavelength, max_wavelength).
@@ -343,7 +342,7 @@ class Newport_843R(QMI_Instrument):
         self.ask(f"$WL {int(wavelength)}")
 
     @rpc_method
-    def get_available_averaging(self) -> List[str]:
+    def get_available_averaging(self) -> list[str]:
         """Return a list of available averaging modes.
 
         The first available mode is "NONE", i.e. no averaging.
