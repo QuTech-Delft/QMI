@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Modernized the type hints of `qmi.instruments.newport.ag_uc8`, `conex_cc`, `newport_843r`, `newport_843r_libusb` and `tlb670x` to use builtin generics and `X | None`. Updated the Newport unit tests to use `tests.patcher` instead of running on full QMI contexts, and added missing unit tests for the 843R modules.
 - Improved and corrected the docstrings of `qmi.instruments.newport` modules `single_axis_motion_controller.py`, `smc_100cc.py`, `smc_100pp.py` and `actuators.py`.
 - `tests/instruments/santec/test_tsl_570.py` now uses `tests.patcher` instead of running on full QMI contexts.
+- Modernized the type hints and docstrings of `qmi.instruments.montana.cryostation`; `tests/instruments/montana/test_cryostation.py` now uses `tests.patcher`, which tracks and releases `make_instrument()`-created instruments on `stop()`.
 
 ### Fixed
 - `tests.patcher.PatcherQmiContext.stop()` no longer calls the now-unused `qmi.stop()`.
