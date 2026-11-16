@@ -6,25 +6,37 @@ import unittest
 import warnings
 from unittest.mock import MagicMock, Mock, call, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException, QMI_TimeoutException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.montana import Montana_Cryostation
+
+from tests.patcher import PatcherQmiContext as QMI_Context
+
+
+def setUpModule():
+    # Tests below deliberately trigger instrument errors through RPC; silence the remote tracebacks logged by RPC.
+    logging.getLogger("qmi.core.rpc").setLevel(logging.CRITICAL)
+
+
+def tearDownModule():
+    logging.getLogger("qmi.core.rpc").setLevel(logging.NOTSET)
 
 
 class TestCryostation(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("TestContext")
+        self._ctx = QMI_Context("TestContext")
+        self._ctx.start()
         self._transport_mock = MagicMock(spec=QMI_TcpTransport)
         with patch(
                 'qmi.instruments.montana.cryostation.create_transport',
-                return_value=self._transport_mock):
-            self.instr: Montana_Cryostation = qmi.make_instrument("instr", Montana_Cryostation, "transport_descriptor")
+                return_value=self._transport_mock
+        ):
+            self.instr = self._ctx.make_instrument("instr", Montana_Cryostation, "transport_descriptor")
 
     def tearDown(self):
+        self._ctx.stop()
         logging.getLogger("qmi.instruments.montana.cryostation").setLevel(logging.NOTSET)
-        qmi.stop()
 
     def _suppress_logging(self):
         logging.getLogger("qmi.instruments.montana.cryostation").setLevel(logging.CRITICAL)
@@ -621,13 +633,13 @@ class TestCryostation(unittest.TestCase):
         with warnings.catch_warnings():
             # Suppress warning for stopping QMI without closing instrument.
             warnings.simplefilter("ignore", ResourceWarning)
-            qmi.stop()
+            self._ctx.stop()
 
         # The driver should have turned off the heater during cleanup.
         self._transport_mock.write.assert_called_once_with(b"11SPHP 0.0000")
 
         # Start QMI again because tearDown() wants to stop it.
-        qmi.start("TestContext")
+        self._ctx.start()
 
     @patch("time.sleep")
     def test_set_platform_heater_power_off_retry(self, sleep_mock):

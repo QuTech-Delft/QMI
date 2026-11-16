@@ -15,12 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `qmi.instruments.newport.single_axis_motion_controller.Newport_SingleAxisMotionController.DEFAULT_CONTROLLER_ADDRESS`, `DEFAULT_RESPONSE_TIMEOUT` and `DEFAULT_HOME_SEARCH_TIMEOUT` are now RPC properties, so e.g. `instr.DEFAULT_CONTROLLER_ADDRESS = 2` can be used to change the controller address that subsequent commands default to, without having to pass an explicit `controller_address` to every call. This also applies to the `Newport_SMC100CC`, `Newport_SMC100PP` and `Newport_ConexCC` drivers that derive from it.
 - QMI driver for the Santec MPM-210H multi-port optical power and current meter, `qmi.instruments.santec.mpm_210h.Santec_Mpm210H`, supporting `serial:`, `tcp:`, and `gpib:` transports. Implements module identification, measurement mode and wavelength/sweep configuration, TIA gain and averaging time settings, power/current readout, logged-data retrieval, and zeroing. Includes unit tests in `tests/instruments/santec/test_mpm_210h.py`.
 - `qmi.instruments.santec.tsl_570.Santec_Tsl570` gained new RPC methods: `set_trigger_input_standby()` and `get_trigger_input_standby()` to control the "Standing by trigger" sweep state entered after `issue_soft_trigger()`, and `readout_power_data()` to read out the power monitor logging data of the last sweep.
+- QMI driver for the Montana Cryostation S100, `qmi.instruments.montana.Montana_CryostationS100`, sharing a new private RESTful API base class with the S50 driver. Includes unit tests in `tests/instruments/montana/test_cryostation_s100.py`, `test_cryostation_s50.py` and `test__cryostation_rest.py`.
 
 ### Changed
+- `qmi.instruments.montana.cryostation_s50.Montana_CryostationS50` is now based on the new private `qmi.instruments.montana._cryostation_rest.Montana_CryostationRest_Base` class, shared with the new S100 driver.
 - Modernized the type hints of `qmi.instruments.newport.single_axis_motion_controller`, `qmi.instruments.newport.smc_100cc` and `qmi.instruments.newport.smc_100pp` to use builtin generics and `X | None`.
 - Modernized the type hints of `qmi.instruments.newport.ag_uc8`, `conex_cc`, `newport_843r`, `newport_843r_libusb` and `tlb670x` to use builtin generics and `X | None`. Updated the Newport unit tests to use `tests.patcher` instead of running on full QMI contexts, and added missing unit tests for the 843R modules.
 - Improved and corrected the docstrings of `qmi.instruments.newport` modules `single_axis_motion_controller.py`, `smc_100cc.py`, `smc_100pp.py` and `actuators.py`.
 - `tests/instruments/santec/test_tsl_570.py` now uses `tests.patcher` instead of running on full QMI contexts.
+- Modernized the type hints and docstrings of `qmi.instruments.montana.cryostation`; `tests/instruments/montana/test_cryostation.py` now uses `tests.patcher`, which tracks and releases `make_instrument()`-created instruments on `stop()`.
 
 ### Fixed
 - `tests.patcher.PatcherQmiContext.stop()` no longer calls the now-unused `qmi.stop()`.

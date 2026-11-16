@@ -3,7 +3,6 @@
 import logging
 import threading
 import time
-from typing import Optional
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException, QMI_TimeoutException
@@ -27,8 +26,8 @@ class Montana_Cryostation(QMI_Instrument):
 
     The Cryostation is monitored and controlled by a simple ASCII-based protocol as described in [1].
 
-    The documentation lists 29 commands. Of these, 17 retrieve setpoints and sensor values;
-    12 are used to alter setpoints or start behavior (e.g. cooldown):
+    The documentation lists 30 commands. Of these, 17 retrieve setpoints and sensor values;
+    13 are used to alter setpoints or start behavior (e.g. cooldown):
 
     Getters:
 
@@ -49,15 +48,15 @@ class Montana_Cryostation(QMI_Instrument):
         GTSP  - Get Temperature Set Point
         GUS   - Get User Stability
         GUT   - Get User Temperature
-        RPID  - Reset PID parameters to their default values
 
     Setters:
 
+        RPID  - Reset PID parameters to their default values
         SCD   - Start Cool Down
         SMD   - Set Magnet Disabled
         SME   - Set Magnet Enabled
         SMTF  - Set Magnet Target Field
-        SPIDF - Set PIDF Fi integral frequency
+        SPIDF - Set PID Fi integral frequency
         SPIDK - Set PID proportional gain
         SPIDT - Set PID Td derivative time
         SSB   - Start StandBy
@@ -65,6 +64,8 @@ class Montana_Cryostation(QMI_Instrument):
         STSP  - Set Temperature Set Point
         SWU   - Start Warm Up
         SPHP  - Set Platform Heater Power
+
+    The commands RPID, SMD, SME and SMTF are not implemented in this driver.
 
     We note that the three commands GPIDF, GPIDK, GPIDT that are used to retrieve PID control parameters
     do not work on our CryoStation.
@@ -120,7 +121,7 @@ class Montana_Cryostation(QMI_Instrument):
         self._transport = create_transport(transport, default_attributes={"port": 7773})
         self._timeout = Montana_Cryostation.RESPONSE_TIMEOUT
         self._platform_heater_on = False
-        self._platform_heater_timer_thread: Optional[threading.Timer] = None
+        self._platform_heater_timer_thread: threading.Timer | None = None
         self._command_lock = threading.Lock()
 
     def release_rpc_object(self) -> None:
@@ -203,18 +204,18 @@ class Montana_Cryostation(QMI_Instrument):
         return alarm_state
 
     @rpc_method
-    def get_chamber_pressure(self, unit: Optional[str]=None) -> float:
+    def get_chamber_pressure(self, unit: str | None = None) -> float:
         """Retrieve the current chamber pressure.
 
         The Cryostation always returns the pressure in [mTorr]. Since that is usually a pretty inconvenient
         unit, this method allows the specification of different units ([Pa], [atm]) that are usually more
-        convenient, converting the retrieved value in [mTorr] to that unit is requested.
+        convenient, converting the retrieved value in [mTorr] to that unit if requested.
 
         Parameters:
             unit: the physical unit of pressure to return. This can be one of 'mTorr', 'Pa', or 'atm'.
                   The default if no unit is specified is mTorr.
 
-        Returns: current chamber pressure in the unit selected, or NaN if the chamber pressure is not available.
+        Returns: current chamber pressure in the unit selected.
         """
 
         if unit is None:
@@ -237,7 +238,7 @@ class Montana_Cryostation(QMI_Instrument):
         return pressure
 
     @rpc_method
-    def get_magnet_state(self) -> Optional[bool]:
+    def get_magnet_state(self) -> bool | None:
         """Retrieves the current magnet state.
 
         Returns: True if magnet is enabled; False if magnet is disabled;
@@ -248,7 +249,7 @@ class Montana_Cryostation(QMI_Instrument):
         response = self._execute_command(command)
 
         # "System not able to execute command at this time.  Activate the magnet module first."
-        magnet_state: Optional[bool] = None
+        magnet_state: bool | None = None
 
         if response == "MAGNET ENABLED":
             magnet_state = True
@@ -317,7 +318,7 @@ class Montana_Cryostation(QMI_Instrument):
         Note: 0 will result in no integral action.
 
         Parameters:
-            i_freq: integral frequency in Hertz. (0.000 - 100.000)
+            i_freq_hz: integral frequency in Hertz. (0.000 - 100.000)
         """
         if not self.MIN_INTEGRAL_FREQUENCY <= i_freq_hz <= self.MAX_INTEGRAL_FREQUENCY:
             raise ValueError(f"Integral frequency ({i_freq_hz}) is not in range {(self.MIN_INTEGRAL_FREQUENCY, self.MAX_INTEGRAL_FREQUENCY)}!")
@@ -345,13 +346,11 @@ class Montana_Cryostation(QMI_Instrument):
     def set_pid_proportional_gain(self, p_gain: float) -> None:
         """Set the PID proportional gain value.
 
-        Note: 0 will result in no derivative action.
-
         Parameters:
             p_gain: Proportional gain in Watts/Kelvin. (0.001 - 100.000)
         """
         if not self.MIN_PROPORTIONAL_GAIN <= p_gain <= self.MAX_PROPORTIONAL_GAIN:
-            raise ValueError(f"Proportionial gain ({p_gain}) is not in range {(self.MIN_PROPORTIONAL_GAIN, self.MAX_PROPORTIONAL_GAIN)}!")
+            raise ValueError(f"Proportional gain ({p_gain}) is not in range {(self.MIN_PROPORTIONAL_GAIN, self.MAX_PROPORTIONAL_GAIN)}!")
 
         _logger.info("[%s] Setting proportional gain to %f Watts/Kelvin", self._name, p_gain)
         self._execute_command(f"SPIDK {p_gain:.3f}", check_ok=True)
@@ -376,8 +375,10 @@ class Montana_Cryostation(QMI_Instrument):
     def set_pid_derivative_time(self, d_time_s: float) -> None:
         """Set the PID derivative time value.
 
+        Note: 0 will result in no derivative action.
+
         Parameters:
-            d_time: derivative time in seconds. (0.000 - 100.000)
+            d_time_s: derivative time in seconds. (0.000 - 100.000)
         """
         if not self.MIN_DERIVATIVE_TIME <= d_time_s <= self.MAX_DERIVATIVE_TIME:
             raise ValueError(f"derivative time ({d_time_s}) is not in range {(self.MIN_DERIVATIVE_TIME, self.MAX_DERIVATIVE_TIME)}!")
@@ -389,7 +390,7 @@ class Montana_Cryostation(QMI_Instrument):
     def get_platform_stability(self) -> float:
         """Retrieves the current platform stability.
 
-        Returns: platform stability in [Kelvin].
+        Returns: platform stability in [Kelvin], or NaN if the platform stability is not available.
         """
 
         command = "GPS"
@@ -497,7 +498,7 @@ class Montana_Cryostation(QMI_Instrument):
     def get_temperature_setpoint(self) -> float:
         """Retrieves the current temperature setpoint.
 
-        Returns: temperature setpoint in [Kelvin], or NaN if the temperature setpoint is not available.
+        Returns: temperature setpoint in [Kelvin].
         """
 
         command = "GTSP"
@@ -550,16 +551,16 @@ class Montana_Cryostation(QMI_Instrument):
 
         if response == "-0.100":
             # The instrument will return -0.100 if the user temperature is not available.
-            user_stability = float("nan")
+            user_temperature = float("nan")
         else:
-            user_stability = float(response)
+            user_temperature = float(response)
 
-        return user_stability
+        return user_temperature
 
     @rpc_method
     def start_standby(self) -> None:
         """Start standby."""
-        _logger.info("[%s] Starting standby.")
+        _logger.info("[%s] Starting standby.", self._name)
 
         command = "SSB"
         self._execute_command(command, check_ok=True)
@@ -567,7 +568,7 @@ class Montana_Cryostation(QMI_Instrument):
     @rpc_method
     def start_cooldown(self) -> None:
         """Start the cooldown."""
-        _logger.info("[%s] Starting the cooldown.")
+        _logger.info("[%s] Starting the cooldown.", self._name)
 
         command = "SCD"
         self._execute_command(command, check_ok=True)
@@ -575,7 +576,7 @@ class Montana_Cryostation(QMI_Instrument):
     @rpc_method
     def start_warmup(self) -> None:
         """Start the warmup."""
-        _logger.info("[%s] Starting the warmup.")
+        _logger.info("[%s] Starting the warmup.", self._name)
 
         command = "SWU"
         self._execute_command(command, check_ok=True)
@@ -583,7 +584,7 @@ class Montana_Cryostation(QMI_Instrument):
     @rpc_method
     def stop_system(self) -> None:
         """Stop either the standby, cooldown or warmup of the system."""
-        _logger.info("[%s] Stopping the system.")
+        _logger.info("[%s] Stopping the system.", self._name)
 
         command = "STP"
         self._execute_command(command, check_ok=True)
@@ -689,7 +690,7 @@ class Montana_Cryostation(QMI_Instrument):
             QMI_InstrumentException: If the Montana does not accept the command.
         """
         if not (0.0 <= power <= self._MAX_PLATFORM_HEATER_POWER):
-            _logger.error("Trying to set %f W, but maximum is %d W", power, self._MAX_PLATFORM_HEATER_POWER)
+            _logger.error("Trying to set %f W, but maximum is %f W", power, self._MAX_PLATFORM_HEATER_POWER)
             raise QMI_InvalidOperationException("Invalid platform heater power")
 
         # If a heater burst timer is running, cancel it.
