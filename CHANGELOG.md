@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - QMI driver for the Santec MPM-210H multi-port optical power and current meter, `qmi.instruments.santec.mpm_210h.Santec_Mpm210H`, supporting `serial:`, `tcp:`, and `gpib:` transports. Implements module identification, measurement mode and wavelength/sweep configuration, TIA gain and averaging time settings, power/current readout, logged-data retrieval, and zeroing. Includes unit tests in `tests/instruments/santec/test_mpm_210h.py`.
 - `qmi.instruments.santec.tsl_570.Santec_Tsl570` gained new RPC methods: `set_trigger_input_standby()` and `get_trigger_input_standby()` to control the "Standing by trigger" sweep state entered after `issue_soft_trigger()`, and `readout_power_data()` to read out the power monitor logging data of the last sweep.
 - QMI driver for the Montana Cryostation S100, `qmi.instruments.montana.Montana_CryostationS100`, sharing a new private RESTful API base class with the S50 driver. Includes unit tests in `tests/instruments/montana/test_cryostation_s100.py`, `test_cryostation_s50.py` and `test__cryostation_rest.py`.
+- QMI driver for the Signal Hound BB60C Spectrum Analyzer, `qmi.instruments.signal_hound.SignalHound_BB60C`, communicating over a network transport using SCPI.
 
 ### Changed
 - `qmi.instruments.montana.cryostation_s50.Montana_CryostationS50` is now based on the new private `qmi.instruments.montana._cryostation_rest.Montana_CryostationRest_Base` class, shared with the new S100 driver.
