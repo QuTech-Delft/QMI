@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.55.0-beta.0] - Unreleased
+## [0.56.0-beta.0] - Unreleased
+
+## [0.55.0] - 2026-11-16
 
 ### Added
 - QMI driver for the AlphaLab MR3 three-axis magnetic field meter, `qmi.instruments.alphalab.AlphaLab_MR3`, communicating over a serial port using the AlphaLab Data Acquisition Communication Protocol. Includes unit tests in `tests/instruments/alphalab/test_mr3.py`.
@@ -31,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `qmi.core.logging_init.start_logging()` used `logging.basicConfig()` to install the console log handler. `basicConfig()` silently does nothing once the root logger already has handlers, so a second call (for example a new `qmi.start()` after `qmi.stop()`, with a changed `console_loglevel` in `qmi.conf`) had no effect. The console handler is now tracked explicitly, like the file handler, and is replaced via `logging.getLogger().addHandler()` on every call.
 - In `tests/instruments/thorlabs/test_tsp01b.py`, the cleanup of possibly earlier mocked `usb.core` and `usb.util` modules from `sys.modules` now checks the presence of `usb.util` separately, instead of deleting it unconditionally whenever `usb.core` was present.
 - `QbloxManager.__init__` now calls `_import_modules()`, so the lazily-imported `qblox_instruments` vendor module, `ChannelType` and `ChannelMapCache` are available as soon as a manager is created, instead of remaining `None` and raising errors on first use.
-- `.bumpversion_stable.toml`, used to prepare a patch release on a stable branch: the `CHANGELOG.md` entry now searches for the literal `[VERSION] - Unreleased` placeholder instead of `[{current_version}] - Unreleased`, the `pyproject.toml` entry now uses a plain version bump instead of an invalid `search`/`replace` pair, and a `CITATION.cff` entry was added so it gets bumped too.
+- `.bumpversion_stable.toml`, used to prepare a patch release on a stable branch: the `CHANGELOG.md` entry now searches for the literal `[0.56.0-beta.0] - Unreleased` placeholder instead of `[{current_version}] - Unreleased`, the `pyproject.toml` entry now uses a plain version bump instead of an invalid `search`/`replace` pair, and a `CITATION.cff` entry was added so it gets bumped too.
 - Randomly failing `test_pending_events_limit` in `tests/instruments/picoquant/test_hydraharp_event_processing.py`: the test reused and `clear()`-ed a single `threading.Event` across three successive measurement phases while repatching the mocked `ReadFiFo` side effect. The background fetch thread could re-set that shared event from a stale, already-exhausted FIFO stream right after it was cleared but before the new measurement's data had been processed, causing an intermittent `AssertionError`. Each phase now uses its own dedicated event instead.
 - `RpcInterfaceDescriptor` in `qmi.core.rpc` could not unpickle descriptors sent by peer contexts running a QMI version older than 0.54.0, since those descriptors have 6 fields instead of the current 7 (missing `properties`). Such descriptors are now accepted and get an empty `properties` list.
 - `DataFolder.read_dataset()` raised `FileNotFoundError` for a raw dataset (data without axes, e.g. plain 2D data) written by `DataFolder.write_dataset()`, because such datasets are stored at the HDF5 file root instead of in a group named after the dataset. `read_dataset()` now falls back to reading the file root when a child group with the dataset's name is not found but the file's root attributes identify it as that raw dataset. Affects both the `h5py` and `h5netcdf` backends.
