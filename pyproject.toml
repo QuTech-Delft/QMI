@@ -47,6 +47,8 @@ dependencies = [
     "python-vxi11",
     # For legacy python-vxi11
     "standard-xdrlib",
+    # For PyVISA-based transports (GPIB, USBTMC and HiSLIP); also pulls in pyvisa
+    "pyvisa-py",
     # For miscellaneous functionality
     "pytz",
     "psutil",
