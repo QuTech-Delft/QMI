@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.56.0-beta.0] - Unreleased
 
+### Added
+- QMI driver for the HiSLIP (High-Speed LAN Instrument Protocol) transport, `qmi.core.transport_hislip_visa.QMI_HislipTransport`, implemented as a wrapper around PyVISA. Supports opening and closing the connection, write, read, query, device clear, reading the status byte, and timeout handling. Can be created via a `hislip:<ip_address>[:<sub_address>][:port=<port>]` transport descriptor in `create_transport()`.
+- `pyvisa-py` dependency, which also installs `pyvisa`. This fixes the previously undeclared `pyvisa` dependency of `qmi.core.transport_gpib_visa` and `qmi.core.transport_usbtmc_visa`.
+
 ## [0.55.0] - 2026-11-16
 
 ### Added
