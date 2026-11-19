@@ -1,6 +1,7 @@
 """Implementation of the QMI_HislipTransport class, a transport for the HiSLIP protocol based on PyVISA."""
 
 import logging
+from typing import cast
 
 import pyvisa
 import pyvisa.errors
@@ -76,7 +77,7 @@ class QMI_HislipTransport(QMI_Transport):
         _logger.debug("Opening %s", self)
         rm = pyvisa.ResourceManager()
         try:
-            self._device = rm.open_resource(self._visa_resource)
+            self._device = cast(pyvisa.resources.MessageBasedResource, rm.open_resource(self._visa_resource))
         except pyvisa.errors.VisaIOError as exc:
             raise QMI_InstrumentException(f"Error attempting to open HiSLIP transport to {self._visa_resource}") \
                 from exc
@@ -97,7 +98,8 @@ class QMI_HislipTransport(QMI_Transport):
         Parameters:
             timeout: Timeout for reading, in seconds, or None to wait indefinitely.
         """
-        self._safe_device.timeout = int(timeout * 1000) if timeout is not None else None
+        timeout_ms = int(timeout * 1000) if timeout is not None else None
+        self._safe_device.timeout = cast(float, timeout_ms)
         try:
             return self._safe_device.read_raw()
         except pyvisa.errors.VisaIOError as exc:

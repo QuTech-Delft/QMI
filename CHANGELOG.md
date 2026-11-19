@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.56.0-beta.0] - Unreleased
 
 ### Added
-- QMI driver for the HiSLIP (High-Speed LAN Instrument Protocol) transport, `qmi.core.transport_hislip_visa.QMI_HislipTransport`, implemented as a wrapper around PyVISA. Supports opening and closing the connection, write, read, query, device clear, reading the status byte, and timeout handling. Can be created via a `hislip:<ip_address>[:<sub_address>][:port=<port>]` transport descriptor in `create_transport()`.
+- QMI driver for the HiSLIP (High-Speed LAN Instrument Protocol) transport, `qmi.core.transport_hislip_visa.QMI_HislipTransport`, implemented as a wrapper around PyVISA. Supports opening and closing the connection, write, read, query, device clear, reading the status byte, and timeout handling. Can be created via a `hislip:<ip_address>[:<sub_address>][:port=<port>]` transport descriptor in `create_transport()`. Includes unit tests in `tests/core/test_transport_hislip_visa.py` and `tests/core/test_transport.py`.
 - `pyvisa-py` dependency, which also installs `pyvisa`. This fixes the previously undeclared `pyvisa` dependency of `qmi.core.transport_gpib_visa` and `qmi.core.transport_usbtmc_visa`.
+
+### Fixed
+- Mypy errors in `qmi.core.transport_usbtmc_visa`, `qmi.core.transport_hislip_visa` and `qmi.core.transport_gpib_visa`, now that `pyvisa` is an installed, typed dependency: the PyVISA device handles were typed as `pyvisa.ResourceManager` instead of `pyvisa.resources.MessageBasedResource`, and the `None` value used to set an infinite PyVISA timeout did not match the `float` type of the `timeout` attribute.
 
 ## [0.55.0] - 2026-11-16
 

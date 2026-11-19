@@ -1,5 +1,6 @@
 import os, sys
 import logging
+from typing import cast
 
 from qmi.core.exceptions import QMI_TimeoutException, QMI_TransportDescriptorException, QMI_InstrumentException,\
     QMI_RuntimeException, QMI_EndOfInputException, QMI_Exception
@@ -61,7 +62,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
         self._board = board
         self._secondary_addr = secondary_addr
         self._connect_timeout = connect_timeout
-        self._device: pyvisa.ResourceManager | None = None
+        self._device: pyvisa.resources.MessageBasedResource | None = None
         self._read_buffer = bytes()
 
     def _open_transport(self) -> None:
@@ -73,12 +74,12 @@ class QMI_VisaGpibTransport(QMI_Transport):
 
         rm = pyvisa.ResourceManager()
         try:
-            self._device = rm.open_resource(
+            self._device = cast(pyvisa.resources.MessageBasedResource, rm.open_resource(
                 visa_resource,
                 open_timeout=int(self._connect_timeout * 1000),
                 write_termination='\n',
                 read_termination='\n'
-            )
+            ))
 
         except ValueError as exc:
             if "install a suitable backend" in str(exc):
@@ -89,7 +90,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
                 raise QMI_InstrumentException(exc)
 
     @property
-    def _safe_device(self) -> pyvisa.ResourceManager:
+    def _safe_device(self) -> pyvisa.resources.MessageBasedResource:
         """ The _safe_device property should be used inside the QMI_Transport code if-and-only-if we are 100% sure that
         the _device attribute is not None.
 
@@ -188,7 +189,7 @@ class QMI_VisaGpibTransport(QMI_Transport):
             self._safe_device.timeout = int(timeout * 1000)  # in milliseconds
 
         else:
-            self._safe_device.timeout = timeout  # infinite
+            self._safe_device.timeout = cast(float, timeout)  # infinite
 
         try:
             data = self._safe_device.read_raw()

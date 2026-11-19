@@ -1,6 +1,7 @@
 """Extension of the QMI_UsbTmcTransport class utilizing usb.core with libusb1 backend and pyvisa packages."""
 
 import os, sys
+from typing import cast
 from qmi.core.exceptions import QMI_TimeoutException, QMI_TransportDescriptorException, QMI_InstrumentException,\
     QMI_RuntimeException
 from qmi.core.transport import QMI_UsbTmcTransport
@@ -24,13 +25,13 @@ class QMI_VisaUsbTmcTransport(QMI_UsbTmcTransport):
 
     def __init__(self, vendorid: int, productid: int, serialnr: str) -> None:
         super().__init__(vendorid, productid, serialnr)
-        self._device: pyvisa.ResourceManager | None = None
+        self._device: pyvisa.resources.MessageBasedResource | None = None
 
     def _open_transport(self) -> None:
         visa_resource = f"USB::0x{self.vendorid:04x}::0x{self.productid:04x}::{self.serialnr}::INSTR"
         rm = pyvisa.ResourceManager()
         try:
-            self._device = rm.open_resource(visa_resource)
+            self._device = cast(pyvisa.resources.MessageBasedResource, rm.open_resource(visa_resource))
 
         except ValueError as exc:
             if "install a suitable backend" in str(exc):
@@ -41,7 +42,7 @@ class QMI_VisaUsbTmcTransport(QMI_UsbTmcTransport):
                 raise QMI_InstrumentException(exc)
 
     @property
-    def _safe_device(self) -> pyvisa.ResourceManager:
+    def _safe_device(self) -> pyvisa.resources.MessageBasedResource:
         """ The _safe_device property should be used inside the QMI_Transport code if-and-only-if we are 100% sure that
         the _device attribute is not None.
 
