@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Mypy errors in `qmi.core.transport_usbtmc_visa`, `qmi.core.transport_hislip_visa` and `qmi.core.transport_gpib_visa`, now that `pyvisa` is an installed, typed dependency: the PyVISA device handles were typed as `pyvisa.ResourceManager` instead of `pyvisa.resources.MessageBasedResource`, and the `None` value used to set an infinite PyVISA timeout did not match the `float` type of the `timeout` attribute.
+- `tests/core/test_transport_gpib_visa.py`, `tests/core/test_transport_usbtmc.py` and `tests/core/test_transport.py` replaced the real `pyvisa` module with a hand-written stub (`tests/core/pyvisa_stub.py`), needed only because `pyvisa` used to be an undeclared, possibly-missing dependency. Now that `pyvisa` is a real, installed dependency, this stub broke the test suite by missing the `pyvisa.resources` submodule. Removed the stub and updated the affected tests to mock only the PyVISA calls that would otherwise touch hardware.
 
 ## [0.55.0] - 2026-11-16
 
