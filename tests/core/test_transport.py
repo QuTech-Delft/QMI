@@ -255,6 +255,18 @@ class TestQmiTransportFactory(unittest.TestCase):
         self.assertIs(trans, mock.return_value)
         mock.assert_called_with(host="localhost")
 
+    @unittest.mock.patch("qmi.core.transport_hislip_visa.QMI_HislipTransport")
+    def test_parse_hislip_basic(self, mock):
+        trans = create_transport("hislip:192.168.1.10")
+        self.assertIs(trans, mock.return_value)
+        mock.assert_called_once_with(ip_address="192.168.1.10")
+
+    @unittest.mock.patch("qmi.core.transport_hislip_visa.QMI_HislipTransport")
+    def test_parse_hislip_attrs(self, mock):
+        trans = create_transport("hislip:192.168.1.10:hislip1:port=5025")
+        self.assertIs(trans, mock.return_value)
+        mock.assert_called_once_with(ip_address="192.168.1.10", sub_address="hislip1", port=5025)
+
 
 class TestTransportOpenWithDummyInstrument(unittest.TestCase):
     """Test various 'open' cases with a dummy instrument """
@@ -445,6 +457,32 @@ class TestQmiTransportParsing(unittest.TestCase):
         trans = create_transport("vxi11:localhost")
         self.assertIs(trans, mock.return_value)
         mock.assert_called_with(host="localhost")
+
+    def test_parse_hislip_defaults(self):
+        ip_address = "192.168.1.10"
+        desc = create_transport(f"hislip:{ip_address}")
+
+        self.assertEqual(ip_address, desc._ip_address)
+        self.assertEqual("hislip0", desc._sub_address)
+        self.assertEqual(4880, desc._port)
+
+    def test_parse_hislip_attrs(self):
+        ip_address = "192.168.1.10"
+        sub_address = "hislip1"
+        port = 5025
+        desc = create_transport(f"hislip:{ip_address}:{sub_address}:port={port}")
+
+        self.assertEqual(ip_address, desc._ip_address)
+        self.assertEqual(sub_address, desc._sub_address)
+        self.assertEqual(port, desc._port)
+
+    def test_parse_hislip_missing_ip_address(self):
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            create_transport("hislip")
+
+    def test_parse_hislip_bad_port(self):
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            create_transport("hislip:192.168.1.10:port=not_a_number")
 
 
 class TestQmiSocketTransportBase(unittest.TestCase):
