@@ -359,6 +359,12 @@ Vxi11TransportDescriptorParser = TransportDescriptorParser(
     {}
 )
 
+HislipTransportDescriptorParser = TransportDescriptorParser(
+    "hislip",
+    [("ip_address", (str, True)), ("sub_address", (str, False))],
+    {'port': (int, False)}
+)
+
 
 class QMI_SerialTransport(QMI_Transport):
     """Byte stream transport via serial port.
@@ -1309,6 +1315,7 @@ def create_transport(
 
     String format:
       - VXI-11 instrument: "vxi11:host"
+      - HiSLIP instrument: "hislip:ip_address<:sub_address=hislip0><:port=4880>"
       - UDP connection:    "udp:host<:port>"
       - TCP connection:    "tcp:host<:port><:connect_timeout=10>"
       - Serial port:       "serial:device<:baudrate=115200><:databits=8><:parity=N><:stopbits=1><:rtscts=False>"
@@ -1320,6 +1327,11 @@ def create_transport(
         Numerical IPv6 addresses must be enclosed in square brackets, e.g. "tcp:[2620:0:2d0:200::8]:5000".
       - "port" (for UDP and TCP transports) specifies the UDP/TCP port number of the server/client.
       - "connect_timeout" is TCP connection timeout.
+
+    HiSLIP:
+      - "ip_address" is the IP address of the instrument.
+      - "sub_address" is the optional HiSLIP sub-address of the instrument. Defaults to "hislip0".
+      - "port" is the optional HiSLIP port number of the instrument. Defaults to 4880.
 
     Serial:
       - "device" is the name of the serial port, for example "COM3" or "/dev/ttyUSB0".
@@ -1378,5 +1390,9 @@ def create_transport(
     elif Vxi11TransportDescriptorParser.match_interface(transport_descriptor):
         attributes = Vxi11TransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
         return QMI_Vxi11Transport(**attributes)
+    elif HislipTransportDescriptorParser.match_interface(transport_descriptor):
+        attributes = HislipTransportDescriptorParser.parse_parameter_strings(transport_descriptor, default_attributes)
+        from qmi.core.transport_hislip_visa import QMI_HislipTransport
+        return QMI_HislipTransport(**attributes)
     else:
         raise QMI_TransportDescriptorException(f"Unknown type in transport descriptor {transport_descriptor!r}")

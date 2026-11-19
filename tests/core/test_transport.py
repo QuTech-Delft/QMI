@@ -30,8 +30,6 @@ from qmi.core.context import QMI_Context
 from qmi.core.rpc import rpc_method
 from qmi.utils.context_managers import open_close
 
-from tests.core.pyvisa_stub import ResourceManager, visa_str_1, visa_str_3
-
 
 class Dummy_USBTMCInstrument(QMI_Instrument):
     """Dummy Instrument driver using USBTMC transport."""
@@ -255,6 +253,18 @@ class TestQmiTransportFactory(unittest.TestCase):
         self.assertIs(trans, mock.return_value)
         mock.assert_called_with(host="localhost")
 
+    @unittest.mock.patch("qmi.core.transport_hislip_visa.QMI_HislipTransport")
+    def test_parse_hislip_basic(self, mock):
+        trans = create_transport("hislip:192.168.1.10")
+        self.assertIs(trans, mock.return_value)
+        mock.assert_called_once_with(ip_address="192.168.1.10")
+
+    @unittest.mock.patch("qmi.core.transport_hislip_visa.QMI_HislipTransport")
+    def test_parse_hislip_attrs(self, mock):
+        trans = create_transport("hislip:192.168.1.10:hislip1:port=5025")
+        self.assertIs(trans, mock.return_value)
+        mock.assert_called_once_with(ip_address="192.168.1.10", sub_address="hislip1", port=5025)
+
 
 class TestTransportOpenWithDummyInstrument(unittest.TestCase):
     """Test various 'open' cases with a dummy instrument """
@@ -351,11 +361,6 @@ class TestQmiTransportParsing(unittest.TestCase):
             self.assertEqual(expected_text, str(exc.exception))
 
     elif sys.platform.startswith("win") or "msys" in sys.platform:
-        # Remove the possibility of import error of pyvisa
-        import tests.core.pyvisa_stub
-        sys.modules["pyvisa"] = tests.core.pyvisa_stub
-        sys.modules["pyvisa.errors"] = tests.core.pyvisa_stub.errors
-
         def test_parse_usbtmc(self):
             serialnr = "XYZ"
             vendorid = 0x0699
@@ -445,6 +450,32 @@ class TestQmiTransportParsing(unittest.TestCase):
         trans = create_transport("vxi11:localhost")
         self.assertIs(trans, mock.return_value)
         mock.assert_called_with(host="localhost")
+
+    def test_parse_hislip_defaults(self):
+        ip_address = "192.168.1.10"
+        desc = create_transport(f"hislip:{ip_address}")
+
+        self.assertEqual(ip_address, desc._ip_address)
+        self.assertEqual("hislip0", desc._sub_address)
+        self.assertEqual(4880, desc._port)
+
+    def test_parse_hislip_attrs(self):
+        ip_address = "192.168.1.10"
+        sub_address = "hislip1"
+        port = 5025
+        desc = create_transport(f"hislip:{ip_address}:{sub_address}:port={port}")
+
+        self.assertEqual(ip_address, desc._ip_address)
+        self.assertEqual(sub_address, desc._sub_address)
+        self.assertEqual(port, desc._port)
+
+    def test_parse_hislip_missing_ip_address(self):
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            create_transport("hislip")
+
+    def test_parse_hislip_bad_port(self):
+        with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
+            create_transport("hislip:192.168.1.10:port=not_a_number")
 
 
 class TestQmiSocketTransportBase(unittest.TestCase):
@@ -1740,10 +1771,19 @@ class ListUsbtmcTransportsTestCase(unittest.TestCase):
         transport_str_1 = f"usbtmc:vendorid=0x{vendor_ids[0]:04x}:productid=0x{product_ids[0]:04x}:serialnr={serial_nrs[0]}"
         transport_str_2 = f"usbtmc:vendorid=0x{vendor_ids[1]:04x}:productid=0x{product_ids[1]:04x}:serialnr={serial_nrs[1]}"
         expected_resources = [transport_str_1, transport_str_2]
+        # VISA-style resource strings as returned by pyvisa.ResourceManager.list_resources(). The middle one is
+        # malformed and should be ignored.
+        visa_resources = [
+            f"USB1::0x{vendor_ids[0]:04x}::0x{product_ids[0]:04x}::{serial_nrs[0]}::INSTR",
+            "USB2::x0699::x3000::IJK::INSTR",
+            f"USBTMC::0x{vendor_ids[1]:04x}::0x{product_ids[1]:04x}::{serial_nrs[1]}::INSTR",
+        ]
+        mock_rm = unittest.mock.Mock()
+        mock_rm.list_resources.return_value = visa_resources
         # Act
         with unittest.mock.patch(
                 "qmi.core.transport_usbtmc_visa.pyvisa.ResourceManager",
-                return_value=ResourceManager()
+                return_value=mock_rm
         ):
             resources = list_usbtmc_transports()
 
@@ -1759,10 +1799,14 @@ class ListUsbtmcTransportsTestCase(unittest.TestCase):
         transport_str_1 = f"usbtmc:vendorid=0x{vendor_ids[0]:04x}:productid=0x{product_ids[0]:04x}:serialnr={serial_nrs[0]}"
         transport_str_2 = f"usbtmc:vendorid=0x{vendor_ids[1]:04x}:productid=0x{product_ids[1]:04x}:serialnr={serial_nrs[1]}"
         expected_resources = [transport_str_1, transport_str_2]
+        visa_resources = [
+            f"USB1::0x{vendor_ids[0]:04x}::0x{product_ids[0]:04x}::{serial_nrs[0]}::INSTR",
+            f"USBTMC::0x{vendor_ids[1]:04x}::0x{product_ids[1]:04x}::{serial_nrs[1]}::INSTR",
+        ]
         # Act
         with unittest.mock.patch(
                 "qmi.core.transport_usbtmc_pyusb.usbtmc.list_resources",
-                return_value=[visa_str_1, visa_str_3]
+                return_value=visa_resources
         ):
             resources = list_usbtmc_transports()
 
