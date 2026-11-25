@@ -755,6 +755,8 @@ If the task is 'running' and publishing data, the receiver should receive the da
 the signal again. Forgetting to unsubscribe from the signal could possibly lead to memory issues if the receiver is
 still present, because then the published data could keep accumulating into the receiver queue.
 
+See `Publishing and receiving signals`_ for more about signals and this context manager.
+
 Tasks and RPC methods
 ---------------------
 
@@ -903,6 +905,303 @@ An example output is:
 >>> sample = 28.763647335054355 amplitude = 99.00000000000001
 >>> sample = 33.873943823248275 amplitude = 89.10000000000001
 >>> sample = 39.12230323820781 amplitude = 80.19000000000001
+
+Publishing and receiving signals
+---------------------------------
+
+So far, all communication went one way: a script calls an RPC method and waits for the answer.
+Often a task or instrument *produces* data at its own pace, e.g. a wavemeter reading out frequencies
+or a monitor task that detects a fault. Instead of polling such objects, other tasks and scripts can
+*subscribe* to the *signals* that the object *publishes*.
+
+A signal is declared as a class attribute with :py:class:`QMI_Signal <qmi.core.pubsub.QMI_Signal>`,
+listing the types of the arguments that are published with it. A signal without arguments works as a
+simple trigger. Any `QMI_RpcObject` can publish signals, so this works for tasks, instruments and plain
+RPC objects alike. The complete, runnable code of this section is in the ``examples/signals`` directory of the
+QMI repository.
+
+Create a module ``demo_signals.py`` with a task that samples our ``NoisySineGenerator`` and publishes every
+sample, plus a trigger when the sample is out of range::
+
+    import time
+    from typing import NamedTuple
+
+    import qmi
+    from qmi.core.exceptions import QMI_TaskStopException
+    from qmi.core.pubsub import QMI_Signal
+    from qmi.core.task import QMI_Task
+
+
+    class SampleData(NamedTuple):
+        timestamp: float
+        value: float
+
+
+    class SamplerTask(QMI_Task):
+
+        sig_sample = QMI_Signal([SampleData])  # Data signal with one argument.
+        sig_overrange = QMI_Signal([])         # Trigger signal without arguments.
+
+        def __init__(self, task_runner, name, nsg_name, rate=10.0, threshold=50.0):
+            super().__init__(task_runner, name)
+            self._nsg_name = nsg_name
+            self._period = 1.0 / rate
+            self._threshold = threshold
+
+        def run(self):
+            nsg = qmi.get_instrument(self._nsg_name)
+            try:
+                while not self.stop_requested():
+                    sample = SampleData(timestamp=time.time(), value=nsg.get_sample())
+                    self.sig_sample.publish(sample)
+                    if abs(sample.value) > self._threshold:
+                        self.sig_overrange.publish()
+
+                    self.sleep(self._period)
+
+            except QMI_TaskStopException:
+                pass  # A normal stop request.
+
+Inside the task, ``self.sig_sample`` has a ``publish()`` method. Every call broadcasts the arguments to all
+receivers that are subscribed at that moment, in this program or in any connected program.
+
+.. note::
+    Signal arguments are pickled when they travel to another context. Use simple, picklable types and
+    define custom types such as ``SampleData`` at module level, in a module that the subscribers can import
+    as well. A ``NamedTuple`` or a ``dataclass`` works well.
+
+Receiving signals
+^^^^^^^^^^^^^^^^^
+
+On the receiving side, the proxy of the task offers the same signal attributes, now as
+:py:class:`QMI_SignalSubscriber <qmi.core.pubsub.QMI_SignalSubscriber>` objects. To receive signals,
+create a :py:class:`QMI_SignalReceiver <qmi.core.pubsub.QMI_SignalReceiver>`, which is a queue,
+and subscribe it::
+
+    receiver = QMI_SignalReceiver()
+    sampler.sig_sample.subscribe(receiver)
+    try:
+        for _ in range(3):
+            received = receiver.get_next_signal(timeout=1.0)
+            sample = received.args[0]
+            print(f"{received.publisher_name}.{received.signal_name}: value = {sample.value:.2f}")
+    finally:
+        sampler.sig_sample.unsubscribe(receiver)
+
+:py:meth:`get_next_signal() <qmi.core.pubsub.QMI_SignalReceiver.get_next_signal>` returns the oldest signal in
+the queue as a :py:class:`ReceivedSignal <qmi.core.pubsub.ReceivedSignal>` tuple, which contains the publishing
+context and object, the signal name, the arguments in ``args`` and a sequence number. If the queue is empty, it
+waits at most ``timeout`` seconds and then raises ``QMI_TimeoutException``. Note that the default timeout is ``0``,
+i.e. no waiting at all, and ``timeout=None`` waits forever.
+
+The ``finally`` clause is important: a receiver that is not unsubscribed keeps queueing signals for as long as the
+program runs. The :py:func:`subscribe_unsubscribe <qmi.utils.context_managers.subscribe_unsubscribe>` context
+manager does the bookkeeping for you. If you pass ``None`` as the receiver, it creates one with default settings::
+
+    from qmi.utils.context_managers import subscribe_unsubscribe
+
+    with subscribe_unsubscribe(sampler.sig_sample, None) as receiver:
+        for _ in range(3):
+            sample = receiver.get_next_signal(timeout=1.0).args[0]
+            print(f"value = {sample.value:.2f}")
+
+Waiting for a trigger works the same way; the received ``args`` is just an empty tuple::
+
+    with subscribe_unsubscribe(sampler.sig_overrange, None) as trigger:
+        nsg.set_amplitude(200.0)  # Provoke the trigger.
+        try:
+            trigger.get_next_signal(timeout=5.0)
+            print("over-range!")
+        except QMI_TimeoutException:
+            print("no over-range within 5 seconds")
+
+A receiver is only subscribed *after* the ``subscribe()`` call, so it never sees signals published earlier.
+To be sure that you only process fresh data in a receiver that has been subscribed for a while, call
+``receiver.discard_all()`` before you start waiting.
+
+The receive queue
+^^^^^^^^^^^^^^^^^
+
+By default a receiver keeps up to 10000 signals and drops the *oldest* signal when the queue is full.
+Both can be changed. For a control loop that only cares about the *latest* value, a queue length of one is
+the natural choice::
+
+    receiver = QMI_SignalReceiver(max_queue_length=1, discard_policy=QMI_SignalReceiver.DISCARD_OLD)
+
+With ``discard_policy=QMI_SignalReceiver.DISCARD_NEW`` the receiver keeps the first signals and ignores new ones
+while the queue is full. The ``receiver_seqnr`` field counts every signal the receiver was offered, so a gap in
+the sequence numbers shows that signals were dropped::
+
+    receiver = QMI_SignalReceiver(max_queue_length=3)
+    with subscribe_unsubscribe(sampler.sig_sample, receiver):
+        time.sleep(1.0)  # About 10 samples are published; only the last 3 are kept.
+        seqnrs = [receiver.get_next_signal().receiver_seqnr for _ in range(receiver.get_queue_length())]
+        print(seqnrs)  # For example [6, 7, 8].
+
+Signals between tasks
+^^^^^^^^^^^^^^^^^^^^^
+
+Signals are a good way to chain tasks without the tasks knowing about each other. Let us turn the amplitude
+control loop of the ``DemoTask`` into a task that is driven by the samples of the ``SamplerTask``. The signal to
+listen to is passed as a constructor argument, and the task publishes a signal of its own::
+
+    from qmi.core.exceptions import QMI_TaskStopException, QMI_TimeoutException
+    from qmi.core.pubsub import QMI_Signal, QMI_SignalReceiver, QMI_SignalSubscriber
+    from qmi.utils.context_managers import subscribe_unsubscribe
+
+
+    class AmplitudeControlSettings(NamedTuple):
+        limit: float
+        gain: float
+
+
+    class AmplitudeControlTask(QMI_Task):
+
+        sig_amplitude_changed = QMI_Signal([float])
+
+        def __init__(self, task_runner, name, nsg_name, sample_signal: QMI_SignalSubscriber):
+            super().__init__(task_runner, name)
+            self._nsg_name = nsg_name
+            self._sample_signal = sample_signal
+            self.settings = AmplitudeControlSettings(limit=10.0, gain=0.1)
+
+        def run(self):
+            nsg = qmi.get_instrument(self._nsg_name)
+            receiver = QMI_SignalReceiver(max_queue_length=1, discard_policy=QMI_SignalReceiver.DISCARD_OLD)
+            with subscribe_unsubscribe(self._sample_signal, receiver):
+                try:
+                    while not self.stop_requested():
+                        self.update_settings()
+                        try:
+                            received = receiver.get_next_signal(timeout=1.0)
+                        except QMI_TimeoutException:
+                            continue  # The publisher is not running (yet).
+
+                        sample = received.args[0]
+                        amplitude = nsg.get_amplitude()
+                        if abs(sample.value) > self.settings.limit:
+                            amplitude *= 1.0 - self.settings.gain
+                        else:
+                            amplitude *= 1.0 + self.settings.gain
+
+                        nsg.set_amplitude(amplitude)
+                        self.sig_amplitude_changed.publish(amplitude)
+
+                except QMI_TaskStopException:
+                    pass
+
+Note that the task does not need ``self.sleep()``: the loop is paced by the incoming samples. When
+``get_next_signal()`` is called from a task thread, a stop request interrupts the wait and raises
+``QMI_TaskStopException``, just like ``self.sleep()`` does. The context manager then unsubscribes the receiver.
+
+The task is created with the signal of the sampler proxy as an argument::
+
+    with qmi.make_task("sampler", SamplerTask, "signal_demo.nsg") as sampler:
+        with qmi.make_task("control", AmplitudeControlTask, "signal_demo.nsg", sampler.sig_sample) as control:
+            ...
+
+Every ``QMI_Task`` also has a built-in signal ``sig_settings_updated``, which ``update_settings()`` publishes
+with the new settings. Subscribe to it when you need to know that another client changed the settings of a task.
+Similarly, a ``QMI_LoopTask`` publishes ``sig_status_updated`` when its status changes.
+
+Signals from RPC objects
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Publishing is not limited to tasks. Here, a simulated shutter announces every state change made through its
+RPC methods::
+
+    from qmi.core.rpc import QMI_RpcObject, rpc_method
+
+
+    class Shutter(QMI_RpcObject):
+
+        sig_state = QMI_Signal([bool])
+
+        def __init__(self, context, name):
+            super().__init__(context, name)
+            self._is_open = False
+
+        def _set_state(self, is_open):
+            self._is_open = is_open
+            self.sig_state.publish(is_open)
+
+        @rpc_method
+        def open(self):
+            self._set_state(True)
+
+        @rpc_method
+        def close(self):
+            self._set_state(False)
+
+One receiver can be subscribed to several signals, even from different publishers. The ``signal_name`` (and
+``publisher_name``) of the received signal tell them apart. ``contextlib.ExitStack`` combines several
+``subscribe_unsubscribe`` context managers::
+
+    from contextlib import ExitStack
+
+    shutter = qmi.make_rpc_object("shutter", Shutter)
+    receiver = QMI_SignalReceiver()
+    with ExitStack() as stack:
+        for signal in (control.sig_amplitude_changed, control.sig_settings_updated, shutter.sig_state):
+            stack.enter_context(subscribe_unsubscribe(signal, receiver))
+
+        shutter.open()
+        control.set_settings(AmplitudeControlSettings(limit=20.0, gain=0.05))
+        time.sleep(0.5)
+        shutter.close()
+
+        while receiver.has_signal_ready():
+            received = receiver.get_next_signal()
+            if received.signal_name == "sig_state":
+                print("shutter is", "open" if received.args[0] else "closed")
+            elif received.signal_name == "sig_settings_updated":
+                print("controller has new settings:", received.args[0])
+            else:
+                print(f"amplitude = {received.args[0]:.2f}")
+
+An example output is:
+
+>>> shutter is open
+>>> amplitude = 180.00
+>>> controller has new settings: AmplitudeControlSettings(limit=20.0, gain=0.05)
+>>> amplitude = 171.00
+>>> amplitude = 162.45
+>>> amplitude = 154.33
+>>> shutter is closed
+
+Each signal needs its own ``subscribe()``/``unsubscribe()`` pair, and subscribing the same receiver twice to the
+same signal is an error. When subscribing in a loop, make sure that every signal is later unsubscribed with the
+same receiver it was subscribed with; the ``ExitStack`` takes care of that.
+
+Receiving signals from another program
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Signals cross context boundaries in exactly the same way as RPC calls. Run the sampler in a program whose context
+has a TCP server port in ``qmi.conf`` (see `Accessing a remote instrument`_), e.g. ``signal_server.py``::
+
+    with qmi.start("signal_server"):
+        with qmi.make_instrument("nsg", NoisySineGenerator):
+            with qmi.make_task("sampler", SamplerTask, "signal_server.nsg"):
+                try:
+                    while True:
+                        time.sleep(1.0)
+                except KeyboardInterrupt:
+                    pass
+
+In another program, get a proxy of the remote task and subscribe as before::
+
+    with qmi.start("signal_client"):
+        sampler = qmi.get_task("signal_server.sampler", auto_connect=True, host_port="127.0.0.1:40002")
+        with subscribe_unsubscribe(sampler.sig_sample, None) as receiver:
+            for _ in range(5):
+                received = receiver.get_next_signal(timeout=2.0)
+                print(f"{received.publisher_context}.{received.publisher_name}: {received.args[0].value:.2f}")
+
+>>> signal_server.sampler: 98.26
+>>> signal_server.sampler: 22.55
+>>> signal_server.sampler: -86.27
+
+The client must be able to import ``demo_signals`` to unpickle the ``SampleData`` arguments.
 
 Managing background processes
 -----------------------------
