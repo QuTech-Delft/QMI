@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.56.0-beta.0] - Unreleased
 
+### Added
+- Tutorial section "Publishing and receiving signals" in `documentation/sphinx/source/tutorial.rst`, covering `QMI_Signal`, `QMI_SignalReceiver`, `subscribe_unsubscribe`, receive queue discard policies, signals between tasks, signals from plain RPC objects, and receiving signals from another program. Example programs follow in `examples/signals/`.
+
 ## [0.55.0] - 2026-11-16
 
 ### Added
