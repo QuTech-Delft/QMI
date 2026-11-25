@@ -109,6 +109,10 @@ class AptProtocol:
 
     HEADER_SIZE_BYTES = 6
 
+    # Timeout (in seconds) for reading a pending unsolicited message in `send_message`. This only needs to cover
+    # the time for a message that is already (partially) in the buffer to fully arrive.
+    _PENDING_MESSAGE_TIMEOUT = 0.050
+
     def __init__(
         self,
         transport: QMI_SerialTransport,
@@ -161,15 +165,29 @@ class AptProtocol:
         )
 
     def send_message(self, msg: _AptMessage) -> None:
-        """Encode and send a binary message to the instrument. Before sending a new command, do a non-blocking read
-        to consume a potential old message from the instrument. This prevents a buildup of unhandled notification
-        messages from the instrument after several move_XXX() commands.
+        """Encode and send a binary message to the instrument. Before sending a new command, consume any pending
+        unsolicited messages from the instrument. This prevents a buildup of unhandled notification messages from
+        the instrument after several move_XXX() commands.
+
+        Pending messages are read and decoded as whole messages (rather than discarding raw buffered bytes), so
+        that a message which is only partially received at this point is completed first. Otherwise its remaining
+        bytes would be left in the buffer and misread as the header of the next reply.
 
         Parameters:
             msg: An `_AptMessage` instance.
         """
-        pending_msg = self._clear_buffer()
-        _logger.debug("Pending message %s (message_id=0x%04x): %s", type(msg).__name__, msg.message_id, pending_msg)
+        while self._transport._safe_serial.in_waiting > 0:
+            try:
+                pending_msg = self.read_message(timeout=self._PENDING_MESSAGE_TIMEOUT)
+            except (QMI_InstrumentException, QMI_TimeoutException):
+                # Discard whatever raw bytes remain; they could not be decoded as a valid message.
+                self._transport.discard_read()
+                break
+            else:
+                _logger.debug(
+                    "Pending message %s (message_id=0x%04x) discarded before sending %s (message_id=0x%04x)",
+                    type(pending_msg).__name__, pending_msg.message_id, type(msg).__name__, msg.message_id
+                )
 
         self._transport.write(bytes(msg))
 
@@ -185,12 +203,6 @@ class AptProtocol:
         Raises:
             QMI_InstrumentException: If an unknown or partial message is received.
         """
-
-        # Read message header. If the header is not ready, double the timeout.
-        if self._transport._safe_serial.in_waiting < self.HEADER_SIZE_BYTES:
-            if timeout is not None:
-                time.sleep(timeout)
-
         data = self._transport.read(nbytes=self.HEADER_SIZE_BYTES, timeout=timeout)
 
         # Decode message header.

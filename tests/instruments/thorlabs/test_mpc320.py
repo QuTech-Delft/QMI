@@ -75,8 +75,11 @@ class TestThorlabsMPC320(unittest.TestCase):
         self._transport_mock.read.side_effect = [unexpected_read + b"\x81\x00", b"320\0MPC" * 12]
 
         # Act
-        with self.assertRaises(QMI_TimeoutException) as exc:
-            _ = self._instr.get_idn()
+        # `read_message` no longer sleeps for the timeout while waiting for the header to arrive, so the
+        # timeout here needs to be induced by advancing the monotonic clock instead of a real sleep.
+        with unittest.mock.patch("time.monotonic", side_effect=[0.0, 100.0]):
+            with self.assertRaises(QMI_TimeoutException) as exc:
+                _ = self._instr.get_idn()
 
         # Assert
         self.assertEqual(expected_error, str(exc.exception))
