@@ -6,20 +6,20 @@ import qmi
 from qmi.instruments.stanford_research_systems import Srs_Sim900
 from qmi.instruments.stanford_research_systems import Srs_Sim922
 from qmi.core.exceptions import QMI_UsageException, QMI_InstrumentException
+from tests.patcher import PatcherQmiContext
 
 
 class TestSIM922(unittest.TestCase):
     """Testcase of SIM922 temperature sensor."""
 
     def setUp(self):
-        qmi.start("test_siglent_sim922")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("test_siglent_sim922")
+        self.addCleanup(self.qmi_patcher.stop)
         self._sim900 = MagicMock(spec=Srs_Sim900)
         self._port = 1
         self._channel = 2
         self.sim922 = qmi.make_instrument("SIM922", Srs_Sim922, self._sim900, self._port)
-
-    def tearDown(self):
-        qmi.stop()
 
     def test_get_id(self):
         # arrange
