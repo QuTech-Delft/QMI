@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """
 Test shutdown of QMI with instrument still open.

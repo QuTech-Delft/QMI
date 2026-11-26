@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Test basic start/stop functionality of QMI framework.
 """

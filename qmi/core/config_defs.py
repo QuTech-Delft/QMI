@@ -61,7 +61,6 @@ class CfgProcessHost:
     """Configuration of process management for a specific host.
 
     Attributes:
-        logdir:         Directory for output logs from managed processes.
         server_command: Command to run on the host for remote process management.
         ssh_host:       Optional host name to pass to SSH to access this host (default: host address).
         ssh_user:       Optional user name to pass to SSH to access this host (default: current user).

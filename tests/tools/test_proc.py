@@ -28,7 +28,7 @@ logging.disable(logging.CRITICAL)
 
 CONFIG = {
     "ip": "10.10.10.10",  # Local IP address
-    "port": 1032,
+    "port": 10320,
     "server_command": "test_config_server_command",
     "ssh_host": "test_config_ssh_host",
     "ssh_user": "test_config_ssh_user",
@@ -42,7 +42,7 @@ CONFIG0 = {
     "program_args": ["test_program_arg0"],
 }
 CONTEXT_CFG = {
-        "ContextName2": {"tcp_server_port": 1031},
+        "ContextName2": {"tcp_server_port": 10310},
         "ContextName1": {
             "host": CONFIG["ip"],
             "tcp_server_port": CONFIG["port"],
@@ -141,6 +141,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             )
 
         self.addCleanup(patcher)
+        self.addCleanup(qmi_mock)
 
     def test_pmc_init_default(self):
         """Test ProcessManagementClient.__init__, happy flow, default parameters."""
@@ -195,6 +196,8 @@ class ProcessManagementClientTestCase(unittest.TestCase):
             manager._proc.stdout.close.assert_called_once_with()
             manager._proc.wait.assert_called_once_with(timeout=2)
 
+        self.addCleanup(qmi_mock)
+
     def test_pmc_close_timeout(self):
         """Test whether ProcessManagementClient.close kills the process when a timeout happened."""
         with patch("qmi.tools.proc.qmi") as qmi_mock:
@@ -210,6 +213,7 @@ class ProcessManagementClientTestCase(unittest.TestCase):
                 manager.close()
 
         manager._proc.kill.assert_called_once_with()
+        self.addCleanup(qmi_mock)
 
     def test_pmc_start_process(self):
         """Test ProcessManagementClient.start_process, happy flow."""
@@ -804,6 +808,8 @@ class QmiProcMethodsTestCase(unittest.TestCase):
                 ]
             )
 
+        self.addCleanup(context)
+
     def test_shutdown_context_soft(self):
         """Test shutdown_context, happy flow, soft shutdown."""
         with patch(
@@ -863,6 +869,8 @@ class QmiProcMethodsTestCase(unittest.TestCase):
             with self.assertRaises(proc.ProcessException):
                 proc.shutdown_context("ContextName1", MagicMock())
 
+        self.addCleanup(context)
+
     def test_shutdown_context_soft_timeout(self):
         """Test shutdown_context flow when soft shutdown results in a timeout."""
         proxy = QMI_RpcProxy
@@ -883,6 +891,8 @@ class QmiProcMethodsTestCase(unittest.TestCase):
                     call(""),
                 ]
             )
+
+        self.addCleanup(context)
 
     def test_shutdown_context_soft_exception(self):
         """Test shutdown_context flow when soft shutdown results in a connection error."""
@@ -925,6 +935,8 @@ class QmiProcMethodsTestCase(unittest.TestCase):
             )
 
             proc.shutdown_context("ContextName1", MagicMock())  # exception is passed.
+
+        self.addCleanup(context)
 
     def test_select_contexts(self):
         """Test select_contexts, happy flow."""
@@ -1341,6 +1353,7 @@ class QmiProcVenvTestCase(unittest.TestCase):
             start_new_session=True,
             env=os.environ.copy()
         )
+        self.addCleanup(qmi_mock)
 
     @unittest.mock.patch("sys.platform", "win32")
     def test_start_local_process_winvenv(self):
@@ -1376,6 +1389,8 @@ class QmiProcVenvTestCase(unittest.TestCase):
             start_new_session=True,
             env=os.environ.copy()
         )
+        self.addCleanup(qmi_mock)
+
 
 class ArgParserTestCase(unittest.TestCase):
 

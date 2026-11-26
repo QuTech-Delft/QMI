@@ -125,7 +125,7 @@ def start(
     if _qmi_context is not None:
         raise QMI_UsageException("QMI context already started")
 
-    config = create_config_from_file(config_file)  # this will raise FileNotFoundError if config_file == ""
+    config = create_config_from_file(config_file)
 
     # Check for insert or override of context or contexts.
     if context_cfg is not None:
