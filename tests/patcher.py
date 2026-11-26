@@ -65,6 +65,20 @@ class PatcherQmiContext:
         if self._context is not None:
             if self._context._active:
                 self._context.stop()
+            else:
+                # `start()` was never called, or it failed before the context became active, so
+                # `QMI_Context.stop()` can not be used (it requires an active context). The "$context" RPC
+                # object created in `QMI_Context.__init__()` already spawned a background thread though, so
+                # stop that (and the message router thread, if it got that far) directly.
+                with self._context._rpc_object_map_lock:
+                    managers = [m for m in self._context._rpc_object_map.values() if m is not None]
+                    self._context._rpc_object_map.clear()
+                for manager in managers:
+                    self._context.unregister_message_handler(manager)
+                    manager.stop()
+                if self._context._message_router._thread is not None:
+                    self._context._message_router.stop()
+                qmi.object_registry.unregister(self._context._oid)
             self._context = None
 
         if self._patcher_started:
