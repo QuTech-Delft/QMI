@@ -94,14 +94,11 @@ When implementing an issue:
 3. Make logical commits.
 4. Push the branch right after the first commit, and push again after every further commit, so that no work is lost
    if the run is cut off. Pushing starts the "on push" CI workflow (`push-ci.yml`).
-5. Only then run the tests (the commands under "Development"), or wait for the CI run of the last push:
-   `gh run list --branch <branch> --workflow push-ci.yml --limit 1`, then `gh run watch <run-id> --exit-status`.
-   On failure, read `gh run view <run-id> --log-failed`.
+5. Only then run the tests (the commands under "Development").
 6. Fix any problems found, review the complete diff, commit and push again. Repeat until the tests pass.
 7. Describe the new code in the CHANGELOG.md, in one or more of the applying sections of the latest 'Unreleased' entry. Categorize accordingly under:
   - "Added", "Removed", "Changed", "Fixed", or "Deprecated"
-8. Push again and make sure the CI run of that push passes. Note: `push-ci.yml` ignores pushes that only change
-   `CHANGELOG.md`, so a CHANGELOG-only push starts no new CI run.
+8. Push again and make sure the tests pass.
 9. Create a pull request describing the changes and request 'heevasti' as reviewer. If the pull-request CI fails, fix
    it on the same branch.
 

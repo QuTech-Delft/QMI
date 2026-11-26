@@ -63,19 +63,18 @@ jobs:
       - name: Run coverage
         timeout-minutes: 25
         run: |
-          ( while sleep 15; do echo "[mon] $(date -u +%T) $(free -m | awk '/Mem:/{print "used="$3"M avail="$7"M"}') threads=$(ps -eLf | wc -l)"; done ) &
           batch=0
           for dir in "."; do
             subdirs=$(find "tests/$dir" -mindepth 1 -maxdepth 1 -type d ! -name "__pycache__" ! -name "data")
             if [ -n "$subdirs" ]; then
               for subdir in $subdirs; do
                 echo "Running coverage for tests in $subdir"
-                timeout -s ABRT -k 30s 9m python -X faulthandler -m coverage run --branch --data-file=".coverage.$batch" -m unittest discover -v --start-directory="$subdir" --pattern="test_*.py"
+                coverage run --branch --data-file=".coverage.$batch" -m unittest discover --start-directory="$subdir" --pattern="test_*.py"
                 batch=$((batch + 1))
               done
             else
               echo "Running coverage for tests in tests/$dir"
-              timeout -s ABRT -k 30s 9m python -X faulthandler -m coverage run --branch --data-file=".coverage.$batch" -m unittest discover -v --start-directory=tests/"$dir" --pattern="test_*.py"
+              coverage run --branch --data-file=".coverage.$batch" -m unittest discover --start-directory=tests/"$dir" --pattern="test_*.py"
               batch=$((batch + 1))
             fi
           done

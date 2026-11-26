@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tutorial section "Publishing and receiving signals" in `documentation/sphinx/source/tutorial.rst`, covering `QMI_Signal`, `QMI_SignalReceiver`, `subscribe_unsubscribe`, receive queue discard policies, signals between tasks, signals from plain RPC objects, and receiving signals from another program. Example programs follow in `examples/signals/`.
 
 ### Changed
-- CI coverage step now runs `unittest` with `-v` under `python -X faulthandler` and a `timeout -s ABRT` per test batch, and prints memory use and thread count every 15 s, so a hanging test reports its name and thread stacks (#249). The step timeout is raised from 15 to 25 minutes.
-- The `claude[bot]` workflow (`.github/workflows/claude.yml`) now has a 45-minute job timeout, 15/30-minute per-command timeouts, a limit of 100 turns, and may read CI results with `gh pr checks` and `gh run list/view/watch`. `CLAUDE.md` now tells the bot to push after every commit, before running tests or waiting for CI (#249).
+- The timeout of the CI coverage step is raised from 15 to 25 minutes (#249).
+- The `claude[bot]` workflow (`.github/workflows/claude.yml`) now has a 45-minute job timeout, 15/30-minute per-command timeouts and a limit of 100 turns. `CLAUDE.md` now tells the bot to push after every commit, before running tests (#249).
 
 ### Fixed
 - `pull-request-ci.yml` passed the misspelled input `fetch_depth` to `actions/checkout`; it is now `fetch-depth` (#249).
