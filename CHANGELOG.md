@@ -4,16 +4,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.55.0-beta.0] - Unreleased
+## [0.56.0-beta.0] - Unreleased
 
 ### Added
+- Tutorial section "Publishing and receiving signals" in `documentation/sphinx/source/tutorial.rst`, covering `QMI_Signal`, `QMI_SignalReceiver`, `subscribe_unsubscribe`, receive queue discard policies, signals between tasks, signals from plain RPC objects, and receiving signals from another program. Example programs follow in `examples/signals/`.
+
+## [0.55.0] - 2026-11-16
+
+### Added
+- QMI driver for the AlphaLab MR3 three-axis magnetic field meter, `qmi.instruments.alphalab.AlphaLab_MR3`, communicating over a serial port using the AlphaLab Data Acquisition Communication Protocol. Includes unit tests in `tests/instruments/alphalab/test_mr3.py`.
+- QMI driver for the Bluefors dilution refrigerator, `qmi.instruments.bluefors.Bluefors_DilutionRefrigerator`, based on the Bluefors control software HTTP API. Includes unit tests in `tests/instruments/bluefors/test_dilution_refrigerator.py`.
+- QMI driver for the Lake Shore Model 211 Temperature Monitor, `qmi.instruments.lake_shore.LakeShore_Model211`, communicating over a serial connection using SCPI, and enforcing the manual's message flow control timing. Includes unit tests in `tests/instruments/lake_shore/test_temperature_monitor_211.py`.
 - `qmi.core.logging_init.stop_logging()`, which undoes `start_logging()`: it removes the QMI console and file log handlers, restores the original `sys.excepthook`, and switches off `logging.captureWarnings()`. `qmi.stop()` now calls it automatically when the matching `qmi.start()` initialized logging.
 - QMI driver for the Keithley 2400 series SourceMeter, `qmi.instruments.keithley.Keithley_Sourcemeter2400`, supporting GPIB and RS-232 transports. Implements resetting, configuring a fixed voltage or current source, selecting the sense function, reading out the measured voltage, and switching the output on and off.
+- `qmi.instruments.newport.single_axis_motion_controller.Newport_SingleAxisMotionController.DEFAULT_CONTROLLER_ADDRESS`, `DEFAULT_RESPONSE_TIMEOUT` and `DEFAULT_HOME_SEARCH_TIMEOUT` are now RPC properties, so e.g. `instr.DEFAULT_CONTROLLER_ADDRESS = 2` can be used to change the controller address that subsequent commands default to, without having to pass an explicit `controller_address` to every call. This also applies to the `Newport_SMC100CC`, `Newport_SMC100PP` and `Newport_ConexCC` drivers that derive from it.
+- QMI driver for the Santec MPM-210H multi-port optical power and current meter, `qmi.instruments.santec.mpm_210h.Santec_Mpm210H`, supporting `serial:`, `tcp:`, and `gpib:` transports. Implements module identification, measurement mode and wavelength/sweep configuration, TIA gain and averaging time settings, power/current readout, logged-data retrieval, and zeroing. Includes unit tests in `tests/instruments/santec/test_mpm_210h.py`.
+- `qmi.instruments.santec.tsl_570.Santec_Tsl570` gained new RPC methods: `set_trigger_input_standby()` and `get_trigger_input_standby()` to control the "Standing by trigger" sweep state entered after `issue_soft_trigger()`, and `readout_power_data()` to read out the power monitor logging data of the last sweep.
+- QMI driver for the Montana Cryostation S100, `qmi.instruments.montana.Montana_CryostationS100`, sharing a new private RESTful API base class with the S50 driver. Includes unit tests in `tests/instruments/montana/test_cryostation_s100.py`, `test_cryostation_s50.py` and `test__cryostation_rest.py`.
+- QMI driver for the Signal Hound BB60C Spectrum Analyzer, `qmi.instruments.signal_hound.SignalHound_BB60C`, communicating over a network transport using SCPI.
+
+### Changed
+- `qmi.instruments.montana.cryostation_s50.Montana_CryostationS50` is now based on the new private `qmi.instruments.montana._cryostation_rest.Montana_CryostationRest_Base` class, shared with the new S100 driver.
+- Modernized the type hints of `qmi.instruments.newport.single_axis_motion_controller`, `qmi.instruments.newport.smc_100cc` and `qmi.instruments.newport.smc_100pp` to use builtin generics and `X | None`.
+- Modernized the type hints of `qmi.instruments.newport.ag_uc8`, `conex_cc`, `newport_843r`, `newport_843r_libusb` and `tlb670x` to use builtin generics and `X | None`. Updated the Newport unit tests to use `tests.patcher` instead of running on full QMI contexts, and added missing unit tests for the 843R modules.
+- Improved and corrected the docstrings of `qmi.instruments.newport` modules `single_axis_motion_controller.py`, `smc_100cc.py`, `smc_100pp.py` and `actuators.py`.
+- `tests/instruments/santec/test_tsl_570.py` now uses `tests.patcher` instead of running on full QMI contexts.
+- Modernized the type hints and docstrings of `qmi.instruments.montana.cryostation`; `tests/instruments/montana/test_cryostation.py` now uses `tests.patcher`, which tracks and releases `make_instrument()`-created instruments on `stop()`.
 
 ### Changed
 - CI coverage step now runs `unittest` with `-v` under `python -X faulthandler` and a `timeout -s ABRT` per test batch, so a hanging test reports its name and thread stacks (#249).
 
 ### Fixed
+- `tests.patcher.PatcherQmiContext.stop()` no longer calls the now-unused `qmi.stop()`.
 - `qmi.core.logging_init.start_logging()` used `logging.basicConfig()` to install the console log handler. `basicConfig()` silently does nothing once the root logger already has handlers, so a second call (for example a new `qmi.start()` after `qmi.stop()`, with a changed `console_loglevel` in `qmi.conf`) had no effect. The console handler is now tracked explicitly, like the file handler, and is replaced via `logging.getLogger().addHandler()` on every call.
 - In `tests/instruments/thorlabs/test_tsp01b.py`, the cleanup of possibly earlier mocked `usb.core` and `usb.util` modules from `sys.modules` now checks the presence of `usb.util` separately, instead of deleting it unconditionally whenever `usb.core` was present.
 - `QbloxManager.__init__` now calls `_import_modules()`, so the lazily-imported `qblox_instruments` vendor module, `ChannelType` and `ChannelMapCache` are available as soon as a manager is created, instead of remaining `None` and raising errors on first use.
@@ -23,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DataFolder.read_dataset()` raised `FileNotFoundError` for a raw dataset (data without axes, e.g. plain 2D data) written by `DataFolder.write_dataset()`, because such datasets are stored at the HDF5 file root instead of in a group named after the dataset. `read_dataset()` now falls back to reading the file root when a child group with the dataset's name is not found but the file's root attributes identify it as that raw dataset. Affects both the `h5py` and `h5netcdf` backends.
 - Randomly failing `test_elf_upload_timeout` in `tests/instruments/zurich_instruments/test_hdawg.py`: the test relied on real wall-clock timing via `time.sleep()`, combined with a mocked upload progress sequence, to land on exactly two poll iterations before the upload timeout tripped. Under CI scheduling jitter, the real elapsed time could exceed the timeout one iteration earlier than intended, causing the reported progress to be `0.0%` instead of the expected `50.0%`. The test now mocks `time.monotonic()` (and `time.sleep()`) so the timeout trip point is deterministic.
 - `qmi.utils.adbasic_compiler._parse_stderr_lines()` raised `AdbasicCompilerException` and discarded the whole compile result whenever the ADbasic compiler's stderr contained text it did not recognize, such as the "requires executable stack" linker warning emitted by GNU binutils >= 2.39 for ADwin's `libc_T12ld.a` on Linux. Unrecognized stderr text is now recorded as a warning instead of raising, as long as it contains the word "warning"; other unrecognized text still raises `AdbasicCompilerException` as before.
+- `tests/test_bumpversion_stable_config.py` sat directly in `tests/`, so the CI coverage run, which discovers tests per subdirectory of `tests/`, never ran it. Moved it to `tests/root/test_bumpversion_stable_config.py` so CI now runs it.
 
 ## [0.54.0] - 2026-10-02
 

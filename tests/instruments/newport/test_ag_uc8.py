@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 from unittest.mock import patch
 from unittest.mock import call
 
-from typing import cast
 from dataclasses import dataclass
 
 from qmi.core.transport import QMI_Transport
@@ -16,9 +15,7 @@ from qmi.instruments.newport.ag_uc8 import AxisStatus
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.exceptions import QMI_UsageException
 
-
-# Disable all logging
-logging.disable(logging.CRITICAL)
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 @dataclass
@@ -36,23 +33,29 @@ class TestNewport_AG_UC8(TestCase):
     """Testcase for the Newport_AG_UC8 class."""
 
     def setUp(self):
+        logging.getLogger("qmi.instruments.newport.ag_uc8").setLevel(logging.CRITICAL)
+
         mock_transport = MagicMock(spec=QMI_Transport)
         mock_name = MagicMock()
         mock_transport_str = MagicMock()
         mock_super = MagicMock()
 
+        self._ctx = QMI_Context("AG_UC8_Mock")
+        self._ctx.start()
+        self.addCleanup(self._ctx.stop)
+
         with patch(
             "qmi.instruments.newport.ag_uc8.create_transport",
             return_value=mock_transport,
         ):
-            instr = Newport_AG_UC8(MagicMock(), mock_name, mock_transport_str)
+            instr = Newport_AG_UC8(self._ctx, mock_name, mock_transport_str)
 
         self._patcher_super = patch("qmi.instruments.newport.ag_uc8.super", mock_super)
         self._patcher_super.start()
 
         self._meta = TestMeta(
             transport=mock_transport,
-            instr=cast(Newport_AG_UC8, instr),
+            instr=instr,
             transport_str=mock_transport_str,
             name=mock_name,
             super=mock_super,
@@ -61,6 +64,7 @@ class TestNewport_AG_UC8(TestCase):
     def tearDown(self):
         self._meta = None
         self._patcher_super.stop()
+        logging.getLogger("qmi.instruments.newport.ag_uc8").setLevel(logging.NOTSET)
 
     def test_init(self):
         """Newport_AG_UC8.__init__(), happy flow"""

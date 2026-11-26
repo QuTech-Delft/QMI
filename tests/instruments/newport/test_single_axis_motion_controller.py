@@ -1,22 +1,26 @@
 """Unit tests for a Newport single axis motion controller."""
 
-from typing import cast
+import logging
 import unittest
-from unittest.mock import Mock, call, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
-from qmi.utils.context_managers import start_stop
 from qmi.instruments.newport import Newport_Smc100Pp, Newport_Smc100Cc, Newport_ConexCc
 from qmi.instruments.newport.actuators import TRA12CC, TRB6CC, CMA25CCL, UTS100PP
 from qmi.instruments.newport.single_axis_motion_controller import Newport_SingleAxisMotionController
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class TestDerivingClassCase(unittest.TestCase):
     """Test that the creation of child classes of Newport_Single_Axis_Motion_Controller work as expected."""
 
     def setUp(self):
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.CRITICAL)
+        self._ctx = QMI_Context("TestDerivingClassContext")
+        self._ctx.start()
+        self.addCleanup(self._ctx.stop)
         # Add patches
         patcher = patch(
             "qmi.instruments.newport.single_axis_motion_controller.create_transport", spec=QMI_TcpTransport
@@ -27,54 +31,54 @@ class TestDerivingClassCase(unittest.TestCase):
         self._scpi_mock: Mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
 
+    def tearDown(self):
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.NOTSET)
+
     def test_smc100pp(self):
         """
         Test SMC100PP
         """
-        expected_rpc_class = "qmi.instruments.newport.smc_100pp.Newport_SMC100PP"
-        with qmi.start("TestSMC100PP", console_loglevel="CRITICAL"):
-            # Make DUT
-            self.instr: Newport_Smc100Pp = qmi.make_instrument(
-                "pp_controller", Newport_Smc100Pp, "Beverly_Hills", "FT5TMFGL", {1: UTS100PP}, 90210
-            )
-            # Test __init__ is of correct module
-            self.assertIn(expected_rpc_class, str(self.instr.__init__))
+        expected_rpc_class = "Newport_SMC100PP"
+        # Make DUT
+        self.instr: Newport_Smc100Pp = Newport_Smc100Pp(
+            self._ctx, "pp_controller", "Beverly_Hills", "FT5TMFGL", {1: UTS100PP}, 90210
+        )
+        # Test __init__ is of correct module
+        self.assertIn(expected_rpc_class, str(self.instr.__init__))
 
     def test_smc100cc(self):
         """
         Test SMC100CC
         """
-        expected_rpc_class = "qmi.instruments.newport.smc_100cc.Newport_SMC100CC"
-        with qmi.start("TestSMC100CC", console_loglevel="CRITICAL"):
-            # Make DUT
-            self.instr: Newport_Smc100Cc = qmi.make_instrument(
-                "sam_controller",
-                Newport_Smc100Cc,
-                "Beverly_Hills",
-                "FT5TMFGL",
-                {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
-                90210,
-            )
-            # Test __init__ is of correct module
-            self.assertIn(expected_rpc_class, str(self.instr.__init__))
+        expected_rpc_class = "Newport_SMC100CC"
+        # Make DUT
+        self.instr: Newport_Smc100Cc = Newport_Smc100Cc(
+            self._ctx,
+            "sam_controller",
+            "Beverly_Hills",
+            "FT5TMFGL",
+            {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
+            90210,
+        )
+        # Test __init__ is of correct module
+        self.assertIn(expected_rpc_class, str(self.instr.__init__))
 
     def test_conex_cc(self):
         """
         Test Conex CC
         """
-        expected_rpc_class = "qmi.instruments.newport.conex_cc.Newport_ConexCC"
-        with qmi.start("TestConexCC", console_loglevel="CRITICAL"):
-            # Make DUT
-            self.instr: Newport_ConexCc = qmi.make_instrument(
-                "sam_controller",
-                Newport_ConexCc,
-                "Beverly_Hills",
-                "FT5TMFGL",
-                {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
-                90210,
-            )
-            # Test __init__ is of correct module
-            self.assertIn(expected_rpc_class, str(self.instr.__init__))
+        expected_rpc_class = "Newport_ConexCC"
+        # Make DUT
+        self.instr: Newport_ConexCc = Newport_ConexCc(
+            self._ctx,
+            "sam_controller",
+            "Beverly_Hills",
+            "FT5TMFGL",
+            {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
+            90210,
+        )
+        # Test __init__ is of correct module
+        self.assertIn(expected_rpc_class, str(self.instr.__init__))
 
 
 class TestSingleAxisMotionController(unittest.TestCase):
@@ -85,7 +89,10 @@ class TestSingleAxisMotionController(unittest.TestCase):
     TRANSPORT_STR = "/dev/cu.usbserial-FT5TMFGL"
 
     def setUp(self):
-        qmi.start("TestSamControllerContext", console_loglevel="CRITICAL")
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.CRITICAL)
+        self._ctx = QMI_Context("TestSamControllerContext")
+        self._ctx.start()
+        self.addCleanup(self._ctx.stop)
         # Add patches
         patcher = patch(
             "qmi.instruments.newport.single_axis_motion_controller.create_transport", spec=QMI_TcpTransport
@@ -99,20 +106,19 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self.controller_address = 1
         Newport_SingleAxisMotionController.PW0_EXEC_TIME = 0.1
         Newport_SingleAxisMotionController.COMMAND_EXEC_TIME = 0.01
-        self.instr: Newport_SingleAxisMotionController = qmi.make_instrument(
+        self.instr: Newport_SingleAxisMotionController = Newport_SingleAxisMotionController(
+            self._ctx,
             "sam_controller",
-            Newport_SingleAxisMotionController,
             self.TRANSPORT_STR,
             "FT5TMFGL",
             {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
             90210,
         )
-        self.instr = cast(Newport_SingleAxisMotionController, self.instr)
         self.instr.open()
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.NOTSET)
 
     def test_reset_without_controller_address_resets(self):
         """Test reset."""
@@ -134,6 +140,37 @@ class TestSingleAxisMotionController(unittest.TestCase):
         """Test build command with invalid controller address."""
         with self.assertRaises(QMI_InstrumentException):
             self.instr.reset(4)
+
+        self._scpi_mock.write.assert_not_called()
+        self._scpi_mock.ask.assert_not_called()
+
+    def test_default_controller_address_is_rpc_property(self):
+        """Test that DEFAULT_CONTROLLER_ADDRESS can be changed through the RPC property and that commands sent
+        without an explicit controller address then use the new default."""
+        self._scpi_mock.ask.return_value = "@"
+        self.instr.DEFAULT_CONTROLLER_ADDRESS = 2
+
+        self.instr.reset()
+
+        self._scpi_mock.write.assert_called_once_with("2RS\r\n")
+        self._scpi_mock.ask.assert_called_once_with("2TE\r\n")
+
+    def test_default_controller_address_can_still_be_overridden_explicitly(self):
+        """Test that an explicitly given controller address still takes precedence over a changed default."""
+        self._scpi_mock.ask.return_value = "@"
+        self.instr.DEFAULT_CONTROLLER_ADDRESS = 2
+
+        self.instr.reset(3)
+
+        self._scpi_mock.write.assert_called_once_with("3RS\r\n")
+        self._scpi_mock.ask.assert_called_once_with("3TE\r\n")
+
+    def test_default_controller_address_with_invalid_value_throws_exception_on_use(self):
+        """Test that an invalid DEFAULT_CONTROLLER_ADDRESS still raises an exception when it is used."""
+        self.instr.DEFAULT_CONTROLLER_ADDRESS = 4
+
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.reset()
 
         self._scpi_mock.write.assert_not_called()
         self._scpi_mock.ask.assert_not_called()
@@ -1122,6 +1159,33 @@ class TestSingleAxisMotionController(unittest.TestCase):
         self._scpi_mock.write.assert_not_called()
         self._scpi_mock.ask.assert_not_called()
 
+    def test_get_controller_rs485_address_always_uses_address_1(self):
+        """Test that getting the controller RS485 address always targets controller address 1."""
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
+        expected_value = 2
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", f"1SA %s" % expected_value, "@"]
+        expected_ask_calls = [call("1TS\r\n"), call("1SA?\r\n"), call("1TE\r\n")]
+        expected_write_calls = [call("1PW0\r\n")]
+
+        actual_value = self.instr.get_controller_rs485_address()
+
+        self.assertEqual(actual_value, expected_value)
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
+    def test_set_controller_rs485_address_always_uses_address_1(self):
+        """Test that setting the controller RS485 address always targets controller address 1."""
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
+        controller_rs485_address = 30
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@"]
+        expected_ask_calls = [call("1TS\r\n"), call("1TE\r\n")]
+        expected_write_calls = [call(f"1SA{controller_rs485_address}\r\n"), call("1PW0\r\n")]
+
+        self.instr.set_controller_rs485_address(controller_rs485_address)
+
+        self._scpi_mock.write.assert_has_calls(expected_write_calls)
+        self._scpi_mock.ask.assert_has_calls(expected_ask_calls)
+
     def test_get_negative_software_limit_gets_limit(self):
         """Test get negative software limit."""
         state = "3C"  # Set to DISABLE state to take the shortest path
@@ -1281,3 +1345,102 @@ class TestSingleAxisMotionController(unittest.TestCase):
 
         self._scpi_mock.write.assert_not_called()
         self._scpi_mock.ask.assert_not_called()
+
+
+class TestControllerRs485AddressRestoration(unittest.TestCase):
+    """Tests that the controller address used before calling the RS-485 address methods is restored
+    afterwards, also when an exception occurs. The driver is instantiated directly (not through an RPC
+    proxy, unlike `TestSingleAxisMotionController`) so that the internal `_controller_address` attribute,
+    which is not exposed via RPC, can be inspected directly."""
+
+    def setUp(self):
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.CRITICAL)
+        patcher = patch(
+            "qmi.instruments.newport.single_axis_motion_controller.create_transport", spec=QMI_TcpTransport
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = patch("qmi.instruments.newport.single_axis_motion_controller.ScpiProtocol", autospec=True)
+        self._scpi_mock: Mock = patcher.start().return_value
+        self.addCleanup(patcher.stop)
+        Newport_SingleAxisMotionController.PW0_EXEC_TIME = 0.1
+        Newport_SingleAxisMotionController.COMMAND_EXEC_TIME = 0.01
+        self.instr = Newport_SingleAxisMotionController(
+            MagicMock(),
+            "sam_controller",
+            "/dev/cu.usbserial-FT5TMFGL",
+            "FT5TMFGL",
+            {1: TRA12CC, 2: TRB6CC, 3: CMA25CCL},
+            90210,
+        )
+
+    def tearDown(self):
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.NOTSET)
+
+    def test_get_controller_rs485_address_restores_address_when_different(self):
+        """Test that the controller address is switched to 1 and the original value is restored afterwards,
+        when the current controller address is not 1."""
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
+        expected_value = 2
+        self.instr._controller_address = 3
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", f"1SA %s" % expected_value, "@"]
+
+        actual_value = self.instr.get_controller_rs485_address()
+
+        self.assertEqual(actual_value, expected_value)
+        self.assertEqual(self.instr._controller_address, 3)
+
+    def test_get_controller_rs485_address_restores_address_after_exception(self):
+        """Test that the previous controller address is restored even when the command raises an exception."""
+        self.instr._controller_address = 2
+        self._scpi_mock.ask.side_effect = QMI_InstrumentException("Simulated error")
+
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.get_controller_rs485_address()
+
+        self.assertEqual(self.instr._controller_address, 2)
+
+    def test_get_controller_rs485_address_with_address_already_1_does_not_switch(self):
+        """Test that the controller address stays 1 when it was already 1 before the call."""
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
+        expected_value = 2
+        self.instr._controller_address = 1
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", f"1SA %s" % expected_value, "@"]
+
+        actual_value = self.instr.get_controller_rs485_address()
+
+        self.assertEqual(actual_value, expected_value)
+        self.assertEqual(self.instr._controller_address, 1)
+
+    def test_set_controller_rs485_address_restores_address_when_different(self):
+        """Test that the controller address is switched to 1 and the original value is restored afterwards,
+        when the current controller address is not 1."""
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
+        controller_rs485_address = 30
+        self.instr._controller_address = 2
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@"]
+
+        self.instr.set_controller_rs485_address(controller_rs485_address)
+
+        self.assertEqual(self.instr._controller_address, 2)
+
+    def test_set_controller_rs485_address_restores_address_after_exception(self):
+        """Test that the previous controller address is restored even when the command raises an exception."""
+        self.instr._controller_address = 3
+        self._scpi_mock.ask.side_effect = QMI_InstrumentException("Simulated error")
+
+        with self.assertRaises(QMI_InstrumentException):
+            self.instr.set_controller_rs485_address(10)
+
+        self.assertEqual(self.instr._controller_address, 3)
+
+    def test_set_controller_rs485_address_with_address_already_1_does_not_switch(self):
+        """Test that the controller address stays 1 when it was already 1 before the call."""
+        state = "14"  # Set to CONFIGURATION state to take the shortest path
+        controller_rs485_address = 30
+        self.instr._controller_address = 1
+        self._scpi_mock.ask.side_effect = [f"1TS0000{state}", "@"]
+
+        self.instr.set_controller_rs485_address(controller_rs485_address)
+
+        self.assertEqual(self.instr._controller_address, 1)

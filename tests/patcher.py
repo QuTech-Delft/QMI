@@ -4,11 +4,12 @@ import tempfile
 
 import qmi
 from qmi.core.context import QMI_Context, QMI_RpcProxy
+from qmi.core.exceptions import QMI_UnknownNameException
 
 
 class PatcherQmiRpcProxy:
 
-    rpc_nonblocking = Mock()  # patch("qmi.core.rpc.QMI_RpcNonBlockingProxy")
+    rpc_nonblocking = Mock()
 
     def __init__(self, context, descriptor):
         self._context = context
@@ -17,7 +18,8 @@ class PatcherQmiRpcProxy:
     def get_pid(self):
         return 123
 
-    def get_version(self):
+    @classmethod
+    def get_version(cls):
         return "SomeVersion"
 
 
@@ -29,6 +31,8 @@ class PatcherQmiContext:
     def __init__(self, name=None):
         self.name = name
         self.qmi_patcher = None
+        # Instruments made with `make_instrument`, as (owning context, proxy) pairs.
+        self._instruments: list[tuple[QMI_Context, QMI_RpcProxy]] = []
 
     def start(self, context_name=None, config=None):
         """Start the qmi_context and patcher."""
@@ -39,14 +43,26 @@ class PatcherQmiContext:
         qmi.core.context_singleton._connect_to_peers()
 
     def stop(self):
-        """Stop the qmi_context and patcher."""
-        qmi.stop()
+        """Remove the instruments made with `make_instrument`, then stop the patcher.
+
+        Like stopping a real QMI context, removing an instrument stops its RPC thread, which calls
+        `release_rpc_object()` on the instrument.
+        """
+        while self._instruments:
+            context, proxy = self._instruments.pop()
+            try:
+                context.remove_rpc_object(proxy)
+            except QMI_UnknownNameException:
+                pass  # Already removed by the test itself.
+
         self.qmi_patcher.stop()
 
     def make_instrument(self, instrument_name, instrument_class, *args, **kwargs):
-        return qmi.core.context_singleton._qmi_context.make_instrument(
-            instrument_name, instrument_class, *args, **kwargs
-        )
+        """Make an instrument in the patched context and register it for removal on `stop()`."""
+        context = qmi.core.context_singleton._qmi_context
+        proxy = context.make_instrument(instrument_name, instrument_class, *args, **kwargs)
+        self._instruments.append((context, proxy))
+        return proxy
 
     def connect_to_peer(self, peer_context_name, peer_address):
         return None
@@ -66,4 +82,4 @@ class PatcherQmiContext:
         return temp_dir
 
     def get_config(self):
-        return Mock()
+        return qmi.core.context_singleton._qmi_context._config

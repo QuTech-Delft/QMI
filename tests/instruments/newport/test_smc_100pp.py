@@ -1,13 +1,14 @@
 """Unit tests for a Newport single axis motion controller."""
-from typing import cast
+import logging
 import unittest
 from unittest.mock import Mock, call, patch
 
-import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.newport import Newport_Smc100Pp
 from qmi.instruments.newport.actuators import UTS100PP
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 
 class TestNewportSmc100Pp(unittest.TestCase):
@@ -18,7 +19,11 @@ class TestNewportSmc100Pp(unittest.TestCase):
     TRANSPORT_STR = "/dev/cu.usbserial-FT5TMFGL"
 
     def setUp(self):
-        qmi.start("Test100PpControllerContext", console_loglevel="CRITICAL")
+        logging.getLogger("qmi.instruments.newport.smc_100pp").setLevel(logging.CRITICAL)
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.CRITICAL)
+        self._ctx = QMI_Context("Test100PpControllerContext")
+        self._ctx.start()
+        self.addCleanup(self._ctx.stop)
         # Add patches
         patcher = patch(
             'qmi.instruments.newport.single_axis_motion_controller.create_transport', spec=QMI_TcpTransport)
@@ -32,16 +37,16 @@ class TestNewportSmc100Pp(unittest.TestCase):
         self.controller_address = 1
         Newport_Smc100Pp.PW0_EXEC_TIME = 0.1
         Newport_Smc100Pp.COMMAND_EXEC_TIME = 0.01
-        self.instr: Newport_Smc100Pp = qmi.make_instrument(
-            "sam_controller", Newport_Smc100Pp, self.TRANSPORT_STR, "FT5TMFGL",
+        self.instr = Newport_Smc100Pp(
+            self._ctx, "sam_controller", self.TRANSPORT_STR, "FT5TMFGL",
             {1: UTS100PP},
             90210)
-        self.instr = cast(Newport_Smc100Pp, self.instr)
         self.instr.open()
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
+        logging.getLogger("qmi.instruments.newport.smc_100pp").setLevel(logging.NOTSET)
+        logging.getLogger("qmi.instruments.newport.single_axis_motion_controller").setLevel(logging.NOTSET)
 
     def test_get_micro_step_per_full_step_factor(self):
         """Test getting motor micro-step factor."""

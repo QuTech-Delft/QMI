@@ -3,7 +3,6 @@ Instrument driver for the Newport SMC100PP motion controller.
 """
 import logging
 from time import sleep
-from typing import Dict, Optional
 
 from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
@@ -16,18 +15,19 @@ _logger = logging.getLogger(__name__)
 
 
 class Newport_SMC100PP(Newport_SingleAxisMotionController):
-    """Instrument driver for the Newport SMC100PP servo motion controller."""
+    """Instrument driver for the Newport SMC100PP stepper motion controller."""
 
     def __init__(self,
                  context: QMI_Context,
                  name: str,
                  transport: str,
                  serial: str,
-                 actuators: Dict[Optional[int], LinearActuator],
+                 actuators: dict[int | None, LinearActuator],
                  baudrate: int = 57600) -> None:
         """Initialize driver.
 
         Parameters:
+            context:    QMI_Context object for the instrument driver.
             name:       Name for this instrument instance.
             transport:  QMI transport descriptor to connect to the instrument.
             serial:     The serial number of the instrument.
@@ -40,13 +40,13 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
                          actuators, baudrate)
 
     @rpc_method
-    def get_micro_step_per_full_step_factor(self, controller_address: Optional[int] = None) -> float:
+    def get_micro_step_per_full_step_factor(self, controller_address: int | None = None) -> float:
         """
         Get the micro-step per full step factor of the motor configuration.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             factor: The micro-step per full step factor as float.
@@ -63,14 +63,17 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
         return float(factor[4:])
 
     @rpc_method
-    def set_micro_step_per_full_step_factor(self, factor: int, controller_address: Optional[int] = None) -> None:
+    def set_micro_step_per_full_step_factor(self, factor: int, controller_address: int | None = None) -> None:
         """
         Set the micro-step per full step factor of the motor configuration.
 
         Parameters:
             factor:             Micro-step per full step factor.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the given factor is not in the valid range.
         """
         if factor <= 0 or factor > 2000:
             raise QMI_InstrumentException(
@@ -88,13 +91,13 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
         self._exit_configuration_state()
 
     @rpc_method
-    def get_motion_distance_per_full_step(self, controller_address: Optional[int] = None) -> float:
+    def get_motion_distance_per_full_step(self, controller_address: int | None = None) -> float:
         """
         Get the motion distance per motor’s full step.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             m_dist: Motion distance as float.
@@ -111,14 +114,17 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
         return float(m_dist[4:])
 
     @rpc_method
-    def set_motion_distance_per_full_step(self, m_dist: float, controller_address: Optional[int] = None) -> None:
+    def set_motion_distance_per_full_step(self, m_dist: float, controller_address: int | None = None) -> None:
         """
         Set the motion distance per motor’s full step.
 
         Parameters:
             m_dist:             Motion distance per motor's full step.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the given motion distance is not in the valid range.
         """
         if m_dist <= self.MIN_FLOAT_LIMIT or m_dist >= self.MAX_FLOAT_LIMIT:
             raise QMI_InstrumentException(
@@ -136,13 +142,13 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
         self._exit_configuration_state()
 
     @rpc_method
-    def get_base_velocity(self, controller_address: Optional[int] = None) -> float:
+    def get_base_velocity(self, controller_address: int | None = None) -> float:
         """
         Get the profile generator base velocity.
 
         Parameters:
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
 
         Returns:
             base_velocity: Base velocity as float.
@@ -172,7 +178,7 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
 
     @rpc_method
     def set_base_velocity(
-            self, base_velocity: float, persist: Optional[bool] = False, controller_address: Optional[int] = None
+            self, base_velocity: float, persist: bool = False, controller_address: int | None = None
     ) -> None:
         """
         Set the profile generator base velocity. It must not be larger than the maximum velocity set by VA command.
@@ -182,8 +188,11 @@ class Newport_SMC100PP(Newport_SingleAxisMotionController):
             persist:            Flag to indicate if the velocity should be persisted to the controller's memory, so it
                                 is still available after powering down the controller. When not persisted, the maximum
                                 base velocity that can be set is the one stored in the controller's memory.
-            controller_address: Optional address of the controller that needs to be controlled. By default,
-                                it is set to the initialised value of the controller address.
+            controller_address: Optional address of the controller to send the command to. If not given,
+                                DEFAULT_CONTROLLER_ADDRESS is used.
+
+        Raises:
+            QMI_InstrumentException: If the given base velocity is not in the valid range.
         """
         self.controller_address = controller_address
         if persist:
