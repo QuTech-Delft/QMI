@@ -12,9 +12,9 @@ patcher = patch("ADwin.ADwin")
 _patcher = patcher.start()
 
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
-from qmi.core.context import QMI_Context
 from qmi.instruments.adwin import adwin
 from qmi.instruments.adwin import JagerMessTechnik_AdwinGoldII, JagerMessTechnik_AdwinProII
+from tests.patcher import PatcherQmiContext
 
 # Class constants from ADwin.ADwin class
 ADWIN_DATATYPE_INT8 = 1
@@ -26,24 +26,45 @@ ADWIN_DATATYPE_INT64 = 7
 
 
 class AdwinProIITest(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("test")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     def test_class_constants_are_ok(self) -> None:
-        self._adwin = JagerMessTechnik_AdwinProII(QMI_Context("test"), "Adwin", 1234)
+        self._adwin = JagerMessTechnik_AdwinProII(self.qmi_patcher, "Adwin", 1234)
         self.assertEqual(self._adwin.MAX_PAR, 80)
         self.assertEqual(self._adwin.MAX_DATA, 200)
         self.assertEqual(self._adwin.MAX_PROCESS_NO, 10)
 
 
 class AdwinGoldIITest(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("test")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     def test_class_constants_are_ok(self) -> None:
-        self._adwin = JagerMessTechnik_AdwinGoldII(QMI_Context("test"), "Adwin", 1234)
+        self._adwin = JagerMessTechnik_AdwinGoldII(self.qmi_patcher, "Adwin", 1234)
         self.assertEqual(self._adwin.MAX_PAR, 80)
         self.assertEqual(self._adwin.MAX_DATA, 200)
         self.assertEqual(self._adwin.MAX_PROCESS_NO, 10)
 
 
 class ADwinTestBaseClass(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("test")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     def setUp(self) -> None:
-        self._adwin = adwin.Adwin_Base(QMI_Context("test"), "Adwin", 1234)
+        self._adwin = adwin.Adwin_Base(self.qmi_patcher, "Adwin", 1234)
         self._adwin.MAX_PROCESS_NO = 1
         self._adwin.MAX_PAR = 2
         self._adwin.MAX_DATA = 3
