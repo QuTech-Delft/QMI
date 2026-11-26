@@ -85,7 +85,7 @@ class TestAptProtocolSendMessage(unittest.TestCase):
 
         self._transport_mock.read.assert_has_calls([
             unittest.mock.call(nbytes=6, timeout=AptProtocol._PENDING_MESSAGE_TIMEOUT),
-            unittest.mock.call(nbytes=14, timeout=0.050),
+            unittest.mock.call(nbytes=14, timeout=AptProtocol._PENDING_MESSAGE_TIMEOUT),
         ])
         self._transport_mock.discard_read.assert_not_called()
         self._transport_mock.write.assert_called_once_with(bytes(self._new_msg))

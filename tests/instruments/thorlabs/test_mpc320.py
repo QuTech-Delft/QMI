@@ -6,7 +6,7 @@ import unittest.mock
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.transport import QMI_SerialTransport
 from qmi.instruments.thorlabs import Thorlabs_Mpc320
-from qmi.instruments.thorlabs.apt_protocol import AptChannelJogDirection, AptChannelState
+from qmi.instruments.thorlabs.apt_protocol import AptChannelJogDirection, AptChannelState, AptProtocol
 from qmi.instruments.thorlabs.apt_packets import AptMessageId, _AptMsgHwGetInfo
 
 from tests.patcher import PatcherQmiContext
@@ -87,7 +87,7 @@ class TestThorlabsMPC320(unittest.TestCase):
         self._transport_mock.write.assert_called_once_with(expected_write)
         self._transport_mock.read.assert_has_calls([
             unittest.mock.call(nbytes=6, timeout=Thorlabs_Mpc320.DEFAULT_RESPONSE_TIMEOUT),
-            unittest.mock.call(nbytes=0, timeout=0.050)
+            unittest.mock.call(nbytes=0, timeout=AptProtocol._PENDING_MESSAGE_TIMEOUT)
         ])
 
     def test_identify_sends_command(self):
