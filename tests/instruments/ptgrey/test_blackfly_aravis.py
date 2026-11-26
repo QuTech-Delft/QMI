@@ -6,7 +6,6 @@ from typing import cast
 import numpy as np
 
 import qmi
-from qmi.core.context import QMI_Context
 from qmi.core.exceptions import (
     QMI_InstrumentException,
     QMI_UsageException,
@@ -15,6 +14,7 @@ from qmi.core.exceptions import (
 from qmi.instruments.ptgrey import Flir_Blackfly_Aravis
 import qmi.instruments.ptgrey.blackfly_aravis as ba
 import tests.instruments.ptgrey.aravis_stub as Aravis
+from tests.patcher import PatcherQmiContext
 
 
 class Region:
@@ -31,7 +31,7 @@ class TestPtGreyBlackFly(unittest.TestCase):
     def _create_instr_obj(self):
         """Create a PtGeyBlackFlyAravis object using an serial_number."""
         instr: Flir_Blackfly_Aravis = Flir_Blackfly_Aravis(
-            QMI_Context("context"),
+            self.qmi_patcher,
             "name",
             "SerialNumber",
             None,
@@ -67,7 +67,8 @@ class TestPtGreyBlackFly(unittest.TestCase):
 
     def setUp(self):
         logging.getLogger("qmi.instruments.ptgrey.blackfly_aravis").setLevel(logging.CRITICAL)
-        qmi.start("TestContext")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("TestContext")
         ba.Aravis = self.aravis = MagicMock(spec=Aravis)
 
         # Most of these are slight guess work, for now this is not an issue.
@@ -95,7 +96,7 @@ class TestPtGreyBlackFly(unittest.TestCase):
         }
 
     def tearDown(self) -> None:
-        qmi.stop()
+        self.qmi_patcher.stop()
         logging.getLogger("qmi.instruments.ptgrey.blackfly_aravis").setLevel(logging.NOTSET)
 
     def test_open_ser(self):
@@ -1018,7 +1019,7 @@ class TestPtGreyBlackFly(unittest.TestCase):
         """Create a PtGeyBlackFlyAravis object usage exception due to invalid input."""
         with self.assertRaises(QMI_UsageException):
             Flir_Blackfly_Aravis(
-                QMI_Context("context"),
+                self.qmi_patcher,
                 "name",
                 None,
                 None,
