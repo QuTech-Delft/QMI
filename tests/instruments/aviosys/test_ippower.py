@@ -6,12 +6,19 @@ import urllib.parse
 import urllib.request
 
 import qmi.instruments.aviosys.ippower
-from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.instruments.aviosys import Aviosys_IpPower9850, PowerSocket, PowerState
+from tests.patcher import PatcherQmiContext
 
 
 class AviosysIPPower9850ClassTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("IPPower9850_test")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     def setUp(self) -> None:
         self._ipv4addess_patch = patch("qmi.instruments.aviosys.ippower.IPv4Address", autospec=IPv4Address)
 
@@ -24,7 +31,7 @@ class AviosysIPPower9850ClassTestCase(unittest.TestCase):
         expected_username = "admin"
         expected_password = "12345678"
         # Act
-        ippower = Aviosys_IpPower9850(QMI_Context("IPPower9850_test"), "ippower", address)
+        ippower = Aviosys_IpPower9850(self.qmi_patcher, "ippower", address)
         # Assert
         self.assertEqual(ippower._baseurl, expected_baseurl)
         self.assertEqual(ippower._username, expected_username)
@@ -40,7 +47,7 @@ class AviosysIPPower9850ClassTestCase(unittest.TestCase):
         expected_password = "9876543210"
         # Act
         ippower = Aviosys_IpPower9850(
-            QMI_Context("IPPower9850_test"), "ippower", address, username=expected_username, password=expected_password)
+            self.qmi_patcher, "ippower", address, username=expected_username, password=expected_password)
         # Assert
         self.assertEqual(ippower._baseurl, expected_baseurl)
         self.assertEqual(ippower._username, expected_username)
@@ -48,10 +55,17 @@ class AviosysIPPower9850ClassTestCase(unittest.TestCase):
 
 
 class AviosysIPPower9850OpenCloseTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("IPPower9850_test")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     def setUp(self) -> None:
         self._ipv4addess_patch = patch("qmi.instruments.aviosys.ippower.IPv4Address", autospec=IPv4Address)
         self._ipv4addess_patch.return_value = "10.10.10.1"
-        self.ippower = Aviosys_IpPower9850(QMI_Context("IPPower9850_test"), "ippower", "10.10.10.1")
+        self.ippower = Aviosys_IpPower9850(self.qmi_patcher, "ippower", "10.10.10.1")
 
     @patch("qmi.instruments.aviosys.ippower.urllib.request", autospec=urllib.request)
     def test_open(self, request_patch):
@@ -135,10 +149,17 @@ class AviosysIPPower9850OpenCloseTestCase(unittest.TestCase):
 
 
 class AviosysIPPower9850MethodsTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("IPPower9850_test")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     def setUp(self) -> None:
         self._ipv4addess_patch = patch("qmi.instruments.aviosys.ippower.IPv4Address", autospec=IPv4Address)
         self._ipv4addess_patch.return_value = "10.10.10.1"
-        self.ippower = Aviosys_IpPower9850(QMI_Context("IPPower9850_test"), "ippower", "10.10.10.1")
+        self.ippower = Aviosys_IpPower9850(self.qmi_patcher, "ippower", "10.10.10.1")
 
         with patch("qmi.instruments.aviosys.ippower.urllib.request", autospec=urllib.request) as self.request_patch:
             self.request_patch.HTTPBasicAuthHandler = MagicMock()
