@@ -9,13 +9,16 @@ from qmi.core.transport import QMI_SerialTransport
 from qmi.core.usbtmc import Instrument
 
 from qmi.instruments.wl_photonics import WlPhotonics_WltfN
+from tests.patcher import PatcherQmiContext
 
 
 class TestWlPhotonicsWltfNOpenCloseSerial(unittest.TestCase):
 
     def setUp(self):
         logging.getLogger("qmi.instruments.wl_photonics.wltf_n").setLevel(logging.CRITICAL)
-        qmi.start("TestWlPhotonicsWltfNClassContext")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("TestWlPhotonicsWltfNClassContext")
+        self.addCleanup(self.qmi_patcher.stop)
         # Add patches
         patcher = patch('qmi.instruments.wl_photonics.wltf_n.create_transport', spec=QMI_SerialTransport)
         self._transport_mock = patcher.start()
@@ -24,7 +27,6 @@ class TestWlPhotonicsWltfNOpenCloseSerial(unittest.TestCase):
         self.instr: WlPhotonics_WltfN = WlPhotonics_WltfN(qmi.context(), "WlPhotonics_wltf_n", "")
 
     def tearDown(self):
-        qmi.stop()
         logging.getLogger("qmi.instruments.wl_photonics.wltf_n").setLevel(logging.NOTSET)
 
     def test_open_close(self):
@@ -80,7 +82,9 @@ class TestWlPhotonicsWltfNOpenClosePyUSB(unittest.TestCase):
 
     def setUp(self):
         logging.getLogger("qmi.instruments.wl_photonics.wltf_n").setLevel(logging.CRITICAL)
-        qmi.start("TestWlPhotonicsWltfNClassContext")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("TestWlPhotonicsWltfNClassContext")
+        self.addCleanup(self.qmi_patcher.stop)
         # Add patches - now we should patch a bit deeper to test the creation of USBTMC transport without SN.
         patcher = patch('qmi.core.usbtmc.Instrument', autospec=Instrument)
         self._transport_mock = patcher.start()
@@ -94,7 +98,6 @@ class TestWlPhotonicsWltfNOpenClosePyUSB(unittest.TestCase):
             self.instr: WlPhotonics_WltfN = WlPhotonics_WltfN(qmi.context(), "WlPhotonics_wltf_n", transport_string)
 
     def tearDown(self):
-        qmi.stop()
         logging.getLogger("qmi.instruments.wl_photonics.wltf_n").setLevel(logging.NOTSET)
 
     def test_open_close(self):
@@ -157,7 +160,9 @@ class TestWlPhotonicsWltfNClassMethods(unittest.TestCase):
         expected_start_step = (self.step_max - self.step_min) // 2
 
         logging.getLogger("qmi.instruments.wl_photonics.wltf_n").setLevel(logging.CRITICAL)
-        qmi.start("TestWlPhotonicsWltfNClassContext")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("TestWlPhotonicsWltfNClassContext")
+        self.addCleanup(self.qmi_patcher.stop)
         # Add patches
         patcher = patch('qmi.instruments.wl_photonics.wltf_n.create_transport', spec=QMI_SerialTransport)
         self._transport_mock = patcher.start()
@@ -179,7 +184,6 @@ class TestWlPhotonicsWltfNClassMethods(unittest.TestCase):
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
         logging.getLogger("qmi.instruments.wl_photonics.wltf_n").setLevel(logging.NOTSET)
 
     def test_wrong_int_value(self):
