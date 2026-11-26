@@ -53,14 +53,15 @@ class TestNsgFunctions(unittest.TestCase):
     """Tests for Dummy NSG methods and properties."""
     
     def setUp(self):
-        qmi.start("dummy", None)
+        self.qmi_patcher = QMI_Context("dummy")
+        self.qmi_patcher.start()
         NSG.max_wait = 0.1
         self.nsg = qmi.make_instrument("nsg", NSG)
         self.nsg.open()
 
     def tearDown(self):
         self.nsg.close()
-        qmi.stop()
+        self.qmi_patcher.stop()
 
     def test_frequency_setting(self):
         """Test that frequency can be set."""
