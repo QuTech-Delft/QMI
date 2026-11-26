@@ -61,7 +61,7 @@ jobs:
           path: mypy-${{ inputs.python-version }}.log
 
       - name: Run coverage
-        timeout-minutes: 20
+        timeout-minutes: 25
         run: |
           ( while sleep 15; do echo "[mon] $(date -u +%T) $(free -m | awk '/Mem:/{print "used="$3"M avail="$7"M"}') threads=$(ps -eLf | wc -l)"; done ) &
           batch=0
