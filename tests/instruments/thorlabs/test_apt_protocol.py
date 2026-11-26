@@ -15,9 +15,23 @@ class TestAptProtocolReadMessage(unittest.TestCase):
         self._transport_mock = unittest.mock.MagicMock(spec=QMI_SerialTransport)
         self._protocol = AptProtocol(self._transport_mock)
 
-    def test_read_message_does_not_sleep_waiting_for_header(self):
-        """`read_message` must read the header directly instead of sleeping the full timeout first, even when
-        the header is not yet available in the buffer."""
+    def test_read_message_skips_sleep_when_header_already_available(self):
+        """`read_message` must read the header directly, without sleeping first, when it is already fully
+        buffered."""
+        header = struct.pack("<HBBBB", _AptMsgMoveHomed.MESSAGE_ID, 1, 0, 0x01, 0x50)
+        self._transport_mock._safe_serial.in_waiting = AptProtocol.HEADER_SIZE_BYTES
+        self._transport_mock.read.return_value = header
+
+        with unittest.mock.patch("qmi.instruments.thorlabs.apt_protocol.time.sleep") as mock_sleep:
+            msg = self._protocol.read_message(timeout=0.3)
+
+        mock_sleep.assert_not_called()
+        self._transport_mock.read.assert_called_once_with(nbytes=AptProtocol.HEADER_SIZE_BYTES, timeout=0.3)
+        self.assertIsInstance(msg, _AptMsgMoveHomed)
+
+    def test_read_message_sleeps_when_header_not_yet_available(self):
+        """`read_message` sleeps for the given timeout before reading the header when it is not yet fully
+        buffered, to make the following (potentially non-blocking) `read()` call more likely to succeed."""
         header = struct.pack("<HBBBB", _AptMsgMoveHomed.MESSAGE_ID, 1, 0, 0x01, 0x50)
         self._transport_mock._safe_serial.in_waiting = 0  # Header is not yet available.
         self._transport_mock.read.return_value = header
@@ -25,7 +39,7 @@ class TestAptProtocolReadMessage(unittest.TestCase):
         with unittest.mock.patch("qmi.instruments.thorlabs.apt_protocol.time.sleep") as mock_sleep:
             msg = self._protocol.read_message(timeout=0.3)
 
-        mock_sleep.assert_not_called()
+        mock_sleep.assert_called_once_with(0.3)
         self._transport_mock.read.assert_called_once_with(nbytes=AptProtocol.HEADER_SIZE_BYTES, timeout=0.3)
         self.assertIsInstance(msg, _AptMsgMoveHomed)
 
@@ -58,14 +72,16 @@ class TestAptProtocolSendMessage(unittest.TestCase):
         pending_bytes = bytes(pending)  # 20 bytes: a 6-byte header plus 14 bytes of data.
         self.assertEqual(20, len(pending_bytes))
 
-        # Only part of the header has arrived so far; by the time it has been read in full, nothing remains.
-        in_waiting_values = iter([4, 0])
+        # Only part of the header has arrived when both `send_message` and `read_message` check for it; by the
+        # time the whole message has been read out, nothing remains.
+        in_waiting_values = iter([4, 4, 0])
         type(self._transport_mock._safe_serial).in_waiting = unittest.mock.PropertyMock(
             side_effect=lambda: next(in_waiting_values)
         )
         self._transport_mock.read.side_effect = [pending_bytes[:6], pending_bytes[6:]]
 
-        self._protocol.send_message(self._new_msg)
+        with unittest.mock.patch("qmi.instruments.thorlabs.apt_protocol.time.sleep"):
+            self._protocol.send_message(self._new_msg)
 
         self._transport_mock.read.assert_has_calls([
             unittest.mock.call(nbytes=6, timeout=AptProtocol._PENDING_MESSAGE_TIMEOUT),
@@ -80,7 +96,8 @@ class TestAptProtocolSendMessage(unittest.TestCase):
         self._transport_mock._safe_serial.in_waiting = 4  # Only part of the header has arrived, and never completes.
         self._transport_mock.read.side_effect = QMI_TimeoutException("Timeout after 4 bytes while expecting 6")
 
-        self._protocol.send_message(self._new_msg)
+        with unittest.mock.patch("qmi.instruments.thorlabs.apt_protocol.time.sleep"):
+            self._protocol.send_message(self._new_msg)
 
         self._transport_mock.read.assert_called_once_with(nbytes=6, timeout=AptProtocol._PENDING_MESSAGE_TIMEOUT)
         self._transport_mock.discard_read.assert_called_once()

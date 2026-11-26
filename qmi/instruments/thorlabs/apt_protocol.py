@@ -203,6 +203,12 @@ class AptProtocol:
         Raises:
             QMI_InstrumentException: If an unknown or partial message is received.
         """
+        # Read message header. If the header is not yet fully buffered, double the timeout. This makes the
+        # subsequent `read()` call below more likely to succeed, since its own non-blocking path (timeout <= 0)
+        # does not read anything unless all requested bytes are already available.
+        if self._transport._safe_serial.in_waiting < self.HEADER_SIZE_BYTES and timeout is not None:
+            time.sleep(timeout)
+
         data = self._transport.read(nbytes=self.HEADER_SIZE_BYTES, timeout=timeout)
 
         # Decode message header.
@@ -226,7 +232,7 @@ class AptProtocol:
                     # only needs to account for the time it takes to receive
                     # the payload data. (The instrument will probably transmit
                     # the entire message as fast as possible).
-                    data += self._transport.read(nbytes=hdr.data_length, timeout=0.050)
+                    data += self._transport.read(nbytes=hdr.data_length, timeout=self._PENDING_MESSAGE_TIMEOUT)
                 except QMI_TimeoutException:
                     # Discard data after receiving a partial message.
                     partial_msg = self._clear_buffer()

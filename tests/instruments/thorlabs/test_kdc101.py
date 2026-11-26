@@ -762,9 +762,10 @@ class TestThorlabsKdc101MethodsLinear(unittest.TestCase):
         # Let's get all expected values as "False"
         self._transport_mock.read.side_effect = [unexpected_read, expected_read, b"\x00\x00\x00\x00\x00\x00\x00\x00"]
 
-        # `read_message` no longer sleeps for the timeout while waiting for the header to arrive, so the
-        # timeout here needs to be induced by advancing the monotonic clock instead of a real sleep.
-        with unittest.mock.patch("time.monotonic", side_effect=[0.0, 0.0, 100.0]):
+        # The timeout here needs to be induced by advancing the monotonic clock, and `time.sleep` is mocked to
+        # avoid a real wait for the header (which is never available in this mocked transport).
+        with unittest.mock.patch("time.monotonic", side_effect=[0.0, 0.0, 100.0]), \
+                unittest.mock.patch("time.sleep"):
             with self.assertRaises(QMI_TimeoutException):
                 self.instr.wait_move_complete(1.0)
 
