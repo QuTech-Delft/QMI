@@ -8,6 +8,7 @@ from qmi.core.exceptions import QMI_TimeoutException, QMI_InstrumentException
 from qmi.core.transport import QMI_Transport
 from qmi.instruments.nkt_photonics import NktPhotonics_KoherasAdjustik
 from qmi.instruments.nkt_photonics.nkt_photonics_interbus_protocol import NKTPhotonicsInterbusProtocol
+from tests.patcher import PatcherQmiContext
 
 
 class TestTransportOperations(unittest.TestCase):
@@ -18,13 +19,14 @@ class TestTransportOperations(unittest.TestCase):
             'qmi.instruments.nkt_photonics.adjustik.create_transport', spec=QMI_Transport)
         self.transport = patcher.start().return_value
         self.addCleanup(patcher.stop)
-        qmi.start("test_adjustik_open_close")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("test_adjustik_open_close")
         self.laser = qmi.make_instrument("test_laser", NktPhotonics_KoherasAdjustik, "transport_stub")
 
     def tearDown(self) -> None:
         if self.laser.is_open():
             self.laser.close()
-        qmi.stop()
+        self.qmi_patcher.stop()
 
     def test_open(self):
         # arrange
@@ -48,7 +50,8 @@ class TestTransportOperations(unittest.TestCase):
 class TestMethods(unittest.TestCase):
 
     def setUp(self) -> None:
-        qmi.start("test_adjustik_methods")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("test_adjustik_methods")
 
         patcher = patch(
             'qmi.instruments.nkt_photonics.adjustik.create_transport', spec=QMI_Transport)
@@ -67,7 +70,7 @@ class TestMethods(unittest.TestCase):
     def tearDown(self) -> None:
         if self.laser.is_open():
             self.laser.close()
-        qmi.stop()
+        self.qmi_patcher.stop()
 
     def test_getters(self):
         TestDescr = namedtuple("TestDescriptor", ["method_name", "register", "value", "value_bytes"])
