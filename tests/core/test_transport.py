@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Test QMI_Transport functionality."""
 import os, sys

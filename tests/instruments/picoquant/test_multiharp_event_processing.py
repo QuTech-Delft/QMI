@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 """Unit test for T2 mode event processing in MultiHarp driver."""
 
