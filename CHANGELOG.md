@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Tutorial section "Publishing and receiving signals" in `documentation/sphinx/source/tutorial.rst`, covering `QMI_Signal`, `QMI_SignalReceiver`, `subscribe_unsubscribe`, receive queue discard policies, signals between tasks, signals from plain RPC objects, and receiving signals from another program. Example programs follow in `examples/signals/`.
 
+### Fixed
+- `qmi.instruments.thorlabs.apt_protocol.AptProtocol.read_message` no longer unconditionally sleeps for the full `timeout` before reading the reply header, which made every query to an APT device (e.g. the Thorlabs K10CRx) take at least `RESPONSE_TIMEOUT`, regardless of how quickly the instrument actually replied. `send_message` now also drains any pending unsolicited message (e.g. `MOT_MOVE_COMPLETED`) as a whole decoded message instead of discarding raw buffered bytes, so a message that is only partially received when a new command is sent no longer leaves a tail behind that gets misread as the header of the next reply. Includes unit tests in the new `tests/instruments/thorlabs/test_apt_protocol.py`.
+
 ## [0.55.0] - 2026-11-16
 
 ### Added

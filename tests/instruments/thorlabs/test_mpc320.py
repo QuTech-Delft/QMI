@@ -6,7 +6,7 @@ import unittest.mock
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.transport import QMI_SerialTransport
 from qmi.instruments.thorlabs import Thorlabs_Mpc320
-from qmi.instruments.thorlabs.apt_protocol import AptChannelJogDirection, AptChannelState
+from qmi.instruments.thorlabs.apt_protocol import AptChannelJogDirection, AptChannelState, AptProtocol
 from qmi.instruments.thorlabs.apt_packets import AptMessageId, _AptMsgHwGetInfo
 
 from tests.patcher import PatcherQmiContext
@@ -75,15 +75,19 @@ class TestThorlabsMPC320(unittest.TestCase):
         self._transport_mock.read.side_effect = [unexpected_read + b"\x81\x00", b"320\0MPC" * 12]
 
         # Act
-        with self.assertRaises(QMI_TimeoutException) as exc:
-            _ = self._instr.get_idn()
+        # The timeout here needs to be induced by advancing the monotonic clock, and `time.sleep` is mocked to
+        # avoid a real wait for the header (which is never available in this mocked transport).
+        with unittest.mock.patch("time.monotonic", side_effect=[0.0, 100.0]), \
+                unittest.mock.patch("time.sleep"):
+            with self.assertRaises(QMI_TimeoutException) as exc:
+                _ = self._instr.get_idn()
 
         # Assert
         self.assertEqual(expected_error, str(exc.exception))
         self._transport_mock.write.assert_called_once_with(expected_write)
         self._transport_mock.read.assert_has_calls([
             unittest.mock.call(nbytes=6, timeout=Thorlabs_Mpc320.DEFAULT_RESPONSE_TIMEOUT),
-            unittest.mock.call(nbytes=0, timeout=0.050)
+            unittest.mock.call(nbytes=0, timeout=AptProtocol._PENDING_MESSAGE_TIMEOUT)
         ])
 
     def test_identify_sends_command(self):

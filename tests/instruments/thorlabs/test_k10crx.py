@@ -620,8 +620,12 @@ class TestThorlabsK10crxMethods(unittest.TestCase):
         # Let's get all expected values as "False"
         self._transport_mock.read.side_effect = [unexpected_read, expected_read, b"\x00\x00\x00\x00\x00\x00\x00\x00"]
 
-        with self.assertRaises(QMI_TimeoutException):
-            self.instr.wait_move_complete(1.0)
+        # The timeout here needs to be induced by advancing the monotonic clock, and `time.sleep` is mocked to
+        # avoid a real wait for the header (which is never available in this mocked transport).
+        with unittest.mock.patch("time.monotonic", side_effect=[0.0, 0.0, 100.0]), \
+                unittest.mock.patch("time.sleep"):
+            with self.assertRaises(QMI_TimeoutException):
+                self.instr.wait_move_complete(1.0)
 
         self._transport_mock.write.assert_called_with(expected_write)
         self._transport_mock.read.assert_called_once_with(nbytes=6, timeout=Thorlabs_K10CRxBase.RESPONSE_TIMEOUT)
