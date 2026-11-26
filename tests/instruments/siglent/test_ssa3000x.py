@@ -2,13 +2,19 @@ import unittest
 from unittest.mock import call, patch
 import numpy as np
 
-from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_UsageException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.siglent import Siglent_Ssa3000x
+from tests.patcher import PatcherQmiContext
 
 
 class TestSSA3000X(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("test_siglent")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
 
     def setUp(self):
         # Add patches
@@ -19,7 +25,7 @@ class TestSSA3000X(unittest.TestCase):
         self._scpi_mock = patcher.start().return_value
         self.addCleanup(patcher.stop)
         # Make DUT
-        self.instr = Siglent_Ssa3000x(QMI_Context("test_siglent"), name="siglent", transport_descr="")
+        self.instr = Siglent_Ssa3000x(self.qmi_patcher, name="siglent", transport_descr="")
         self.instr._TIMEOUT = 0.01  # Make testing faster
         self.instr.open()
 
