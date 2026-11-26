@@ -97,6 +97,7 @@ sys.modules['usb.util.claim_interface'] = unittest.mock.Mock()
 from qmi.instruments.thorlabs import Thorlabs_Tsp01b
 import qmi.core.exceptions
 from qmi.utils.context_managers import open_close
+from tests.patcher import PatcherQmiContext
 
 ENDPOINT_TYPE_INTR: int = 0x03
 ENDPOINT_IN: int = 0x80
@@ -133,12 +134,13 @@ class TestThorlabsTsp01b(unittest.TestCase):
         _usb_util_mock.endpoint_type = endpoint_type
         _usb_util_mock.endpoint_direction = endpoint_direction
 
-        qmi.start("TestTsp01bContext")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("TestTsp01bContext")
+        self.addCleanup(self.qmi_patcher.stop)
         self._serial = "123456"
         self.instr: Thorlabs_Tsp01b = qmi.make_instrument("instr", Thorlabs_Tsp01b, self._serial)
 
     def tearDown(self):
-        qmi.stop()
         self.patch_dispose.stop()
         self.patch_claim.stop()
         self.patch_error.stop()
@@ -250,7 +252,9 @@ class TestThorlabsTsp01bMethods(unittest.TestCase):
         _usb_util_mock.ENDPOINT_OUT = ENDPOINT_OUT
         _usb_util_mock.endpoint_type = endpoint_type
         _usb_util_mock.endpoint_direction = endpoint_direction
-        qmi.start("TestTsp01bContext")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("TestTsp01bContext")
+        self.addCleanup(self.qmi_patcher.stop)
         self._serial = "123456"
         self.instr: Thorlabs_Tsp01b = qmi.make_instrument("instr", Thorlabs_Tsp01b, self._serial)
 
@@ -258,7 +262,6 @@ class TestThorlabsTsp01bMethods(unittest.TestCase):
         self.patch_dispose.stop()
         self.patch_claim.stop()
         self.patch_error.stop()
-        qmi.stop()
 
     @unittest.mock.Mock("qmi.instruments.thorlabs.tsp01b.usb")
     @unittest.mock.patch("qmi.instruments.thorlabs.tsp01b.usb.core.find", return_value=DevMock())
