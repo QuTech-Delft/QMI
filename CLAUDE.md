@@ -92,11 +92,15 @@ When implementing an issue:
 1. Never work directly on `main`.
 2. Create a dedicated feature branch named `<issue-number>-<short-slug-of-issue-title>` (e.g. `183-thorlabs-k10crx-devices-with-different-constants`), matching this repository's existing convention. Branch off an up-to-date `main`. Note: the workflow's `branch_prefix` setting (`claude/`) is prepended automatically, so the pushed branch will look like `claude/183-thorlabs-k10crx-devices-with-different-constants` — this is intentional, and makes bot-authored branches easy to tell apart from human ones at a glance.
 3. Make logical commits.
-4. Run tests locally before creating a PR. All tests should pass first.
-5. Review the complete diff.
-6. Describe the new code in the CHANGELOG.md, in one or more of the applying sections of the latest 'Unreleased' entry. Categorize accordingly under:
+4. Push the branch right after the first commit, and push again after every further commit, so that no work is lost
+   if the run is cut off. Pushing starts the "on push" CI workflow (`push-ci.yml`).
+5. Only then run the tests (the commands under "Development").
+6. Fix any problems found, review the complete diff, commit and push again. Repeat until the tests pass.
+7. Describe the new code in the CHANGELOG.md, in one or more of the applying sections of the latest 'Unreleased' entry. Categorize accordingly under:
   - "Added", "Removed", "Changed", "Fixed", or "Deprecated"
-7. Create a pull request describing the changes in the PR and request 'heevasti' as reviewer.
+8. Push again and make sure the tests pass.
+9. Create a pull request describing the changes and request 'heevasti' as reviewer. If the pull-request CI fails, fix
+   it on the same branch.
 
 ## Working from a local Claude Code session
 

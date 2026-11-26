@@ -13,6 +13,7 @@ on:
 jobs:
   claude:
     runs-on: ubuntu-latest
+    timeout-minutes: 45   # Explicit upper bound for one bot run.
     permissions:
       contents: write
       pull-requests: write
@@ -27,6 +28,9 @@ jobs:
       - uses: astral-sh/setup-uv@v6   # Use the current major version; installs uv for the CLAUDE.md commands.
 
       - uses: anthropics/claude-code-action@v1
+        env:
+          BASH_DEFAULT_TIMEOUT_MS: "900000"    # 15 min per command by default, so a full test run fits.
+          BASH_MAX_TIMEOUT_MS: "1800000"       # Up to 30 min when requested, e.g. for a long test run.
         with:
           # anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           # If you authenticate with a Claude subscription instead of an API
@@ -46,7 +50,7 @@ jobs:
 
           # Keep runs bounded (cost + time control)
           claude_args: |
-            --max-turns 90
+            --max-turns 100
             --model claude-sonnet-5
             --allowedTools "Bash(uv sync:*),Bash(uv run:*),Bash(git diff:*),Bash(git status:*),Bash(git log:*),Bash(git fetch:*),Bash(git merge:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr edit:*)"
-            --append-system-prompt "Follow this repository's CLAUDE.md exactly: use the exact test, lint, and mypy commands listed there (not your own defaults), update CHANGELOG.md, request heevasti as reviewer, and never merge the PR yourself."
+            --append-system-prompt "Follow this repository's CLAUDE.md exactly: use the exact test, lint, and mypy commands listed there (not your own defaults), update CHANGELOG.md, request heevasti as reviewer, and never merge the PR yourself. Push the branch after every commit, before running tests."
