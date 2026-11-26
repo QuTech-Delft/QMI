@@ -69,6 +69,7 @@ class TestPtGreyBlackFly(unittest.TestCase):
         logging.getLogger("qmi.instruments.ptgrey.blackfly_aravis").setLevel(logging.CRITICAL)
         self.qmi_patcher = PatcherQmiContext()
         self.qmi_patcher.start("TestContext")
+        self.addCleanup(self.qmi_patcher.stop)
         ba.Aravis = self.aravis = MagicMock(spec=Aravis)
 
         # Most of these are slight guess work, for now this is not an issue.
@@ -96,7 +97,6 @@ class TestPtGreyBlackFly(unittest.TestCase):
         }
 
     def tearDown(self) -> None:
-        self.qmi_patcher.stop()
         logging.getLogger("qmi.instruments.ptgrey.blackfly_aravis").setLevel(logging.NOTSET)
 
     def test_open_ser(self):

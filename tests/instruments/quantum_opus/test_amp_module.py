@@ -15,12 +15,10 @@ class TestAmpSimModule(unittest.TestCase):
     def setUp(self):
         self.qmi_patcher = PatcherQmiContext()
         self.qmi_patcher.start("test_quantum_opus_ampsim900")
+        self.addCleanup(self.qmi_patcher.stop)
         self._sim900 = MagicMock(spec=Srs_Sim900)
         self._port = 6
         self.amp_sim_module = qmi.make_instrument("QOAmpSim", QuantumOpus_QoAmpSim, self._sim900, self._port)
-
-    def tearDown(self):
-        self.qmi_patcher.stop()
 
     def test_get_module_id(self):
         # arrange

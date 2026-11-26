@@ -18,10 +18,10 @@ class MyTestCase(unittest.TestCase):
         self.transport = MagicMock(spec=QMI_Transport)
         self.qmi_patcher = PatcherQmiContext()
         self.qmi_patcher.start("AGC302_unit-test")
+        self.addCleanup(self.qmi_patcher.stop)
         self.instrument: InstruTech_AGC302 = qmi.make_instrument("pressure_gauge", InstruTech_AGC302, self.transport)
 
     def tearDown(self) -> None:
-        self.qmi_patcher.stop()
         logging.getLogger("qmi.core.instrument").setLevel(logging.NOTSET)
 
     def test_read_gauge(self):

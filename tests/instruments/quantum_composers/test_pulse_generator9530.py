@@ -32,15 +32,13 @@ class TestPulseGenerator9530(unittest.TestCase):
     def setUp(self):
         self.qmi_patcher = PatcherQmiContext()
         self.qmi_patcher.start("TestContext")
+        self.addCleanup(self.qmi_patcher.stop)
         self._transport_mock = MagicMock(spec=QMI_TcpTransport)
         with patch(
                 'qmi.instruments.quantum_composers.pulse_generator9530.create_transport',
                 return_value=self._transport_mock):
             self.instr: QuantumComposers_9530 = qmi.make_instrument("instr", QuantumComposers_9530, "transport_descriptor")
             self.instr = cast(QuantumComposers_9530, self.instr)
-
-    def tearDown(self):
-        self.qmi_patcher.stop()
 
     def test_open_close(self):
         self.instr.open()
