@@ -1,21 +1,27 @@
 import unittest
 from unittest.mock import patch
 
-from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.scpi_protocol import ScpiProtocol
 from qmi.core.transport import create_transport
 from qmi.instruments.anapico import Anapico_Apsin
+from tests.patcher import PatcherQmiContext
 
 
 class AnapicoApsinTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("test_apsin")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
 
     def setUp(self) -> None:
         self.transport_patch = patch("qmi.instruments.anapico.apsin.create_transport", autospec=create_transport)
         self.transport_patch.start()
         self.scpi_patch = patch("qmi.instruments.anapico.apsin.ScpiProtocol", autospec=ScpiProtocol)
         self.scpi_patch.start()
-        self.apsin = Anapico_Apsin(QMI_Context("test_apsin"), name="apsin", transport="mock")
+        self.apsin = Anapico_Apsin(self.qmi_patcher, name="apsin", transport="mock")
 
     def tearDown(self) -> None:
         self.transport_patch.stop()
