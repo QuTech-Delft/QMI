@@ -11,7 +11,7 @@ from qmi.instruments.high_finesse.support import (
     wlmData,
     WlmGetErr,
 )
-from tests.patcher import QMI_Context
+from tests.patcher import PatcherQmiContext
 
 # Disable all logging
 logging.disable(logging.CRITICAL)
@@ -20,9 +20,15 @@ logging.disable(logging.CRITICAL)
 @patch("qmi.instruments.high_finesse.support._library_wrapper.wlmData.LoadDLL")
 class TestHighFinesse_Wlm(TestCase):
     """Test the behavior of the High Finesse driver (with the actual dll mocked)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("highfinesse_wlm_client")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     def setUp(self):
-        # Start QMI context
-        self.ctx = QMI_Context("highfinesse_wlm_client")
+        self.ctx = self.qmi_patcher
 
     def test_open(self, dll_patcher):
         """The connection should be 'open' after open() was (implicitly) called."""
