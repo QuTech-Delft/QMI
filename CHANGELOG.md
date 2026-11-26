@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Tutorial section "Publishing and receiving signals" in `documentation/sphinx/source/tutorial.rst`, covering `QMI_Signal`, `QMI_SignalReceiver`, `subscribe_unsubscribe`, receive queue discard policies, signals between tasks, signals from plain RPC objects, and receiving signals from another program. Example programs follow in `examples/signals/`.
 
+### Changed
+- CI coverage step now runs `unittest` with `-v` under `python -X faulthandler` and a `timeout -s ABRT` per test batch, and prints memory use and thread count every 15 s, so a hanging test reports its name and thread stacks (#249). The step timeout is raised from 15 to 25 minutes.
+- The `claude[bot]` workflow (`.github/workflows/claude.yml`) now has a 45-minute job timeout, 15/30-minute per-command timeouts, a limit of 100 turns, and may read CI results with `gh pr checks` and `gh run list/view/watch`. `CLAUDE.md` now tells the bot to push after every commit, before running tests or waiting for CI (#249).
+
 ### Fixed
+- `pull-request-ci.yml` passed the misspelled input `fetch_depth` to `actions/checkout`; it is now `fetch-depth` (#249).
 - `qmi.instruments.thorlabs.apt_protocol.AptProtocol.read_message` no longer unconditionally sleeps for the full `timeout` before reading the reply header, which made every query to an APT device (e.g. the Thorlabs K10CRx) take at least `RESPONSE_TIMEOUT`, regardless of how quickly the instrument actually replied. `send_message` now also drains any pending unsolicited message (e.g. `MOT_MOVE_COMPLETED`) as a whole decoded message instead of discarding raw buffered bytes, so a message that is only partially received when a new command is sent no longer leaves a tail behind that gets misread as the header of the next reply. Includes unit tests in the new `tests/instruments/thorlabs/test_apt_protocol.py`.
 
 ## [0.55.0] - 2026-11-16
@@ -33,9 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved and corrected the docstrings of `qmi.instruments.newport` modules `single_axis_motion_controller.py`, `smc_100cc.py`, `smc_100pp.py` and `actuators.py`.
 - `tests/instruments/santec/test_tsl_570.py` now uses `tests.patcher` instead of running on full QMI contexts.
 - Modernized the type hints and docstrings of `qmi.instruments.montana.cryostation`; `tests/instruments/montana/test_cryostation.py` now uses `tests.patcher`, which tracks and releases `make_instrument()`-created instruments on `stop()`.
-
-### Changed
-- CI coverage step now runs `unittest` with `-v` under `python -X faulthandler` and a `timeout -s ABRT` per test batch, so a hanging test reports its name and thread stacks (#249).
 
 ### Fixed
 - `tests.patcher.PatcherQmiContext.stop()` no longer calls the now-unused `qmi.stop()`.
