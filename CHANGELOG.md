@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - The timeout of the CI coverage step is raised from 15 to 25 minutes (#249).
 - The `claude[bot]` workflow (`.github/workflows/claude.yml`) now has a 45-minute job timeout, 15/30-minute per-command timeouts and a limit of 100 turns. `CLAUDE.md` now tells the bot to push after every commit, before running tests (#249).
+- Minor code style cleanups in `qmi.core.config_defs`, `qmi.core.context_singleton` and `qmi.tools.proc`: removed a stale `logdir` attribute description and a redundant trailing comment, reformatted wrapped `_logger.debug` and `parser.add_argument` calls, capitalized "Not responding via TCP" status messages, and `qmi.tools.proc.run()` now starts the QMI context with `with qmi.start(...) as ctx:` instead of a bare `qmi.start()`/`finally: qmi.stop()` pair (#274).
 
 ### Fixed
 - `pull-request-ci.yml` passed the misspelled input `fetch_depth` to `actions/checkout`; it is now `fetch-depth` (#249).
