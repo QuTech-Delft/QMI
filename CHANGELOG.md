@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Tutorial section "Publishing and receiving signals" in `documentation/sphinx/source/tutorial.rst`, covering `QMI_Signal`, `QMI_SignalReceiver`, `subscribe_unsubscribe`, receive queue discard policies, signals between tasks, signals from plain RPC objects, and receiving signals from another program. Example programs follow in `examples/signals/`.
 - `tests/core/test_qmi_proc.py`, an integration test covering `qmi.tools.proc.run()`'s `--config` argument default value behavior (`default=None` vs. `default=""`) against `QMI_CONFIG`, using the new `tests/core/some_proc_service.py` as a real `qmi_proc start`/`stop` target (#274).
+- QMI driver for the NKT Photonics Fianium (FemtoPower 1060) supercontinuum laser source, `qmi.instruments.nkt_photonics.NktPhotonics_Fianium`, over a serial connection. Includes unit tests in `tests/instruments/nkt_photonics/test_fianium.py`.
+- QMI driver for the NKT Photonics Katana 05 HP pulsed laser, `qmi.instruments.nkt_photonics.NktPhotonics_Katana`, over a serial connection. Includes unit tests in `tests/instruments/nkt_photonics/test_katana.py`.
 
 ### Changed
 - Minor code style cleanups in `qmi.core.config_defs`, `qmi.core.context_singleton` and `qmi.tools.proc`.
