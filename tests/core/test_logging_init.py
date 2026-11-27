@@ -4,6 +4,7 @@ import unittest.mock
 import sys
 import logging
 from collections import namedtuple
+
 import qmi.core.logging_init
 from qmi.core.logging_init import start_logging, stop_logging, WatchedRotatingFileHandler, _RateLimitFilter, \
     _log_excepthook
