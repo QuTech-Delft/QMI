@@ -255,9 +255,9 @@ class TestQmiTransportFactory(unittest.TestCase):
         self.assertIs(trans, mock.return_value)
         mock.assert_called_with(host="localhost")
 
-    def test_parse_udp_rejects_connect_timeout_issue280_item11(self):
-        """Issue #280 item 11: UdpTransportDescriptorParser must not accept a `connect_timeout`
-        keyword, since QMI_UdpTransport.__init__ does not support it. It should be rejected with
+    def test_parse_udp_rejects_connect_timeout(self):
+        """UdpTransportDescriptorParser must not accept a `connect_timeout` keyword, since
+        QMI_UdpTransport.__init__ does not support it. It should be rejected with
         QMI_TransportDescriptorException, instead of reaching __init__ and raising TypeError."""
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
             create_transport("udp:localhost:5000:connect_timeout=1")
@@ -1145,10 +1145,10 @@ class TestQmiTcpTransport(unittest.TestCase):
         with self.assertRaises(qmi.core.exceptions.QMI_TransportDescriptorException):
             QMI_TcpTransport("192.168.1.300", 22)
 
-    def test_read_no_false_timeout_when_last_chunk_completes_read_issue280_item6(self):
-        """Issue #280 item 6: read must not raise QMI_TimeoutException when the chunk that
-        completes `nbytes` arrives just before the deadline is checked, i.e. nbuf >= nbytes must
-        be checked before the deadline."""
+    def test_read_no_false_timeout_when_last_chunk_completes_read(self):
+        """Read must not raise QMI_TimeoutException when the chunk that completes `nbytes`
+        arrives just before the deadline is checked, i.e. nbuf >= nbytes must be checked before
+        the deadline."""
         with open_close(QMI_TcpTransport("localhost", self.server_port, connect_timeout=1)) as trans:
             (server_conn, peer_address) = self.server_sock.accept()
             server_conn.settimeout(1.0)
@@ -1165,9 +1165,9 @@ class TestQmiTcpTransport(unittest.TestCase):
             self.assertEqual(testmsg, data)
             server_conn.close()
 
-    def test_read_from_socket_tcp_error_message_issue280_item10(self):
-        """Issue #280 item 10: _read_from_socket on a TCP transport must not describe an OSError
-        such as ConnectionResetError with the UDP-specific "UDP packet size" message."""
+    def test_read_from_socket_tcp_error_message(self):
+        """_read_from_socket on a TCP transport must not describe an OSError such as
+        ConnectionResetError with the UDP-specific "UDP packet size" message."""
         with open_close(QMI_TcpTransport("localhost", self.server_port, connect_timeout=1)) as trans:
             (server_conn, peer_address) = self.server_sock.accept()
             with unittest.mock.patch.object(
@@ -1588,7 +1588,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
 
         Expecting:
             A few bytes are read.
-            QMI_InstrumentException is raised (issue #280 item 8: consistent with read_until).
+            QMI_InstrumentException is raised, consistent with read_until.
             The read bytes remain in the buffer and are not discarded.
         """
         # Arrange
@@ -1621,7 +1621,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         """Test read_until with buffer already filled.
 
         Expecting:
-            Data is returned from buffer, including the terminator (issue #280 item 1).
+            Data is returned from buffer, including the terminator.
             read_raw() is not called.
         """
         test_string = "test\n".encode("utf-8")
@@ -1705,7 +1705,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
 
         Expecting:
             Timeout is set.
-            Read excepts with QMI_InstrumentException (issue #280 item 8: consistent with read_until).
+            Read excepts with QMI_InstrumentException, consistent with read_until.
             Bytes read from VXI11 instrument until exception remain in read buffer.
             Timeout is reverted.
         """
@@ -1769,9 +1769,9 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             self.instr.discard_read()
 
-    def test_read_until_buffer_already_filled_consumes_terminator_issue280_item1(self):
-        """Issue #280 item 1: read_until must include the terminator in the returned data and
-        remove it from the buffer, so a subsequent call returns the next message, not b''."""
+    def test_read_until_buffer_already_filled_consumes_terminator(self):
+        """read_until must include the terminator in the returned data and remove it from the
+        buffer, so a subsequent call returns the next message, not b''."""
         first_msg = b"first\n"
         second_msg = b"second\n"
         self.instr._read_buffer = first_msg + second_msg
@@ -1780,9 +1780,9 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         second_data = self.instr.read_until(message_terminator=b"\n")
         self.assertEqual(second_msg, second_data)
 
-    def test_read_returns_only_nbytes_issue280_item2(self):
-        """Issue #280 item 2: read must return exactly nbytes and keep any extra bytes in the
-        buffer so they are returned by the next read call."""
+    def test_read_returns_only_nbytes(self):
+        """Read must return exactly nbytes and keep any extra bytes in the buffer so they are
+        returned by the next read call."""
         nbytes = 4
         extra = b"EXTRA"
         self.mock().read_raw.side_effect = [b"abcd" + extra]
@@ -1793,9 +1793,9 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.assertEqual(extra, data2)
         self.mock().read_raw.assert_called_once()
 
-    def test_read_until_timeout_returns_only_nbytes_issue280_item2(self):
-        """Issue #280 item 2: read_until_timeout (via read) must also return exactly nbytes and
-        leave the remaining bytes in the buffer for a subsequent call."""
+    def test_read_until_timeout_returns_only_nbytes(self):
+        """read_until_timeout (via read) must also return exactly nbytes and leave the remaining
+        bytes in the buffer for a subsequent call."""
         nbytes = 4
         extra = b"EXTRA"
         self.mock().read_raw.side_effect = [b"abcd" + extra]
@@ -1803,9 +1803,9 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.assertEqual(b"abcd", data)
         self.assertEqual(extra, self.instr._read_buffer)
 
-    def test_read_timeout_zero_sets_instrument_timeout_issue280_item5(self):
-        """Issue #280 item 5: read with timeout=0 must set a non-blocking instrument timeout of
-        0, instead of falling back to the instrument's current timeout because 0 is falsy."""
+    def test_read_timeout_zero_sets_instrument_timeout(self):
+        """Read with timeout=0 must set a non-blocking instrument timeout of 0, instead of
+        falling back to the instrument's current timeout because 0 is falsy."""
         observed_timeouts = []
 
         def fake_read_raw(_size):
@@ -1817,9 +1817,9 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.instr.read(nbytes=8, timeout=0)
         self.assertEqual([0], observed_timeouts)
 
-    def test_read_until_timeout_zero_sets_instrument_timeout_issue280_item5(self):
-        """Issue #280 item 5: read_until with timeout=0 must set a non-blocking instrument
-        timeout of 0, instead of falling back to the instrument's current timeout."""
+    def test_read_until_timeout_zero_sets_instrument_timeout(self):
+        """read_until with timeout=0 must set a non-blocking instrument timeout of 0, instead of
+        falling back to the instrument's current timeout."""
         observed_timeouts = []
 
         def fake_read_raw(_size):
@@ -1831,16 +1831,16 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.instr.read_until(message_terminator=b"\n", timeout=0)
         self.assertEqual([0], observed_timeouts)
 
-    def test_read_maps_nontimeout_vxi11exception_to_instrument_exception_issue280_item8(self):
-        """Issue #280 item 8: read must map a non-timeout Vxi11Exception to
-        QMI_InstrumentException, consistent with read_until, instead of QMI_EndOfInputException."""
+    def test_read_maps_nontimeout_vxi11exception_to_instrument_exception(self):
+        """Read must map a non-timeout Vxi11Exception to QMI_InstrumentException, consistent with
+        read_until, instead of QMI_EndOfInputException."""
         self.mock().read_raw.side_effect = vxi11.vxi11.Vxi11Exception(note="Test error!")
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             self.instr.read(nbytes=8, timeout=0.1)
 
-    def test_discard_read_restores_timeout_on_unexpected_exception_issue280_item9(self):
-        """Issue #280 item 9: discard_read must restore the original instrument timeout on every
-        exit path, including an unexpected exception raised from read_raw."""
+    def test_discard_read_restores_timeout_on_unexpected_exception(self):
+        """discard_read must restore the original instrument timeout on every exit path,
+        including an unexpected exception raised from read_raw."""
         self.mock().timeout = 10.0  # default/original timeout
         self.mock().read_raw.side_effect = RuntimeError("Unexpected failure")
         with self.assertRaises(RuntimeError):
