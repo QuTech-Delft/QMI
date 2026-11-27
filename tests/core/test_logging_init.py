@@ -4,8 +4,6 @@ import unittest.mock
 import sys
 import logging
 from collections import namedtuple
-from time import monotonic, sleep
-
 import qmi.core.logging_init
 from qmi.core.logging_init import start_logging, stop_logging, WatchedRotatingFileHandler, _RateLimitFilter, \
     _log_excepthook
@@ -385,8 +383,9 @@ class Test_RateLimitFilter(unittest.TestCase):
         Record = namedtuple("Record", ["name", "levelno"])
         return Record(name, levelno)
 
+    @unittest.mock.patch("qmi.core.logging_init.time")
     @unittest.mock.patch("qmi.core.logging_init.logging")
-    def test_filter(self, logging_patch):
+    def test_filter(self, logging_patch, time_patch):
         """Test filter function and counter_data"""
         # Arrange
         rate_limit = 5
@@ -395,29 +394,28 @@ class Test_RateLimitFilter(unittest.TestCase):
         levelno = 5
         bucket_level = 0
         discarded_msgs = 1
+        t0 = 1000.0
+        time_patch.monotonic.side_effect = [t0, t0 + 1.0]
         exp_bucket_level = float(bucket_level + rate_limit - 1)
         exp_disc_msgs = discarded_msgs + 1
-        exp_record = {(name, levelno): (round(monotonic() + 1, 1), exp_bucket_level, exp_disc_msgs)}
+        exp_record = {(name, levelno): (t0 + 1.0, exp_bucket_level, exp_disc_msgs)}
 
         filter_obj = _RateLimitFilter(rate_limit, burst_limit)
         filter_obj._counters = {
-            (name, levelno): (monotonic(), bucket_level, discarded_msgs)
+            (name, levelno): (t0, bucket_level, discarded_msgs)
         }
         # Act
         res1 = filter_obj.filter(self._record(name, levelno))
-        sleep(1)  # sleep to make (time_now - last_time) larger
         res2 = filter_obj.filter(self._record(name, levelno))
         values = filter_obj._counters[(name, levelno)]
-        rounded_filter_obj = {
-            (name, levelno): (round(values[0], 1), round(values[1]), values[2])
-        }
 
         # Assert
         self.assertFalse(res1)
         self.assertTrue(res2)
-        self.assertDictEqual(exp_record, rounded_filter_obj)
+        self.assertDictEqual(exp_record, {(name, levelno): values})
 
-    def test_filter_no_counter_data(self):
+    @unittest.mock.patch("qmi.core.logging_init.time")
+    def test_filter_no_counter_data(self, time_patch):
         """Test case where gotten counter_data is None."""
         # Arrange
         rate_limit = 5
@@ -426,24 +424,21 @@ class Test_RateLimitFilter(unittest.TestCase):
         levelno = 5
         exp_bucket_level = float(burst_limit - 1)
         exp_disc_msgs = 0
-        round_up = (monotonic() + 1) * -10 // 1 * -1 / 10  # (-)10 for 1 decimal
-        exp_record = {(name, levelno): (round_up, exp_bucket_level, exp_disc_msgs)}
+        t0 = 1000.0
+        time_patch.monotonic.side_effect = [t0, t0 + 1.0]
+        exp_record = {(name, levelno): (t0 + 1.0, exp_bucket_level, exp_disc_msgs)}
 
         filter_obj = _RateLimitFilter(rate_limit, burst_limit)
         filter_obj._counters = {(name, levelno): None}
         # Act
         res1 = filter_obj.filter(self._record(name, levelno))
-        sleep(1)  # sleep to make (time_now - last_time) larger
         res2 = filter_obj.filter(self._record(name, levelno))
         values = filter_obj._counters[(name, levelno)]
-        rounded_filter_obj = {
-            (name, levelno): (values[0] * -10 // 1 * -1 / 10, round(values[1]), values[2])
-        }
 
         # Assert
         self.assertTrue(res1)
         self.assertTrue(res2)
-        self.assertDictEqual(exp_record, rounded_filter_obj)
+        self.assertDictEqual(exp_record, {(name, levelno): values})
 
 
 if __name__ == '__main__':
