@@ -15,10 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Minor code style cleanups in `qmi.core.config_defs`, `qmi.core.context_singleton` and `qmi.tools.proc`.
 - Unit-test clean-ups: consistent shebangs, clearer port numbers and missing `addCleanup` calls in `tests/tools/test_proc.py`, and instrument tests no longer inherit a leftover `QMI_CONFIG` (#274).
+- `qmi.core.transport.QMI_Vxi11Transport.read` now raises `QMI_InstrumentException` instead of `QMI_EndOfInputException` for non-timeout VXI-11 errors, like `read_until` already did (#280).
 
 ### Fixed
 - Instrument unit tests no longer leak `QMI_Context` threads: they use `PatcherQmiContext`, whose `stop()` now also stops the underlying context (#276).
 - `qmi.instruments.thorlabs.apt_protocol.AptProtocol.read_message` no longer unconditionally sleeps for the full `timeout` before reading the reply header, which made every query to an APT device (e.g. the Thorlabs K10CRx) take at least `RESPONSE_TIMEOUT`, regardless of how quickly the instrument actually replied. `send_message` now also drains any pending unsolicited message (e.g. `MOT_MOVE_COMPLETED`) as a whole decoded message instead of discarding raw buffered bytes, so a message that is only partially received when a new command is sent no longer leaves a tail behind that gets misread as the header of the next reply. Includes unit tests in the new `tests/instruments/thorlabs/test_apt_protocol.py`.
+- `qmi.core.transport.QMI_Vxi11Transport.read_until`, when the message terminator was already present in the buffer, returned the data without the terminator and left it in the buffer, unlike the normal (blocking) path (#280).
+- `qmi.core.transport.QMI_Vxi11Transport.read` (and so `read_until_timeout`) returned the entire read buffer instead of exactly the requested number of bytes, discarding the distinction between what was requested and what was buffered. It now returns exactly `nbytes` and keeps any remainder buffered for the next call (#280).
+- `qmi.core.transport.QMI_Vxi11Transport.read` and `read_until` treated `timeout=0` the same as `timeout=None` because of a falsy check, so a non-blocking read with `timeout=0` fell back to the instrument's current timeout instead of setting it to 0 (#280).
+- `qmi.core.transport.QMI_Vxi11Transport.discard_read` did not restore the instrument's original timeout when an unexpected (non-VXI-11-timeout) exception occurred while discarding (#280).
+- `qmi.core.transport.QMI_UsbTmcTransport.read` raised `UnicodeDecodeError` instead of `QMI_EndOfInputException` for a length-mismatched message containing non-UTF-8 binary data, because of an eagerly-evaluated debug log that called `bytes.decode()` (#280).
+- `qmi.core.transport.QMI_SocketTransport.read` raised a spurious `QMI_TimeoutException` when the last chunk completing the requested number of bytes arrived right at the deadline (#280).
+- `qmi.core.transport.QMI_SocketTransport._read_from_socket` reported any socket `OSError` (e.g. a TCP connection reset) with the UDP-specific "packet size" message; non-UDP sockets now raise `QMI_RuntimeException` with a message describing the actual socket address and error (#280).
+- `qmi.core.transport.UdpTransportDescriptorParser` accepted an unsupported `connect_timeout` keyword that `QMI_UdpTransport.__init__` does not take, so `create_transport("udp:host:port:connect_timeout=1")` raised `TypeError` instead of `QMI_TransportDescriptorException` (#280).
 
 ## [0.55.0] - 2026-11-16
 
