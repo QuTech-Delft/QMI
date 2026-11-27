@@ -4,10 +4,11 @@ import logging
 import unittest
 from unittest.mock import MagicMock, call, patch
 
-from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_InstrumentException, QMI_InvalidOperationException
 from qmi.core.instrument import QMI_InstrumentIdentification
 from qmi.instruments.nkt_photonics.fianium import NKT_Fianium
+
+from tests.patcher import PatcherQmiContext as QMI_Context
 
 MODULE = "qmi.instruments.nkt_photonics.fianium"
 TERMINATOR = b"\n\r"
@@ -30,8 +31,12 @@ class FianiumOpenCloseTestCase(unittest.TestCase):
         """The transport is created with the serial settings of the laser."""
         self.create_transport.assert_called_once_with(
             "serial:COM1",
-            default_attributes={"baudrate": 19200, "bytesize": 8, "parity": 'N', "stopbits": 1.0},
+            default_attributes={"baudrate": 19200},
         )
+
+    def test_response_timeout_is_rpc_property(self):
+        """RESPONSE_TIMEOUT is exposed as an RPC property."""
+        self.assertIn("RESPONSE_TIMEOUT", NKT_Fianium._rpc_properties)
 
     def test_open_close(self):
         """Opening opens the transport and discards stale input, closing closes the transport."""
