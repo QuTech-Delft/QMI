@@ -17,6 +17,7 @@ from qmi.utils.context_managers import open_close
 from qmi.core.exceptions import QMI_InstrumentException, QMI_TimeoutException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.tektronix import Tektronix_Awg5014
+from tests.patcher import PatcherQmiContext
 
 
 ### GLOBALS ###
@@ -262,16 +263,15 @@ class TektronixAWG5014TestCase(unittest.TestCase):
     contents = b'1234,5678,"SAMPLE1.AWG,,2948","aaa.txt,,1024","ddd,DIR,0","zzz.awg,,2948"\n'
 
     def setUp(self):
-        qmi.start("TestContext")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("TestContext")
+        self.addCleanup(self.qmi_patcher.stop)
         self._transport_mock = MagicMock(spec=QMI_TcpTransport)
         with patch(
                 'qmi.instruments.tektronix.awg5014.create_transport',
                 return_value=self._transport_mock):
             self.instr: Tektronix_Awg5014 = qmi.make_instrument("instr", Tektronix_Awg5014, "transport_descriptor")
             self.instr = cast(Tektronix_Awg5014, self.instr)
-
-    def tearDown(self):
-        qmi.stop()
 
     def test_open_close(self):
         """Test that the open and close functions include calls as expected."""

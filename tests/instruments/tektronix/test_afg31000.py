@@ -9,21 +9,21 @@ import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.tektronix import Waveform, BurstMode, TriggerEdge, Tektronix_Afg31000
+from tests.patcher import PatcherQmiContext
 
 
 class TestAFG31000(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("TestContext")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("TestContext")
+        self.addCleanup(self.qmi_patcher.stop)
         self._transport_mock = MagicMock(spec=QMI_TcpTransport)
         with patch(
                 'qmi.instruments.tektronix.afg31000.create_transport',
                 return_value=self._transport_mock):
             self.instr: Tektronix_Afg31000 = qmi.make_instrument("instr", Tektronix_Afg31000, "transport_descriptor")
             self.instr = cast(Tektronix_Afg31000, self.instr)
-
-    def tearDown(self):
-        qmi.stop()
 
     def _open_helper(self):
         """Open instrument and check transport calls."""

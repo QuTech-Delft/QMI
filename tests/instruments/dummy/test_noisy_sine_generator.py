@@ -17,10 +17,8 @@ class TestNsgOpenClose(unittest.TestCase):
     def setUp(self):
         self.ctx = QMI_Context("dummy")
         self.ctx.start()
+        self.addCleanup(self.ctx.stop)
         self.nsg = NSG(self.ctx, "nsg")
-
-    def tearDown(self):
-        self.ctx.stop()
 
     def test_open_close(self):
         """Test the basic open-close functions and logic."""
@@ -53,14 +51,15 @@ class TestNsgFunctions(unittest.TestCase):
     """Tests for Dummy NSG methods and properties."""
     
     def setUp(self):
-        qmi.start("dummy", None)
+        self.qmi_patcher = QMI_Context("dummy")
+        self.qmi_patcher.start()
+        self.addCleanup(self.qmi_patcher.stop)
         NSG.max_wait = 0.1
         self.nsg = qmi.make_instrument("nsg", NSG)
         self.nsg.open()
 
     def tearDown(self):
         self.nsg.close()
-        qmi.stop()
 
     def test_frequency_setting(self):
         """Test that frequency can be set."""

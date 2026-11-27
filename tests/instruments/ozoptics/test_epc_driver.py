@@ -6,17 +6,17 @@ import qmi
 import qmi.utils.context_managers
 from qmi.core.transport import QMI_Transport
 from qmi.instruments.ozoptics import OzOptics_EPC
+from tests.patcher import PatcherQmiContext
 
 
 class TestEpcDriver(unittest.TestCase):
 
     def setUp(self) -> None:
         self.transport = MagicMock(spec=QMI_Transport)
-        qmi.start("test_ozoptics_epc")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("test_ozoptics_epc")
+        self.addCleanup(self.qmi_patcher.stop)
         self.instrument: OzOptics_EPC = qmi.make_instrument('epc_driver', OzOptics_EPC, self.transport)
-
-    def tearDown(self) -> None:
-        qmi.stop()
 
     def test_get_frequency(self):
         # arrange

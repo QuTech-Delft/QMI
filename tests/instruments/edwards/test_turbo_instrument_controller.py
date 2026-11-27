@@ -10,6 +10,7 @@ from qmi.core.transport import QMI_TcpTransport
 from qmi.instruments.edwards import EdwardsVacuum_TIC, EdwardsVacuum_TIC_AlertId,\
     EdwardsVacuum_TIC_GaugeState, EdwardsVacuum_TIC_Priority,\
     EdwardsVacuum_TIC_PumpState, EdwardsVacuum_TIC_State
+from tests.patcher import PatcherQmiContext
 
 
 class TestTurboInstrumentControllerOpenClose(unittest.TestCase):
@@ -18,7 +19,8 @@ class TestTurboInstrumentControllerOpenClose(unittest.TestCase):
     """
 
     def setUp(self):
-        qmi.start("test-tic-context")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("test-tic-context")
         # Add patches
         patcher = patch('qmi.instruments.edwards.turbo_instrument_controller.create_transport', spec=QMI_TcpTransport)
         self._transport_mock: Mock = patcher.start().return_value
@@ -32,7 +34,7 @@ class TestTurboInstrumentControllerOpenClose(unittest.TestCase):
         self.instr = cast(EdwardsVacuum_TIC, self.instr)
 
     def tearDown(self):
-        qmi.stop()
+        self.qmi_patcher.stop()
         logging.getLogger("qmi.core.instrument").setLevel(logging.NOTSET)
 
     def test_open_close_opens_and_closes(self):
@@ -49,7 +51,8 @@ class TestTurboInstrumentController(unittest.TestCase):
     """
 
     def setUp(self):
-        qmi.start("test-tic-context")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("test-tic-context")
         # Add patches
         patcher = patch('qmi.instruments.edwards.turbo_instrument_controller.create_transport', spec=QMI_TcpTransport)
         self._transport_mock: Mock = patcher.start().return_value
@@ -65,7 +68,7 @@ class TestTurboInstrumentController(unittest.TestCase):
 
     def tearDown(self):
         self.instr.close()
-        qmi.stop()
+        self.qmi_patcher.stop()
 
     def test_get_idn_gets_idn(self):
         """Get idn of device."""

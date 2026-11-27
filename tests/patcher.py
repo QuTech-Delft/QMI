@@ -31,22 +31,29 @@ class PatcherQmiContext:
     def __init__(self, name=None):
         self.name = name
         self.qmi_patcher = None
+        self._patcher_started = False
+        self._context: QMI_Context | None = None
         # Instruments made with `make_instrument`, as (owning context, proxy) pairs.
         self._instruments: list[tuple[QMI_Context, QMI_RpcProxy]] = []
 
     def start(self, context_name=None, config=None):
         """Start the qmi_context and patcher."""
         context_name = context_name or self.name
-        self.qmi_patcher = patch("qmi.core.context_singleton._qmi_context", QMI_Context(context_name, config))
+        self._context = QMI_Context(context_name, config)
+        self.qmi_patcher = patch("qmi.core.context_singleton._qmi_context", self._context)
         self.qmi_patcher.start()
+        self._patcher_started = True
         qmi.core.context_singleton._qmi_context.start()
         qmi.core.context_singleton._connect_to_peers()
 
     def stop(self):
-        """Remove the instruments made with `make_instrument`, then stop the patcher.
+        """Remove the instruments made with `make_instrument`, stop the real context, then stop the patcher.
 
         Like stopping a real QMI context, removing an instrument stops its RPC thread, which calls
         `release_rpc_object()` on the instrument.
+
+        Safe to call even if `start()` was never called, or failed half-way, in which case it cleans up
+        whatever was already created and otherwise does nothing.
         """
         while self._instruments:
             context, proxy = self._instruments.pop()
@@ -55,7 +62,28 @@ class PatcherQmiContext:
             except QMI_UnknownNameException:
                 pass  # Already removed by the test itself.
 
-        self.qmi_patcher.stop()
+        if self._context is not None:
+            if self._context._active:
+                self._context.stop()
+            else:
+                # `start()` was never called, or it failed before the context became active, so
+                # `QMI_Context.stop()` can not be used (it requires an active context). The "$context" RPC
+                # object created in `QMI_Context.__init__()` already spawned a background thread though, so
+                # stop that (and the message router thread, if it got that far) directly.
+                with self._context._rpc_object_map_lock:
+                    managers = [m for m in self._context._rpc_object_map.values() if m is not None]
+                    self._context._rpc_object_map.clear()
+                for manager in managers:
+                    self._context.unregister_message_handler(manager)
+                    manager.stop()
+                if self._context._message_router._thread is not None:
+                    self._context._message_router.stop()
+                qmi.object_registry.unregister(self._context._oid)
+            self._context = None
+
+        if self._patcher_started:
+            self.qmi_patcher.stop()
+            self._patcher_started = False
 
     def make_instrument(self, instrument_name, instrument_class, *args, **kwargs):
         """Make an instrument in the patched context and register it for removal on `stop()`."""

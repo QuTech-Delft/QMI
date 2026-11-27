@@ -7,6 +7,7 @@ import numpy
 import qmi
 from qmi.instruments.imagine_eyes import ImagineEyes_Mirao52e, MirrorStatus
 from qmi.core.exceptions import QMI_InstrumentException
+from tests.patcher import PatcherQmiContext
 
 readline_mock = Mock()
 
@@ -24,31 +25,43 @@ class PopenMock:
 
 class InstanceCreationTestCase(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("Mirao")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     def test_default_directory(self):
         """Test that the behaviour is as expected when using default directory while creating instance."""
         if os.path.isdir(ImagineEyes_Mirao52e.DEFAULT_BRIDGE_DIR):
             expected_dir = ImagineEyes_Mirao52e.DEFAULT_BRIDGE_DIR
-            mirao = ImagineEyes_Mirao52e(qmi.core.context.QMI_Context("Mirao"), "Mirao test")
+            mirao = ImagineEyes_Mirao52e(self.qmi_patcher, "Mirao test")
             self.assertEqual(mirao._bridge_dir, expected_dir)
 
         else:
             with self.assertRaises(QMI_InstrumentException):
-                ImagineEyes_Mirao52e(qmi.core.context.QMI_Context("Mirao"), "Mirao test")
+                ImagineEyes_Mirao52e(self.qmi_patcher, "Mirao test")
 
     def test_custom_directory(self):
         """Test that a custom directory, set as local directory, does run without exceptions"""
         expected_dir = os.path.dirname(__file__)
-        mirao = ImagineEyes_Mirao52e(qmi.core.context.QMI_Context("Mirao"), "Mirao test", expected_dir)
+        mirao = ImagineEyes_Mirao52e(self.qmi_patcher, "Mirao test", expected_dir)
         self.assertEqual(mirao._bridge_dir, expected_dir)
 
     def test_faulty_custom_directory(self):
         """Test that a custom directory that does not exist raises an exception"""
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
-            ImagineEyes_Mirao52e(qmi.core.context.QMI_Context("Mirao"), "Mirao test", r"Q:\utech\QID\QMI")
+            ImagineEyes_Mirao52e(self.qmi_patcher, "Mirao test", r"Q:\utech\QID\QMI")
 
 
 @patch("sys.platform", "linux1")
 class MethodsLinuxTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("Mirao")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
 
     @patch("sys.platform", "linux1")
     def setUp(self):
@@ -57,7 +70,7 @@ class MethodsLinuxTestCase(unittest.TestCase):
         self._popen_patcher.start()
         readline_mock.side_effect = [b"MIRAO52_BRIDGE bla", b"READY"] + [b"OK", b"READY"] * 3
         path = os.path.dirname(__file__)
-        self.mirao = ImagineEyes_Mirao52e(qmi.core.context.QMI_Context("Mirao"), "Mirao test", path)
+        self.mirao = ImagineEyes_Mirao52e(self.qmi_patcher, "Mirao test", path)
 
     @patch("sys.platform", "linux1")
     def tearDown(self):
@@ -162,13 +175,19 @@ class MethodsLinuxTestCase(unittest.TestCase):
 @patch("sys.platform", "win32")
 class MethodsWindowsOnlyTestCase(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("Mirao")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     @patch("sys.platform", "win32")
     def setUp(self):
         self._popen_patcher = patch("qmi.instruments.imagine_eyes.mirao52e.subprocess.Popen", new=PopenMock)
         self._popen_patcher.start()
         readline_mock.side_effect = [b"MIRAO52_BRIDGE bla", b"READY"] + [b"OK", b"READY"] * 3
         path = os.path.dirname(__file__)
-        self.mirao = ImagineEyes_Mirao52e(qmi.core.context.QMI_Context("Mirao"), "Mirao test", path)
+        self.mirao = ImagineEyes_Mirao52e(self.qmi_patcher, "Mirao test", path)
 
     @patch("sys.platform", "win32")
     def tearDown(self):

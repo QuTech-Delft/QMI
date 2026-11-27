@@ -5,17 +5,17 @@ import struct
 
 import qmi
 from qmi.instruments.parallax import Parallax_UsbPropeller
+from tests.patcher import PatcherQmiContext
 
 
 class ParallaxUsbPropellerOpenCloseTestCase(unittest.TestCase):
 
     def setUp(self) -> None:
-        qmi.start("parallax_unit_test")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("parallax_unit_test")
+        self.addCleanup(self.qmi_patcher.stop)
         transport = "serial:COM1"
         self.parallax = qmi.make_instrument("Parallax", Parallax_UsbPropeller, transport)
-
-    def tearDown(self) -> None:
-        qmi.stop()
 
     def test_open_close(self):
         """Test opening and closing the instrument"""
@@ -42,7 +42,9 @@ class ParallaxUsbPropellerCommandsTestCase(unittest.TestCase):
         logging.getLogger("qmi.instruments.parallax.usb_propeller").setLevel(logging.CRITICAL)
         self._lead_in = b"!", b"S", b"C"
         self._endline = b"\r"
-        qmi.start("parallax_unit_test")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("parallax_unit_test")
+        self.addCleanup(self.qmi_patcher.stop)
         transport = "serial:/dev/ttyS1"
         self.patcher_open = patch("qmi.core.transport.QMI_Transport.open")
         self.patcher_discard = patch("qmi.core.transport.QMI_SerialTransport.discard_read")
@@ -57,7 +59,6 @@ class ParallaxUsbPropellerCommandsTestCase(unittest.TestCase):
         patcher_close = patch("qmi.core.transport.QMI_Transport.close")
         patcher_close.start()
         self.parallax.close()
-        qmi.stop()
         patcher_close.stop()
         # restore logging
         logging.getLogger("qmi.instruments.parallax.usb_propeller").setLevel(logging.NOTSET)

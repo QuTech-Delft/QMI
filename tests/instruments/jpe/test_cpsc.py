@@ -5,6 +5,7 @@ import os
 import qmi
 from qmi.instruments.jpe import Jpe_CPSC, StatusPositionControl
 from qmi.core.exceptions import QMI_InstrumentException
+from tests.patcher import PatcherQmiContext
 
 readlines_mock = Mock()
 
@@ -34,25 +35,31 @@ class RunMock:
 
 class InstanceCreationTestCase(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("JPE")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     def test_default_directory(self):
         """Test that the behaviour is as expected when using default directory while creating instance."""
         if os.path.isdir(Jpe_CPSC.DEFAULT_CPSC_DIR):
             expected_sn = "@1234-567890"
             expected_dir = Jpe_CPSC.DEFAULT_CPSC_DIR
-            jpe = Jpe_CPSC(qmi.core.context.QMI_Context("JPE"), "JPE test", expected_sn[1:])  # strip '@' from SN
+            jpe = Jpe_CPSC(self.qmi_patcher, "JPE test", expected_sn[1:])  # strip '@' from SN
             self.assertEqual(jpe._serial_number, expected_sn)
             self.assertEqual(jpe._cpsp_dir, expected_dir)
 
         else:
             with self.assertRaises(QMI_InstrumentException):
-                Jpe_CPSC(qmi.core.context.QMI_Context("JPE"), "JPE test", "1234")
+                Jpe_CPSC(self.qmi_patcher, "JPE test", "1234")
 
     def test_custom_directory(self):
         """Test that a custom directory, set as local directory, does run without exceptions"""
         expected_sn = "@1234-567890"
         expected_dir = os.path.dirname(__file__)
         expected_cmd = os.path.join(expected_dir, "cacli.exe")
-        jpe = Jpe_CPSC(qmi.core.context.QMI_Context("JPE"), "JPE test", expected_sn[1:], expected_dir)
+        jpe = Jpe_CPSC(self.qmi_patcher, "JPE test", expected_sn[1:], expected_dir)
         self.assertEqual(jpe._serial_number, expected_sn)
         self.assertEqual(jpe._cpsp_dir, expected_dir)
         self.assertEqual(jpe._cpsp_cmd, expected_cmd)
@@ -60,11 +67,17 @@ class InstanceCreationTestCase(unittest.TestCase):
     def test_faulty_custom_directory(self):
         """Test that a custom directory that does not exist raises an exception"""
         with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
-            Jpe_CPSC(qmi.core.context.QMI_Context("JPE"), "JPE test", "1234", r"Q:\utech\QID\QMI")
+            Jpe_CPSC(self.qmi_patcher, "JPE test", "1234", r"Q:\utech\QID\QMI")
 
 
 @patch("sys.platform", "linux1")
 class MethodsLinuxTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("JPE")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
 
     @patch("sys.platform", "linux1")
     def setUp(self):
@@ -75,7 +88,7 @@ class MethodsLinuxTestCase(unittest.TestCase):
         self.sn = "@1234-567890"
         path = os.path.dirname(__file__)
         self.cmd = os.path.join(path, "cacli.exe")
-        self.jpe = Jpe_CPSC(qmi.core.context.QMI_Context("JPE"), "JPE test", self.sn, path)
+        self.jpe = Jpe_CPSC(self.qmi_patcher, "JPE test", self.sn, path)
 
     @patch("sys.platform", "linux1")
     def tearDown(self):
@@ -128,6 +141,12 @@ class MethodsLinuxTestCase(unittest.TestCase):
 @patch("sys.platform", "win32")
 class MethodsWindowsOnlyTestCase(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("JPE")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     @patch("sys.platform", "win32")
     def setUp(self):
         self._run_patcher = patch("qmi.instruments.jpe.cpsc.run", new=RunMock)
@@ -135,7 +154,7 @@ class MethodsWindowsOnlyTestCase(unittest.TestCase):
         self.sn = "@1234-567890"
         path = os.path.dirname(__file__)
         self.cmd = os.path.join(path, "cacli.exe")
-        self.jpe = Jpe_CPSC(qmi.core.context.QMI_Context("JPE"), "JPE test", self.sn, path)
+        self.jpe = Jpe_CPSC(self.qmi_patcher, "JPE test", self.sn, path)
 
     @patch("sys.platform", "win32")
     def tearDown(self):

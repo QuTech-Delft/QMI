@@ -1,11 +1,18 @@
 import unittest
 from unittest.mock import patch, Mock
 
-from qmi.core.context import QMI_Context
 from qmi.instruments.raspberry import RaspberryPi_Gpio
+from tests.patcher import PatcherQmiContext
 
 
 class RasperryPiGpioTestCase(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("rpi_test")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     def setUp(self) -> None:
         self.patcher = patch("qmi.instruments.raspberry.gpio.GPIO")
         self.board = [3, 5, 7, 8, 10, 11, 12, 13, 15, 16, 18, 19, 21, 22, 23, 24, 26, 29, 31, 32, 33, 35, 36]
@@ -15,7 +22,7 @@ class RasperryPiGpioTestCase(unittest.TestCase):
         self.patcher.target.GPIO.BOARD = self.board
         self.patcher.target.GPIO.HIGH = self.high
         self.patcher.target.GPIO.LOW = self.low
-        self.gpio = RaspberryPi_Gpio(QMI_Context("rpi_test"), "rpi_gpio")
+        self.gpio = RaspberryPi_Gpio(self.qmi_patcher, "rpi_gpio")
 
     def tearDown(self) -> None:
         self.patcher.stop()

@@ -11,15 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tests/core/test_qmi_proc.py`, an integration test covering `qmi.tools.proc.run()`'s `--config` argument default value behavior (`default=None` vs. `default=""`) against `QMI_CONFIG`, using the new `tests/core/some_proc_service.py` as a real `qmi_proc start`/`stop` target (#274).
 
 ### Changed
-- The timeout of the CI coverage step is raised from 15 to 25 minutes (#249).
-- The `claude[bot]` workflow (`.github/workflows/claude.yml`) now has a 45-minute job timeout, 15/30-minute per-command timeouts and a limit of 100 turns. `CLAUDE.md` now tells the bot to push after every commit, before running tests (#249).
-- Minor code style cleanups in `qmi.core.config_defs`, `qmi.core.context_singleton` and `qmi.tools.proc`: removed a stale `logdir` attribute description and a redundant trailing comment, reformatted wrapped `_logger.debug` and `parser.add_argument` calls, capitalized "Not responding via TCP" status messages, and `qmi.tools.proc.run()` now starts the QMI context with `with qmi.start(...) as ctx:` instead of a bare `qmi.start()`/`finally: qmi.stop()` pair (#274).
-- Test files in `tests/` now use the `#! /usr/bin/env python` shebang instead of `#! /usr/bin/env python3`, and `tests/core/test_context_singleton_config_file_input.py` has an improved module docstring (#274).
-- `tests/tools/test_proc.py`: replaced ambiguous port numbers `1032`/`1031` with `10320`/`10310`, added missing `addCleanup` calls for several mocked `qmi`/context patches, and fixed a missing blank line between two test classes (#274).
-- `tests/instruments/__init__.py` now removes a leftover `QMI_CONFIG` environment variable before instrument tests run, so a `QMI_CONFIG` set by an earlier test module can no longer leak into them (#274).
+- Minor code style cleanups in `qmi.core.config_defs`, `qmi.core.context_singleton` and `qmi.tools.proc`.
+- Unit-test clean-ups: consistent shebangs, clearer port numbers and missing `addCleanup` calls in `tests/tools/test_proc.py`, and instrument tests no longer inherit a leftover `QMI_CONFIG` (#274).
 
 ### Fixed
-- `pull-request-ci.yml` passed the misspelled input `fetch_depth` to `actions/checkout`; it is now `fetch-depth` (#249).
+- Instrument unit tests no longer leak `QMI_Context` threads: they use `PatcherQmiContext`, whose `stop()` now also stops the underlying context (#276).
 - `qmi.instruments.thorlabs.apt_protocol.AptProtocol.read_message` no longer unconditionally sleeps for the full `timeout` before reading the reply header, which made every query to an APT device (e.g. the Thorlabs K10CRx) take at least `RESPONSE_TIMEOUT`, regardless of how quickly the instrument actually replied. `send_message` now also drains any pending unsolicited message (e.g. `MOT_MOVE_COMPLETED`) as a whole decoded message instead of discarding raw buffered bytes, so a message that is only partially received when a new command is sent no longer leaves a tail behind that gets misread as the header of the next reply. Includes unit tests in the new `tests/instruments/thorlabs/test_apt_protocol.py`.
 
 ## [0.55.0] - 2026-11-16

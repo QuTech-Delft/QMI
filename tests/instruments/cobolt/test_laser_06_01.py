@@ -7,20 +7,20 @@ import qmi
 from qmi.core.exceptions import QMI_InstrumentException
 from qmi.core.transport import QMI_SerialTransport
 from qmi.instruments.cobolt import Hubner_Cobolt0601
+from tests.patcher import PatcherQmiContext
 
 
 class TestLaser_06_01(unittest.TestCase):
 
     def setUp(self):
-        qmi.start("TestContext")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("TestContext")
+        self.addCleanup(self.qmi_patcher.stop)
         self._transport_mock = MagicMock(spec=QMI_SerialTransport)
         with patch(
                 'qmi.instruments.cobolt.laser_06_01.create_transport',
                 return_value=self._transport_mock):
             self.instr = qmi.make_instrument("instr", Hubner_Cobolt0601, "transport_descriptor")
-
-    def tearDown(self):
-        qmi.stop()
 
     def test_open_close(self):
         self.instr.open()

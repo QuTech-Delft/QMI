@@ -8,7 +8,6 @@ import sys
 if "picosdk.ps4000a" in sys.modules:
     del sys.modules["picosdk.ps4000a"]
 
-from qmi.core.context import QMI_Context
 from qmi.core.exceptions import QMI_TimeoutException, QMI_InstrumentException, QMI_UsageException
 
 # For not causing an error by missing picosdk library in the pipeline tests, we mock also the picosdk existence
@@ -19,6 +18,7 @@ sys.modules['picosdk.ps3000a'] = tests.instruments.picotech.ps3000a_stub
 from qmi.instruments.picotech import picoscope3403
 from qmi.instruments.picotech import _picoscope
 from qmi.instruments.picotech._picoscope import ChannelCoupling, TriggerEdge
+from tests.patcher import PatcherQmiContext
 
 patcher = patch("picosdk.ps3000a", autospec=True)
 picoscope3403._ps = patcher.start()
@@ -26,10 +26,16 @@ picoscope3403._ps = patcher.start()
 
 class PicoscopeMethodsTestCase(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.qmi_patcher = PatcherQmiContext()
+        cls.qmi_patcher.start("test_picoscope_3403")
+        cls.addClassCleanup(cls.qmi_patcher.stop)
+
     def setUp(self) -> None:
         _picoscope._ps = ps3000a
         self._picoscope = picoscope3403.PicoTech_PicoScope3403(
-            QMI_Context('test_picoscope_3403'), 'PicoScope3403', "GR956/0069"
+            self.qmi_patcher, 'PicoScope3403', "GR956/0069"
         )
         # Mock the PicoScope "open" function to be able to open the virtual unit.
         self._picoscope._ps = PropertyMock(autospec=True)

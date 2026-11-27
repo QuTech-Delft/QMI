@@ -2,7 +2,6 @@ import unittest
 import unittest.mock
 
 import qmi.core.exceptions
-from qmi.core.context import QMI_Context
 from qmi.instruments.agiltron._ff_optical_switch import Agiltron_FfOpticalSwitch
 from qmi.instruments.agiltron import Agiltron_Ff1x4, Agiltron_Ff1x8
 

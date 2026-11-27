@@ -7,13 +7,16 @@ import qmi
 from qmi.core.exceptions import QMI_InvalidOperationException, QMI_UsageException
 from qmi.core.transport import QMI_Transport
 from qmi.instruments.stanford_research_systems import Srs_Sim900
+from tests.patcher import PatcherQmiContext
 
 
 class TestSim900(unittest.TestCase):
     """Testcase of Stanford Research Systems Sim900 instrument"""
 
     def setUp(self):
-        qmi.start("test_sim_900")
+        self.qmi_patcher = PatcherQmiContext()
+        self.qmi_patcher.start("test_sim_900")
+        self.addCleanup(self.qmi_patcher.stop)
         # Add patches
         patcher = patch('qmi.instruments.stanford_research_systems.sim900.create_transport', spec=QMI_Transport)
         self.transport_mock = patcher.start().return_value
@@ -25,7 +28,6 @@ class TestSim900(unittest.TestCase):
     def tearDown(self):
         if self.sim900.is_open():
             self.sim900.close()
-        qmi.stop()
         logging.getLogger("qmi.core.instrument").setLevel(logging.NOTSET)
 
     def test_check_constructor(self):
