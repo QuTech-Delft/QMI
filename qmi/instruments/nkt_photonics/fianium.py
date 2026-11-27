@@ -1,5 +1,5 @@
 """Instrument driver for the NKT Photonics Fianium (FemtoPower 1060) supercontinuum laser source. The controller is
-connected via USB using a serial port. The code is very similar to the Cobolt_06_01 green laser.
+connected via USB using a serial port.
 Commands can be found in the FemtoPower1060 Supercontinuum Laser Source manual.
 
 Written by Yanik Herrmann (y.s.herrmann@tudelft.nl).
@@ -19,19 +19,25 @@ _logger = logging.getLogger(__name__)
 
 
 class NKT_Fianium(QMI_Instrument):
-    """Instrument driver for the NKT Photonics Fianium (FemtoPower 1060) supercontinuum laser source."""
+    """Instrument driver for the NKT Photonics Fianium (FemtoPower 1060) supercontinuum laser source.
 
-    # Instrument should respond within 0.5 seconds.
+    Attributes:
+        RESPONSE_TIMEOUT:     Instrument should respond within 0.5 seconds.
+        LINE_END:             Line feed and carriage return (LF CR) sequence. Commands are sent as ASCII strings
+                               terminated by a line feed, and the laser replies are ASCII strings terminated by this
+                               sequence.
+        CONTROL_MODES:        Valid laser control modes for `set_control_mode`.
+        STATUS_DISPLAY_MODES: Valid status display modes for `set_status_display_mode`.
+    """
+
+    _rpc_properties = {"RESPONSE_TIMEOUT"}
+
     RESPONSE_TIMEOUT = 0.5
 
-    # Line feed and carriage return (LF CR) sequence. Commands are sent as ASCII strings terminated by a line feed,
-    # and the laser replies are ASCII strings terminated by this sequence.
-    CR_CODE = "\n\r"
+    LINE_END = "\n\r"
 
-    # Valid laser control modes for `set_control_mode`.
     CONTROL_MODES = (0, 1, 2)
 
-    # Valid status display modes for `set_status_display_mode`.
     STATUS_DISPLAY_MODES = (0, 1, 2)
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
@@ -43,10 +49,7 @@ class NKT_Fianium(QMI_Instrument):
             transport: QMI transport descriptor string for the serial connection, e.g. "serial:COM1".
         """
         super().__init__(context, name)
-        self._transport = create_transport(
-            transport,
-            default_attributes={"baudrate": 19200, "bytesize": 8, "parity": "N", "stopbits": 1.0},
-        )
+        self._transport = create_transport(transport, default_attributes={"baudrate": 19200})
 
     @rpc_method
     def open(self) -> None:
@@ -102,7 +105,7 @@ class NKT_Fianium(QMI_Instrument):
 
         # Read response. Reading stops at the first terminator, so a "Command>" prompt that may follow the
         # response is left in the input buffer and discarded before the next command.
-        resp = self._transport.read_until(message_terminator=str.encode(self.CR_CODE), timeout=self.RESPONSE_TIMEOUT)
+        resp = self._transport.read_until(message_terminator=str.encode(self.LINE_END), timeout=self.RESPONSE_TIMEOUT)
 
         # Return the answer without the trailing terminator.
         return resp.rstrip().decode("ascii")

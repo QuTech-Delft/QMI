@@ -17,19 +17,24 @@ _logger = logging.getLogger(__name__)
 
 
 class NKT_Katana(QMI_Instrument):
-    """Instrument driver for the NKT Photonics Katana 05 HP laser."""
+    """Instrument driver for the NKT Photonics Katana 05 HP laser.
 
-    # Instrument should respond within 0.5 seconds.
+    Attributes:
+        RESPONSE_TIMEOUT:          Instrument should respond within 0.5 seconds.
+        LINE_END:                  Line feed (LF) code. Commands should be sent as ASCII strings terminated by this.
+                                    The laser replies are in the same format.
+        TRIGGER_SOURCES:           Valid trigger sources for `set_trigger_source`.
+        TRIGGER_INPUT_LEVEL_RANGE: External trigger input level range in volts.
+    """
+
+    _rpc_properties = {"RESPONSE_TIMEOUT"}
+
     RESPONSE_TIMEOUT = 0.5
 
-    # Line feed (LF) code. Commands should be sent as ASCII strings terminated by this. The laser replies are in the
-    # same format.
-    CR_CODE = "\n"
+    LINE_END = "\n"
 
-    # Valid trigger sources for `set_trigger_source`.
     TRIGGER_SOURCES = (0, 1, 2)
 
-    # External trigger input level range in volts.
     TRIGGER_INPUT_LEVEL_RANGE = (-5.0, 5.0)
 
     def __init__(self, context: QMI_Context, name: str, transport: str) -> None:
@@ -41,10 +46,7 @@ class NKT_Katana(QMI_Instrument):
             transport: QMI transport descriptor string for the serial connection, e.g. "serial:COM1".
         """
         super().__init__(context, name)
-        self._transport = create_transport(
-            transport,
-            default_attributes={"baudrate": 38400, "bytesize": 8, "parity": "N", "stopbits": 1.0},
-        )
+        self._transport = create_transport(transport, default_attributes={"baudrate": 38400})
 
     @rpc_method
     def open(self) -> None:
@@ -61,7 +63,7 @@ class NKT_Katana(QMI_Instrument):
 
     def _read_line(self) -> str:
         """Read one response line from the instrument and return it without the trailing line terminator."""
-        resp = self._transport.read_until(message_terminator=str.encode(self.CR_CODE), timeout=self.RESPONSE_TIMEOUT)
+        resp = self._transport.read_until(message_terminator=str.encode(self.LINE_END), timeout=self.RESPONSE_TIMEOUT)
         return resp.rstrip().decode("ascii")
 
     def _ask(self, cmd: str) -> str:
