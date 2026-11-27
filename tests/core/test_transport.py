@@ -1588,14 +1588,14 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
 
         Expecting:
             A few bytes are read.
-            QMI_EndOfInputException is raised.
+            QMI_InstrumentException is raised (issue #280 item 8: consistent with read_until).
             The read bytes remain in the buffer and are not discarded.
         """
         # Arrange
         test_string = b"test"
         self.mock().read_raw.side_effect = [bytearray(test_string)] +\
            [vxi11.vxi11.Vxi11Exception(note="Test error!")]
-        with self.assertRaises(qmi.core.exceptions.QMI_EndOfInputException):
+        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             self.instr.read(8, 0.1)  # Try to read 8 bytes
 
         self.assertEqual(test_string, self.instr._read_buffer)
@@ -1621,7 +1621,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         """Test read_until with buffer already filled.
 
         Expecting:
-            Data is returned from buffer.
+            Data is returned from buffer, including the terminator (issue #280 item 1).
             read_raw() is not called.
         """
         test_string = "test\n".encode("utf-8")
@@ -1629,7 +1629,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         data = self.instr.read_until(message_terminator="\n".encode("utf-8"))
         # Assert
         self.mock().read_raw.assert_not_called()
-        self.assertEqual(test_string.strip(), data)
+        self.assertEqual(test_string, data)
 
     def test_read_until_invalid_term_char(self):
         """Test that a too long terminator raises an error. """
@@ -1700,12 +1700,12 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.assertEqual(second_read_len, len(data_second_read))
         self.assertEqual(expected_read, data)
 
-    def test_read_until_timeout_partial_read_with_endofinput_exception(self):
-        """Test read_until_timeout excepts with QMI_EndOfInputException and read buffer remains as is.
+    def test_read_until_timeout_partial_read_with_instrument_exception(self):
+        """Test read_until_timeout excepts with QMI_InstrumentException and read buffer remains as is.
 
         Expecting:
             Timeout is set.
-            Read excepts with QMI_EndOfInputException.
+            Read excepts with QMI_InstrumentException (issue #280 item 8: consistent with read_until).
             Bytes read from VXI11 instrument until exception remain in read buffer.
             Timeout is reverted.
         """
@@ -1716,7 +1716,7 @@ class TestQmiVxi11TransportMethods(unittest.TestCase):
         self.mock().read_raw.side_effect = [chr(c).encode() for c in expected_read[:first_read_len]] +\
                                            [vxi11.vxi11.Vxi11Exception(note="End of input!")]
         # The read should except and return nothing.
-        with self.assertRaises(qmi.core.exceptions.QMI_EndOfInputException):
+        with self.assertRaises(qmi.core.exceptions.QMI_InstrumentException):
             self.instr.read_until_timeout(nbytes, 1.5)
 
         self.assertAlmostEqual(self.mock().timeout, 10.0)

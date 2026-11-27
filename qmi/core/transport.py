@@ -1172,6 +1172,21 @@ class QMI_Vxi11Transport(QMI_Transport):
             raise QMI_InstrumentException() from err
 
     def read(self, nbytes: int, timeout: float | None = None) -> bytes:
+        """Read a specified number of bytes from the transport.
+
+        Parameters:
+            nbytes: Number of bytes to read.
+            timeout: Maximum time to wait (in seconds), or None to wait indefinitely.
+
+        Returns:
+            Received bytes.
+
+        Raises:
+            ~qmi.core.exceptions.QMI_TimeoutException: If the timeout expires before the
+                requested number of bytes are available.
+            ~qmi.core.exceptions.QMI_InstrumentException: If a non-timeout error occurs while
+                reading from the instrument.
+        """
         self._check_is_open()
         nbuf = len(self._read_buffer)
         if nbuf >= nbytes:
@@ -1181,7 +1196,7 @@ class QMI_Vxi11Transport(QMI_Transport):
             return ret
 
         old_timeout = self._safe_instr.timeout
-        if timeout:
+        if timeout is not None:
             self._safe_instr.timeout = timeout
 
         try:
@@ -1193,13 +1208,13 @@ class QMI_Vxi11Transport(QMI_Transport):
                 # Raise timeout exception separately to provide opportunity for upper layer to handle it.
                 raise QMI_TimeoutException(f"Timeout error attempting to read {nbytes} bytes") from err
             else:
-                raise QMI_EndOfInputException(f"Error attempting to read {nbytes} bytes.") from err
+                raise QMI_InstrumentException(f"Error attempting to read {nbytes} bytes.") from err
 
         finally:
             self._safe_instr.timeout = old_timeout
 
-        ret = self._read_buffer
-        self._read_buffer = bytes()
+        ret = self._read_buffer[:nbytes]
+        self._read_buffer = self._read_buffer[nbytes:]
         return ret
 
     def read_until(self, message_terminator: bytes, timeout: float | None = None) -> bytes:
@@ -1211,10 +1226,11 @@ class QMI_Vxi11Transport(QMI_Transport):
 
         nbuf = len(self._read_buffer)
         if nbuf > 0 and message_terminator in self._read_buffer:
-            # The requested response is already in the buffer. Return it immediately.
-            terminator_index = self._read_buffer.index(message_terminator)
-            ret = self._read_buffer[:terminator_index]
-            self._read_buffer = self._read_buffer[terminator_index:]
+            # The requested response is already in the buffer. Return it immediately,
+            # including the terminator, and remove it from the buffer.
+            nbytes = self._read_buffer.index(message_terminator) + len(message_terminator)
+            ret = self._read_buffer[:nbytes]
+            self._read_buffer = self._read_buffer[nbytes:]
             return ret
 
         # Set terminator, but keep old value.
@@ -1223,7 +1239,7 @@ class QMI_Vxi11Transport(QMI_Transport):
 
         # Set timeout if available.
         old_timeout = self._safe_instr.timeout
-        if timeout:
+        if timeout is not None:
             self._safe_instr.timeout = timeout
 
         try:
@@ -1268,21 +1284,22 @@ class QMI_Vxi11Transport(QMI_Transport):
         self._safe_instr.timeout = 0.0  # Immediate read
         # Clear any possible data in read buffer first
         self._read_buffer = bytes()
-        while True:
-            try:
-                self._safe_instr.read_raw(1)
+        try:
+            while True:
+                try:
+                    self._safe_instr.read_raw(1)
 
-            except vxi11.vxi11.Vxi11Exception as err:
-                if err.err == 15:
+                except vxi11.vxi11.Vxi11Exception as err:
+                    if err.err == 15:
+                        break
+                    else:
+                        raise QMI_InstrumentException("Error attempting to read a byte") from err
+
+                except TimeoutError:
                     break
-                else:
-                    self._safe_instr.timeout = old_timeout
-                    raise QMI_InstrumentException("Error attempting to read a byte") from err
 
-            except TimeoutError:
-                break
-
-        self._safe_instr.timeout = old_timeout
+        finally:
+            self._safe_instr.timeout = old_timeout
 
 
 def list_usbtmc_transports() -> list[str]:
