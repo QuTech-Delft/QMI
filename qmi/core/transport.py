@@ -137,7 +137,7 @@ class QMI_Transport:
 
         Raises:
             ~qmi.core.exceptions.QMI_TimeoutException: If the timeout expires before the
-                requested number of bytes are available.
+                message terminator is received.
             ~qmi.core.exceptions.QMI_EndOfInputException: If the transport has been closed on
                 the remote side and the end of the input is reached before the
                 message terminator is found.
@@ -334,7 +334,7 @@ UdpTransportDescriptorParser = TransportDescriptorParser(
     "udp",
     [("host", (str, True)),
      ('port', (int, True))],
-    {'connect_timeout': (float, False)}
+    {}
 )
 
 UsbTmcTransportDescriptorParser = TransportDescriptorParser(
@@ -683,8 +683,12 @@ class QMI_SocketTransport(QMI_Transport):
         except (BlockingIOError, socket.timeout) as err:
             raise err  # Re-raise this for handling in the upper try-except.
         except OSError as err:
+            if self._safe_socket.type == socket.SOCK_DGRAM:
+                raise QMI_RuntimeException(
+                    f"UDP packet size was larger than {packet_size}. Data is lost."
+                ) from err
             raise QMI_RuntimeException(
-                f"UDP packet size was larger than {packet_size}. Data is lost."
+                f"Error reading from socket {format_address_and_port(self._address)}: {err}"
             ) from err
 
         if not b:
@@ -716,6 +720,8 @@ class QMI_SocketTransport(QMI_Transport):
                 ) from err
             self._read_buffer.extend(b)
             nbuf = len(self._read_buffer)
+            if nbuf >= nbytes:
+                break
             if timeout is not None:
                 tremain = tstart + timeout - time.monotonic()
                 if tremain < 0:
@@ -1016,7 +1022,7 @@ class QMI_UsbTmcTransport(QMI_Transport):
         if len(ret) == nbytes:
             return ret
 
-        _logger.debug(f"USBTMC read message contained data {ret.decode()}")
+        _logger.debug("USBTMC read message contained data %r", ret)
         raise QMI_EndOfInputException(
             f"The read message did not contain expected bytes of data ({len(ret)} != {nbytes}."
         )
@@ -1326,8 +1332,8 @@ def create_transport(
 
     String format:
       - VXI-11 instrument: "vxi11:host"
-      - UDP connection:    "udp:host<:port>"
-      - TCP connection:    "tcp:host<:port><:connect_timeout=10>"
+      - UDP connection:    "udp:host:port"
+      - TCP connection:    "tcp:host:port<:connect_timeout=10>"
       - Serial port:       "serial:device<:baudrate=115200><:databits=8><:parity=N><:stopbits=1><:rtscts=False>"
       - USBTMC device:     "usbtmc:vendorid:productid:serialnr"
       - GPIB device:       "gpib:<board=None:>primary_addr<:secondary_addr=None><:connect_timeout=30.0>"
