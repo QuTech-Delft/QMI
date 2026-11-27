@@ -79,6 +79,21 @@ class TestQmiPyUsbTmcTransport(unittest.TestCase):
         self.assertEqual(str(exc.exception), str(expected))
 
     @unittest.mock.patch("qmi.core.usbtmc.Instrument")
+    def test_read_raises_end_of_input_exception_for_binary_data_issue280_item4(self, mock):
+        """Issue #280 item 4: read with a length mismatch on non-UTF-8 binary data must raise
+        QMI_EndOfInputException, not UnicodeDecodeError from the eagerly-evaluated debug log."""
+        nbytes = 4
+        buf = b"\xff\xfe"
+        mock().read_raw.return_value = buf
+
+        dev = QMI_PyUsbTmcTransport(0x1234, 0x5678, "90")
+        dev.open()
+        with self.assertRaises(QMI_EndOfInputException):
+            dev.read(nbytes, timeout=0.001)
+
+        dev.close()
+
+    @unittest.mock.patch("qmi.core.usbtmc.Instrument")
     def test_read_until(self, mock):
         """This should forward the executions to read_until_timeout, so we test both in one go."""
         expected = b"01234"

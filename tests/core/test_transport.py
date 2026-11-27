@@ -1171,7 +1171,7 @@ class TestQmiTcpTransport(unittest.TestCase):
         with open_close(QMI_TcpTransport("localhost", self.server_port, connect_timeout=1)) as trans:
             (server_conn, peer_address) = self.server_sock.accept()
             with unittest.mock.patch.object(
-                trans._socket, "recvfrom", side_effect=ConnectionResetError("Connection reset by peer")
+                socket.socket, "recvfrom", side_effect=ConnectionResetError("Connection reset by peer")
             ):
                 with self.assertRaises(qmi.core.exceptions.QMI_RuntimeException) as exc:
                     trans._read_from_socket(100)
